@@ -31,7 +31,11 @@ interface EntityBrowserProps {
 function buildHierarchy(entities: HAEntity[]): Integration[] {
   const domainMap = new Map<string, Map<string, HAEntity[]>>();
 
-  for (const entity of entities) {
+  const availableEntities = entities.filter(e =>
+    e.state !== 'unavailable' && e.state !== 'unknown'
+  );
+
+  for (const entity of availableEntities) {
     const domain = entity.entity_id.split('.')[0];
 
     const deviceId = entity.attributes._device_id as string | null;

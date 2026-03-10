@@ -98,6 +98,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const activeCaseValue = liveValues[node.id] !== undefined ? Number(liveValues[node.id]) : 0;
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button === 2) return;
+
     const target = e.target as HTMLElement;
     if (target.closest('.node-port')) return;
     if (target.closest('[data-action="delete"]')) return;
@@ -840,6 +842,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               <Icons.HandMetal className="w-3.5 h-3.5" />
               Manuell uebersteuern
             </button>
+            <div className="border-t border-slate-700 mt-1 pt-1">
+              <button
+                onClick={() => { setDpContextMenu(null); onDelete(node.id); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-slate-700 transition-colors"
+              >
+                <Icons.Trash2 className="w-3.5 h-3.5" />
+                Loeschen
+              </button>
+            </div>
           </div>
         </>,
         document.body

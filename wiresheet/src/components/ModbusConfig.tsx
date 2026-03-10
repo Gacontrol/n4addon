@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModbusDevice, ModbusDatapoint, FlowNode } from '../types/flow';
-import { Plus, Trash2, ChevronDown, ChevronRight, Server, Settings, Library, X, Search, Wifi, WifiOff, Play, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Server, Settings, Library, X, Search, Wifi, WifiOff, Play, RefreshCw, Radio } from 'lucide-react';
 import { modbusDeviceLibrary, ModbusDeviceTemplate, getDeviceCategories } from '../data/modbusDeviceLibrary';
 
 interface ModbusDriverConfigProps {
@@ -232,12 +232,19 @@ export const ModbusDriverConfig: React.FC<ModbusDriverConfigProps> = ({
                   <span className="text-[10px] text-slate-400 font-mono">{device.host}:{device.port}</span>
 
                   <button
-                    onClick={() => onPingDevice(device.id)}
+                    onClick={(e) => { e.stopPropagation(); onPingDevice(device.id); }}
                     disabled={status.pinging}
-                    className={`p-1 rounded transition-colors ${status.pinging ? 'text-yellow-400 animate-spin' : 'text-slate-400 hover:text-emerald-400'}`}
-                    title="Ping"
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      status.pinging
+                        ? 'bg-yellow-500/20 text-yellow-400'
+                        : status.online
+                          ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                          : 'bg-slate-600/50 text-slate-400 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Verbindung testen"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
+                    <Radio className={`w-3 h-3 ${status.pinging ? 'animate-pulse' : ''}`} />
+                    {status.pinging ? 'Ping...' : 'Ping'}
                   </button>
 
                   <button
