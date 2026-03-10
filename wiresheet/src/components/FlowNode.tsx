@@ -344,8 +344,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 zIndex: 100
               }}
               data-port-id={`${node.id}-input-0`}
-              onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
-              onPointerUp={e => { e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, 'input-0', false); }}
+              onPointerDown={e => { console.log('[CASE INPUT PORT] pointerDown', node.id); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerUp={e => { console.log('[CASE INPUT PORT] pointerUp', node.id); e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, 'input-0', false); }}
             />
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Icons.Layers className="w-4 h-4 text-white flex-shrink-0" />
@@ -766,8 +766,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       zIndex: 100
                     }}
                     data-port-id={`${node.id}-${input.id}`}
-                    onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
-                    onPointerUp={e => { e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, input.id, false); }}
+                    onPointerDown={e => { console.log('[INPUT PORT] pointerDown', node.id, input.id); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
+                    onPointerUp={e => { console.log('[INPUT PORT] pointerUp', node.id, input.id); e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, input.id, false); }}
                   />
                   <div style={{ width: 16 }} />
                   <div className="pr-3 flex items-center gap-1.5 min-w-0">
@@ -818,8 +818,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       zIndex: 100
                     }}
                     data-port-id={`${node.id}-${output.id}`}
-                    onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
-                    onPointerUp={e => { e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, output.id, true); }}
+                    onPointerDown={e => { console.log('[OUTPUT PORT] pointerDown', node.id, output.id); e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); }}
+                    onPointerUp={e => { console.log('[OUTPUT PORT] pointerUp', node.id, output.id); e.stopPropagation(); e.currentTarget.releasePointerCapture(e.pointerId); onPortClick(node.id, output.id, true); }}
                   />
                 </div>
               );

@@ -185,14 +185,21 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [zoom]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
+    console.log('[handlePortClick]', { nodeId, portId, isOutput, connectingFrom });
     if (!connectingFrom) {
       if (isOutput) {
+        console.log('[handlePortClick] Starting connection from output:', nodeId, portId);
         onConnectionStart(nodeId, portId);
+      } else {
+        console.log('[handlePortClick] Clicked input but no connection in progress - ignoring');
       }
     } else {
+      console.log('[handlePortClick] Connection in progress from:', connectingFrom);
       if (connectingFrom.nodeId !== nodeId) {
+        console.log('[handlePortClick] Completing connection to:', nodeId, portId);
         onConnectionEnd(nodeId, portId, connectingFrom.nodeId, connectingFrom.portId);
       } else {
+        console.log('[handlePortClick] Same node clicked - canceling');
         onConnectionCancel();
       }
     }

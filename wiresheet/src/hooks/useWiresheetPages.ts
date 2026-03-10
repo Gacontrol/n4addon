@@ -558,12 +558,14 @@ export const useWiresheetPages = () => {
   const connectingFromRef = useRef<{ nodeId: string; portId: string } | null>(null);
 
   const startConnection = useCallback((nodeId: string, portId: string) => {
+    console.log('[useWiresheetPages] startConnection:', nodeId, portId);
     const newValue = { nodeId, portId };
     connectingFromRef.current = newValue;
     setConnectingFrom(newValue);
   }, []);
 
   const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => {
+    console.log('[useWiresheetPages] endConnection:', { targetNodeId, targetPortId, sourceNodeId, sourcePortId });
     if (sourceNodeId !== targetNodeId) {
       const connection: Connection = {
         id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
@@ -572,7 +574,10 @@ export const useWiresheetPages = () => {
         target: targetNodeId,
         targetPort: targetPortId
       };
+      console.log('[useWiresheetPages] Creating connection:', connection);
       addConnection(connection);
+    } else {
+      console.log('[useWiresheetPages] Same node - not creating connection');
     }
     connectingFromRef.current = null;
     setConnectingFrom(null);
