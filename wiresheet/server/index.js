@@ -780,26 +780,40 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
             const val = inputVals[i];
 
             if (val !== null && val !== undefined) {
-              let writeValue = val;
-              if (dp.scale && dp.scale !== 1) {
-                writeValue = writeValue / dp.scale;
-              }
-              if (dp.offset) {
-                writeValue = writeValue - dp.offset;
-              }
-
               try {
-                await modbusWriteRegister(
-                  device.host,
-                  device.port,
-                  device.unitId,
-                  dp.address,
-                  writeValue,
-                  dp.registerType || 'holding',
-                  dp.dataType || 'uint16',
-                  device.timeout || 3000
-                );
-                console.log(`Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
+                if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
+                  const bitValue = toBool(val);
+                  await modbusWriteBit(
+                    device.host,
+                    device.port,
+                    device.unitId,
+                    dp.address,
+                    dp.bitIndex,
+                    bitValue,
+                    dp.registerType || 'holding',
+                    device.timeout || 3000
+                  );
+                  console.log(`Modbus WriteBit ${device.name}/${dp.name} (${dp.address}:${dp.bitIndex}): ${bitValue}`);
+                } else {
+                  let writeValue = val;
+                  if (dp.scale && dp.scale !== 1) {
+                    writeValue = writeValue / dp.scale;
+                  }
+                  if (dp.offset) {
+                    writeValue = writeValue - dp.offset;
+                  }
+                  await modbusWriteRegister(
+                    device.host,
+                    device.port,
+                    device.unitId,
+                    dp.address,
+                    writeValue,
+                    dp.registerType || 'holding',
+                    dp.dataType || 'uint16',
+                    device.timeout || 3000
+                  );
+                  console.log(`Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
+                }
                 nodeValues[`${nodeId}:input-${i}`] = val;
               } catch (err) {
                 console.error(`Modbus Write Fehler ${device.name}/${dp.name}:`, err.message);
@@ -1192,6 +1206,21 @@ function modbusWriteRegister(host, port, unitId, address, value, registerType, d
     socket.setTimeout(timeout);
     socket.connect(port, host);
   });
+}
+
+async function modbusWriteBit(host, port, unitId, address, bitIndex, bitValue, registerType, timeout = 3000) {
+  const currentValue = await modbusReadRegister(host, port, unitId, address, registerType, 'uint16', timeout);
+
+  let newValue;
+  if (bitValue) {
+    newValue = currentValue | (1 << bitIndex);
+  } else {
+    newValue = currentValue & ~(1 << bitIndex);
+  }
+
+  console.log(`Modbus WriteBit: address=${address}, bit=${bitIndex}, currentValue=${currentValue}, bitValue=${bitValue}, newValue=${newValue}`);
+
+  return modbusWriteRegister(host, port, unitId, address, newValue, registerType, 'uint16', timeout);
 }
 
 app.post(['/modbus/ping', '/api/modbus/ping'], async (req, res) => {

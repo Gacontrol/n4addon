@@ -286,10 +286,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
     setContextMenu({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       type: 'canvas'
     });
   };
@@ -298,15 +297,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
 
     if (!selectedNodes.has(nodeId)) {
       onNodeSelect(nodeId);
     }
 
     setContextMenu({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       type: 'node',
       targetId: nodeId
     });
@@ -321,11 +319,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
     onConnectionSelect(connId);
     setContextMenu({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       type: 'connection',
       targetId: connId
     });
@@ -364,6 +361,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       id="flow-canvas"
       ref={canvasRef}
       className="flex-1 relative overflow-auto"
+      data-zoom={zoom}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -680,7 +678,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       {contextMenu && (
         <div
           data-context-menu
-          className="absolute bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 z-50 min-w-40"
+          className="fixed bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 z-50 min-w-40"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={e => e.stopPropagation()}
         >
@@ -736,8 +734,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onClick={() => {
                   if (canvasRef.current) {
                     const rect = canvasRef.current.getBoundingClientRect();
-                    const x = (contextMenu.x - rect.left) / zoom;
-                    const y = (contextMenu.y - rect.top) / zoom;
+                    const scrollLeft = canvasRef.current.scrollLeft;
+                    const scrollTop = canvasRef.current.scrollTop;
+                    const x = (contextMenu.x - rect.left + scrollLeft) / zoom;
+                    const y = (contextMenu.y - rect.top + scrollTop) / zoom;
                     onAddTextAnnotation?.(x, y);
                   }
                   setContextMenu(null);

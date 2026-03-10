@@ -126,6 +126,9 @@ function App() {
       const canvas = document.getElementById('flow-canvas');
       if (canvas && ghostNodeRef.current) {
         const rect = canvas.getBoundingClientRect();
+        const scrollLeft = canvas.scrollLeft;
+        const scrollTop = canvas.scrollTop;
+        const currentZoom = parseFloat(canvas.dataset.zoom || '1');
         const isOverCanvas = (
           e.clientX >= rect.left && e.clientX <= rect.right &&
           e.clientY >= rect.top && e.clientY <= rect.bottom
@@ -133,8 +136,8 @@ function App() {
 
         if (isOverCanvas) {
           const template = ghostNodeRef.current.template;
-          let x = e.clientX - rect.left - 90;
-          let y = e.clientY - rect.top - 30;
+          let x = (e.clientX - rect.left + scrollLeft) / currentZoom - 90;
+          let y = (e.clientY - rect.top + scrollTop) / currentZoom - 30;
 
           const allDropZones = document.querySelectorAll('[data-case-drop-zone]');
           let dropZone: Element | null = null;
