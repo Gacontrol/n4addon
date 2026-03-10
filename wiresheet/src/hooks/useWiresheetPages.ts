@@ -459,26 +459,34 @@ export const useWiresheetPages = () => {
   }, [selectedConnection, selectedNodes, deleteConnection, deleteNodes]);
 
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; portId: string } | null>(null);
+  const connectingFromRef = useRef<{ nodeId: string; portId: string } | null>(null);
 
   const startConnection = useCallback((nodeId: string, portId: string) => {
-    setConnectingFrom({ nodeId, portId });
+    const newValue = { nodeId, portId };
+    connectingFromRef.current = newValue;
+    setConnectingFrom(newValue);
   }, []);
 
   const endConnection = useCallback((nodeId: string, portId: string) => {
-    if (connectingFrom && connectingFrom.nodeId !== nodeId) {
+    const connecting = connectingFromRef.current;
+    if (connecting && connecting.nodeId !== nodeId) {
       const connection: Connection = {
-        id: `${connectingFrom.nodeId}-${connectingFrom.portId}-${nodeId}-${portId}`,
-        source: connectingFrom.nodeId,
-        sourcePort: connectingFrom.portId,
+        id: `${connecting.nodeId}-${connecting.portId}-${nodeId}-${portId}`,
+        source: connecting.nodeId,
+        sourcePort: connecting.portId,
         target: nodeId,
         targetPort: portId
       };
       addConnection(connection);
     }
+    connectingFromRef.current = null;
     setConnectingFrom(null);
-  }, [connectingFrom, addConnection]);
+  }, [addConnection]);
 
-  const cancelConnection = useCallback(() => setConnectingFrom(null), []);
+  const cancelConnection = useCallback(() => {
+    connectingFromRef.current = null;
+    setConnectingFrom(null);
+  }, []);
 
   const updateContainerSize = useCallback((nodeId: string, width: number, height: number) => {
     updateActivePage(p => ({
