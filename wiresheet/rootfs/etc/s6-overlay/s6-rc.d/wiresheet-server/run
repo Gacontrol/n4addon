@@ -1,7 +1,6 @@
 #!/command/with-contenv bashio
 
 echo "=== WIRESHEET SERVER START ==="
-echo "SUPERVISOR_TOKEN vorhanden: $(if [ -n \"$SUPERVISOR_TOKEN" ]; then echo 'ja'; else echo 'nein'; fi)"
 
 cd /app
 exec node server/index.js
