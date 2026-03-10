@@ -116,15 +116,20 @@ function App() {
           let x = e.clientX - rect.left - 90;
           let y = e.clientY - rect.top - 30;
 
-          const elements = document.elementsFromPoint(e.clientX, e.clientY);
+          const allDropZones = document.querySelectorAll('[data-case-drop-zone]');
           let dropZone: Element | null = null;
-          for (const el of elements) {
-            const zone = el.closest('[data-case-drop-zone]');
-            if (zone) {
+
+          for (const zone of allDropZones) {
+            const zoneRect = zone.getBoundingClientRect();
+            if (
+              e.clientX >= zoneRect.left && e.clientX <= zoneRect.right &&
+              e.clientY >= zoneRect.top && e.clientY <= zoneRect.bottom
+            ) {
               dropZone = zone;
               break;
             }
           }
+
           let parentContainerId: string | undefined;
           let caseIndex: number | undefined;
 
@@ -139,7 +144,7 @@ function App() {
               const dropZoneRect = dropZone.getBoundingClientRect();
               x = Math.max(4, e.clientX - dropZoneRect.left - 90);
               y = Math.max(4, e.clientY - dropZoneRect.top - 30);
-              console.log('Drop in case container:', { parentContainerId, caseIndex, x, y, dropZoneRect: { left: dropZoneRect.left, top: dropZoneRect.top } });
+              console.log('Drop in case container:', { parentContainerId, caseIndex, x, y });
             }
           }
 
@@ -192,7 +197,7 @@ function App() {
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [addNode, selectNode]);
+  }, [addNode, selectNode, nodes, updateNodeData]);
 
   const selectedNodeData = selectedNodes.size === 1
     ? nodes.find(n => selectedNodes.has(n.id)) || null
