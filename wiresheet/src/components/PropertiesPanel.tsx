@@ -246,6 +246,23 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
       <div className="flex-1 overflow-y-auto p-4 pl-5 space-y-5">
 
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Bezeichnung</label>
+          <input
+            type="text"
+            defaultValue={node.data.label}
+            key={node.id}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== node.data.label) onUpdateNode(node.id, { label: v });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            }}
+            className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 focus:border-blue-500 focus:outline-none"
+          />
+        </div>
+
         {hasLive && (
           <div className="bg-emerald-950/50 border border-emerald-700/50 rounded-lg px-3 py-2 flex items-center gap-2">
             <Activity className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />

@@ -72,10 +72,13 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     switch (widget.type) {
       case 'visu-switch': {
         const swCfg = widget.config as SwitchConfig;
-        const isWriteOnly = !!widget.binding && !widget.binding.paramKey;
+        const isWriteOnly = !!widget.binding && widget.binding.direction === 'write';
+        const switchValue = isWriteOnly
+          ? Boolean(statusValue ?? swCfg.defaultValue ?? false)
+          : Boolean(value ?? swCfg.defaultValue ?? false);
         return (
           <VisuSwitch
-            value={Boolean(isWriteOnly ? (statusValue ?? swCfg.defaultValue ?? false) : value)}
+            value={switchValue}
             statusValue={widget.statusBinding ? Boolean(statusValue) : undefined}
             onChange={onValueChange}
             config={swCfg}
