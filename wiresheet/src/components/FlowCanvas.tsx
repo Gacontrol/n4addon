@@ -95,6 +95,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
+  const connectingFromRef = useRef(connectingFrom);
+
+  useEffect(() => {
+    connectingFromRef.current = connectingFrom;
+  }, [connectingFrom]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -185,26 +190,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [zoom]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
-    if (!connectingFrom) {
+    const cf = connectingFromRef.current;
+    if (!cf) {
       if (isOutput) {
         onConnectionStart(nodeId, portId);
       }
     } else {
-      if (isOutput) {
-        if (connectingFrom.nodeId !== nodeId) {
-          onConnectionEnd(nodeId, portId);
-        } else {
-          onConnectionCancel();
-        }
+      if (cf.nodeId !== nodeId) {
+        onConnectionEnd(nodeId, portId);
       } else {
-        if (connectingFrom.nodeId !== nodeId) {
-          onConnectionEnd(nodeId, portId);
-        } else {
-          onConnectionCancel();
-        }
+        onConnectionCancel();
       }
     }
-  }, [connectingFrom, onConnectionStart, onConnectionEnd, onConnectionCancel]);
+  }, [onConnectionStart, onConnectionEnd, onConnectionCancel]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return;
