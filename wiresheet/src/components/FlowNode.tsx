@@ -126,8 +126,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     const canvas = document.getElementById('flow-canvas');
     if (!canvas) return;
     const canvasRect = canvas.getBoundingClientRect();
-    const x = e.clientX - canvasRect.left - dragOffset.current.x;
-    const y = e.clientY - canvasRect.top - dragOffset.current.y;
+    const x = (e.clientX - canvasRect.left - dragOffset.current.x) / zoom;
+    const y = (e.clientY - canvasRect.top - dragOffset.current.y) / zoom;
     onPositionChange(node.id, Math.max(0, x), Math.max(0, y));
   };
 

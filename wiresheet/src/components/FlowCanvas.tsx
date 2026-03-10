@@ -227,8 +227,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
     if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const dx = e.clientX - rect.left - dragStartMouse.current.x;
-      const dy = e.clientY - rect.top - dragStartMouse.current.y;
+      const dx = (e.clientX - rect.left - dragStartMouse.current.x) / zoom;
+      const dy = (e.clientY - rect.top - dragStartMouse.current.y) / zoom;
 
       const updates: Array<{ id: string; x: number; y: number }> = [];
       dragStartPositions.current.forEach((pos, id) => {
@@ -240,10 +240,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   const handleCanvasPointerUp = () => {
     if (lasso) {
-      const minX = Math.min(lasso.startX, lasso.currentX);
-      const maxX = Math.max(lasso.startX, lasso.currentX);
-      const minY = Math.min(lasso.startY, lasso.currentY);
-      const maxY = Math.max(lasso.startY, lasso.currentY);
+      const minX = Math.min(lasso.startX, lasso.currentX) / zoom;
+      const maxX = Math.max(lasso.startX, lasso.currentX) / zoom;
+      const minY = Math.min(lasso.startY, lasso.currentY) / zoom;
+      const maxY = Math.max(lasso.startY, lasso.currentY) / zoom;
 
       if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
         const selectedIds = nodes.filter(node => {
@@ -333,10 +333,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     : null;
 
   const lassoRect = lasso ? {
-    x: Math.min(lasso.startX, lasso.currentX),
-    y: Math.min(lasso.startY, lasso.currentY),
-    width: Math.abs(lasso.currentX - lasso.startX),
-    height: Math.abs(lasso.currentY - lasso.startY)
+    x: Math.min(lasso.startX, lasso.currentX) / zoom,
+    y: Math.min(lasso.startY, lasso.currentY) / zoom,
+    width: Math.abs(lasso.currentX - lasso.startX) / zoom,
+    height: Math.abs(lasso.currentY - lasso.startY) / zoom
   } : null;
 
   return (
