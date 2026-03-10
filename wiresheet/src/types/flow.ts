@@ -24,6 +24,8 @@ export interface CaseDefinition {
   id: string;
   label: string;
   nodeIds: string[];
+  width?: number;
+  height?: number;
 }
 
 export interface NodeConfig {
@@ -75,6 +77,7 @@ export interface FlowNode {
     liveState?: 'ok' | 'error' | 'idle';
     dpType?: DatapointType;
     override?: DatapointOverride;
+    parentContainerId?: string;
   };
 }
 

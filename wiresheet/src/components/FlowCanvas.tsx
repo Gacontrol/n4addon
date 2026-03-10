@@ -161,13 +161,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     if (!isOnNode) {
-      if (connectingFrom) {
-        onConnectionCancel();
-        return;
+      if (!e.shiftKey && !connectingFrom) {
+        onClearSelection();
       }
 
-      if (!e.shiftKey) {
-        onClearSelection();
+      if (connectingFrom) {
+        return;
       }
 
       if (!canvasRef.current) return;
@@ -382,42 +381,104 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       </svg>
 
       <div className="absolute inset-0" style={{ zIndex: 5 }}>
-        {nodes.map(node => {
-          const portValues: Record<string, unknown> = {};
-          for (const input of node.data.inputs) {
-            const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
-            if (conn) {
-              const srcVal = liveValues[conn.source];
-              if (srcVal !== undefined && srcVal !== null) {
-                portValues[input.id] = srcVal;
+        {nodes
+          .filter(n => n.type === 'case-container')
+          .map(node => {
+            const portValues: Record<string, unknown> = {};
+            for (const input of node.data.inputs) {
+              const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
+              if (conn) {
+                const srcVal = liveValues[conn.source];
+                if (srcVal !== undefined && srcVal !== null) {
+                  portValues[input.id] = srcVal;
+                }
               }
             }
-          }
-          return (
-            <FlowNode
-              key={node.id}
-              node={node}
-              isSelected={selectedNodes.has(node.id)}
-              onPositionChange={onNodePositionChange}
-              onSelect={(id, e) => {
-                const addToSelection = e?.ctrlKey || e?.metaKey || e?.shiftKey;
-                onNodeSelect(id, addToSelection);
-              }}
-              onDelete={onNodeDelete}
-              onPortClick={handlePortClick}
-              onOverrideChange={onOverrideChange}
-              isConnecting={!!connectingFrom}
-              connectingFromNodeId={connectingFrom?.nodeId}
-              liveValues={liveValues}
-              portValues={portValues}
-              onContextMenu={handleNodeContextMenu}
-              onMultiDragStart={handleMultiDragStart}
-              onContainerResize={onContainerResize}
-              isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
-              isDraggingMultiple={isDraggingMultiple}
-            />
-          );
-        })}
+            return (
+              <FlowNode
+                key={node.id}
+                node={node}
+                isSelected={selectedNodes.has(node.id)}
+                onPositionChange={onNodePositionChange}
+                onSelect={(id, e) => {
+                  const addToSelection = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                  onNodeSelect(id, addToSelection);
+                }}
+                onDelete={onNodeDelete}
+                onPortClick={handlePortClick}
+                onOverrideChange={onOverrideChange}
+                isConnecting={!!connectingFrom}
+                connectingFromNodeId={connectingFrom?.nodeId}
+                liveValues={liveValues}
+                portValues={portValues}
+                onContextMenu={handleNodeContextMenu}
+                onMultiDragStart={handleMultiDragStart}
+                onContainerResize={onContainerResize}
+                isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
+                isDraggingMultiple={isDraggingMultiple}
+              />
+            );
+          })}
+        {nodes
+          .filter(n => n.type !== 'case-container')
+          .map(node => {
+            const portValues: Record<string, unknown> = {};
+            for (const input of node.data.inputs) {
+              const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
+              if (conn) {
+                const srcVal = liveValues[conn.source];
+                if (srcVal !== undefined && srcVal !== null) {
+                  portValues[input.id] = srcVal;
+                }
+              }
+            }
+
+            const parentContainer = node.data.parentContainerId
+              ? nodes.find(n => n.id === node.data.parentContainerId)
+              : null;
+
+            const adjustedNode = parentContainer ? {
+              ...node,
+              position: {
+                x: parentContainer.position.x + node.position.x + 4,
+                y: parentContainer.position.y + node.position.y + 80
+              }
+            } : node;
+
+            return (
+              <FlowNode
+                key={node.id}
+                node={adjustedNode}
+                isSelected={selectedNodes.has(node.id)}
+                onPositionChange={(id, x, y) => {
+                  if (parentContainer) {
+                    const relX = x - parentContainer.position.x - 4;
+                    const relY = y - parentContainer.position.y - 80;
+                    onNodePositionChange(id, Math.max(0, relX), Math.max(0, relY));
+                  } else {
+                    onNodePositionChange(id, x, y);
+                  }
+                }}
+                onSelect={(id, e) => {
+                  const addToSelection = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                  onNodeSelect(id, addToSelection);
+                }}
+                onDelete={onNodeDelete}
+                onPortClick={handlePortClick}
+                onOverrideChange={onOverrideChange}
+                isConnecting={!!connectingFrom}
+                connectingFromNodeId={connectingFrom?.nodeId}
+                liveValues={liveValues}
+                portValues={portValues}
+                onContextMenu={handleNodeContextMenu}
+                onMultiDragStart={handleMultiDragStart}
+                onContainerResize={onContainerResize}
+                isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
+                isDraggingMultiple={isDraggingMultiple}
+                parentContainer={parentContainer}
+              />
+            );
+          })}
       </div>
 
       {ghostNode && canvasRef.current && (() => {
@@ -445,7 +506,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
       {connectingFrom && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white px-4 py-1.5 rounded-full text-xs font-medium pointer-events-none" style={{ zIndex: 60 }}>
-          Eingangs-Port auswaehlen - Klick auf Canvas zum Abbrechen
+          Eingangs-Port auswaehlen - ESC zum Abbrechen
         </div>
       )}
 

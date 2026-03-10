@@ -113,8 +113,25 @@ function App() {
 
         if (isOverCanvas) {
           const template = ghostNodeRef.current.template;
-          const x = e.clientX - rect.left - 90;
-          const y = e.clientY - rect.top - 30;
+          let x = e.clientX - rect.left - 90;
+          let y = e.clientY - rect.top - 30;
+
+          const dropZone = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-case-drop-zone]');
+          let parentContainerId: string | undefined;
+
+          if (dropZone) {
+            parentContainerId = dropZone.getAttribute('data-case-drop-zone') || undefined;
+            const containerNode = nodes.find(n => n.id === parentContainerId);
+            if (containerNode) {
+              const containerEl = document.querySelector(`[data-node-id="${parentContainerId}"]`);
+              if (containerEl) {
+                const containerRect = containerEl.getBoundingClientRect();
+                const dropZoneRect = dropZone.getBoundingClientRect();
+                x = e.clientX - dropZoneRect.left;
+                y = e.clientY - dropZoneRect.top;
+              }
+            }
+          }
 
           const newNode: FlowNode = {
             id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -125,12 +142,31 @@ function App() {
               icon: template.icon,
               config: template.defaultConfig ? { ...template.defaultConfig } : undefined,
               inputs: template.inputs.map((input, idx) => ({ ...input, id: `input-${idx}` })),
-              outputs: template.outputs.map((output, idx) => ({ ...output, id: `output-${idx}` }))
+              outputs: template.outputs.map((output, idx) => ({ ...output, id: `output-${idx}` })),
+              parentContainerId
             }
           };
 
           addNode(newNode);
           selectNode(newNode.id);
+
+          if (parentContainerId) {
+            const containerNode = nodes.find(n => n.id === parentContainerId);
+            if (containerNode && containerNode.type === 'case-container') {
+              const nodeWidth = 180;
+              const nodeHeight = 80;
+              const currentWidth = containerNode.data.config?.containerWidth || 400;
+              const currentHeight = containerNode.data.config?.containerHeight || 300;
+              const headerAndCases = 80;
+
+              const requiredWidth = Math.max(currentWidth, x + nodeWidth + 20);
+              const requiredHeight = Math.max(currentHeight, y + nodeHeight + headerAndCases + 20);
+
+              if (requiredWidth > currentWidth || requiredHeight > currentHeight) {
+                updateContainerSize(parentContainerId, requiredWidth, requiredHeight);
+              }
+            }
+          }
         }
       }
 

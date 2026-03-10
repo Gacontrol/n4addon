@@ -156,7 +156,23 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const addCase = () => {
     const cases: CaseDefinition[] = config.cases || [];
     const nextNum = cases.length;
-    updateConfig('cases', [...cases, { id: `case-${nextNum}`, label: `Case ${nextNum}`, nodeIds: [] }]);
+    const existingWidth = config.containerWidth || 400;
+    const existingHeight = config.containerHeight || 300;
+    const newCases = [...cases, { id: `case-${nextNum}`, label: `Case ${nextNum}`, nodeIds: [] }];
+    setConfig(prev => ({
+      ...prev,
+      cases: newCases,
+      containerWidth: existingWidth,
+      containerHeight: existingHeight
+    }));
+    onUpdateNode(node.id, {
+      config: {
+        ...config,
+        cases: newCases,
+        containerWidth: existingWidth,
+        containerHeight: existingHeight
+      }
+    });
   };
 
   const updateCase = (index: number, label: string) => {

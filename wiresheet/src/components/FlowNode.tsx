@@ -24,6 +24,7 @@ interface FlowNodeProps {
   portValues?: Record<string, unknown>;
   isMultiSelected?: boolean;
   isDraggingMultiple?: boolean;
+  parentContainer?: FlowNodeType | null;
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -42,7 +43,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   liveValues = {},
   portValues = {},
   isMultiSelected = false,
-  isDraggingMultiple = false
+  isDraggingMultiple = false,
+  parentContainer = null
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -207,10 +209,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   }, [isResizing]);
 
   if (isCaseContainer) {
-    const caseRowHeight = 36;
     const headerHeight = 44;
-    const calculatedHeight = headerHeight + (cases.length * caseRowHeight) + 8;
-    const finalHeight = Math.max(containerHeight, calculatedHeight);
+    const caseTabHeight = 28;
+    const casesBarHeight = caseTabHeight + 8;
+    const minContentHeight = 150;
+    const finalHeight = Math.max(containerHeight, headerHeight + casesBarHeight + minContentHeight);
 
     return (
       <div
@@ -221,29 +224,27 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         style={{
           left: node.position.x,
           top: node.position.y,
-          zIndex: isSelected || isDragging ? 5 : 0,
-          cursor: isDragging ? 'grabbing' : 'grab',
+          zIndex: isSelected || isDragging ? 2 : 0,
           touchAction: 'none',
           width: containerWidth,
           height: finalHeight
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onContextMenu={handleContextMenu}
       >
         <div
           className="w-full h-full rounded-xl overflow-hidden flex flex-col"
           style={{
-            background: 'rgba(30, 41, 59, 0.95)',
-            border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.5)'}`,
+            background: 'rgba(30, 41, 59, 0.6)',
+            border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.4)'}`,
             boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.3)'
           }}
         >
           <div
             className="px-3 py-2.5 flex items-center gap-3 flex-shrink-0"
-            style={{ backgroundColor: '#6366f1' }}
+            style={{ backgroundColor: '#6366f1', cursor: isDragging ? 'grabbing' : 'grab' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
           >
             <div
               className="node-port relative flex-shrink-0 cursor-crosshair"
@@ -279,49 +280,48 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </button>
           </div>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex gap-1 px-2 py-1 bg-slate-800/80 border-b border-indigo-900/50 flex-shrink-0 overflow-x-auto">
             {cases.map((c, idx) => {
               const isActive = activeCaseValue === idx;
               return (
                 <div
                   key={c.id}
-                  className="flex items-center border-b last:border-b-0 transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-all flex-shrink-0"
                   style={{
-                    height: caseRowHeight,
-                    backgroundColor: isActive ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                    borderColor: 'rgba(99, 102, 241, 0.2)'
+                    backgroundColor: isActive ? 'rgba(99, 102, 241, 0.4)' : 'rgba(99, 102, 241, 0.15)',
+                    color: isActive ? '#c7d2fe' : '#94a3b8',
+                    border: isActive ? '1px solid rgba(99, 102, 241, 0.6)' : '1px solid transparent'
                   }}
                 >
-                  <div
-                    className="w-10 h-full flex items-center justify-center flex-shrink-0 font-mono text-xs border-r"
-                    style={{
-                      backgroundColor: isActive ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.1)',
-                      borderColor: 'rgba(99, 102, 241, 0.2)',
-                      color: isActive ? '#a5b4fc' : '#64748b'
-                    }}
-                  >
-                    {idx}
-                  </div>
-                  <div className="flex-1 px-3 flex items-center gap-2 min-w-0">
-                    <span className={`text-xs truncate ${isActive ? 'text-indigo-200 font-medium' : 'text-slate-400'}`}>
-                      {c.label}
-                    </span>
-                    {isActive && (
-                      <Icons.ArrowRight className="w-3 h-3 text-indigo-400 flex-shrink-0" />
-                    )}
-                  </div>
-                  <div className="px-2 flex-shrink-0">
-                    {isActive && (
-                      <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                    )}
-                  </div>
+                  <span className="font-mono text-[10px] opacity-60">{idx}</span>
+                  <span className="font-medium">{c.label}</span>
+                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />}
                 </div>
               );
             })}
+            {cases.length === 0 && (
+              <span className="text-xs text-slate-500 py-1">Keine Cases definiert</span>
+            )}
           </div>
 
           <div
-            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize flex items-center justify-center hover:bg-indigo-600/30 rounded-tl transition-colors"
+            className="flex-1 relative"
+            data-case-drop-zone={node.id}
+            style={{
+              backgroundImage: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 1px, transparent 1px)',
+              backgroundSize: '16px 16px'
+            }}
+          >
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center opacity-30">
+                <Icons.MousePointerClick className="w-6 h-6 mx-auto mb-1 text-indigo-400" />
+                <p className="text-xs text-indigo-300">Bausteine hier platzieren</p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-center hover:bg-indigo-600/30 rounded-tl transition-colors"
             onPointerDown={handleResizePointerDown}
             onPointerMove={handleResizePointerMove}
             onPointerUp={handleResizePointerUp}
