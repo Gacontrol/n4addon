@@ -17,6 +17,12 @@ const DATA_PATHS = [
 let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
 
+const runningPages = new Map();
+let cachedDeviceRegistry = null;
+let cachedEntityRegistry = null;
+let registryCacheTime = 0;
+const REGISTRY_CACHE_TTL = 60000;
+
 app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -90,17 +96,80 @@ async function haPost(apiPath, body) {
   return response.data;
 }
 
+async function haWsCommand(msgType, payload = {}) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Kein Token');
+  }
+  const response = await axios.post(
+    'http://supervisor/core/api/websocket_api',
+    { type: msgType, ...payload },
+    {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      timeout: 10000
+    }
+  );
+  return response.data;
+}
+
+async function loadRegistries() {
+  const now = Date.now();
+  if (cachedDeviceRegistry && cachedEntityRegistry && now - registryCacheTime < REGISTRY_CACHE_TTL) {
+    return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry };
+  }
+
+  try {
+    const token = getToken();
+    if (!token) throw new Error('Kein Token');
+
+    const [devRes, entRes] = await Promise.all([
+      axios.get('http://supervisor/core/api/config/device_registry', {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
+      }).catch(() => ({ data: [] })),
+      axios.get('http://supervisor/core/api/config/entity_registry', {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
+      }).catch(() => ({ data: [] }))
+    ]);
+
+    cachedDeviceRegistry = Array.isArray(devRes.data) ? devRes.data : [];
+    cachedEntityRegistry = Array.isArray(entRes.data) ? entRes.data : [];
+    registryCacheTime = now;
+
+    console.log(`Registry geladen: ${cachedDeviceRegistry.length} Devices, ${cachedEntityRegistry.length} Entity-Eintraege`);
+  } catch (err) {
+    console.log('Registry-Laden fehlgeschlagen:', err.message);
+    cachedDeviceRegistry = cachedDeviceRegistry || [];
+    cachedEntityRegistry = cachedEntityRegistry || [];
+  }
+
+  return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry };
+}
+
 app.get('/api/status', (req, res) => {
   const envKeys = Object.keys(process.env).filter(k =>
     k.includes('SUPER') || k.includes('HASSIO') || k.includes('HA_') || k.includes('HOME')
   );
+
+  const runningStatus = {};
+  runningPages.forEach((info, pageId) => {
+    runningStatus[pageId] = {
+      running: true,
+      cycleMs: info.cycleMs,
+      lastRun: info.lastRun,
+      cycleCount: info.cycleCount
+    };
+  });
+
   res.json({
     dataDir,
     haConnected: !!getToken(),
     supervisorToken: getToken() ? 'vorhanden' : 'fehlt',
     envVars: envKeys,
     supervisorTokenPresent: !!process.env.SUPERVISOR_TOKEN,
-    hassioTokenPresent: !!process.env.HASSIO_TOKEN
+    hassioTokenPresent: !!process.env.HASSIO_TOKEN,
+    runningPages: runningStatus
   });
 });
 
@@ -108,6 +177,13 @@ app.get(['/pages', '/api/pages'], async (req, res) => {
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');
     const pages = JSON.parse(data);
+
+    pages.forEach(page => {
+      if (runningPages.has(page.id)) {
+        page.running = true;
+      }
+    });
+
     console.log(`Geladen: ${pages.length} Seiten aus ${pagesFile}`);
     res.json(pages);
   } catch (err) {
@@ -142,9 +218,47 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
 
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
   try {
-    const data = await haGet('/states');
-    console.log(`HA States geladen: ${data.length} Entities`);
-    res.json(data);
+    const [states, registry] = await Promise.all([
+      haGet('/states'),
+      loadRegistries()
+    ]);
+
+    const deviceMap = new Map();
+    registry.devices.forEach(d => {
+      deviceMap.set(d.id, d);
+    });
+
+    const entityRegMap = new Map();
+    registry.entities.forEach(e => {
+      entityRegMap.set(e.entity_id, e);
+    });
+
+    const enrichedStates = states.map(state => {
+      const regEntry = entityRegMap.get(state.entity_id);
+      let deviceInfo = null;
+      let integrationName = null;
+
+      if (regEntry) {
+        if (regEntry.device_id) {
+          deviceInfo = deviceMap.get(regEntry.device_id);
+        }
+        integrationName = regEntry.platform || null;
+      }
+
+      return {
+        ...state,
+        attributes: {
+          ...state.attributes,
+          _device_id: regEntry?.device_id || null,
+          _device_name: deviceInfo?.name_by_user || deviceInfo?.name || null,
+          _integration: integrationName || state.entity_id.split('.')[0],
+          _area_id: deviceInfo?.area_id || regEntry?.area_id || null
+        }
+      };
+    });
+
+    console.log(`HA States geladen: ${enrichedStates.length} Entities`);
+    res.json(enrichedStates);
   } catch (err) {
     console.error('Fehler beim Abrufen der HA States:', err.message);
     res.status(503).json({ error: err.message });
@@ -200,116 +314,268 @@ function toBool(val) {
   return !!val;
 }
 
-app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
-  const { nodes, connections, manualOverrides = {} } = req.body;
-  try {
-    const nodeValues = {};
+async function executePageLogic(nodes, connections, manualOverrides = {}) {
+  const nodeValues = {};
 
-    const statePromises = nodes
-      .filter(n => (n.type === 'ha-input') && n.data.entityId)
-      .map(async (n) => {
-        try {
-          const state = await haGet(`/states/${n.data.entityId}`);
-          const rawState = state.state;
-          const numVal = parseFloat(rawState);
-          if (!isNaN(numVal)) {
-            nodeValues[n.id] = numVal;
-          } else {
-            nodeValues[n.id] = rawState;
-          }
-        } catch {
-          nodeValues[n.id] = null;
-        }
-      });
-
-    await Promise.all(statePromises);
-
-    const topoOrder = [];
-    const visited = new Set();
-    const getInputs = (nodeId) => connections.filter(c => c.target === nodeId).map(c => c.source);
-
-    const visit = (nodeId) => {
-      if (visited.has(nodeId)) return;
-      visited.add(nodeId);
-      for (const srcId of getInputs(nodeId)) visit(srcId);
-      topoOrder.push(nodeId);
-    };
-    nodes.forEach(n => visit(n.id));
-
-    for (const nodeId of topoOrder) {
-      const node = nodes.find(n => n.id === nodeId);
-      if (!node) continue;
-      const incomingConns = connections.filter(c => c.target === nodeId);
-      const inputVals = incomingConns.map(c => nodeValues[c.source]);
-
-      const cfg = node.data.config || {};
-
-      if (manualOverrides[nodeId] !== undefined) {
-        nodeValues[nodeId] = manualOverrides[nodeId];
-      } else if (node.type === 'ha-input') {
-      } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
-        nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
-      } else if (node.type === 'and-gate') {
-        if (inputVals.length === 0) {
-          nodeValues[nodeId] = false;
+  const statePromises = nodes
+    .filter(n => (n.type === 'ha-input') && n.data.entityId)
+    .map(async (n) => {
+      try {
+        const state = await haGet(`/states/${n.data.entityId}`);
+        const rawState = state.state;
+        const numVal = parseFloat(rawState);
+        if (!isNaN(numVal)) {
+          nodeValues[n.id] = numVal;
         } else {
-          nodeValues[nodeId] = inputVals.every(v => toBool(v));
+          nodeValues[n.id] = rawState;
         }
-      } else if (node.type === 'or-gate') {
-        nodeValues[nodeId] = inputVals.some(v => toBool(v));
-      } else if (node.type === 'not-gate') {
-        nodeValues[nodeId] = !toBool(inputVals[0]);
-      } else if (node.type === 'compare') {
-        const a = parseFloat(inputVals[0]) || 0;
-        const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
-        const op = cfg.compareOperator || '>';
-        if (op === '>') nodeValues[nodeId] = a > b;
-        else if (op === '>=') nodeValues[nodeId] = a >= b;
-        else if (op === '==') nodeValues[nodeId] = a == b;
-        else if (op === '<=') nodeValues[nodeId] = a <= b;
-        else if (op === '<') nodeValues[nodeId] = a < b;
-        else if (op === '!=') nodeValues[nodeId] = a != b;
-        else nodeValues[nodeId] = false;
-      } else if (node.type === 'threshold') {
-        const val = parseFloat(inputVals[0]) || 0;
-        const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
-        nodeValues[nodeId] = val > thr ? 'above' : 'below';
-      } else if (node.type === 'delay') {
-        nodeValues[nodeId] = inputVals[0];
-      } else if (node.type === 'ha-output' && node.data.entityId) {
-        const val = inputVals[0];
-        if (val !== null && val !== undefined) {
-          const entityId = node.data.entityId;
-          const [domain] = entityId.split('.');
-          const boolVal = toBool(val);
-          try {
-            if (domain === 'light') {
-              await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'switch') {
-              await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'input_boolean') {
-              await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'input_number') {
-              const numVal = parseFloat(val);
-              if (!isNaN(numVal)) {
-                await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
-              }
+      } catch {
+        nodeValues[n.id] = null;
+      }
+    });
+
+  await Promise.all(statePromises);
+
+  const topoOrder = [];
+  const visited = new Set();
+  const getInputs = (nodeId) => connections.filter(c => c.target === nodeId).map(c => c.source);
+
+  const visit = (nodeId) => {
+    if (visited.has(nodeId)) return;
+    visited.add(nodeId);
+    for (const srcId of getInputs(nodeId)) visit(srcId);
+    topoOrder.push(nodeId);
+  };
+  nodes.forEach(n => visit(n.id));
+
+  for (const nodeId of topoOrder) {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) continue;
+    const incomingConns = connections.filter(c => c.target === nodeId);
+    const inputVals = incomingConns.map(c => nodeValues[c.source]);
+
+    const cfg = node.data.config || {};
+
+    if (manualOverrides[nodeId] !== undefined) {
+      nodeValues[nodeId] = manualOverrides[nodeId];
+    } else if (node.type === 'ha-input') {
+    } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
+      nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
+    } else if (node.type === 'and-gate') {
+      if (inputVals.length === 0) {
+        nodeValues[nodeId] = false;
+      } else {
+        nodeValues[nodeId] = inputVals.every(v => toBool(v));
+      }
+    } else if (node.type === 'or-gate') {
+      nodeValues[nodeId] = inputVals.some(v => toBool(v));
+    } else if (node.type === 'not-gate') {
+      nodeValues[nodeId] = !toBool(inputVals[0]);
+    } else if (node.type === 'compare') {
+      const a = parseFloat(inputVals[0]) || 0;
+      const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
+      const op = cfg.compareOperator || '>';
+      if (op === '>') nodeValues[nodeId] = a > b;
+      else if (op === '>=') nodeValues[nodeId] = a >= b;
+      else if (op === '==') nodeValues[nodeId] = a == b;
+      else if (op === '<=') nodeValues[nodeId] = a <= b;
+      else if (op === '<') nodeValues[nodeId] = a < b;
+      else if (op === '!=') nodeValues[nodeId] = a != b;
+      else nodeValues[nodeId] = false;
+    } else if (node.type === 'threshold') {
+      const val = parseFloat(inputVals[0]) || 0;
+      const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
+      nodeValues[nodeId] = val > thr ? 'above' : 'below';
+    } else if (node.type === 'delay') {
+      nodeValues[nodeId] = inputVals[0];
+    } else if (node.type === 'ha-output' && node.data.entityId) {
+      const val = inputVals[0];
+      if (val !== null && val !== undefined) {
+        const entityId = node.data.entityId;
+        const [domain] = entityId.split('.');
+        const boolVal = toBool(val);
+        try {
+          if (domain === 'light') {
+            await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+          } else if (domain === 'switch') {
+            await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+          } else if (domain === 'input_boolean') {
+            await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+          } else if (domain === 'input_number') {
+            const numVal = parseFloat(val);
+            if (!isNaN(numVal)) {
+              await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
             }
-            nodeValues[nodeId] = boolVal;
-          } catch (e) {
-            console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
-            nodeValues[nodeId] = null;
           }
+          nodeValues[nodeId] = boolVal;
+        } catch (e) {
+          console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
+          nodeValues[nodeId] = null;
         }
       }
     }
+  }
 
+  return nodeValues;
+}
+
+app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
+  const { nodes, connections, manualOverrides = {} } = req.body;
+  try {
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides);
     res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
+async function runPageCycle(pageId) {
+  const pageInfo = runningPages.get(pageId);
+  if (!pageInfo || !pageInfo.running) return;
+
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    const page = pages.find(p => p.id === pageId);
+
+    if (!page) {
+      console.log(`Seite ${pageId} nicht gefunden, stoppe Ausfuehrung`);
+      stopPage(pageId);
+      return;
+    }
+
+    if (page.nodes.length > 0) {
+      await executePageLogic(page.nodes, page.connections, {});
+    }
+
+    pageInfo.lastRun = Date.now();
+    pageInfo.cycleCount++;
+
+  } catch (err) {
+    console.error(`Zyklus-Fehler fuer ${pageId}:`, err.message);
+  }
+
+  if (pageInfo.running) {
+    pageInfo.timeout = setTimeout(() => runPageCycle(pageId), pageInfo.cycleMs);
+  }
+}
+
+function startPage(pageId, cycleMs) {
+  if (runningPages.has(pageId)) {
+    const existing = runningPages.get(pageId);
+    if (existing.timeout) clearTimeout(existing.timeout);
+  }
+
+  const pageInfo = {
+    running: true,
+    cycleMs: Math.max(20, cycleMs || 1000),
+    lastRun: null,
+    cycleCount: 0,
+    timeout: null
+  };
+
+  runningPages.set(pageId, pageInfo);
+  console.log(`Seite ${pageId} gestartet mit ${pageInfo.cycleMs}ms Zykluszeit`);
+
+  runPageCycle(pageId);
+}
+
+function stopPage(pageId) {
+  const pageInfo = runningPages.get(pageId);
+  if (pageInfo) {
+    pageInfo.running = false;
+    if (pageInfo.timeout) {
+      clearTimeout(pageInfo.timeout);
+    }
+    runningPages.delete(pageId);
+    console.log(`Seite ${pageId} gestoppt`);
+  }
+}
+
+app.post(['/pages/:pageId/start', '/api/pages/:pageId/start'], async (req, res) => {
+  const { pageId } = req.params;
+  const { cycleMs } = req.body;
+
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    const page = pages.find(p => p.id === pageId);
+
+    if (!page) {
+      return res.status(404).json({ error: 'Seite nicht gefunden' });
+    }
+
+    const actualCycleMs = cycleMs || page.cycleMs || 1000;
+    startPage(pageId, actualCycleMs);
+
+    page.running = true;
+    await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+
+    res.json({ success: true, pageId, cycleMs: actualCycleMs });
+  } catch (err) {
+    console.error('Start-Fehler:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/pages/:pageId/stop', '/api/pages/:pageId/stop'], async (req, res) => {
+  const { pageId } = req.params;
+
+  try {
+    stopPage(pageId);
+
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    const page = pages.find(p => p.id === pageId);
+
+    if (page) {
+      page.running = false;
+      await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+    }
+
+    res.json({ success: true, pageId });
+  } catch (err) {
+    console.error('Stop-Fehler:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get(['/pages/running', '/api/pages/running'], (req, res) => {
+  const status = {};
+  runningPages.forEach((info, pageId) => {
+    status[pageId] = {
+      running: info.running,
+      cycleMs: info.cycleMs,
+      lastRun: info.lastRun,
+      cycleCount: info.cycleCount
+    };
+  });
+  res.json(status);
+});
+
+async function restoreRunningPages() {
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+
+    let restoredCount = 0;
+    for (const page of pages) {
+      if (page.running) {
+        startPage(page.id, page.cycleMs || 1000);
+        restoredCount++;
+      }
+    }
+
+    if (restoredCount > 0) {
+      console.log(`${restoredCount} Seite(n) nach Neustart wiederhergestellt`);
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('Fehler beim Wiederherstellen:', err.message);
+    }
+  }
+}
 
 async function start() {
   try {
@@ -346,8 +612,10 @@ async function start() {
       console.log(`Stelle sicher dass config.json "homeassistant_api": true hat`);
     }
 
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
       console.log(`=== Wiresheet API Server laeuft auf Port ${PORT} ===`);
+
+      await restoreRunningPages();
     });
   } catch (err) {
     console.error('Start fehlgeschlagen:', err);

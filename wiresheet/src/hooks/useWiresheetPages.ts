@@ -34,7 +34,7 @@ export const useWiresheetPages = () => {
   const [haError, setHaError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const cycleTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const localCycleTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInProgress = useRef(false);
   const pagesRef = useRef<WiresheetPage[]>(pages);
@@ -160,10 +160,11 @@ export const useWiresheetPages = () => {
 
   const deletePage = useCallback((pageId: string) => {
     if (pages.length <= 1) return;
-    if (cycleTimers.current[pageId]) {
-      clearInterval(cycleTimers.current[pageId]);
-      delete cycleTimers.current[pageId];
+    if (localCycleTimers.current[pageId]) {
+      clearInterval(localCycleTimers.current[pageId]);
+      delete localCycleTimers.current[pageId];
     }
+    fetch(`${API_BASE}/pages/${pageId}/stop`, { method: 'POST' }).catch(() => {});
     updatePages(prev => {
       const next = prev.filter(p => p.id !== pageId);
       if (activePageId === pageId) setActivePageId(next[0].id);
@@ -176,11 +177,16 @@ export const useWiresheetPages = () => {
   }, [updatePages]);
 
   const setCycleTime = useCallback((pageId: string, ms: number) => {
-    updatePages(prev => prev.map(p => p.id === pageId ? { ...p, cycleMs: ms } : p));
+    const clampedMs = Math.max(20, ms);
+    updatePages(prev => prev.map(p => p.id === pageId ? { ...p, cycleMs: clampedMs } : p));
+
     const page = pages.find(p => p.id === pageId);
     if (page?.running) {
-      if (cycleTimers.current[pageId]) clearInterval(cycleTimers.current[pageId]);
-      cycleTimers.current[pageId] = setInterval(() => executePage(pageId), ms);
+      fetch(`${API_BASE}/pages/${pageId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cycleMs: clampedMs })
+      }).catch(() => {});
     }
   }, [pages, updatePages]);
 
@@ -206,30 +212,47 @@ export const useWiresheetPages = () => {
         setLiveValues(prev => ({ ...prev, ...nodeValues }));
       }
     } catch {
-      // silent
     }
   }, []);
 
-  const startPage = useCallback((pageId: string) => {
-    updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: true } : p));
+  const startPage = useCallback(async (pageId: string) => {
     const page = pagesRef.current.find(p => p.id === pageId);
     if (!page) return;
-    if (cycleTimers.current[pageId]) clearInterval(cycleTimers.current[pageId]);
+
+    updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: true } : p));
+
+    try {
+      await fetch(`${API_BASE}/pages/${pageId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cycleMs: page.cycleMs })
+      });
+    } catch {
+    }
+
+    if (localCycleTimers.current[pageId]) clearInterval(localCycleTimers.current[pageId]);
     executePage(pageId);
-    cycleTimers.current[pageId] = setInterval(() => executePage(pageId), page.cycleMs);
+    const interval = Math.max(200, page.cycleMs);
+    localCycleTimers.current[pageId] = setInterval(() => executePage(pageId), interval);
   }, [updatePages, executePage]);
 
-  const stopPage = useCallback((pageId: string) => {
+  const stopPage = useCallback(async (pageId: string) => {
     updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: false } : p));
-    if (cycleTimers.current[pageId]) {
-      clearInterval(cycleTimers.current[pageId]);
-      delete cycleTimers.current[pageId];
+
+    try {
+      await fetch(`${API_BASE}/pages/${pageId}/stop`, { method: 'POST' });
+    } catch {
+    }
+
+    if (localCycleTimers.current[pageId]) {
+      clearInterval(localCycleTimers.current[pageId]);
+      delete localCycleTimers.current[pageId];
     }
   }, [updatePages]);
 
   useEffect(() => {
     return () => {
-      Object.values(cycleTimers.current).forEach(clearInterval);
+      Object.values(localCycleTimers.current).forEach(clearInterval);
     };
   }, []);
 

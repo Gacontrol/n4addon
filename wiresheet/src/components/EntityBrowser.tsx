@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, Search, RefreshCw, Check, Layers, Cpu, Tag } from 'lucide-react';
 
 interface HAEntity {
@@ -32,17 +32,21 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
   const integrationMap = new Map<string, Map<string, HAEntity[]>>();
 
   for (const entity of entities) {
-    const domain = entity.entity_id.split('.')[0];
-    const integration = String(entity.attributes.integration || domain);
-    const platform = String(
-      entity.attributes.platform || entity.attributes.device_class || domain
-    );
+    const integration = String(entity.attributes._integration || entity.entity_id.split('.')[0]);
 
-    const friendlyDevice = String(
-      entity.attributes.friendly_name || entity.entity_id
-    ).replace(/\s+\S+$/, '').trim() || platform;
+    const deviceId = entity.attributes._device_id as string | null;
+    const deviceName = entity.attributes._device_name as string | null;
 
-    const deviceKey = String(entity.attributes.device_id || friendlyDevice);
+    let deviceKey: string;
+    let deviceLabel: string;
+
+    if (deviceId && deviceName) {
+      deviceKey = deviceId;
+      deviceLabel = deviceName;
+    } else {
+      deviceKey = '_no_device';
+      deviceLabel = 'Ohne Geraet';
+    }
 
     if (!integrationMap.has(integration)) {
       integrationMap.set(integration, new Map());
@@ -58,14 +62,17 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
   integrationMap.forEach((deviceMap, integrationId) => {
     const devices: Device[] = [];
     deviceMap.forEach((ents, deviceId) => {
-      const label = ents[0]
-        ? String(ents[0].attributes.friendly_name || deviceId)
-            .replace(/\s+\S+$/, '')
-            .trim() || deviceId
-        : deviceId;
+      const firstWithName = ents.find(e => e.attributes._device_name);
+      const label = firstWithName
+        ? String(firstWithName.attributes._device_name)
+        : (deviceId === '_no_device' ? 'Ohne Geraet' : deviceId);
       devices.push({ id: deviceId, label, entities: ents });
     });
-    devices.sort((a, b) => a.label.localeCompare(b.label));
+    devices.sort((a, b) => {
+      if (a.id === '_no_device') return 1;
+      if (b.id === '_no_device') return -1;
+      return a.label.localeCompare(b.label);
+    });
     integrations.push({ id: integrationId, label: integrationId, devices });
   });
   integrations.sort((a, b) => a.label.localeCompare(b.label));
@@ -113,7 +120,8 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
             ...device,
             entities: device.entities.filter(e =>
               e.entity_id.toLowerCase().includes(q) ||
-              String(e.attributes.friendly_name || '').toLowerCase().includes(q)
+              String(e.attributes.friendly_name || '').toLowerCase().includes(q) ||
+              String(e.attributes._device_name || '').toLowerCase().includes(q)
             )
           }))
           .filter(d => d.entities.length > 0)
@@ -181,7 +189,7 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
                 ? <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
                 : <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
               }
-              <Layers className="w-3 h-3 text-slate-400 flex-shrink-0" />
+              <Layers className="w-3 h-3 text-cyan-400 flex-shrink-0" />
               <span className="text-xs font-semibold text-slate-300 truncate">{integration.label}</span>
               <span className="text-xs text-slate-500 ml-auto flex-shrink-0">
                 {integration.devices.reduce((sum, d) => sum + d.entities.length, 0)}
@@ -200,7 +208,7 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
                         ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
                         : <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
                       }
-                      <Cpu className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                      <Cpu className="w-3 h-3 text-amber-400 flex-shrink-0" />
                       <span className="text-xs text-slate-400 truncate">{device.label}</span>
                       <span className="text-xs text-slate-600 ml-auto flex-shrink-0">{device.entities.length}</span>
                     </button>

@@ -122,7 +122,7 @@ function App() {
 
   const handleApplyCycleTime = () => {
     const ms = parseInt(cycleInput);
-    if (!isNaN(ms) && ms >= 100) {
+    if (!isNaN(ms) && ms >= 20) {
       setCycleTime(activePageId, ms);
       setShowCycleEditor(false);
     }
@@ -140,7 +140,7 @@ function App() {
     setEditingPageId(null);
   };
 
-  const cycleOptions = [100, 250, 500, 1000, 2000, 5000, 10000];
+  const cycleOptions = [20, 50, 100, 250, 500, 1000, 2000, 5000];
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
@@ -242,8 +242,8 @@ function App() {
                   <div className="flex gap-2">
                     <input
                       type="number"
-                      min={100}
-                      step={100}
+                      min={20}
+                      step={10}
                       value={cycleInput}
                       onChange={(e) => setCycleInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleApplyCycleTime()}
