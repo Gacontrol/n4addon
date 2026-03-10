@@ -281,65 +281,79 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               return (
                 <div
                   key={c.id}
-                  className="flex-1 flex flex-col min-h-0 border-b last:border-b-0"
+                  className="flex flex-col border-b last:border-b-0"
                   style={{
-                    borderColor: 'rgba(99, 102, 241, 0.2)',
-                    backgroundColor: isActiveCase ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
-                    minHeight: caseRowHeight
+                    borderColor: 'rgba(99, 102, 241, 0.3)',
+                    height: caseRowHeight
                   }}
                 >
                   <div
-                    className="px-2 py-1 flex items-center gap-2 flex-shrink-0"
+                    className="px-3 py-1.5 flex items-center gap-2 flex-shrink-0"
                     style={{
-                      backgroundColor: isActiveCase ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.05)',
-                      borderBottom: '1px solid rgba(99, 102, 241, 0.15)'
+                      backgroundColor: isActiveCase ? '#4f46e5' : 'rgba(30, 41, 59, 0.9)',
+                      borderBottom: '1px solid rgba(99, 102, 241, 0.3)'
                     }}
                   >
                     <span
-                      className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                      className="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold"
                       style={{
-                        backgroundColor: isActiveCase ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
-                        color: isActiveCase ? 'white' : '#a5b4fc'
+                        backgroundColor: isActiveCase ? 'rgba(255,255,255,0.2)' : 'rgba(99, 102, 241, 0.4)',
+                        color: 'white'
                       }}
                     >
                       {idx}
                     </span>
                     <span
                       className="text-xs font-medium truncate"
-                      style={{ color: isActiveCase ? '#e0e7ff' : '#64748b' }}
+                      style={{ color: isActiveCase ? 'white' : '#94a3b8' }}
                     >
                       {c.label}
                     </span>
                     {isActiveCase && (
-                      <div className="ml-auto flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[10px] text-emerald-400">aktiv</span>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] text-emerald-300 font-medium">aktiv</span>
+                      </div>
+                    )}
+                    {!isActiveCase && (
+                      <div className="ml-auto">
+                        <Icons.Pause className="w-3 h-3 text-slate-500" />
                       </div>
                     )}
                   </div>
                   <div
-                    className="flex-1 relative"
+                    className="flex-1 relative overflow-hidden"
                     data-case-drop-zone={node.id}
                     data-case-index={idx}
                     style={{
-                      backgroundImage: isActiveCase
-                        ? 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 1px, transparent 1px)'
-                        : 'radial-gradient(circle, rgba(99, 102, 241, 0.04) 1px, transparent 1px)',
-                      backgroundSize: '16px 16px',
+                      backgroundColor: isActiveCase ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.6)',
+                      backgroundImage: `
+                        radial-gradient(circle, ${isActiveCase ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.1)'} 1px, transparent 1px)
+                      `,
+                      backgroundSize: '20px 20px',
+                      backgroundPosition: '10px 10px',
                       pointerEvents: 'auto',
-                      opacity: isSelected ? 1 : (isActiveCase ? 0.8 : 0.4)
+                      opacity: isSelected ? 1 : (isActiveCase ? 1 : 0.5)
                     }}
                     onPointerDown={e => e.stopPropagation()}
-                  />
+                  >
+                    {!isActiveCase && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="text-slate-600 text-[10px] font-medium px-2 py-1 bg-slate-800/50 rounded">
+                          Inaktiv - Case {idx}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
             {cases.length === 0 && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center opacity-40">
-                  <Icons.AlertCircle className="w-6 h-6 mx-auto mb-1 text-indigo-400" />
-                  <p className="text-xs text-indigo-300">Keine Cases definiert</p>
-                  <p className="text-[10px] text-slate-500 mt-1">Im Properties Panel Cases hinzufuegen</p>
+              <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)' }}>
+                <div className="text-center">
+                  <Icons.Layers className="w-8 h-8 mx-auto mb-2 text-indigo-400/50" />
+                  <p className="text-sm text-indigo-300/70 font-medium">Keine Cases</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Properties Panel: Cases hinzufuegen</p>
                 </div>
               </div>
             )}

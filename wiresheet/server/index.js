@@ -436,18 +436,27 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
   nodes.forEach(n => visit(n.id));
 
   const caseContainerActiveCase = new Map();
+
+  const updateCaseContainerValue = (containerId) => {
+    const node = nodes.find(n => n.id === containerId);
+    if (!node || node.type !== 'case-container') return;
+
+    const containerConns = connections.filter(c => c.target === containerId);
+    let caseVal = 0;
+    for (const conn of containerConns) {
+      if (nodeValues[conn.source] !== undefined) {
+        caseVal = parseInt(nodeValues[conn.source]) || 0;
+        break;
+      }
+    }
+    caseContainerActiveCase.set(containerId, caseVal);
+    nodeValues[containerId] = caseVal;
+    console.log(`Case Container ${containerId} aktiver Case: ${caseVal}`);
+  };
+
   for (const node of nodes) {
     if (node.type === 'case-container') {
-      const containerConns = connections.filter(c => c.target === node.id);
-      let caseVal = 0;
-      for (const conn of containerConns) {
-        if (nodeValues[conn.source] !== undefined) {
-          caseVal = parseInt(nodeValues[conn.source]) || 0;
-          break;
-        }
-      }
-      caseContainerActiveCase.set(node.id, caseVal);
-      nodeValues[node.id] = caseVal;
+      updateCaseContainerValue(node.id);
     }
   }
 
@@ -455,12 +464,18 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) continue;
 
+    if (node.type === 'case-container') {
+      updateCaseContainerValue(node.id);
+      continue;
+    }
+
     if (node.data.parentContainerId) {
       const parentContainer = nodes.find(n => n.id === node.data.parentContainerId);
       if (parentContainer && parentContainer.type === 'case-container') {
         const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
         const nodeCase = node.data.caseIndex;
         if (nodeCase !== undefined && nodeCase !== activeCase) {
+          console.log(`Node ${nodeId} uebersprungen - Case ${nodeCase} nicht aktiv (aktiv: ${activeCase})`);
           continue;
         }
       }
@@ -591,9 +606,6 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
         console.log(`Python Script ${nodeId}: Kein Code vorhanden, ueberspringe`);
         nodeValues[nodeId] = null;
       }
-    } else if (node.type === 'case-container') {
-      const caseVal = parseInt(inputVals[0]) || 0;
-      nodeValues[nodeId] = caseVal;
     } else if (node.type === 'ha-output' && node.data.entityId) {
       const val = inputVals[0];
       if (val !== null && val !== undefined) {
