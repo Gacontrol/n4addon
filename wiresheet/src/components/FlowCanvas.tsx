@@ -2,19 +2,43 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection, DatapointOverride } from '../types/flow';
+import { Trash2, Copy, Clipboard } from 'lucide-react';
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  type: 'node' | 'connection' | 'canvas';
+  targetId?: string;
+}
+
+interface LassoState {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
 
 interface FlowCanvasProps {
   nodes: FlowNodeType[];
   connections: Connection[];
-  selectedNode: string | null;
+  selectedNodes: Set<string>;
+  selectedConnection: string | null;
   connectingFrom: { nodeId: string; portId: string } | null;
+  clipboard: { nodes: FlowNodeType[]; connections: Connection[] } | null;
   onNodePositionChange: (id: string, x: number, y: number) => void;
-  onNodeSelect: (id: string) => void;
+  onMultipleNodePositionsChange: (updates: Array<{ id: string; x: number; y: number }>) => void;
+  onNodeSelect: (id: string, addToSelection?: boolean) => void;
+  onNodesSelect: (ids: string[]) => void;
   onNodeDelete: (id: string) => void;
   onConnectionStart: (nodeId: string, portId: string) => void;
   onConnectionEnd: (nodeId: string, portId: string) => void;
   onConnectionCancel: () => void;
-  onCanvasClick: () => void;
+  onConnectionSelect: (id: string | null) => void;
+  onConnectionDelete: (id: string) => void;
+  onClearSelection: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
+  onDeleteSelected: () => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
@@ -23,15 +47,24 @@ interface FlowCanvasProps {
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   nodes,
   connections,
-  selectedNode,
+  selectedNodes,
+  selectedConnection,
   connectingFrom,
+  clipboard,
   onNodePositionChange,
+  onMultipleNodePositionsChange,
   onNodeSelect,
+  onNodesSelect,
   onNodeDelete,
   onConnectionStart,
   onConnectionEnd,
   onConnectionCancel,
-  onCanvasClick,
+  onConnectionSelect,
+  onConnectionDelete,
+  onClearSelection,
+  onCopy,
+  onPaste,
+  onDeleteSelected,
   ghostNode,
   liveValues = {},
   onOverrideChange
@@ -39,6 +72,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [, forceUpdate] = useState(0);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [lasso, setLasso] = useState<LassoState | null>(null);
+  const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
+  const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
@@ -53,6 +91,36 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   useEffect(() => {
     forceUpdate(n => n + 1);
   }, [nodes]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onDeleteSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        onCopy();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        onPaste();
+      } else if (e.key === 'Escape') {
+        onClearSelection();
+        onConnectionCancel();
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onDeleteSelected, onCopy, onPaste, onClearSelection, onConnectionCancel]);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
 
   const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
     if (!canvasRef.current) return null;
@@ -81,10 +149,136 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   };
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 2) return;
     const target = e.target as HTMLElement;
-    if (target === e.currentTarget || target.id === 'flow-canvas' || target.closest('#canvas-bg')) {
-      onCanvasClick();
-      if (connectingFrom) onConnectionCancel();
+    if (target === e.currentTarget || target.id === 'flow-canvas' || target.closest('#canvas-bg') || target.closest('svg')) {
+      if (connectingFrom) {
+        onConnectionCancel();
+        return;
+      }
+
+      if (!e.shiftKey) {
+        onClearSelection();
+      }
+
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      setLasso({ startX: x, startY: y, currentX: x, currentY: y });
+    }
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent) => {
+    if (lasso && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      setLasso(prev => prev ? {
+        ...prev,
+        currentX: e.clientX - rect.left,
+        currentY: e.clientY - rect.top
+      } : null);
+    }
+
+    if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const dx = e.clientX - rect.left - dragStartMouse.current.x;
+      const dy = e.clientY - rect.top - dragStartMouse.current.y;
+
+      const updates: Array<{ id: string; x: number; y: number }> = [];
+      dragStartPositions.current.forEach((pos, id) => {
+        updates.push({ id, x: Math.max(0, pos.x + dx), y: Math.max(0, pos.y + dy) });
+      });
+      onMultipleNodePositionsChange(updates);
+    }
+  };
+
+  const handleCanvasPointerUp = () => {
+    if (lasso) {
+      const minX = Math.min(lasso.startX, lasso.currentX);
+      const maxX = Math.max(lasso.startX, lasso.currentX);
+      const minY = Math.min(lasso.startY, lasso.currentY);
+      const maxY = Math.max(lasso.startY, lasso.currentY);
+
+      if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
+        const selectedIds = nodes.filter(node => {
+          const nx = node.position.x;
+          const ny = node.position.y;
+          const nw = 180;
+          const nh = 60;
+          return nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
+        }).map(n => n.id);
+
+        if (selectedIds.length > 0) {
+          onNodesSelect(selectedIds);
+        }
+      }
+      setLasso(null);
+    }
+
+    if (isDraggingMultiple) {
+      setIsDraggingMultiple(false);
+      dragStartPositions.current.clear();
+      dragStartMouse.current = null;
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    setContextMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      type: 'canvas'
+    });
+  };
+
+  const handleNodeContextMenu = (nodeId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+
+    if (!selectedNodes.has(nodeId)) {
+      onNodeSelect(nodeId);
+    }
+
+    setContextMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      type: 'node',
+      targetId: nodeId
+    });
+  };
+
+  const handleConnectionClick = (connId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onConnectionSelect(connId);
+  };
+
+  const handleConnectionContextMenu = (connId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    onConnectionSelect(connId);
+    setContextMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      type: 'connection',
+      targetId: connId
+    });
+  };
+
+  const handleMultiDragStart = (nodeId: string, e: React.PointerEvent) => {
+    if (selectedNodes.size > 1 && selectedNodes.has(nodeId) && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      dragStartMouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      dragStartPositions.current.clear();
+      nodes.filter(n => selectedNodes.has(n.id)).forEach(n => {
+        dragStartPositions.current.set(n.id, { x: n.position.x, y: n.position.y });
+      });
+      setIsDraggingMultiple(true);
     }
   };
 
@@ -92,12 +286,22 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     ? getPortCenter(connectingFrom.nodeId, connectingFrom.portId)
     : null;
 
+  const lassoRect = lasso ? {
+    x: Math.min(lasso.startX, lasso.currentX),
+    y: Math.min(lasso.startY, lasso.currentY),
+    width: Math.abs(lasso.currentX - lasso.startX),
+    height: Math.abs(lasso.currentY - lasso.startY)
+  } : null;
+
   return (
     <div
       id="flow-canvas"
       ref={canvasRef}
       className="flex-1 relative overflow-hidden"
       onPointerDown={handleCanvasPointerDown}
+      onPointerMove={handleCanvasPointerMove}
+      onPointerUp={handleCanvasPointerUp}
+      onContextMenu={handleContextMenu}
       style={{
         background: '#0f172a',
         backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
@@ -107,7 +311,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       <svg
         id="canvas-bg"
         className="absolute inset-0 w-full h-full"
-        style={{ zIndex: 0, pointerEvents: 'none' }}
+        style={{ zIndex: 0 }}
       >
         <defs>
           <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -116,6 +320,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           <marker id="arr-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="#60a5fa" />
           </marker>
+          <marker id="arr-selected" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" />
+          </marker>
         </defs>
 
         {connections.map(conn => {
@@ -123,13 +330,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           const end = getPortCenter(conn.target, conn.targetPort);
           if (!start || !end) return null;
           const connValue = liveValues[conn.source];
+          const isSelected = selectedConnection === conn.id;
           return (
             <ConnectionLine
               key={conn.id}
               x1={start.x} y1={start.y}
               x2={end.x} y2={end.y}
-              color="#10b981"
+              color={isSelected ? '#f59e0b' : '#10b981'}
               liveValue={connValue}
+              isSelected={isSelected}
+              onClick={(e) => handleConnectionClick(conn.id, e)}
+              onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
             />
           );
         })}
@@ -140,6 +351,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             x2={mousePos.x} y2={mousePos.y}
             color="#60a5fa"
             isActive
+          />
+        )}
+
+        {lassoRect && lassoRect.width > 5 && lassoRect.height > 5 && (
+          <rect
+            x={lassoRect.x}
+            y={lassoRect.y}
+            width={lassoRect.width}
+            height={lassoRect.height}
+            fill="rgba(59, 130, 246, 0.1)"
+            stroke="#3b82f6"
+            strokeWidth="1"
+            strokeDasharray="4 2"
           />
         )}
       </svg>
@@ -160,9 +384,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             <FlowNode
               key={node.id}
               node={node}
-              isSelected={selectedNode === node.id}
+              isSelected={selectedNodes.has(node.id)}
               onPositionChange={onNodePositionChange}
-              onSelect={onNodeSelect}
+              onSelect={(id, e) => {
+                const addToSelection = e?.ctrlKey || e?.metaKey || e?.shiftKey;
+                onNodeSelect(id, addToSelection);
+              }}
               onDelete={onNodeDelete}
               onPortClick={handlePortClick}
               onOverrideChange={onOverrideChange}
@@ -170,6 +397,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               connectingFromNodeId={connectingFrom?.nodeId}
               liveValues={liveValues}
               portValues={portValues}
+              onContextMenu={handleNodeContextMenu}
+              onMultiDragStart={handleMultiDragStart}
+              isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
+              isDraggingMultiple={isDraggingMultiple}
             />
           );
         })}
@@ -200,7 +431,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
       {connectingFrom && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white px-4 py-1.5 rounded-full text-xs font-medium pointer-events-none" style={{ zIndex: 60 }}>
-          Eingangs-Port auswählen — Klick auf Canvas zum Abbrechen
+          Eingangs-Port auswaehlen - Klick auf Canvas zum Abbrechen
         </div>
       )}
 
@@ -209,6 +440,56 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           <div className="text-center opacity-40">
             <p className="text-slate-400 text-sm">Bausteine aus der Palette links hierher ziehen</p>
           </div>
+        </div>
+      )}
+
+      {contextMenu && (
+        <div
+          className="absolute bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 z-50 min-w-40"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={e => e.stopPropagation()}
+        >
+          {contextMenu.type === 'node' && (
+            <>
+              <button
+                onClick={() => { onCopy(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors text-left"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Kopieren (Ctrl+C)
+              </button>
+              <button
+                onClick={() => { onDeleteSelected(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-slate-700 transition-colors text-left"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Loeschen (Del)
+              </button>
+            </>
+          )}
+          {contextMenu.type === 'connection' && (
+            <button
+              onClick={() => { if (contextMenu.targetId) onConnectionDelete(contextMenu.targetId); setContextMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-slate-700 transition-colors text-left"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Verbindung loeschen (Del)
+            </button>
+          )}
+          {contextMenu.type === 'canvas' && (
+            <button
+              onClick={() => { onPaste(); setContextMenu(null); }}
+              disabled={!clipboard || clipboard.nodes.length === 0}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
+                clipboard && clipboard.nodes.length > 0
+                  ? 'text-slate-300 hover:bg-slate-700'
+                  : 'text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              <Clipboard className="w-3.5 h-3.5" />
+              Einfuegen (Ctrl+V)
+            </button>
+          )}
         </div>
       )}
     </div>

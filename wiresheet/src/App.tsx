@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -31,17 +31,27 @@ function App() {
     loadPages,
     nodes,
     connections,
-    selectedNode,
+    selectedNodes,
+    selectedConnection,
     connectingFrom,
+    clipboard,
     addNode,
     updateNodePosition,
+    updateMultipleNodePositions,
     updateNodeData,
     updateNodeOverride,
     deleteNode,
+    deleteConnection,
+    selectNode,
+    selectNodes,
+    clearSelection,
+    selectConnection,
+    copySelection,
+    pasteClipboard,
+    deleteSelected,
     startConnection,
     endConnection,
-    cancelConnection,
-    setSelectedNode
+    cancelConnection
   } = useWiresheetPages();
 
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
@@ -102,7 +112,7 @@ function App() {
           };
 
           addNode(newNode);
-          setSelectedNode(newNode.id);
+          selectNode(newNode.id);
         }
       }
 
@@ -116,9 +126,11 @@ function App() {
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [addNode, setSelectedNode]);
+  }, [addNode, selectNode]);
 
-  const selectedNodeData = nodes.find(n => n.id === selectedNode) || null;
+  const selectedNodeData = selectedNodes.size === 1
+    ? nodes.find(n => selectedNodes.has(n.id)) || null
+    : null;
 
   const handleApplyCycleTime = () => {
     const ms = parseInt(cycleInput);
@@ -300,15 +312,24 @@ function App() {
         <FlowCanvas
           nodes={nodes}
           connections={connections}
-          selectedNode={selectedNode}
+          selectedNodes={selectedNodes}
+          selectedConnection={selectedConnection}
           connectingFrom={connectingFrom}
+          clipboard={clipboard}
           onNodePositionChange={updateNodePosition}
-          onNodeSelect={setSelectedNode}
+          onMultipleNodePositionsChange={updateMultipleNodePositions}
+          onNodeSelect={selectNode}
+          onNodesSelect={selectNodes}
           onNodeDelete={deleteNode}
           onConnectionStart={startConnection}
           onConnectionEnd={endConnection}
           onConnectionCancel={cancelConnection}
-          onCanvasClick={() => setSelectedNode(null)}
+          onConnectionSelect={selectConnection}
+          onConnectionDelete={deleteConnection}
+          onClearSelection={clearSelection}
+          onCopy={copySelection}
+          onPaste={pasteClipboard}
+          onDeleteSelected={deleteSelected}
           ghostNode={ghostNode}
           liveValues={liveValues}
           onOverrideChange={updateNodeOverride}
@@ -317,7 +338,7 @@ function App() {
         {selectedNodeData && (
           <PropertiesPanel
             node={selectedNodeData}
-            onClose={() => setSelectedNode(null)}
+            onClose={() => clearSelection()}
             onUpdateNode={updateNodeData}
             haEntities={haEntities}
             haLoading={haLoading}
@@ -332,6 +353,16 @@ function App() {
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>
             {nodes.length} Knoten &middot; {connections.length} Verbindungen
+            {selectedNodes.size > 0 && (
+              <span className="ml-2 text-blue-400">
+                {selectedNodes.size} ausgewaehlt
+              </span>
+            )}
+            {selectedConnection && (
+              <span className="ml-2 text-amber-400">
+                Verbindung ausgewaehlt
+              </span>
+            )}
             {activePage.running && (
               <span className="ml-2 text-emerald-400 font-medium">
                 Laeuft ({activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`} Zyklus)

@@ -11,14 +11,18 @@ interface FlowNodeProps {
   node: FlowNodeType;
   isSelected: boolean;
   onPositionChange: (id: string, x: number, y: number) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, e?: React.PointerEvent | React.MouseEvent) => void;
   onDelete: (id: string) => void;
   onPortClick: (nodeId: string, portId: string, isOutput: boolean) => void;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
+  onContextMenu?: (nodeId: string, e: React.MouseEvent) => void;
+  onMultiDragStart?: (nodeId: string, e: React.PointerEvent) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
   portValues?: Record<string, unknown>;
+  isMultiSelected?: boolean;
+  isDraggingMultiple?: boolean;
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -29,14 +33,18 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onDelete,
   onPortClick,
   onOverrideChange,
+  onContextMenu,
+  onMultiDragStart,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
-  portValues = {}
+  portValues = {},
+  isMultiSelected = false,
+  isDraggingMultiple = false
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [dpContextMenu, setDpContextMenu] = useState<ContextMenuState | null>(null);
   const [overrideInput, setOverrideInput] = useState<string>('');
   const [showOverrideInput, setShowOverrideInput] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -68,10 +76,16 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (target.closest('[data-action="context"]')) return;
 
     e.stopPropagation();
+
+    if (isMultiSelected && !isDraggingMultiple) {
+      onMultiDragStart?.(node.id, e);
+      return;
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    onSelect(node.id);
-    setContextMenu(null);
+    onSelect(node.id, e);
+    setDpContextMenu(null);
 
     const rect = nodeRef.current?.getBoundingClientRect();
     if (rect) {
@@ -80,7 +94,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || isDraggingMultiple) return;
     e.stopPropagation();
     const canvas = document.getElementById('flow-canvas');
     if (!canvas) return;
@@ -97,22 +111,26 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    if (!isDPNode) return;
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-    const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
-    setOverrideInput(currentVal);
+
+    if (isDPNode) {
+      setDpContextMenu({ x: e.clientX, y: e.clientY });
+      const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
+      setOverrideInput(currentVal);
+    } else {
+      onContextMenu?.(node.id, e);
+    }
   };
 
   const handleSetManual = () => {
     setShowOverrideInput(true);
-    setContextMenu(null);
+    setDpContextMenu(null);
   };
 
   const handleSetAuto = () => {
     onOverrideChange?.(node.id, { manual: false, value: null });
-    setContextMenu(null);
+    setDpContextMenu(null);
     setShowOverrideInput(false);
   };
 
@@ -197,7 +215,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     e.stopPropagation();
                     const rect = nodeRef.current?.getBoundingClientRect();
                     if (rect) {
-                      setContextMenu({ x: rect.right, y: rect.top });
+                      setDpContextMenu({ x: rect.right, y: rect.top });
                       const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
                       setOverrideInput(currentVal);
                     }
@@ -224,7 +242,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 text-xs">
                 <Icons.Link className="w-3 h-3 text-slate-400 flex-shrink-0" />
                 <span className="text-slate-300 truncate font-mono text-[10px]">
-                  {data.entityId || 'entity.id wählen...'}
+                  {data.entityId || 'entity.id waehlen...'}
                 </span>
               </div>
             </div>
@@ -359,7 +377,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
                     {hasPortVal && (
                       <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1 py-0.5 rounded leading-none max-w-16 truncate">
-                        {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '…' : String(portVal)}
+                        {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '...' : String(portVal)}
                       </span>
                     )}
                   </div>
@@ -377,7 +395,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       <span className={`text-[9px] font-mono px-1 py-0.5 rounded leading-none max-w-16 truncate ${
                         isManual ? 'text-red-400 bg-red-950/60' : 'text-emerald-400 bg-emerald-950/60'
                       }`}>
-                        {String(outVal).length > 8 ? String(outVal).slice(0, 8) + '…' : String(outVal)}
+                        {String(outVal).length > 8 ? String(outVal).slice(0, 8) + '...' : String(outVal)}
                       </span>
                     )}
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
@@ -402,16 +420,16 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         </div>
       </div>
 
-      {contextMenu && isDPNode && (
+      {dpContextMenu && isDPNode && (
         <>
           <div
             className="fixed inset-0 z-40"
-            onClick={() => setContextMenu(null)}
-            onContextMenu={e => { e.preventDefault(); setContextMenu(null); }}
+            onClick={() => setDpContextMenu(null)}
+            onContextMenu={e => { e.preventDefault(); setDpContextMenu(null); }}
           />
           <div
             className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl py-1 w-40"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            style={{ left: dpContextMenu.x, top: dpContextMenu.y }}
             onPointerDown={e => e.stopPropagation()}
           >
             <div className="px-3 py-1.5 border-b border-slate-700">
@@ -432,7 +450,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-300 hover:bg-red-900/30 transition-colors"
             >
               <Icons.HandMetal className="w-3.5 h-3.5" />
-              Manuell übersteuern
+              Manuell uebersteuern
             </button>
           </div>
         </>

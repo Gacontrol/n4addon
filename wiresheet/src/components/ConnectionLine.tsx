@@ -7,7 +7,10 @@ interface ConnectionLineProps {
   y2: number;
   color?: string;
   isActive?: boolean;
+  isSelected?: boolean;
   liveValue?: unknown;
+  onClick?: (e: React.MouseEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export const ConnectionLine: React.FC<ConnectionLineProps> = ({
@@ -17,7 +20,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
   y2,
   color = '#10b981',
   isActive = false,
-  liveValue
+  isSelected = false,
+  liveValue,
+  onClick,
+  onContextMenu
 }) => {
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
@@ -26,19 +32,39 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
 
   const hasValue = liveValue !== undefined && liveValue !== null;
   const displayVal = hasValue ? String(liveValue) : null;
-  const truncated = displayVal && displayVal.length > 10 ? displayVal.slice(0, 10) + '…' : displayVal;
+  const truncated = displayVal && displayVal.length > 10 ? displayVal.slice(0, 10) + '...' : displayVal;
 
   return (
-    <g>
+    <g style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <path
+        d={path}
+        stroke="transparent"
+        strokeWidth={12}
+        fill="none"
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+        style={{ pointerEvents: 'stroke' }}
+      />
       <path
         d={path}
         stroke={color}
-        strokeWidth={isActive ? 3 : 2}
+        strokeWidth={isActive || isSelected ? 3 : 2}
         fill="none"
         strokeLinecap="round"
-        className={isActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'}
-        style={{ transition: 'opacity 0.2s' }}
+        className={isActive || isSelected ? 'opacity-100' : 'opacity-60 hover:opacity-100'}
+        style={{ transition: 'opacity 0.2s', pointerEvents: 'none' }}
       />
+      {isSelected && (
+        <path
+          d={path}
+          stroke={color}
+          strokeWidth={6}
+          fill="none"
+          strokeLinecap="round"
+          opacity={0.3}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
       {hasValue && truncated && !isActive && (
         <>
           <rect
@@ -51,6 +77,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             stroke={color}
             strokeWidth="1"
             opacity="0.9"
+            style={{ pointerEvents: 'none' }}
           />
           <text
             x={midX}
@@ -60,6 +87,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             fontSize="9"
             fontFamily="monospace"
             opacity="1"
+            style={{ pointerEvents: 'none' }}
           >
             {truncated}
           </text>

@@ -39,6 +39,10 @@ export const useWiresheetPages = () => {
   const saveInProgress = useRef(false);
   const pagesRef = useRef<WiresheetPage[]>(pages);
 
+  const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
+  const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<{ nodes: FlowNode[]; connections: Connection[] } | null>(null);
+
   const activePage = pages.find(p => p.id === activePageId) || pages[0];
 
   const loadPages = useCallback(async () => {
@@ -260,10 +264,24 @@ export const useWiresheetPages = () => {
     updateActivePage(p => ({ ...p, nodes: [...p.nodes, node] }));
   }, [updateActivePage]);
 
+  const addNodes = useCallback((newNodes: FlowNode[]) => {
+    updateActivePage(p => ({ ...p, nodes: [...p.nodes, ...newNodes] }));
+  }, [updateActivePage]);
+
   const updateNodePosition = useCallback((nodeId: string, x: number, y: number) => {
     updateActivePage(p => ({
       ...p,
       nodes: p.nodes.map(n => n.id === nodeId ? { ...n, position: { x, y } } : n)
+    }));
+  }, [updateActivePage]);
+
+  const updateMultipleNodePositions = useCallback((updates: Array<{ id: string; x: number; y: number }>) => {
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.map(n => {
+        const upd = updates.find(u => u.id === n.id);
+        return upd ? { ...n, position: { x: upd.x, y: upd.y } } : n;
+      })
     }));
   }, [updateActivePage]);
 
@@ -280,6 +298,21 @@ export const useWiresheetPages = () => {
       nodes: p.nodes.filter(n => n.id !== nodeId),
       connections: p.connections.filter(c => c.source !== nodeId && c.target !== nodeId)
     }));
+    setSelectedNodes(prev => {
+      const next = new Set(prev);
+      next.delete(nodeId);
+      return next;
+    });
+  }, [updateActivePage]);
+
+  const deleteNodes = useCallback((nodeIds: string[]) => {
+    const idSet = new Set(nodeIds);
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.filter(n => !idSet.has(n.id)),
+      connections: p.connections.filter(c => !idSet.has(c.source) && !idSet.has(c.target))
+    }));
+    setSelectedNodes(new Set());
   }, [updateActivePage]);
 
   const addConnection = useCallback((connection: Connection) => {
@@ -293,9 +326,16 @@ export const useWiresheetPages = () => {
     });
   }, [updateActivePage]);
 
+  const addConnections = useCallback((newConns: Connection[]) => {
+    updateActivePage(p => ({ ...p, connections: [...p.connections, ...newConns] }));
+  }, [updateActivePage]);
+
   const deleteConnection = useCallback((connectionId: string) => {
     updateActivePage(p => ({ ...p, connections: p.connections.filter(c => c.id !== connectionId) }));
-  }, [updateActivePage]);
+    if (selectedConnection === connectionId) {
+      setSelectedConnection(null);
+    }
+  }, [updateActivePage, selectedConnection]);
 
   const updateNodeOverride = useCallback((nodeId: string, override: DatapointOverride) => {
     updateActivePage(p => ({
@@ -304,7 +344,87 @@ export const useWiresheetPages = () => {
     }));
   }, [updateActivePage]);
 
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const selectNode = useCallback((nodeId: string, addToSelection = false) => {
+    setSelectedConnection(null);
+    if (addToSelection) {
+      setSelectedNodes(prev => {
+        const next = new Set(prev);
+        if (next.has(nodeId)) {
+          next.delete(nodeId);
+        } else {
+          next.add(nodeId);
+        }
+        return next;
+      });
+    } else {
+      setSelectedNodes(new Set([nodeId]));
+    }
+  }, []);
+
+  const selectNodes = useCallback((nodeIds: string[]) => {
+    setSelectedConnection(null);
+    setSelectedNodes(new Set(nodeIds));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodes(new Set());
+    setSelectedConnection(null);
+  }, []);
+
+  const selectConnectionFn = useCallback((connId: string | null) => {
+    setSelectedNodes(new Set());
+    setSelectedConnection(connId);
+  }, []);
+
+  const copySelection = useCallback(() => {
+    const page = pagesRef.current.find(p => p.id === activePageId);
+    if (!page) return;
+
+    const nodesToCopy = page.nodes.filter(n => selectedNodes.has(n.id));
+    if (nodesToCopy.length === 0) return;
+
+    const nodeIdSet = new Set(nodesToCopy.map(n => n.id));
+    const connsToCopy = page.connections.filter(
+      c => nodeIdSet.has(c.source) && nodeIdSet.has(c.target)
+    );
+
+    setClipboard({ nodes: nodesToCopy, connections: connsToCopy });
+  }, [activePageId, selectedNodes]);
+
+  const pasteClipboard = useCallback((offsetX = 50, offsetY = 50) => {
+    if (!clipboard || clipboard.nodes.length === 0) return;
+
+    const idMap = new Map<string, string>();
+    const newNodes: FlowNode[] = clipboard.nodes.map(n => {
+      const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      idMap.set(n.id, newId);
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + offsetX, y: n.position.y + offsetY }
+      };
+    });
+
+    const newConns: Connection[] = clipboard.connections.map(c => ({
+      ...c,
+      id: `${idMap.get(c.source)}-${c.sourcePort}-${idMap.get(c.target)}-${c.targetPort}`,
+      source: idMap.get(c.source)!,
+      target: idMap.get(c.target)!
+    }));
+
+    addNodes(newNodes);
+    addConnections(newConns);
+    setSelectedNodes(new Set(newNodes.map(n => n.id)));
+  }, [clipboard, addNodes, addConnections]);
+
+  const deleteSelected = useCallback(() => {
+    if (selectedConnection) {
+      deleteConnection(selectedConnection);
+    } else if (selectedNodes.size > 0) {
+      deleteNodes(Array.from(selectedNodes));
+    }
+  }, [selectedConnection, selectedNodes, deleteConnection, deleteNodes]);
+
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; portId: string } | null>(null);
 
   const startConnection = useCallback((nodeId: string, portId: string) => {
@@ -348,18 +468,29 @@ export const useWiresheetPages = () => {
     loadPages,
     nodes: activePage.nodes,
     connections: activePage.connections,
-    selectedNode,
+    selectedNodes,
+    selectedConnection,
     connectingFrom,
+    clipboard,
     addNode,
+    addNodes,
     updateNodePosition,
+    updateMultipleNodePositions,
     updateNodeData,
     deleteNode,
+    deleteNodes,
     addConnection,
     deleteConnection,
     updateNodeOverride,
+    selectNode,
+    selectNodes,
+    clearSelection,
+    selectConnection: selectConnectionFn,
+    copySelection,
+    pasteClipboard,
+    deleteSelected,
     startConnection,
     endConnection,
-    cancelConnection,
-    setSelectedNode
+    cancelConnection
   };
 };
