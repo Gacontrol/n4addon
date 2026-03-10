@@ -47,6 +47,14 @@ export const useFlowEditor = () => {
     setConnections(prev => prev.filter(conn => conn.id !== connectionId));
   }, []);
 
+  const updateNodeData = useCallback((nodeId: string, updates: Partial<FlowNode['data']>) => {
+    setNodes(prev =>
+      prev.map(node =>
+        node.id === nodeId ? { ...node, data: { ...node.data, ...updates } } : node
+      )
+    );
+  }, []);
+
   const startConnection = useCallback((nodeId: string, portId: string) => {
     setConnectingFrom({ nodeId, portId });
   }, []);
@@ -76,6 +84,7 @@ export const useFlowEditor = () => {
     connectingFrom,
     addNode,
     updateNodePosition,
+    updateNodeData,
     deleteNode,
     addConnection,
     deleteConnection,

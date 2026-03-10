@@ -7,6 +7,7 @@ export interface NodePort {
   id: string;
   label: string;
   type: 'input' | 'output';
+  entityId?: string;
 }
 
 export interface FlowNode {
@@ -18,7 +19,9 @@ export interface FlowNode {
     icon?: string;
     inputs: NodePort[];
     outputs: NodePort[];
-    config?: Record<string, any>;
+    config?: Record<string, unknown>;
+    entityId?: string;
+    entityLabel?: string;
   };
 }
 
@@ -34,7 +37,7 @@ export interface NodeTemplate {
   type: string;
   label: string;
   icon: string;
-  category: 'sensor' | 'actuator' | 'logic' | 'trigger';
+  category: 'input' | 'output' | 'logic' | 'trigger';
   color: string;
   inputs: Omit<NodePort, 'id'>[];
   outputs: Omit<NodePort, 'id'>[];

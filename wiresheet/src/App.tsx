@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
+import { PropertiesPanel } from './components/PropertiesPanel';
 import { useFlowEditor } from './hooks/useFlowEditor';
 import { NodeTemplate, FlowNode } from './types/flow';
-import { Save, Upload, Play, Home } from 'lucide-react';
+import { Save, Upload, Workflow } from 'lucide-react';
 
 function App() {
   const {
@@ -13,6 +14,7 @@ function App() {
     connectingFrom,
     addNode,
     updateNodePosition,
+    updateNodeData,
     deleteNode,
     startConnection,
     endConnection,
@@ -20,60 +22,87 @@ function App() {
     setSelectedNode
   } = useFlowEditor();
 
-  const [draggedTemplate, setDraggedTemplate] = useState<NodeTemplate | null>(null);
+  const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
+  const isDraggingFromPalette = useRef(false);
+  const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
-  const handleNodeDragStart = (template: NodeTemplate) => {
-    setDraggedTemplate(template);
-  };
+  const handleNodePointerDown = useCallback((template: NodeTemplate, clientX: number, clientY: number) => {
+    isDraggingFromPalette.current = true;
+    const ghost = { label: template.label, x: clientX, y: clientY, template };
+    ghostNodeRef.current = ghost;
+    setGhostNode(ghost);
+  }, []);
 
-  const handleCanvasDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!draggedTemplate) return;
-
-    const canvas = document.getElementById('flow-canvas');
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left - 100;
-    const y = e.clientY - rect.top - 50;
-
-    const newNode: FlowNode = {
-      id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: draggedTemplate.type,
-      position: { x, y },
-      data: {
-        label: draggedTemplate.label,
-        icon: draggedTemplate.icon,
-        inputs: draggedTemplate.inputs.map((input, idx) => ({
-          ...input,
-          id: `input-${idx}`
-        })),
-        outputs: draggedTemplate.outputs.map((output, idx) => ({
-          ...output,
-          id: `output-${idx}`
-        }))
-      }
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDraggingFromPalette.current) return;
+      const updated = { ...ghostNodeRef.current!, x: e.clientX, y: e.clientY };
+      ghostNodeRef.current = updated;
+      setGhostNode(updated);
     };
 
-    addNode(newNode);
-    setDraggedTemplate(null);
-  };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (!isDraggingFromPalette.current) return;
+      isDraggingFromPalette.current = false;
 
-  const handleCanvasDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
+      const canvas = document.getElementById('flow-canvas');
+      if (canvas && ghostNodeRef.current) {
+        const rect = canvas.getBoundingClientRect();
+        const isOverCanvas = (
+          e.clientX >= rect.left &&
+          e.clientX <= rect.right &&
+          e.clientY >= rect.top &&
+          e.clientY <= rect.bottom
+        );
+
+        if (isOverCanvas) {
+          const template = ghostNodeRef.current.template;
+          const x = e.clientX - rect.left - 90;
+          const y = e.clientY - rect.top - 30;
+
+          const newNode: FlowNode = {
+            id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: template.type,
+            position: { x: Math.max(0, x), y: Math.max(0, y) },
+            data: {
+              label: template.label,
+              icon: template.icon,
+              inputs: template.inputs.map((input, idx) => ({
+                ...input,
+                id: `input-${idx}`
+              })),
+              outputs: template.outputs.map((output, idx) => ({
+                ...output,
+                id: `output-${idx}`
+              }))
+            }
+          };
+
+          addNode(newNode);
+          setSelectedNode(newNode.id);
+        }
+      }
+
+      ghostNodeRef.current = null;
+      setGhostNode(null);
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [addNode, setSelectedNode]);
 
   const handleCanvasClick = () => {
     setSelectedNode(null);
   };
 
-  const handleExport = () => {
-    const data = {
-      nodes,
-      connections,
-      timestamp: new Date().toISOString()
-    };
+  const selectedNodeData = nodes.find(n => n.id === selectedNode) || null;
 
+  const handleExport = () => {
+    const data = { nodes, connections, timestamp: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -90,14 +119,12 @@ function App() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = JSON.parse(e.target?.result as string);
-          console.log('Imported data:', data);
+          JSON.parse(e.target?.result as string);
         } catch (error) {
-          console.error('Fehler beim Import:', error);
+          console.error('Import-Fehler:', error);
         }
       };
       reader.readAsText(file);
@@ -106,90 +133,71 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+    <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
+      <header className="bg-slate-800 border-b border-slate-700 px-5 py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
-              <Home className="w-6 h-6 text-white" />
+            <div className="bg-blue-600 p-1.5 rounded-lg">
+              <Workflow className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Wiresheet Editor</h1>
-              <p className="text-sm text-slate-400">Visueller Flow-Editor für Home Assistant</p>
+              <h1 className="text-base font-bold text-white leading-tight">Wiresheet Editor</h1>
+              <p className="text-xs text-slate-500">Home Assistant Flow-Programmierung</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleImport}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-xs"
             >
-              <Upload className="w-4 h-4" />
-              <span>Importieren</span>
+              <Upload className="w-3.5 h-3.5" />
+              Import
             </button>
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-xs"
             >
-              <Save className="w-4 h-4" />
-              <span>Exportieren</span>
-            </button>
-            <button
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              <span>Ausführen</span>
+              <Save className="w-3.5 h-3.5" />
+              Export
             </button>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <NodePalette onNodeDragStart={handleNodeDragStart} />
+        <NodePalette onNodePointerDown={handleNodePointerDown} />
 
-        <div
-          className="flex-1"
-          onDrop={handleCanvasDrop}
-          onDragOver={handleCanvasDragOver}
-        >
-          <FlowCanvas
-            nodes={nodes}
-            connections={connections}
-            selectedNode={selectedNode}
-            connectingFrom={connectingFrom}
-            onNodePositionChange={updateNodePosition}
-            onNodeSelect={setSelectedNode}
-            onNodeDelete={deleteNode}
-            onConnectionStart={startConnection}
-            onConnectionEnd={endConnection}
-            onConnectionCancel={cancelConnection}
-            onCanvasClick={handleCanvasClick}
+        <FlowCanvas
+          nodes={nodes}
+          connections={connections}
+          selectedNode={selectedNode}
+          connectingFrom={connectingFrom}
+          onNodePositionChange={updateNodePosition}
+          onNodeSelect={setSelectedNode}
+          onNodeDelete={deleteNode}
+          onConnectionStart={startConnection}
+          onConnectionEnd={endConnection}
+          onConnectionCancel={cancelConnection}
+          onCanvasClick={handleCanvasClick}
+          ghostNode={ghostNode}
+        />
+
+        {selectedNodeData && (
+          <PropertiesPanel
+            node={selectedNodeData}
+            onClose={() => setSelectedNode(null)}
+            onUpdateNode={updateNodeData}
           />
-        </div>
-
-        {selectedNode && (
-          <div className="w-80 bg-slate-800 border-l border-slate-700 p-4">
-            <h3 className="text-lg font-semibold text-white mb-3">Eigenschaften</h3>
-            <div className="bg-slate-700 rounded-lg p-3">
-              <p className="text-sm text-slate-400">Node: {selectedNode}</p>
-              <p className="text-xs text-slate-500 mt-2">
-                Konfigurationsoptionen werden hier angezeigt
-              </p>
-            </div>
-          </div>
         )}
       </div>
 
-      <footer className="bg-slate-800 border-t border-slate-700 px-6 py-3">
-        <div className="flex items-center justify-between text-sm text-slate-400">
-          <div>
-            Nodes: {nodes.length} | Verbindungen: {connections.length}
-          </div>
-          <div>
-            Wiresheet Editor für Home Assistant
-          </div>
+      <div className="bg-slate-800 border-t border-slate-700 px-5 py-1.5 flex-shrink-0">
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>{nodes.length} Knoten &middot; {connections.length} Verbindungen</span>
+          <span>Wiresheet für Home Assistant</span>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

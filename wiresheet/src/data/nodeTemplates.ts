@@ -2,88 +2,72 @@ import { NodeTemplate } from '../types/flow';
 
 export const nodeTemplates: NodeTemplate[] = [
   {
-    type: 'temperature-sensor',
-    label: 'Temperatur Sensor',
-    icon: 'Thermometer',
-    category: 'sensor',
+    type: 'ha-input',
+    label: 'HA Eingang',
+    icon: 'ArrowRightToLine',
+    category: 'input',
     color: '#3b82f6',
     inputs: [],
     outputs: [
-      { label: 'Wert', type: 'output' },
-      { label: 'Status', type: 'output' }
+      { label: 'Wert', type: 'output' }
     ],
-    description: 'Liest Temperaturwerte aus'
+    description: 'Liest einen HA Entity-Wert'
   },
   {
-    type: 'motion-sensor',
-    label: 'Bewegungsmelder',
-    icon: 'Activity',
-    category: 'sensor',
-    color: '#3b82f6',
-    inputs: [],
-    outputs: [
-      { label: 'Bewegung', type: 'output' }
-    ],
-    description: 'Erkennt Bewegungen'
-  },
-  {
-    type: 'light-switch',
-    label: 'Licht Schalter',
-    icon: 'Lightbulb',
-    category: 'actuator',
+    type: 'ha-output',
+    label: 'HA Ausgang',
+    icon: 'ArrowRightFromLine',
+    category: 'output',
     color: '#f59e0b',
     inputs: [
-      { label: 'Ein/Aus', type: 'input' },
-      { label: 'Helligkeit', type: 'input' }
+      { label: 'Wert', type: 'input' }
     ],
-    outputs: [
-      { label: 'Status', type: 'output' }
-    ],
-    description: 'Steuert Lichtquellen'
-  },
-  {
-    type: 'switch',
-    label: 'Schalter',
-    icon: 'ToggleLeft',
-    category: 'actuator',
-    color: '#f59e0b',
-    inputs: [
-      { label: 'Signal', type: 'input' }
-    ],
-    outputs: [
-      { label: 'Status', type: 'output' }
-    ],
-    description: 'Generischer Schalter'
+    outputs: [],
+    description: 'Schreibt einen HA Entity-Wert'
   },
   {
     type: 'and-gate',
-    label: 'UND Gatter',
+    label: 'UND',
     icon: 'GitMerge',
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Eingang A', type: 'input' },
-      { label: 'Eingang B', type: 'input' }
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
     ],
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Logisches UND'
+    description: 'Logisches UND (A AND B)'
   },
   {
     type: 'or-gate',
-    label: 'ODER Gatter',
+    label: 'ODER',
     icon: 'GitBranch',
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Eingang A', type: 'input' },
-      { label: 'Eingang B', type: 'input' }
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
     ],
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Logisches ODER'
+    description: 'Logisches ODER (A OR B)'
+  },
+  {
+    type: 'not-gate',
+    label: 'NICHT',
+    icon: 'Ban',
+    category: 'logic',
+    color: '#10b981',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Logisches NICHT (NOT)'
   },
   {
     type: 'compare',
@@ -96,9 +80,9 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'Wert B', type: 'input' }
     ],
     outputs: [
-      { label: 'Größer', type: 'output' },
-      { label: 'Gleich', type: 'output' },
-      { label: 'Kleiner', type: 'output' }
+      { label: 'A > B', type: 'output' },
+      { label: 'A = B', type: 'output' },
+      { label: 'A < B', type: 'output' }
     ],
     description: 'Vergleicht zwei Werte'
   },
@@ -117,11 +101,26 @@ export const nodeTemplates: NodeTemplate[] = [
     description: 'Verzögert ein Signal'
   },
   {
+    type: 'threshold',
+    label: 'Schwellwert',
+    icon: 'TrendingUp',
+    category: 'logic',
+    color: '#10b981',
+    inputs: [
+      { label: 'Wert', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Über', type: 'output' },
+      { label: 'Unter', type: 'output' }
+    ],
+    description: 'Prüft gegen Schwellwert'
+  },
+  {
     type: 'time-trigger',
     label: 'Zeit Trigger',
     icon: 'CalendarClock',
     category: 'trigger',
-    color: '#8b5cf6',
+    color: '#0ea5e9',
     inputs: [],
     outputs: [
       { label: 'Trigger', type: 'output' }
@@ -133,7 +132,7 @@ export const nodeTemplates: NodeTemplate[] = [
     label: 'Status Trigger',
     icon: 'Zap',
     category: 'trigger',
-    color: '#8b5cf6',
+    color: '#0ea5e9',
     inputs: [
       { label: 'Status', type: 'input' }
     ],
