@@ -28,6 +28,7 @@ interface FlowNodeProps {
   isMultiSelected?: boolean;
   isDraggingMultiple?: boolean;
   parentContainer?: FlowNodeType | null;
+  zoom?: number;
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -50,7 +51,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   portValues = {},
   isMultiSelected = false,
   isDraggingMultiple = false,
-  parentContainer = null
+  parentContainer = null,
+  zoom = 1
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -175,7 +177,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     e.stopPropagation();
 
     if (isDPNode) {
-      setDpContextMenu({ x: e.clientX, y: e.clientY });
+      const canvas = document.getElementById('flow-canvas');
+      if (canvas) {
+        const canvasRect = canvas.getBoundingClientRect();
+        const x = canvasRect.left + (node.position.x + 190) * zoom;
+        const y = canvasRect.top + node.position.y * zoom;
+        setDpContextMenu({ x, y });
+      } else {
+        setDpContextMenu({ x: e.clientX, y: e.clientY });
+      }
       const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
       setOverrideInput(currentVal);
     } else {
@@ -579,9 +589,12 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation();
-                    const rect = nodeRef.current?.getBoundingClientRect();
-                    if (rect) {
-                      setDpContextMenu({ x: rect.right, y: rect.top });
+                    const canvas = document.getElementById('flow-canvas');
+                    if (canvas) {
+                      const canvasRect = canvas.getBoundingClientRect();
+                      const x = canvasRect.left + (node.position.x + 190) * zoom;
+                      const y = canvasRect.top + node.position.y * zoom;
+                      setDpContextMenu({ x, y });
                       const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
                       setOverrideInput(currentVal);
                     }

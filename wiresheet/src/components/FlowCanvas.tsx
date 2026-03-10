@@ -495,6 +495,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onCaseResize={onCaseResize}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
+                zoom={zoom}
               />
             );
           })}
@@ -601,6 +602,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
                 parentContainer={parentContainer}
+                zoom={zoom}
               />
             );
           })}
