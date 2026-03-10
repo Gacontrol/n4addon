@@ -37,6 +37,7 @@ function App() {
     selectedNodes,
     selectedConnection,
     connectingFrom,
+    connectingFromRef,
     clipboard,
     addNode,
     updateNodePosition,
@@ -639,6 +640,7 @@ function App() {
           selectedNodes={selectedNodes}
           selectedConnection={selectedConnection}
           connectingFrom={connectingFrom}
+          connectingFromRef={connectingFromRef}
           clipboard={clipboard}
           onNodePositionChange={updateNodePosition}
           onMultipleNodePositionsChange={updateMultipleNodePositions}

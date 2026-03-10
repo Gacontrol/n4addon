@@ -781,6 +781,7 @@ export const useWiresheetPages = () => {
     selectedNodes,
     selectedConnection,
     connectingFrom,
+    connectingFromRef,
     clipboard,
     addNode,
     addNodes,

@@ -24,6 +24,7 @@ interface FlowCanvasProps {
   selectedNodes: Set<string>;
   selectedConnection: string | null;
   connectingFrom: { nodeId: string; portId: string } | null;
+  connectingFromRef: React.MutableRefObject<{ nodeId: string; portId: string } | null>;
   clipboard: { nodes: FlowNodeType[]; connections: Connection[] } | null;
   onNodePositionChange: (id: string, x: number, y: number) => void;
   onMultipleNodePositionsChange: (updates: Array<{ id: string; x: number; y: number }>) => void;
@@ -59,6 +60,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   selectedNodes,
   selectedConnection,
   connectingFrom,
+  connectingFromRef,
   clipboard,
   onNodePositionChange,
   onMultipleNodePositionsChange,
@@ -95,8 +97,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
-  const connectingFromRef = useRef(connectingFrom);
-  connectingFromRef.current = connectingFrom;
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
