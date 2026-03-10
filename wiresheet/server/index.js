@@ -47,7 +47,7 @@ async function haPost(path, body) {
   return response.data;
 }
 
-app.get('/pages', async (req, res) => {
+app.get(['/pages', '/api/pages'], async (req, res) => {
   try {
     const data = await fs.readFile(PAGES_FILE, 'utf-8');
     res.json(JSON.parse(data));
@@ -63,7 +63,7 @@ app.get('/pages', async (req, res) => {
   }
 });
 
-app.post('/pages', async (req, res) => {
+app.post(['/pages', '/api/pages'], async (req, res) => {
   try {
     await ensureDataDir();
     await fs.writeFile(PAGES_FILE, JSON.stringify(req.body, null, 2));
@@ -74,7 +74,7 @@ app.post('/pages', async (req, res) => {
   }
 });
 
-app.get('/ha/states', async (req, res) => {
+app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
   try {
     const data = await haGet('/states');
     res.json(data);
@@ -84,7 +84,7 @@ app.get('/ha/states', async (req, res) => {
   }
 });
 
-app.get('/ha/states/:entityId', async (req, res) => {
+app.get(['/ha/states/:entityId', '/api/ha/states/:entityId'], async (req, res) => {
   try {
     const data = await haGet(`/states/${req.params.entityId}`);
     res.json(data);
@@ -93,7 +93,7 @@ app.get('/ha/states/:entityId', async (req, res) => {
   }
 });
 
-app.get('/ha/services', async (req, res) => {
+app.get(['/ha/services', '/api/ha/services'], async (req, res) => {
   try {
     const data = await haGet('/services');
     res.json(data);
@@ -102,7 +102,7 @@ app.get('/ha/services', async (req, res) => {
   }
 });
 
-app.post('/ha/services/:domain/:service', async (req, res) => {
+app.post(['/ha/services/:domain/:service', '/api/ha/services/:domain/:service'], async (req, res) => {
   try {
     const { domain, service } = req.params;
     const data = await haPost(`/services/${domain}/${service}`, req.body);
@@ -112,7 +112,7 @@ app.post('/ha/services/:domain/:service', async (req, res) => {
   }
 });
 
-app.post('/ha/call', async (req, res) => {
+app.post(['/ha/call', '/api/ha/call'], async (req, res) => {
   try {
     const { domain, service, data: serviceData } = req.body;
     const result = await haPost(`/services/${domain}/${service}`, serviceData || {});
@@ -122,7 +122,7 @@ app.post('/ha/call', async (req, res) => {
   }
 });
 
-app.post('/pages/:pageId/execute', async (req, res) => {
+app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
   const { nodes, connections, manualOverrides = {} } = req.body;
   try {
     const nodeValues = {};

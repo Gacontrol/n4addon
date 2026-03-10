@@ -18,6 +18,7 @@ interface FlowNodeProps {
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
+  portValues?: Record<string, unknown>;
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -30,7 +31,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onOverrideChange,
   isConnecting,
   connectingFromNodeId,
-  liveValues = {}
+  liveValues = {},
+  portValues = {}
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -334,43 +336,68 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </div>
           )}
 
-          <div className="py-2">
-            {data.inputs.map(input => (
-              <div key={input.id} className="flex items-center py-0.5">
-                <button
-                  className="node-port w-3 h-3 rounded-full border-2 -ml-1.5 flex-shrink-0 transition-all"
-                  style={{
-                    borderColor: isConnecting && connectingFromNodeId !== node.id ? '#60a5fa' : '#475569',
-                    backgroundColor: isConnecting && connectingFromNodeId !== node.id ? '#1d4ed8' : '#1e293b',
-                    boxShadow: isConnecting && connectingFromNodeId !== node.id ? '0 0 8px #60a5fa' : 'none',
-                    cursor: 'crosshair'
-                  }}
-                  data-port-id={`${node.id}-${input.id}`}
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
-                  title={input.label}
-                />
-                <span className="text-xs text-slate-400 pl-2 pr-3 leading-none">{input.label}</span>
-              </div>
-            ))}
+          <div className="py-1.5">
+            {data.inputs.map(input => {
+              const portVal = portValues[input.id];
+              const hasPortVal = portVal !== undefined && portVal !== null;
+              return (
+                <div key={input.id} className="flex items-center py-0.5 min-h-[22px]">
+                  <button
+                    className="node-port w-3 h-3 rounded-full border-2 -ml-1.5 flex-shrink-0 transition-all"
+                    style={{
+                      borderColor: isConnecting && connectingFromNodeId !== node.id ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
+                      backgroundColor: isConnecting && connectingFromNodeId !== node.id ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
+                      boxShadow: isConnecting && connectingFromNodeId !== node.id ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
+                      cursor: 'crosshair'
+                    }}
+                    data-port-id={`${node.id}-${input.id}`}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
+                    title={`${input.label}${hasPortVal ? ': ' + String(portVal) : ''}`}
+                  />
+                  <div className="pl-2 pr-3 flex items-center gap-1.5 min-w-0">
+                    <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
+                    {hasPortVal && (
+                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1 py-0.5 rounded leading-none max-w-16 truncate">
+                        {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '…' : String(portVal)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
 
-            {data.outputs.map(output => (
-              <div key={output.id} className="flex items-center justify-end py-0.5">
-                <span className="text-xs text-slate-400 pl-3 pr-2 leading-none">{output.label}</span>
-                <button
-                  className="node-port w-3 h-3 rounded-full border-2 -mr-1.5 flex-shrink-0 transition-all"
-                  style={{
-                    borderColor: '#475569',
-                    backgroundColor: '#1e293b',
-                    cursor: 'crosshair'
-                  }}
-                  data-port-id={`${node.id}-${output.id}`}
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
-                  title={output.label}
-                />
-              </div>
-            ))}
+            {data.outputs.map(output => {
+              const outVal = isManual ? data.override?.value : liveValues[node.id];
+              const hasOutVal = outVal !== undefined && outVal !== null;
+              return (
+                <div key={output.id} className="flex items-center justify-end py-0.5 min-h-[22px]">
+                  <div className="pl-3 pr-2 flex items-center gap-1.5 min-w-0">
+                    {hasOutVal && (
+                      <span className={`text-[9px] font-mono px-1 py-0.5 rounded leading-none max-w-16 truncate ${
+                        isManual ? 'text-red-400 bg-red-950/60' : 'text-emerald-400 bg-emerald-950/60'
+                      }`}>
+                        {String(outVal).length > 8 ? String(outVal).slice(0, 8) + '…' : String(outVal)}
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
+                  </div>
+                  <button
+                    className="node-port w-3 h-3 rounded-full border-2 -mr-1.5 flex-shrink-0 transition-all"
+                    style={{
+                      borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
+                      backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
+                      boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none',
+                      cursor: 'crosshair'
+                    }}
+                    data-port-id={`${node.id}-${output.id}`}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
+                    title={`${output.label}${hasOutVal ? ': ' + String(outVal) : ''}`}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

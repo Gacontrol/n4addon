@@ -49,11 +49,17 @@ export const useWiresheetPages = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedPages)
         });
-        setSaveStatus(res.ok ? 'saved' : 'error');
-      } catch {
+        if (res.ok) {
+          setSaveStatus('saved');
+        } else {
+          console.error('Save failed:', res.status);
+          setSaveStatus('error');
+        }
+      } catch (err) {
+        console.error('Save error:', err);
         setSaveStatus('error');
       }
-    }, 800);
+    }, 500);
   }, []);
 
   const loadHaEntities = useCallback(async () => {

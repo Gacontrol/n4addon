@@ -122,12 +122,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           const start = getPortCenter(conn.source, conn.sourcePort);
           const end = getPortCenter(conn.target, conn.targetPort);
           if (!start || !end) return null;
+          const connValue = liveValues[conn.source];
           return (
             <ConnectionLine
               key={conn.id}
               x1={start.x} y1={start.y}
               x2={end.x} y2={end.y}
               color="#10b981"
+              liveValue={connValue}
             />
           );
         })}
@@ -143,21 +145,34 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       </svg>
 
       <div className="absolute inset-0" style={{ zIndex: 1 }}>
-        {nodes.map(node => (
-          <FlowNode
-            key={node.id}
-            node={node}
-            isSelected={selectedNode === node.id}
-            onPositionChange={onNodePositionChange}
-            onSelect={onNodeSelect}
-            onDelete={onNodeDelete}
-            onPortClick={handlePortClick}
-            onOverrideChange={onOverrideChange}
-            isConnecting={!!connectingFrom}
-            connectingFromNodeId={connectingFrom?.nodeId}
-            liveValues={liveValues}
-          />
-        ))}
+        {nodes.map(node => {
+          const portValues: Record<string, unknown> = {};
+          for (const input of node.data.inputs) {
+            const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
+            if (conn) {
+              const srcVal = liveValues[conn.source];
+              if (srcVal !== undefined && srcVal !== null) {
+                portValues[input.id] = srcVal;
+              }
+            }
+          }
+          return (
+            <FlowNode
+              key={node.id}
+              node={node}
+              isSelected={selectedNode === node.id}
+              onPositionChange={onNodePositionChange}
+              onSelect={onNodeSelect}
+              onDelete={onNodeDelete}
+              onPortClick={handlePortClick}
+              onOverrideChange={onOverrideChange}
+              isConnecting={!!connectingFrom}
+              connectingFromNodeId={connectingFrom?.nodeId}
+              liveValues={liveValues}
+              portValues={portValues}
+            />
+          );
+        })}
       </div>
 
       {ghostNode && canvasRef.current && (() => {
