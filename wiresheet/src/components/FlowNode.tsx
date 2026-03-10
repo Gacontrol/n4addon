@@ -299,18 +299,19 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         style={{
           left: node.position.x,
           top: node.position.y,
-          zIndex: isSelected || isDragging ? 2 : 0,
+          zIndex: isDragging ? 2 : 0,
           touchAction: 'none',
           width: containerWidth,
           height: finalHeight
         }}
       >
         <div
-          className="w-full h-full rounded-xl overflow-hidden flex flex-col"
+          className="w-full h-full rounded-xl flex flex-col"
           style={{
             background: 'rgba(30, 41, 59, 0.95)',
             border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.3)'}`,
-            boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.3)'
+            boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.3)',
+            overflow: 'visible'
           }}
         >
           <div
@@ -464,6 +465,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   }
 
   const isDimmed = (data as { _dimmed?: boolean })._dimmed === true;
+  const isInContainer = (data as { _inContainer?: boolean })._inContainer === true;
+  const isContainerSelected = (data as { _containerSelected?: boolean })._containerSelected === true;
 
   if (isTextAnnotation) {
     const textContent = data.config?.textContent || 'Text';
@@ -532,7 +535,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         style={{
           left: node.position.x,
           top: node.position.y,
-          zIndex: isSelected || isDragging ? 20 : 1,
+          zIndex: isSelected || isDragging ? 20 : (isInContainer && isContainerSelected ? 10 : 1),
           cursor: isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
           minWidth: 180,

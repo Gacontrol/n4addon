@@ -538,7 +538,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 },
                 data: {
                   ...node.data,
-                  _dimmed: !isContainerSelected
+                  _dimmed: !isContainerSelected,
+                  _inContainer: true,
+                  _containerSelected: isContainerSelected
                 }
               };
             } else if (parentContainer) {
