@@ -263,6 +263,126 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Temperaturanzeige',
     supportsBinding: true,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-rect',
+    label: 'Rechteck',
+    icon: 'RectangleHorizontal',
+    category: 'decoration',
+    defaultSize: { width: 150, height: 100 },
+    defaultConfig: {
+      fillColor: '#1e293b',
+      strokeColor: '#475569',
+      strokeWidth: 2,
+      opacity: 1
+    },
+    defaultStyle: {},
+    description: 'Rechteck zum Gruppieren',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-circle',
+    label: 'Kreis',
+    icon: 'Circle',
+    category: 'decoration',
+    defaultSize: { width: 100, height: 100 },
+    defaultConfig: {
+      fillColor: '#1e293b',
+      strokeColor: '#475569',
+      strokeWidth: 2,
+      opacity: 1
+    },
+    defaultStyle: {},
+    description: 'Kreis / Ellipse',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-line',
+    label: 'Linie',
+    icon: 'Minus',
+    category: 'decoration',
+    defaultSize: { width: 150, height: 4 },
+    defaultConfig: {
+      strokeColor: '#64748b',
+      strokeWidth: 2,
+      opacity: 1
+    },
+    defaultStyle: {},
+    description: 'Linie zur Trennung',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-arrow',
+    label: 'Pfeil',
+    icon: 'ArrowRight',
+    category: 'decoration',
+    defaultSize: { width: 150, height: 30 },
+    defaultConfig: {
+      strokeColor: '#64748b',
+      strokeWidth: 2,
+      arrowEnd: true,
+      arrowStart: false,
+      opacity: 1
+    },
+    defaultStyle: {},
+    description: 'Pfeil zur Richtungsanzeige',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-nav-button',
+    label: 'Seiten-Taster',
+    icon: 'Navigation',
+    category: 'decoration',
+    defaultSize: { width: 120, height: 50 },
+    defaultConfig: {
+      label: 'Seite 2',
+      targetPageId: '',
+      color: '#3b82f6'
+    },
+    defaultStyle: {
+      showLabel: false
+    },
+    description: 'Springt zu einer anderen Visu-Seite',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-home-button',
+    label: 'Home-Taster',
+    icon: 'Home',
+    category: 'decoration',
+    defaultSize: { width: 80, height: 50 },
+    defaultConfig: {
+      label: 'Home',
+      color: '#10b981'
+    },
+    defaultStyle: {
+      showLabel: false
+    },
+    description: 'Springt zur ersten Seite',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-back-button',
+    label: 'Zurueck-Taster',
+    icon: 'ChevronLeft',
+    category: 'decoration',
+    defaultSize: { width: 80, height: 50 },
+    defaultConfig: {
+      label: 'Zurueck',
+      color: '#64748b'
+    },
+    defaultStyle: {
+      showLabel: false
+    },
+    description: 'Springt zur vorherigen Seite',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

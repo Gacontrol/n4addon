@@ -1,4 +1,5 @@
 import React from 'react';
+import { Home, ChevronLeft, Navigation } from 'lucide-react';
 import {
   VisuWidget as VisuWidgetType,
   SwitchConfig,
@@ -12,7 +13,14 @@ import {
   BarConfig,
   LabelConfig,
   TankConfig,
-  ThermometerConfig
+  ThermometerConfig,
+  RectConfig,
+  CircleConfig,
+  LineConfig,
+  ArrowConfig,
+  NavButtonConfig,
+  HomeButtonConfig,
+  BackButtonConfig
 } from '../../types/visualization';
 import {
   VisuSwitch,
@@ -37,6 +45,9 @@ interface VisuWidgetProps {
   isSelected: boolean;
   onSelect: () => void;
   onDoubleClick: () => void;
+  onNavigateToPage?: (pageId: string) => void;
+  onNavigateBack?: () => void;
+  onNavigateHome?: () => void;
 }
 
 export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
@@ -46,7 +57,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   isEditMode,
   isSelected,
   onSelect,
-  onDoubleClick
+  onDoubleClick,
+  onNavigateToPage,
+  onNavigateBack,
+  onNavigateHome
 }) => {
   const renderWidget = () => {
     switch (widget.type) {
@@ -182,24 +196,164 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           />
         );
 
+      case 'visu-rect': {
+        const rCfg = widget.config as RectConfig;
+        return (
+          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: rCfg.opacity ?? 1 }}>
+            <rect
+              x="0" y="0"
+              width="100%" height="100%"
+              fill={rCfg.fillColor || '#1e293b'}
+              stroke={rCfg.strokeColor || '#475569'}
+              strokeWidth={rCfg.strokeWidth ?? 2}
+              rx={widget.style.borderRadius ?? 4}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-circle': {
+        const cCfg = widget.config as CircleConfig;
+        const cx = widget.size.width / 2;
+        const cy = widget.size.height / 2;
+        const rx = Math.max(1, cx - (cCfg.strokeWidth ?? 2) / 2);
+        const ry = Math.max(1, cy - (cCfg.strokeWidth ?? 2) / 2);
+        return (
+          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: cCfg.opacity ?? 1 }}>
+            <ellipse
+              cx={cx} cy={cy} rx={rx} ry={ry}
+              fill={cCfg.fillColor || '#1e293b'}
+              stroke={cCfg.strokeColor || '#475569'}
+              strokeWidth={cCfg.strokeWidth ?? 2}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-line': {
+        const lCfg = widget.config as LineConfig;
+        const cy = widget.size.height / 2;
+        return (
+          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: lCfg.opacity ?? 1 }}>
+            <line
+              x1="0" y1={cy} x2={widget.size.width} y2={cy}
+              stroke={lCfg.strokeColor || '#64748b'}
+              strokeWidth={lCfg.strokeWidth ?? 2}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-arrow': {
+        const aCfg = widget.config as ArrowConfig;
+        const cy = widget.size.height / 2;
+        const sw = aCfg.strokeWidth ?? 2;
+        const arrowSize = Math.max(8, sw * 3);
+        const markerId = `arrowhead-${widget.id}`;
+        const markerStartId = `arrowhead-start-${widget.id}`;
+        return (
+          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: aCfg.opacity ?? 1 }}>
+            <defs>
+              <marker id={markerId} markerWidth={arrowSize} markerHeight={arrowSize} refX={arrowSize - 1} refY={arrowSize / 2} orient="auto">
+                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={aCfg.strokeColor || '#64748b'} />
+              </marker>
+              <marker id={markerStartId} markerWidth={arrowSize} markerHeight={arrowSize} refX="1" refY={arrowSize / 2} orient="auto-start-reverse">
+                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={aCfg.strokeColor || '#64748b'} />
+              </marker>
+            </defs>
+            <line
+              x1={aCfg.arrowStart ? arrowSize : 0} y1={cy}
+              x2={aCfg.arrowEnd ? widget.size.width - arrowSize : widget.size.width} y2={cy}
+              stroke={aCfg.strokeColor || '#64748b'}
+              strokeWidth={sw}
+              markerEnd={aCfg.arrowEnd ? `url(#${markerId})` : undefined}
+              markerStart={aCfg.arrowStart ? `url(#${markerStartId})` : undefined}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-nav-button': {
+        const navCfg = widget.config as NavButtonConfig;
+        return (
+          <button
+            className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
+            style={{ backgroundColor: navCfg.color || '#3b82f6' }}
+            onClick={(e) => {
+              if (!isEditMode && navCfg.targetPageId) {
+                e.stopPropagation();
+                onNavigateToPage?.(navCfg.targetPageId);
+              }
+            }}
+            disabled={isEditMode}
+          >
+            <Navigation className="w-4 h-4" />
+            {navCfg.label || 'Seite'}
+          </button>
+        );
+      }
+
+      case 'visu-home-button': {
+        const homeCfg = widget.config as HomeButtonConfig;
+        return (
+          <button
+            className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
+            style={{ backgroundColor: homeCfg.color || '#10b981' }}
+            onClick={(e) => {
+              if (!isEditMode) {
+                e.stopPropagation();
+                onNavigateHome?.();
+              }
+            }}
+            disabled={isEditMode}
+          >
+            <Home className="w-4 h-4" />
+            {homeCfg.label || 'Home'}
+          </button>
+        );
+      }
+
+      case 'visu-back-button': {
+        const backCfg = widget.config as BackButtonConfig;
+        return (
+          <button
+            className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
+            style={{ backgroundColor: backCfg.color || '#64748b' }}
+            onClick={(e) => {
+              if (!isEditMode) {
+                e.stopPropagation();
+                onNavigateBack?.();
+              }
+            }}
+            disabled={isEditMode}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            {backCfg.label || 'Zurueck'}
+          </button>
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
   };
 
+  const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow'].includes(widget.type);
+  const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button'].includes(widget.type);
+
   return (
     <div
-      className={`absolute flex items-center justify-center ${isEditMode ? 'cursor-move' : ''}`}
+      className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
         width: widget.size.width,
         height: widget.size.height,
         zIndex: widget.zIndex || 1,
-        backgroundColor: widget.style.backgroundColor,
-        borderRadius: widget.style.borderRadius || 8,
-        border: isSelected ? '2px solid #3b82f6' : widget.style.borderColor ? `1px solid ${widget.style.borderColor}` : 'none',
-        padding: 8
+        backgroundColor: isDrawingWidget ? 'transparent' : widget.style.backgroundColor,
+        borderRadius: isDrawingWidget ? 0 : (widget.style.borderRadius ?? 8),
+        border: isSelected ? '2px solid #3b82f6' : (!isDrawingWidget && widget.style.borderColor) ? `1px solid ${widget.style.borderColor}` : 'none',
+        padding: isDrawingWidget || isNavWidget ? 0 : 8
       }}
       onClick={(e) => {
         if (isEditMode) {

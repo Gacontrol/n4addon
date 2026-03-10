@@ -1,49 +1,99 @@
 import React, { useState } from 'react';
 import { X, Link2, Unlink, Trash2 } from 'lucide-react';
-import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
 interface WidgetPropertiesPanelProps {
   widget: VisuWidget;
   availableNodes: FlowNode[];
+  visuPages?: { id: string; name: string }[];
   onUpdate: (updates: Partial<VisuWidget>) => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
+const NON_BINDABLE_TYPES = new Set([
+  'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
+  'visu-nav-button', 'visu-home-button', 'visu-back-button',
+  'ha-output', 'modbus-driver', 'modbus-device-output', 'text-annotation'
+]);
+
+const getNodeLabel = (node: FlowNode) => {
+  const customLabel = node.data.config?.customLabel as string | undefined;
+  return customLabel || node.data.label || node.type;
+};
+
+const getNodeCategory = (type: string): string => {
+  if (type.startsWith('dp-')) return 'Datenpunkte';
+  if (type.startsWith('ha-')) return 'Home Assistant';
+  if (type.startsWith('modbus-')) return 'Modbus';
+  if (type.startsWith('math-')) return 'Mathematik';
+  if (type.endsWith('-gate')) return 'Logik';
+  if (['compare', 'threshold', 'select', 'switch', 'delay', 'timer', 'counter', 'sr-flipflop', 'rising-edge', 'falling-edge'].includes(type)) return 'Logik';
+  if (['pid-controller', 'scaling', 'smoothing'].includes(type)) return 'Regelung';
+  if (type === 'python-script') return 'Scripting';
+  if (['const-value', 'time-trigger', 'state-trigger'].includes(type)) return 'Sonstiges';
+  return 'Sonstiges';
+};
+
+const getNodePorts = (node: FlowNode) => {
+  const ports: { id: string; label: string; isOutput: boolean }[] = [];
+  (node.data.inputs || []).forEach((p, i) => {
+    ports.push({ id: p.id || `input-${i}`, label: p.label || `Eingang ${i + 1}`, isOutput: false });
+  });
+  (node.data.outputs || []).forEach((p, i) => {
+    ports.push({ id: p.id || `output-${i}`, label: p.label || `Ausgang ${i + 1}`, isOutput: true });
+  });
+  return ports;
+};
+
 export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   widget,
   availableNodes,
+  visuPages = [],
   onUpdate,
   onDelete,
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
 
-  const bindableNodes = availableNodes.filter(n =>
-    n.type.startsWith('dp-') ||
-    n.type === 'const-value' ||
-    n.type === 'ha-input' ||
-    n.type === 'modbus-device-input' ||
-    n.type === 'python-script' ||
-    n.type.startsWith('math-') ||
-    n.type.endsWith('-gate') ||
-    n.type === 'compare' ||
-    n.type === 'threshold'
-  );
+  const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
 
-  const handleBindingChange = (nodeId: string) => {
+  const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
+
+  const nodesByCategory = bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
+    const cat = getNodeCategory(node.type);
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(node);
+    return acc;
+  }, {});
+
+  const selectedNode = widget.binding ? availableNodes.find(n => n.id === widget.binding?.nodeId) : null;
+  const selectedNodePorts = selectedNode ? getNodePorts(selectedNode) : [];
+
+  const isWriteWidget = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'].includes(widget.type);
+
+  const handleNodeChange = (nodeId: string) => {
     if (!nodeId) {
       onUpdate({ binding: undefined });
-    } else {
-      const binding: WidgetBinding = {
-        nodeId,
-        direction: widget.type.includes('switch') || widget.type.includes('slider') || widget.type.includes('incrementer') || widget.type.includes('input') || widget.type.includes('button')
-          ? 'readwrite'
-          : 'read'
-      };
-      onUpdate({ binding });
+      return;
     }
+    const node = availableNodes.find(n => n.id === nodeId);
+    const ports = node ? getNodePorts(node) : [];
+    const defaultPort = isWriteWidget
+      ? ports.find(p => !p.isOutput)
+      : ports.find(p => p.isOutput);
+    const binding: WidgetBinding = {
+      nodeId,
+      portId: defaultPort?.id,
+      direction: isWriteWidget ? 'readwrite' : 'read'
+    };
+    onUpdate({ binding });
+  };
+
+  const handlePortChange = (portId: string) => {
+    if (!widget.binding) return;
+    onUpdate({ binding: { ...widget.binding, portId: portId || undefined } });
   };
 
   const renderGeneralConfig = () => {
@@ -374,6 +424,123 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           </>
         );
 
+      case 'visu-rect':
+      case 'visu-circle': {
+        const shapeCfg = config as RectConfig | CircleConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={shapeCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
+              <input type="color" value={shapeCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
+              <input type="number" min="0" max="20" value={shapeCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={shapeCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-line':
+      case 'visu-arrow': {
+        const lineCfg = config as LineConfig | ArrowConfig;
+        const isArrow = widget.type === 'visu-arrow';
+        const arrowCfg = config as ArrowConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe</label>
+              <input type="color" value={lineCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Linienstaerke</label>
+              <input type="number" min="1" max="20" value={lineCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            {isArrow && (
+              <>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={arrowCfg.arrowEnd ?? true} onChange={(e) => onUpdate({ config: { ...config, arrowEnd: e.target.checked } })} />
+                  <label className="text-xs text-slate-400">Pfeilspitze Ende</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={arrowCfg.arrowStart ?? false} onChange={(e) => onUpdate({ config: { ...config, arrowStart: e.target.checked } })} />
+                  <label className="text-xs text-slate-400">Pfeilspitze Anfang</label>
+                </div>
+              </>
+            )}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={lineCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-nav-button': {
+        const navCfg = config as NavButtonConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Label</label>
+              <input type="text" value={navCfg.label || ''} onChange={(e) => onUpdate({ config: { ...config, label: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Zielseite</label>
+              <select value={navCfg.targetPageId || ''} onChange={(e) => onUpdate({ config: { ...config, targetPageId: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Seite waehlen --</option>
+                {visuPages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe</label>
+              <input type="color" value={navCfg.color || '#3b82f6'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-home-button': {
+        const homeCfg = config as HomeButtonConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Label</label>
+              <input type="text" value={homeCfg.label || 'Home'} onChange={(e) => onUpdate({ config: { ...config, label: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe</label>
+              <input type="color" value={homeCfg.color || '#10b981'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-back-button': {
+        const backCfg = config as BackButtonConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Label</label>
+              <input type="text" value={backCfg.label || 'Zurueck'} onChange={(e) => onUpdate({ config: { ...config, label: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe</label>
+              <input type="color" value={backCfg.color || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }
@@ -441,34 +608,73 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
         {activeTab === 'binding' && (
           <>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Verknuepfter Datenpunkt</label>
-              <select
-                value={widget.binding?.nodeId || ''}
-                onChange={(e) => handleBindingChange(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-              >
-                <option value="">-- Keine Verknuepfung --</option>
-                {bindableNodes.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.data.config?.customLabel || node.data.label} ({node.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {widget.binding && (
-              <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                <Link2 className="w-4 h-4 text-green-500" />
-                <span className="text-xs text-green-400">
-                  Verknuepft mit: {bindableNodes.find(n => n.id === widget.binding?.nodeId)?.data.label}
-                </span>
-              </div>
-            )}
-            {!widget.binding && (
+            {isDecorationWidget ? (
               <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
                 <Unlink className="w-4 h-4 text-slate-500" />
-                <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                <span className="text-xs text-slate-400">Dieses Widget unterstuetzt keine Verknuepfungen</span>
               </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt</label>
+                  <select
+                    value={widget.binding?.nodeId || ''}
+                    onChange={(e) => handleNodeChange(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  >
+                    <option value="">-- Keine Verknuepfung --</option>
+                    {Object.entries(nodesByCategory).map(([cat, nodes]) => (
+                      <optgroup key={cat} label={cat}>
+                        {nodes.map((node) => (
+                          <option key={node.id} value={node.id}>
+                            {getNodeLabel(node)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {widget.binding && selectedNodePorts.length > 0 && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Port / Ausgang</label>
+                    <select
+                      value={widget.binding.portId || ''}
+                      onChange={(e) => handlePortChange(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                    >
+                      <option value="">-- Hauptwert --</option>
+                      {selectedNodePorts.filter(p => p.isOutput).length > 0 && (
+                        <optgroup label="Ausgaenge">
+                          {selectedNodePorts.filter(p => p.isOutput).map(p => (
+                            <option key={p.id} value={p.id}>{p.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {selectedNodePorts.filter(p => !p.isOutput).length > 0 && isWriteWidget && (
+                        <optgroup label="Eingaenge">
+                          {selectedNodePorts.filter(p => !p.isOutput).map(p => (
+                            <option key={p.id} value={p.id}>{p.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                )}
+                {widget.binding ? (
+                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <Link2 className="w-4 h-4 text-green-500" />
+                    <div className="text-xs text-green-400">
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      {widget.binding.portId && <p className="text-green-500/70">{selectedNodePorts.find(p => p.id === widget.binding?.portId)?.label || widget.binding.portId}</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
+                    <Unlink className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

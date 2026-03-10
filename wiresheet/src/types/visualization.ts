@@ -20,7 +20,14 @@ export type WidgetType =
   | 'visu-bar'
   | 'visu-label'
   | 'visu-tank'
-  | 'visu-thermometer';
+  | 'visu-thermometer'
+  | 'visu-rect'
+  | 'visu-circle'
+  | 'visu-line'
+  | 'visu-arrow'
+  | 'visu-nav-button'
+  | 'visu-home-button'
+  | 'visu-back-button';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -136,6 +143,51 @@ export interface ButtonConfig {
   color?: string;
 }
 
+export interface RectConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+}
+
+export interface CircleConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+}
+
+export interface LineConfig {
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+}
+
+export interface ArrowConfig {
+  strokeColor?: string;
+  strokeWidth?: number;
+  arrowEnd?: boolean;
+  arrowStart?: boolean;
+  opacity?: number;
+}
+
+export interface NavButtonConfig {
+  label: string;
+  targetPageId?: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface HomeButtonConfig {
+  label?: string;
+  color?: string;
+}
+
+export interface BackButtonConfig {
+  label?: string;
+  color?: string;
+}
+
 export type WidgetConfig =
   | SwitchConfig
   | SliderConfig
@@ -148,7 +200,14 @@ export type WidgetConfig =
   | LabelConfig
   | TankConfig
   | ThermometerConfig
-  | ButtonConfig;
+  | ButtonConfig
+  | RectConfig
+  | CircleConfig
+  | LineConfig
+  | ArrowConfig
+  | NavButtonConfig
+  | HomeButtonConfig
+  | BackButtonConfig;
 
 export interface VisuWidget {
   id: string;

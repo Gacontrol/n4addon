@@ -1,7 +1,8 @@
 import React from 'react';
 import {
   ToggleLeft, Square, SlidersHorizontal, PlusCircle, TextCursorInput,
-  Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer
+  Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer,
+  RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -22,7 +23,14 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   BarChart3,
   Type,
   Container,
-  Thermometer
+  Thermometer,
+  RectangleHorizontal,
+  Circle,
+  Minus,
+  ArrowRight,
+  Navigation,
+  Home,
+  ChevronLeft
 };
 
 const categoryLabels: Record<string, string> = {

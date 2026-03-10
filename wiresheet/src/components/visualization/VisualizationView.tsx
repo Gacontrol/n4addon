@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
@@ -37,6 +37,28 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [showProperties, setShowProperties] = useState(false);
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
+  const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
+
+  const handleNavigateToPage = useCallback((pageId: string) => {
+    pageHistoryRef.current = [...pageHistoryRef.current, pageId];
+    onSetActiveVisuPage(pageId);
+  }, [onSetActiveVisuPage]);
+
+  const handleNavigateBack = useCallback(() => {
+    const history = pageHistoryRef.current;
+    if (history.length > 1) {
+      const newHistory = history.slice(0, -1);
+      pageHistoryRef.current = newHistory;
+      onSetActiveVisuPage(newHistory[newHistory.length - 1]);
+    }
+  }, [onSetActiveVisuPage]);
+
+  const handleNavigateHome = useCallback(() => {
+    if (visuPages.length > 0) {
+      pageHistoryRef.current = [visuPages[0].id];
+      onSetActiveVisuPage(visuPages[0].id);
+    }
+  }, [visuPages, onSetActiveVisuPage]);
 
   const activePage = visuPages.find(p => p.id === activeVisuPageId) || visuPages[0];
 
@@ -259,6 +281,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               setSelectedWidgetId(id);
               setShowProperties(true);
             }}
+            onNavigateToPage={handleNavigateToPage}
+            onNavigateBack={handleNavigateBack}
+            onNavigateHome={handleNavigateHome}
           />
         </div>
 
@@ -266,6 +291,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           <WidgetPropertiesPanel
             widget={selectedWidget}
             availableNodes={logicNodes}
+            visuPages={visuPages.map(p => ({ id: p.id, name: p.name }))}
             onUpdate={(updates) => handleUpdateWidget(selectedWidget.id, updates)}
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}

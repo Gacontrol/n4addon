@@ -12,6 +12,9 @@ interface VisuCanvasProps {
   onDeleteWidget: (widgetId: string) => void;
   onWidgetValueChange: (widgetId: string, value: unknown) => void;
   onEditWidgetProperties: (widgetId: string) => void;
+  onNavigateToPage?: (pageId: string) => void;
+  onNavigateBack?: () => void;
+  onNavigateHome?: () => void;
 }
 
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
@@ -22,7 +25,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSelectWidget,
   onUpdateWidget,
   onWidgetValueChange,
-  onEditWidgetProperties
+  onEditWidgetProperties,
+  onNavigateToPage,
+  onNavigateBack,
+  onNavigateHome
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<{
@@ -220,6 +226,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
             isSelected={selectedWidgetId === widget.id}
             onSelect={() => onSelectWidget(widget.id)}
             onDoubleClick={() => onEditWidgetProperties(widget.id)}
+            onNavigateToPage={onNavigateToPage}
+            onNavigateBack={onNavigateBack}
+            onNavigateHome={onNavigateHome}
           />
         </div>
       ))}
