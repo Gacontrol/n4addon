@@ -30,6 +30,7 @@ interface FlowNodeProps {
   onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
   onDropIntoContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   onDropOutOfContainer?: (nodeId: string) => void;
+  onRenameNode?: (nodeId: string, newLabel: string) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -55,6 +56,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onCaseResize,
   onDropIntoContainer,
   onDropOutOfContainer,
+  onRenameNode,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -74,6 +76,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const resizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
   const caseResizeStartRef = useRef<{ height: number; mouseY: number; caseIndex: number } | null>(null);
   const [showOverrideInput, setShowOverrideInput] = useState(false);
+  const [isRenamingNode, setIsRenamingNode] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
   const dragOffset = useRef({ x: 0, y: 0 });
 
   const { data } = node;
@@ -370,7 +374,42 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </div>
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Icons.Layers className="w-4 h-4 text-white flex-shrink-0" />
-              <span className="text-sm font-bold text-white truncate">{data.label}</span>
+              {isRenamingNode ? (
+                <input
+                  type="text"
+                  value={renameValue}
+                  autoFocus
+                  className="text-sm font-bold text-white bg-white/20 rounded px-1 py-0 outline-none border border-white/40 min-w-0 flex-1 max-w-[120px]"
+                  onChange={e => setRenameValue(e.target.value)}
+                  onBlur={() => {
+                    if (renameValue.trim()) onRenameNode?.(node.id, renameValue.trim());
+                    setIsRenamingNode(false);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      if (renameValue.trim()) onRenameNode?.(node.id, renameValue.trim());
+                      setIsRenamingNode(false);
+                    } else if (e.key === 'Escape') {
+                      setIsRenamingNode(false);
+                    }
+                    e.stopPropagation();
+                  }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="text-sm font-bold text-white truncate cursor-text"
+                  onDoubleClick={e => {
+                    e.stopPropagation();
+                    setRenameValue(data.label || '');
+                    setIsRenamingNode(true);
+                  }}
+                  title="Doppelklick zum Umbenennen"
+                >
+                  {data.label}
+                </span>
+              )}
               <span className="text-xs text-white/70 bg-white/20 px-1.5 py-0.5 rounded font-mono flex-shrink-0">
                 ={activeCaseValue}
               </span>
@@ -596,9 +635,44 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             className="px-3 py-2 rounded-t flex items-center justify-between gap-2"
             style={{ backgroundColor: nodeColor }}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               {IconComponent && <IconComponent className="w-3.5 h-3.5 text-white flex-shrink-0" />}
-              <span className="text-xs font-bold text-white truncate">{data.label}</span>
+              {isRenamingNode ? (
+                <input
+                  type="text"
+                  value={renameValue}
+                  autoFocus
+                  className="text-xs font-bold text-white bg-white/20 rounded px-1 py-0 outline-none border border-white/40 min-w-0 flex-1 max-w-[120px]"
+                  onChange={e => setRenameValue(e.target.value)}
+                  onBlur={() => {
+                    if (renameValue.trim()) onRenameNode?.(node.id, renameValue.trim());
+                    setIsRenamingNode(false);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      if (renameValue.trim()) onRenameNode?.(node.id, renameValue.trim());
+                      setIsRenamingNode(false);
+                    } else if (e.key === 'Escape') {
+                      setIsRenamingNode(false);
+                    }
+                    e.stopPropagation();
+                  }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="text-xs font-bold text-white truncate cursor-text"
+                  onDoubleClick={e => {
+                    e.stopPropagation();
+                    setRenameValue(data.label || '');
+                    setIsRenamingNode(true);
+                  }}
+                  title="Doppelklick zum Umbenennen"
+                >
+                  {data.label}
+                </span>
+              )}
               {isManual && (
                 <span className="text-[9px] font-bold bg-white/20 text-white px-1 py-0.5 rounded uppercase tracking-wide flex-shrink-0">
                   MAN

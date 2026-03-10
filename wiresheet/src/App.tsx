@@ -837,6 +837,7 @@ function App() {
               onOverrideChange={updateNodeOverride}
               onModbusDatapointDrop={handleModbusDatapointDrop}
               visuPages={visuPages}
+              onUpdateNodeData={updateNodeData}
             />
 
             {selectedNodeData && (

@@ -54,6 +54,7 @@ interface FlowCanvasProps {
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
   onModbusDatapointDrop?: (data: unknown, x: number, y: number) => void;
   visuPages?: VisuPage[];
+  onUpdateNodeData?: (nodeId: string, updates: Partial<FlowNodeType['data']>) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -90,7 +91,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   liveValues = {},
   onOverrideChange,
   onModbusDatapointDrop,
-  visuPages = []
+  visuPages = [],
+  onUpdateNodeData
 }) => {
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
     const result: VisuBindingInfo[] = [];
@@ -604,6 +606,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDelete={onNodeDelete}
                 onPortClick={handlePortClick}
                 onOverrideChange={onOverrideChange}
+                onRenameNode={(id, label) => onUpdateNodeData?.(id, { label })}
                 isConnecting={!!connectingFrom}
                 connectingFromNodeId={connectingFrom?.nodeId}
                 liveValues={liveValues}
@@ -709,6 +712,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDelete={onNodeDelete}
                 onPortClick={handlePortClick}
                 onOverrideChange={onOverrideChange}
+                onRenameNode={(id, label) => onUpdateNodeData?.(id, { label })}
                 isConnecting={!!connectingFrom}
                 connectingFromNodeId={connectingFrom?.nodeId}
                 liveValues={liveValues}
