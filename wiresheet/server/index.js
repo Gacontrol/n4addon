@@ -3,6 +3,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
+const { spawn } = require('child_process');
 
 const app = express();
 const PORT = 8100;
@@ -342,6 +343,64 @@ function toBool(val) {
   return !!val;
 }
 
+async function executePythonCode(code, inputs) {
+  return new Promise((resolve, reject) => {
+    const inputJson = JSON.stringify(inputs);
+
+    const wrappedCode = `
+import json
+import sys
+
+_inputs = json.loads('''${inputJson}''')
+
+${Object.keys(inputs).map(k => `${k} = _inputs.get('${k}')`).join('\n')}
+
+${code}
+
+_outputs = {}
+for name in dir():
+    if name.startswith('out'):
+        _outputs[name] = eval(name)
+
+print(json.dumps(_outputs))
+`;
+
+    const python = spawn('python3', ['-c', wrappedCode], {
+      timeout: 5000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    python.stdout.on('data', (data) => { stdout += data.toString(); });
+    python.stderr.on('data', (data) => { stderr += data.toString(); });
+
+    python.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Python error:', stderr);
+        reject(new Error(stderr || `Python exited with code ${code}`));
+        return;
+      }
+      try {
+        const result = JSON.parse(stdout.trim());
+        resolve(result);
+      } catch (e) {
+        reject(new Error(`Invalid JSON output: ${stdout}`));
+      }
+    });
+
+    python.on('error', (err) => {
+      reject(err);
+    });
+
+    setTimeout(() => {
+      python.kill();
+      reject(new Error('Python script timeout'));
+    }, 5000);
+  });
+}
+
 async function executePageLogic(nodes, connections, manualOverrides = {}) {
   const nodeValues = {};
 
@@ -416,6 +475,31 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       nodeValues[nodeId] = val > thr ? 'above' : 'below';
     } else if (node.type === 'delay') {
       nodeValues[nodeId] = inputVals[0];
+    } else if (node.type === 'python-script') {
+      const pythonInputs = cfg.pythonInputs || [];
+      const pythonCode = cfg.pythonCode || '';
+      const inputs = {};
+      pythonInputs.forEach((inp, idx) => {
+        inputs[inp.id] = inputVals[idx] !== undefined ? inputVals[idx] : null;
+      });
+      try {
+        const outputs = await executePythonCode(pythonCode, inputs);
+        const pythonOutputs = cfg.pythonOutputs || [];
+        if (pythonOutputs.length === 1) {
+          nodeValues[nodeId] = outputs[pythonOutputs[0].id];
+        } else {
+          nodeValues[nodeId] = outputs;
+        }
+        pythonOutputs.forEach((out, idx) => {
+          nodeValues[`${nodeId}:${idx}`] = outputs[out.id];
+        });
+      } catch (e) {
+        console.error(`Python Script Fehler (${nodeId}):`, e.message);
+        nodeValues[nodeId] = null;
+      }
+    } else if (node.type === 'case-container') {
+      const caseVal = parseInt(inputVals[0]) || 0;
+      nodeValues[nodeId] = caseVal;
     } else if (node.type === 'ha-output' && node.data.entityId) {
       const val = inputVals[0];
       if (val !== null && val !== undefined) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FlowNode, NodeConfig, EnumStage } from '../types/flow';
-import { X, Plus, Trash2, RefreshCw, Activity } from 'lucide-react';
+import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition } from '../types/flow';
+import { X, Plus, Trash2, RefreshCw, Activity, Code, Play, Layers } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 
 interface HAEntity {
@@ -69,6 +69,71 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const removeEnumStage = (index: number) => {
     const stages = (config.dpEnumStages || []).filter((_, i) => i !== index);
     updateConfig('dpEnumStages', stages);
+  };
+
+  const addPythonInput = () => {
+    const inputs: PythonPort[] = config.pythonInputs || [];
+    const nextNum = inputs.length + 1;
+    const newInput = { id: `in${nextNum}`, label: `In${nextNum}` };
+    updateConfig('pythonInputs', [...inputs, newInput]);
+    const nodeInputs = [...node.data.inputs, { id: `input-${nextNum - 1}`, label: newInput.label, type: 'input' as const }];
+    onUpdateNode(node.id, { inputs: nodeInputs });
+  };
+
+  const addPythonOutput = () => {
+    const outputs: PythonPort[] = config.pythonOutputs || [];
+    const nextNum = outputs.length + 1;
+    const newOutput = { id: `out${nextNum}`, label: `Out${nextNum}` };
+    updateConfig('pythonOutputs', [...outputs, newOutput]);
+    const nodeOutputs = [...node.data.outputs, { id: `output-${nextNum - 1}`, label: newOutput.label, type: 'output' as const }];
+    onUpdateNode(node.id, { outputs: nodeOutputs });
+  };
+
+  const updatePythonPort = (type: 'input' | 'output', index: number, label: string) => {
+    if (type === 'input') {
+      const inputs: PythonPort[] = [...(config.pythonInputs || [])];
+      inputs[index] = { ...inputs[index], label };
+      updateConfig('pythonInputs', inputs);
+      const nodeInputs = node.data.inputs.map((inp, i) => i === index ? { ...inp, label } : inp);
+      onUpdateNode(node.id, { inputs: nodeInputs });
+    } else {
+      const outputs: PythonPort[] = [...(config.pythonOutputs || [])];
+      outputs[index] = { ...outputs[index], label };
+      updateConfig('pythonOutputs', outputs);
+      const nodeOutputs = node.data.outputs.map((out, i) => i === index ? { ...out, label } : out);
+      onUpdateNode(node.id, { outputs: nodeOutputs });
+    }
+  };
+
+  const removePythonPort = (type: 'input' | 'output', index: number) => {
+    if (type === 'input') {
+      const inputs = (config.pythonInputs || []).filter((_, i) => i !== index);
+      updateConfig('pythonInputs', inputs);
+      const nodeInputs = node.data.inputs.filter((_, i) => i !== index);
+      onUpdateNode(node.id, { inputs: nodeInputs });
+    } else {
+      const outputs = (config.pythonOutputs || []).filter((_, i) => i !== index);
+      updateConfig('pythonOutputs', outputs);
+      const nodeOutputs = node.data.outputs.filter((_, i) => i !== index);
+      onUpdateNode(node.id, { outputs: nodeOutputs });
+    }
+  };
+
+  const addCase = () => {
+    const cases: CaseDefinition[] = config.cases || [];
+    const nextNum = cases.length;
+    updateConfig('cases', [...cases, { id: `case-${nextNum}`, label: `Case ${nextNum}`, nodeIds: [] }]);
+  };
+
+  const updateCase = (index: number, label: string) => {
+    const cases: CaseDefinition[] = [...(config.cases || [])];
+    cases[index] = { ...cases[index], label };
+    updateConfig('cases', cases);
+  };
+
+  const removeCase = (index: number) => {
+    const cases = (config.cases || []).filter((_, i) => i !== index);
+    updateConfig('cases', cases);
   };
 
   const dpNodeColor = node.type === 'dp-boolean' ? '#8b5cf6'
@@ -326,7 +391,165 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
-        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && (
+        {node.type === 'python-script' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-blue-400">
+              <Code className="w-4 h-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Python Script</span>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-400 font-medium">Eingaenge</label>
+                <button
+                  onClick={addPythonInput}
+                  className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-600/30 text-blue-300 rounded text-xs transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="space-y-1">
+                {(config.pythonInputs || []).map((inp, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-500 font-mono w-8">{inp.id}</span>
+                    <input
+                      type="text"
+                      value={inp.label}
+                      onChange={e => updatePythonPort('input', idx, e.target.value)}
+                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500"
+                    />
+                    <button
+                      onClick={() => removePythonPort('input', idx)}
+                      className="text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-400 font-medium">Ausgaenge</label>
+                <button
+                  onClick={addPythonOutput}
+                  className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-600/30 text-emerald-300 rounded text-xs transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="space-y-1">
+                {(config.pythonOutputs || []).map((out, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-500 font-mono w-8">{out.id}</span>
+                    <input
+                      type="text"
+                      value={out.label}
+                      onChange={e => updatePythonPort('output', idx, e.target.value)}
+                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      onClick={() => removePythonPort('output', idx)}
+                      className="text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 font-medium mb-2">Python Code</label>
+              <textarea
+                value={config.pythonCode || '# Eingaenge: in1, in2, ...\n# Ausgaenge: out1, out2, ...\n\nout1 = in1'}
+                onChange={e => updateConfig('pythonCode', e.target.value)}
+                className="w-full h-48 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white font-mono outline-none focus:border-blue-500 transition-colors resize-y"
+                placeholder="Python Code hier eingeben..."
+                spellCheck={false}
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Variablen: in1, in2... fuer Eingaenge, out1, out2... fuer Ausgaenge
+              </p>
+            </div>
+          </div>
+        )}
+
+        {node.type === 'case-container' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-indigo-400">
+              <Layers className="w-4 h-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Case Container</span>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-400 font-medium">Cases</label>
+                <button
+                  onClick={addCase}
+                  className="flex items-center gap-1 px-2 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Case
+                </button>
+              </div>
+              <div className="space-y-1">
+                {(config.cases || []).map((c, idx) => (
+                  <div key={c.id} className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-mono w-6">{idx}</span>
+                    <input
+                      type="text"
+                      value={c.label}
+                      onChange={e => updateCase(idx, e.target.value)}
+                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                    />
+                    {(config.cases || []).length > 1 && (
+                      <button
+                        onClick={() => removeCase(idx)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Breite</label>
+                <input
+                  type="number"
+                  min={200}
+                  step={50}
+                  value={config.containerWidth || 400}
+                  onChange={e => updateConfig('containerWidth', parseInt(e.target.value) || 400)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Hoehe</label>
+                <input
+                  type="number"
+                  min={150}
+                  step={50}
+                  value={config.containerHeight || 300}
+                  onChange={e => updateConfig('containerHeight', parseInt(e.target.value) || 300)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Der Case-Eingang bestimmt welcher Case aktiv ist. Nur Nodes im aktiven Case werden ausgefuehrt.
+            </p>
+          </div>
+        )}
+
+        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Ports

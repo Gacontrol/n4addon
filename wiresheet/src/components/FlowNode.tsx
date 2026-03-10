@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { FlowNode as FlowNodeType, DatapointOverride } from '../types/flow';
+import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition } from '../types/flow';
 import * as Icons from 'lucide-react';
 
 interface ContextMenuState {
@@ -57,6 +57,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const isDPNode = node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum';
   const isManual = isDPNode && data.override?.manual === true;
 
+  const isCaseContainer = node.type === 'case-container';
+  const isPythonScript = node.type === 'python-script';
+
   const getNodeColor = () => {
     if (isManual) return '#dc2626';
     if (node.type === 'ha-input') return '#3b82f6';
@@ -64,10 +67,17 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (node.type === 'dp-boolean') return '#8b5cf6';
     if (node.type === 'dp-numeric') return '#06b6d4';
     if (node.type === 'dp-enum') return '#f97316';
+    if (node.type === 'python-script') return '#3776ab';
+    if (node.type === 'case-container') return '#6366f1';
     if (node.type.includes('trigger')) return '#0ea5e9';
     return '#10b981';
   };
   const nodeColor = getNodeColor();
+
+  const cases: CaseDefinition[] = data.config?.cases || [];
+  const containerWidth = data.config?.containerWidth || 400;
+  const containerHeight = data.config?.containerHeight || 300;
+  const activeCaseValue = liveValues[node.id] !== undefined ? Number(liveValues[node.id]) : 0;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
@@ -162,10 +172,114 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
   const displayValue = node.type === 'dp-enum' ? getEnumLabel(liveValue) : String(liveValue);
 
+  if (isCaseContainer) {
+    return (
+      <div
+        ref={nodeRef}
+        data-node-id={node.id}
+        className="absolute select-none"
+        style={{
+          left: node.position.x,
+          top: node.position.y,
+          zIndex: isSelected || isDragging ? 5 : 0,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+          width: containerWidth,
+          height: containerHeight
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onContextMenu={handleContextMenu}
+      >
+        <div
+          className="w-full h-full rounded-xl overflow-hidden"
+          style={{
+            background: 'rgba(99, 102, 241, 0.08)',
+            border: `2px ${isSelected ? 'solid' : 'dashed'} ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.4)'}`,
+            boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3)' : 'none'
+          }}
+        >
+          <div
+            className="px-3 py-2 flex items-center justify-between gap-2"
+            style={{ backgroundColor: 'rgba(99, 102, 241, 0.9)' }}
+          >
+            <div className="flex items-center gap-1.5">
+              <Icons.Layers className="w-4 h-4 text-white" />
+              <span className="text-xs font-bold text-white">{data.label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {cases.map((c, idx) => (
+                  <button
+                    key={c.id}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      activeCaseValue === idx
+                        ? 'bg-white text-indigo-700'
+                        : 'bg-white/20 text-white/80 hover:bg-white/30'
+                    }`}
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                data-action="delete"
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onDelete(node.id); }}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <Icons.X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center px-3 py-1.5 bg-indigo-950/50 border-b border-indigo-500/30">
+            <div
+              className="relative -ml-3 flex-shrink-0"
+              style={{ width: 24, height: 24 }}
+            >
+              <button
+                className="node-port absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all"
+                style={{
+                  borderColor: isConnecting ? '#60a5fa' : '#6366f1',
+                  backgroundColor: isConnecting ? '#1d4ed8' : '#312e81',
+                  boxShadow: isConnecting ? '0 0 8px #60a5fa' : 'none',
+                  cursor: 'crosshair'
+                }}
+                data-port-id={`${node.id}-input-0`}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
+                title="Case Eingang"
+              />
+              <div
+                className="absolute inset-0 cursor-crosshair"
+                data-port-id={`${node.id}-input-0`}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
+              />
+            </div>
+            <span className="text-xs text-indigo-300">Case: {activeCaseValue}</span>
+          </div>
+          <div className="flex-1 p-2 relative" style={{ minHeight: containerHeight - 80 }}>
+            <p className="text-[10px] text-indigo-400/60 text-center absolute inset-0 flex items-center justify-center pointer-events-none">
+              Nodes hier platzieren
+            </p>
+          </div>
+          <div className="absolute bottom-1 right-1 w-4 h-4 cursor-se-resize opacity-30 hover:opacity-60 transition-opacity">
+            <Icons.GripHorizontal className="w-4 h-4 text-indigo-400 rotate-45" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div
         ref={nodeRef}
+        data-node-id={node.id}
         className="absolute select-none"
         style={{
           left: node.position.x,

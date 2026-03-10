@@ -15,6 +15,17 @@ export interface EnumStage {
   label: string;
 }
 
+export interface PythonPort {
+  id: string;
+  label: string;
+}
+
+export interface CaseDefinition {
+  id: string;
+  label: string;
+  nodeIds: string[];
+}
+
 export interface NodeConfig {
   delayMs?: number;
   thresholdValue?: number;
@@ -26,6 +37,13 @@ export interface NodeConfig {
   dpUnit?: string;
   dpFacet?: string;
   dpEnumStages?: EnumStage[];
+  pythonCode?: string;
+  pythonInputs?: PythonPort[];
+  pythonOutputs?: PythonPort[];
+  cases?: CaseDefinition[];
+  activeCase?: number;
+  containerWidth?: number;
+  containerHeight?: number;
   [key: string]: unknown;
 }
 
