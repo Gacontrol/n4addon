@@ -4,12 +4,15 @@ import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { CustomBlockLibrary } from './components/CustomBlockLibrary';
 import { CustomBlockEditor } from './components/CustomBlockEditor';
+import { VisualizationView } from './components/visualization/VisualizationView';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
+import { useVisualization } from './hooks/useVisualization';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice } from './types/flow';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
-  Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid
+  Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
+  Monitor, Cpu
 } from 'lucide-react';
 
 function App() {
@@ -74,6 +77,17 @@ function App() {
     exportAllBlocks
   } = useCustomBlocks();
 
+  const {
+    visuPages,
+    activeVisuPageId,
+    setActiveVisuPageId,
+    addVisuPage,
+    deleteVisuPage,
+    renameVisuPage,
+    updateVisuPage
+  } = useVisualization();
+
+  const [mainView, setMainView] = useState<'logic' | 'visu'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -445,6 +459,24 @@ function App() {
     }
   }, [modbusDevices]);
 
+  const handleVisuWidgetValueChange = useCallback(async (
+    _widgetId: string,
+    binding: { nodeId: string; portId?: string },
+    value: unknown
+  ) => {
+    try {
+      await fetch('/api/visu/write-value', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: binding.nodeId, value })
+      });
+    } catch (err) {
+      console.error('Failed to write visu value:', err);
+    }
+  }, []);
+
+  const allLogicNodes = pages.flatMap(p => p.nodes);
+
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
       <header className="bg-slate-800 border-b border-slate-700 px-4 py-2.5 flex-shrink-0">
@@ -454,12 +486,38 @@ function App() {
               <Workflow className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white leading-tight">Wiresheet Editor</h1>
+              <h1 className="text-sm font-bold text-white leading-tight">Wiresheet</h1>
               <p className="text-xs text-slate-500 leading-tight">Home Assistant</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto min-w-0 py-0.5">
+          <div className="flex items-center gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0">
+            <button
+              onClick={() => setMainView('logic')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'logic'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              Logik
+            </button>
+            <button
+              onClick={() => setMainView('visu')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'visu'
+                  ? 'bg-green-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              Visu
+            </button>
+          </div>
+
+          {mainView === 'logic' && (
+            <div className="flex items-center gap-1 flex-1 overflow-x-auto min-w-0 py-0.5">
             {pages.map(page => (
               <div
                 key={page.id}
@@ -515,7 +573,9 @@ function App() {
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
+          )}
 
+          {mainView === 'logic' && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="relative">
               <button
@@ -586,6 +646,11 @@ function App() {
               {saveStatus === 'error' && <span className="text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Fehler</span>}
             </div>
           </div>
+          )}
+
+          {mainView === 'visu' && (
+            <div className="flex-1" />
+          )}
         </div>
       </header>
 
@@ -597,157 +662,174 @@ function App() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
-          <div className="flex border-b border-slate-700">
-            <button
-              onClick={() => setSidebarTab('nodes')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'nodes'
-                  ? 'bg-slate-800 text-white border-b-2 border-blue-500'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Bausteine
-            </button>
-            <button
-              onClick={() => setSidebarTab('blocks')}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'blocks'
-                  ? 'bg-slate-800 text-white border-b-2 border-cyan-500'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <Blocks className="w-3.5 h-3.5" />
-              Eigene
-              {customBlocks.length > 0 && (
-                <span className="bg-cyan-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                  {customBlocks.length}
-                </span>
-              )}
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            {sidebarTab === 'nodes' ? (
-              <NodePalette onNodePointerDown={handleNodePointerDown} />
-            ) : (
-              <CustomBlockLibrary
-                blocks={customBlocks}
-                onCreateBlock={handleCreateBlockFromSelection}
-                onEditBlock={handleEditBlock}
-                onDeleteBlock={deleteBlock}
-                onDuplicateBlock={duplicateBlock}
-                onExportBlock={exportBlock}
-                onExportAll={exportAllBlocks}
-                onImportBlocks={importBlocks}
-                onAddBlockToCanvas={handleAddBlockToCanvas}
-                canCreateFromSelection={selectedNodes.size >= 1}
+      {mainView === 'logic' ? (
+        <>
+          <div className="flex flex-1 overflow-hidden">
+            <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
+              <div className="flex border-b border-slate-700">
+                <button
+                  onClick={() => setSidebarTab('nodes')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
+                    sidebarTab === 'nodes'
+                      ? 'bg-slate-800 text-white border-b-2 border-blue-500'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  Bausteine
+                </button>
+                <button
+                  onClick={() => setSidebarTab('blocks')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
+                    sidebarTab === 'blocks'
+                      ? 'bg-slate-800 text-white border-b-2 border-cyan-500'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  }`}
+                >
+                  <Blocks className="w-3.5 h-3.5" />
+                  Eigene
+                  {customBlocks.length > 0 && (
+                    <span className="bg-cyan-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                      {customBlocks.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {sidebarTab === 'nodes' ? (
+                  <NodePalette onNodePointerDown={handleNodePointerDown} />
+                ) : (
+                  <CustomBlockLibrary
+                    blocks={customBlocks}
+                    onCreateBlock={handleCreateBlockFromSelection}
+                    onEditBlock={handleEditBlock}
+                    onDeleteBlock={deleteBlock}
+                    onDuplicateBlock={duplicateBlock}
+                    onExportBlock={exportBlock}
+                    onExportAll={exportAllBlocks}
+                    onImportBlocks={importBlocks}
+                    onAddBlockToCanvas={handleAddBlockToCanvas}
+                    canCreateFromSelection={selectedNodes.size >= 1}
+                  />
+                )}
+              </div>
+            </div>
+
+            <FlowCanvas
+              nodes={nodes}
+              connections={connections}
+              selectedNodes={selectedNodes}
+              selectedConnection={selectedConnection}
+              connectingFrom={connectingFrom}
+              connectingFromRef={connectingFromRef}
+              clipboard={clipboard}
+              onNodePositionChange={updateNodePosition}
+              onMultipleNodePositionsChange={updateMultipleNodePositions}
+              onNodeSelect={handleNodeSelectWithModbusRedirect}
+              onNodesSelect={selectNodes}
+              onNodeDelete={deleteNode}
+              onConnectionStart={startConnection}
+              onConnectionEnd={endConnection}
+              onConnectionCancel={cancelConnection}
+              onConnectionSelect={selectConnection}
+              onConnectionDelete={deleteConnection}
+              onClearSelection={clearSelection}
+              onCopy={copySelection}
+              onPaste={pasteClipboard}
+              onDeleteSelected={deleteSelected}
+              onContainerResize={updateContainerSize}
+              onCaseResize={updateCaseSize}
+              onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
+              onMoveNodeOutOfContainer={(nodeId) => moveNodeToContainer(nodeId, null)}
+              onDuplicateSelected={duplicateSelected}
+              onAddTextAnnotation={addTextAnnotation}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              ghostNode={ghostNode}
+              liveValues={liveValues}
+              onOverrideChange={updateNodeOverride}
+              onModbusDatapointDrop={handleModbusDatapointDrop}
+            />
+
+            {selectedNodeData && (
+              <PropertiesPanel
+                node={selectedNodeData}
+                onClose={() => clearSelection()}
+                onUpdateNode={updateNodeData}
+                haEntities={haEntities}
+                haLoading={haLoading}
+                haError={haError}
+                onReloadEntities={loadHaEntities}
+                liveValues={liveValues}
+                modbusDevices={modbusDevices}
+                modbusDriverEnabled={modbusDriverEnabled}
+                onModbusDriverEnabledChange={setModbusDriverEnabled}
+                onModbusDevicesChange={setModbusDevices}
+                onModbusDatapointDragStart={handleModbusDatapointDragStart}
+                onPingModbusDevice={handlePingModbusDevice}
+                modbusDeviceStatus={modbusDeviceStatus}
+                selectedModbusDatapointPath={selectedModbusDatapointPath}
+                allNodes={nodes}
               />
             )}
           </div>
-        </div>
 
-        <FlowCanvas
-          nodes={nodes}
-          connections={connections}
-          selectedNodes={selectedNodes}
-          selectedConnection={selectedConnection}
-          connectingFrom={connectingFrom}
-          connectingFromRef={connectingFromRef}
-          clipboard={clipboard}
-          onNodePositionChange={updateNodePosition}
-          onMultipleNodePositionsChange={updateMultipleNodePositions}
-          onNodeSelect={handleNodeSelectWithModbusRedirect}
-          onNodesSelect={selectNodes}
-          onNodeDelete={deleteNode}
-          onConnectionStart={startConnection}
-          onConnectionEnd={endConnection}
-          onConnectionCancel={cancelConnection}
-          onConnectionSelect={selectConnection}
-          onConnectionDelete={deleteConnection}
-          onClearSelection={clearSelection}
-          onCopy={copySelection}
-          onPaste={pasteClipboard}
-          onDeleteSelected={deleteSelected}
-          onContainerResize={updateContainerSize}
-          onCaseResize={updateCaseSize}
-          onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
-          onMoveNodeOutOfContainer={(nodeId) => moveNodeToContainer(nodeId, null)}
-          onDuplicateSelected={duplicateSelected}
-          onAddTextAnnotation={addTextAnnotation}
-          zoom={zoom}
-          onZoomChange={setZoom}
-          ghostNode={ghostNode}
+          <div className="bg-slate-800 border-t border-slate-700 px-4 py-1 flex-shrink-0">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>
+                {nodes.length} Knoten &middot; {connections.length} Verbindungen
+                {selectedNodes.size > 0 && (
+                  <span className="ml-2 text-blue-400">
+                    {selectedNodes.size} ausgewaehlt
+                  </span>
+                )}
+                {selectedConnection && (
+                  <span className="ml-2 text-amber-400">
+                    Verbindung ausgewaehlt
+                  </span>
+                )}
+                {activePage.running && (
+                  <span className="ml-2 text-emerald-400 font-medium">
+                    Laeuft ({activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`} Zyklus)
+                  </span>
+                )}
+              </span>
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${haEntities.length > 0 ? 'bg-emerald-400' : haError ? 'bg-red-400' : 'bg-amber-400'}`} />
+                  <span className={haEntities.length > 0 ? 'text-emerald-400' : haError ? 'text-red-400' : 'text-amber-400'}>
+                    {haEntities.length > 0 ? `HA: ${haEntities.length}` : haError ? 'HA: Fehler' : 'HA: ...'}
+                  </span>
+                </span>
+                <span>{activePage.name}</span>
+              </span>
+            </div>
+          </div>
+
+          {showBlockEditor && (
+            <CustomBlockEditor
+              block={editingBlock}
+              selectedNodes={selectedNodesList}
+              selectedConnections={selectedConnectionsList}
+              allNodes={nodes}
+              allConnections={connections}
+              onSave={handleSaveBlock}
+              onCancel={() => { setShowBlockEditor(false); setEditingBlock(null); }}
+            />
+          )}
+        </>
+      ) : (
+        <VisualizationView
+          visuPages={visuPages}
+          activeVisuPageId={activeVisuPageId}
+          onSetActiveVisuPage={setActiveVisuPageId}
+          onAddVisuPage={addVisuPage}
+          onDeleteVisuPage={deleteVisuPage}
+          onRenameVisuPage={renameVisuPage}
+          onUpdateVisuPage={updateVisuPage}
           liveValues={liveValues}
-          onOverrideChange={updateNodeOverride}
-          onModbusDatapointDrop={handleModbusDatapointDrop}
-        />
-
-        {selectedNodeData && (
-          <PropertiesPanel
-            node={selectedNodeData}
-            onClose={() => clearSelection()}
-            onUpdateNode={updateNodeData}
-            haEntities={haEntities}
-            haLoading={haLoading}
-            haError={haError}
-            onReloadEntities={loadHaEntities}
-            liveValues={liveValues}
-            modbusDevices={modbusDevices}
-            modbusDriverEnabled={modbusDriverEnabled}
-            onModbusDriverEnabledChange={setModbusDriverEnabled}
-            onModbusDevicesChange={setModbusDevices}
-            onModbusDatapointDragStart={handleModbusDatapointDragStart}
-            onPingModbusDevice={handlePingModbusDevice}
-            modbusDeviceStatus={modbusDeviceStatus}
-            selectedModbusDatapointPath={selectedModbusDatapointPath}
-            allNodes={nodes}
-          />
-        )}
-      </div>
-
-      <div className="bg-slate-800 border-t border-slate-700 px-4 py-1 flex-shrink-0">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>
-            {nodes.length} Knoten &middot; {connections.length} Verbindungen
-            {selectedNodes.size > 0 && (
-              <span className="ml-2 text-blue-400">
-                {selectedNodes.size} ausgewaehlt
-              </span>
-            )}
-            {selectedConnection && (
-              <span className="ml-2 text-amber-400">
-                Verbindung ausgewaehlt
-              </span>
-            )}
-            {activePage.running && (
-              <span className="ml-2 text-emerald-400 font-medium">
-                Laeuft ({activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`} Zyklus)
-              </span>
-            )}
-          </span>
-          <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${haEntities.length > 0 ? 'bg-emerald-400' : haError ? 'bg-red-400' : 'bg-amber-400'}`} />
-              <span className={haEntities.length > 0 ? 'text-emerald-400' : haError ? 'text-red-400' : 'text-amber-400'}>
-                {haEntities.length > 0 ? `HA: ${haEntities.length}` : haError ? 'HA: Fehler' : 'HA: ...'}
-              </span>
-            </span>
-            <span>{activePage.name}</span>
-          </span>
-        </div>
-      </div>
-
-      {showBlockEditor && (
-        <CustomBlockEditor
-          block={editingBlock}
-          selectedNodes={selectedNodesList}
-          selectedConnections={selectedConnectionsList}
-          allNodes={nodes}
-          allConnections={connections}
-          onSave={handleSaveBlock}
-          onCancel={() => { setShowBlockEditor(false); setEditingBlock(null); }}
+          logicNodes={allLogicNodes}
+          onWidgetValueChange={handleVisuWidgetValueChange}
         />
       )}
     </div>

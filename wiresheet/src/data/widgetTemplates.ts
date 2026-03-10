@@ -1,0 +1,275 @@
+import { WidgetTemplate } from '../types/visualization';
+
+export const widgetTemplates: WidgetTemplate[] = [
+  {
+    type: 'visu-switch',
+    label: 'Schalter',
+    icon: 'ToggleLeft',
+    category: 'control',
+    defaultSize: { width: 120, height: 60 },
+    defaultConfig: {
+      onLabel: 'Ein',
+      offLabel: 'Aus',
+      onColor: '#22c55e',
+      offColor: '#64748b'
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top'
+    },
+    description: 'Ein/Aus Schalter zum Steuern von Boolean-Werten',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-button',
+    label: 'Taster',
+    icon: 'Square',
+    category: 'control',
+    defaultSize: { width: 100, height: 50 },
+    defaultConfig: {
+      label: 'Taster',
+      pressValue: true,
+      releaseValue: false,
+      holdMode: false,
+      color: '#3b82f6'
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top'
+    },
+    description: 'Taster fuer Impulssignale',
+    supportsBinding: true,
+    bindingDirection: 'write'
+  },
+  {
+    type: 'visu-slider',
+    label: 'Schieberegler',
+    icon: 'SlidersHorizontal',
+    category: 'control',
+    defaultSize: { width: 200, height: 60 },
+    defaultConfig: {
+      min: 0,
+      max: 100,
+      step: 1,
+      showValue: true,
+      unit: '',
+      orientation: 'horizontal'
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top',
+      accentColor: '#3b82f6'
+    },
+    description: 'Schieberegler fuer numerische Sollwerte',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-incrementer',
+    label: 'Inkrementer',
+    icon: 'PlusMinusIcon',
+    category: 'control',
+    defaultSize: { width: 160, height: 60 },
+    defaultConfig: {
+      min: 0,
+      max: 100,
+      step: 1,
+      unit: ''
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top'
+    },
+    description: 'Plus/Minus Tasten fuer Sollwert-Anpassung',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-input',
+    label: 'Eingabefeld',
+    icon: 'TextCursorInput',
+    category: 'control',
+    defaultSize: { width: 150, height: 60 },
+    defaultConfig: {
+      inputType: 'number',
+      min: 0,
+      max: 1000,
+      placeholder: 'Wert...',
+      unit: ''
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top'
+    },
+    description: 'Direktes Eingabefeld fuer Sollwerte',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-gauge',
+    label: 'Messanzeige',
+    icon: 'Gauge',
+    category: 'display',
+    defaultSize: { width: 150, height: 150 },
+    defaultConfig: {
+      min: 0,
+      max: 100,
+      unit: '%',
+      showValue: true,
+      gaugeType: 'semicircle',
+      thresholds: [
+        { value: 30, color: '#22c55e' },
+        { value: 70, color: '#eab308' },
+        { value: 100, color: '#ef4444' }
+      ]
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'bottom'
+    },
+    description: 'Rundinstrument zur Anzeige von Messwerten',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-display',
+    label: 'Wertanzeige',
+    icon: 'MonitorDot',
+    category: 'display',
+    defaultSize: { width: 120, height: 60 },
+    defaultConfig: {
+      format: '',
+      unit: '',
+      decimals: 1,
+      fontSize: 24
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top',
+      backgroundColor: '#1e293b',
+      textColor: '#22c55e'
+    },
+    description: 'Digitale Wertanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-led',
+    label: 'LED Anzeige',
+    icon: 'Lightbulb',
+    category: 'indicator',
+    defaultSize: { width: 60, height: 60 },
+    defaultConfig: {
+      onColor: '#22c55e',
+      offColor: '#374151',
+      shape: 'circle',
+      blinkOnChange: false
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'bottom'
+    },
+    description: 'LED-Anzeige fuer Zustaende',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-bar',
+    label: 'Balkenanzeige',
+    icon: 'BarChart3',
+    category: 'display',
+    defaultSize: { width: 200, height: 40 },
+    defaultConfig: {
+      min: 0,
+      max: 100,
+      orientation: 'horizontal',
+      showValue: true,
+      unit: '%',
+      color: '#3b82f6',
+      backgroundColor: '#1e293b'
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top'
+    },
+    description: 'Horizontale oder vertikale Balkenanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-label',
+    label: 'Beschriftung',
+    icon: 'Type',
+    category: 'decoration',
+    defaultSize: { width: 150, height: 40 },
+    defaultConfig: {
+      text: 'Beschriftung',
+      fontSize: 16,
+      fontWeight: 'normal',
+      textAlign: 'left'
+    },
+    defaultStyle: {
+      textColor: '#e2e8f0'
+    },
+    description: 'Statischer Text zur Beschriftung',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-tank',
+    label: 'Tankfuellstand',
+    icon: 'Container',
+    category: 'display',
+    defaultSize: { width: 80, height: 150 },
+    defaultConfig: {
+      min: 0,
+      max: 100,
+      unit: '%',
+      showValue: true,
+      fillColor: '#3b82f6',
+      levels: [
+        { value: 20, color: '#ef4444', label: 'Leer' },
+        { value: 80, color: '#3b82f6', label: 'Normal' },
+        { value: 100, color: '#22c55e', label: 'Voll' }
+      ]
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'bottom'
+    },
+    description: 'Tankfuellstandsanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-thermometer',
+    label: 'Thermometer',
+    icon: 'Thermometer',
+    category: 'display',
+    defaultSize: { width: 60, height: 150 },
+    defaultConfig: {
+      min: -20,
+      max: 50,
+      unit: '°C',
+      showValue: true,
+      coldColor: '#3b82f6',
+      hotColor: '#ef4444'
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'bottom'
+    },
+    description: 'Temperaturanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  }
+];
+
+export const getWidgetTemplate = (type: string): WidgetTemplate | undefined => {
+  return widgetTemplates.find(t => t.type === type);
+};
+
+export const getWidgetsByCategory = (category: WidgetTemplate['category']): WidgetTemplate[] => {
+  return widgetTemplates.filter(t => t.category === category);
+};

@@ -18,6 +18,7 @@ const DATA_PATHS = [
 let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
 let blocksFile = path.join(dataDir, 'custom-blocks.json');
+let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 
 const runningPages = new Map();
 let cachedDeviceRegistry = null;
@@ -1002,6 +1003,76 @@ app.post(['/blocks', '/api/blocks'], async (req, res) => {
   }
 });
 
+app.get(['/visu-pages', '/api/visu-pages'], async (req, res) => {
+  try {
+    const data = await fs.readFile(visuPagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    console.log(`Geladen: ${pages.length} Visu-Seiten`);
+    res.json(pages);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      const defaultPages = [
+        { id: 'visu-page-1', name: 'Visu 1', widgets: [], backgroundColor: '#0f172a', gridSize: 10, showGrid: true }
+      ];
+      res.json(defaultPages);
+    } else {
+      console.error('Fehler beim Laden der Visu-Seiten:', err);
+      res.status(500).json({ error: 'Fehler beim Laden der Visu-Seiten', details: err.message });
+    }
+  }
+});
+
+app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
+  try {
+    const pages = req.body;
+    if (!Array.isArray(pages)) {
+      return res.status(400).json({ error: 'Ungueltige Daten - Array erwartet' });
+    }
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(visuPagesFile, JSON.stringify(pages, null, 2));
+    console.log(`Gespeichert: ${pages.length} Visu-Seiten`);
+    res.json({ success: true, saved: pages.length });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Visu-Seiten:', err);
+    res.status(500).json({ error: 'Fehler beim Speichern der Visu-Seiten', details: err.message });
+  }
+});
+
+app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
+  const { nodeId, value } = req.body;
+  if (!nodeId) {
+    return res.status(400).json({ error: 'nodeId fehlt' });
+  }
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    let updated = false;
+    for (const page of pages) {
+      const node = page.nodes.find(n => n.id === nodeId);
+      if (node) {
+        if (!node.data.override) {
+          node.data.override = { manual: true, value };
+        } else {
+          node.data.override.manual = true;
+          node.data.override.value = value;
+        }
+        updated = true;
+        break;
+      }
+    }
+    if (updated) {
+      await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+      console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Node nicht gefunden' });
+    }
+  } catch (err) {
+    console.error('Fehler beim Schreiben des Visu-Werts:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const net = require('net');
 
 function modbusReadRegister(host, port, unitId, address, registerType, dataType, timeout = 3000) {
@@ -1470,6 +1541,7 @@ async function start() {
     dataDir = await findWritableDataDir();
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
+    visuPagesFile = path.join(dataDir, 'visu-pages.json');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
