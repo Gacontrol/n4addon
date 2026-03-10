@@ -494,5 +494,52 @@ export const nodeTemplates: NodeTemplate[] = [
       containerWidth: 400,
       containerHeight: 300
     }
+  },
+  {
+    type: 'pid-controller',
+    label: 'PID Regler',
+    icon: 'Gauge',
+    category: 'math',
+    color: '#ef4444',
+    inputs: [
+      { label: 'Istwert', type: 'input' },
+      { label: 'Sollwert', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Stellgröße', type: 'output' },
+      { label: 'Regelabweichung', type: 'output' }
+    ],
+    description: 'PID-Regler mit einstellbaren Parametern',
+    defaultConfig: {
+      kp: 1.0,
+      ki: 0.1,
+      kd: 0.05,
+      outputMin: 0,
+      outputMax: 100,
+      antiWindup: true,
+      sampleTimeMs: 100
+    }
+  },
+  {
+    type: 'scaling',
+    label: 'Schiebung',
+    icon: 'MoveHorizontal',
+    category: 'math',
+    color: '#8b5cf6',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Skaliert/schiebt Wert zwischen Bereichen',
+    defaultConfig: {
+      inputMin: 0,
+      inputMax: 100,
+      outputMin: 0,
+      outputMax: 100,
+      inverted: false,
+      clamp: true
+    }
   }
 ];

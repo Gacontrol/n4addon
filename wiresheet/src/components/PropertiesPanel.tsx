@@ -695,6 +695,199 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'pid-controller' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-red-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">PID Regler</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Kp</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={config.kp ?? 1.0}
+                  onChange={e => updateConfig('kp', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+                <p className="text-[9px] text-slate-500 mt-0.5">Proportional</p>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Ki</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={config.ki ?? 0.1}
+                  onChange={e => updateConfig('ki', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+                <p className="text-[9px] text-slate-500 mt-0.5">Integral</p>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Kd</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={config.kd ?? 0.05}
+                  onChange={e => updateConfig('kd', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+                <p className="text-[9px] text-slate-500 mt-0.5">Differential</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Ausgang Min</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={config.outputMin ?? 0}
+                  onChange={e => updateConfig('outputMin', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Ausgang Max</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={config.outputMax ?? 100}
+                  onChange={e => updateConfig('outputMax', parseFloat(e.target.value) || 0)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Abtastzeit</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={10}
+                  step={10}
+                  value={config.sampleTimeMs ?? 100}
+                  onChange={e => updateConfig('sampleTimeMs', parseInt(e.target.value) || 100)}
+                  className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                />
+                <span className="text-xs text-slate-400">ms</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
+              <span className="text-xs text-slate-300">Anti-Windup</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.antiWindup !== false}
+                  onChange={e => updateConfig('antiWindup', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-red-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+              </label>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Der PID-Regler berechnet die Stellgroesse basierend auf der Differenz zwischen Soll- und Istwert.
+            </p>
+          </div>
+        )}
+
+        {node.type === 'scaling' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-violet-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Schiebung / Skalierung</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <label className="block text-xs text-slate-400 mb-2 font-medium">Eingangsbereich</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Min X</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={config.inputMin ?? 0}
+                      onChange={e => updateConfig('inputMin', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Max X</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={config.inputMax ?? 100}
+                      onChange={e => updateConfig('inputMax', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbereich</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Min Y</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={config.outputMin ?? 0}
+                      onChange={e => updateConfig('outputMin', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Max Y</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={config.outputMax ?? 100}
+                      onChange={e => updateConfig('outputMax', parseFloat(e.target.value) || 0)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
+                <span className="text-xs text-slate-300">Invertiert</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.inverted === true}
+                    onChange={e => updateConfig('inverted', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-violet-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
+                <span className="text-xs text-slate-300">Begrenzen (Clamp)</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.clamp !== false}
+                    onChange={e => updateConfig('clamp', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-violet-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Skaliert den Eingangswert von [Min X, Max X] auf [Min Y, Max Y]. Bei "Invertiert" wird die Richtung umgekehrt.
+            </p>
+          </div>
+        )}
+
         {node.type === 'case-container' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-indigo-400">
