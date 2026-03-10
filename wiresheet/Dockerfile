@@ -8,7 +8,8 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     nginx && \
-    mkdir -p /data/wiresheet
+    mkdir -p /data/wiresheet && \
+    mkdir -p /run/nginx
 
 WORKDIR /app
 
@@ -18,7 +19,8 @@ RUN npm install --production && \
 
 COPY dist ./dist
 COPY server ./server
-COPY rootfs /
+COPY rootfs/run.sh /run.sh
+COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
 
 RUN chmod +x /run.sh && \
     chown -R root:root /app
