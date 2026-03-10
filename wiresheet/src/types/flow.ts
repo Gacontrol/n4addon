@@ -78,6 +78,7 @@ export interface FlowNode {
     dpType?: DatapointType;
     override?: DatapointOverride;
     parentContainerId?: string;
+    caseIndex?: number;
   };
 }
 

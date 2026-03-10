@@ -126,9 +126,14 @@ function App() {
             }
           }
           let parentContainerId: string | undefined;
+          let caseIndex: number | undefined;
 
           if (dropZone) {
             parentContainerId = dropZone.getAttribute('data-case-drop-zone') || undefined;
+            const caseIndexAttr = dropZone.getAttribute('data-case-index');
+            if (caseIndexAttr !== null) {
+              caseIndex = parseInt(caseIndexAttr);
+            }
             const containerNode = nodes.find(n => n.id === parentContainerId);
             if (containerNode) {
               const dropZoneRect = dropZone.getBoundingClientRect();
@@ -137,8 +142,9 @@ function App() {
             }
           }
 
+          const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const newNode: FlowNode = {
-            id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: newNodeId,
             type: template.type,
             position: { x: Math.max(0, x), y: Math.max(0, y) },
             data: {
@@ -147,27 +153,28 @@ function App() {
               config: template.defaultConfig ? { ...template.defaultConfig } : undefined,
               inputs: template.inputs.map((input, idx) => ({ ...input, id: `input-${idx}` })),
               outputs: template.outputs.map((output, idx) => ({ ...output, id: `output-${idx}` })),
-              parentContainerId
+              parentContainerId,
+              caseIndex
             }
           };
 
           addNode(newNode);
           selectNode(newNode.id);
 
-          if (parentContainerId) {
+          if (parentContainerId && caseIndex !== undefined) {
             const containerNode = nodes.find(n => n.id === parentContainerId);
             if (containerNode && containerNode.type === 'case-container') {
-              const nodeWidth = 180;
-              const nodeHeight = 80;
-              const currentWidth = containerNode.data.config?.containerWidth || 400;
-              const currentHeight = containerNode.data.config?.containerHeight || 300;
-              const headerAndCases = 80;
-
-              const requiredWidth = Math.max(currentWidth, x + nodeWidth + 20);
-              const requiredHeight = Math.max(currentHeight, y + nodeHeight + headerAndCases + 20);
-
-              if (requiredWidth > currentWidth || requiredHeight > currentHeight) {
-                updateContainerSize(parentContainerId, requiredWidth, requiredHeight);
+              const cases = containerNode.data.config?.cases || [];
+              if (cases[caseIndex]) {
+                const updatedCases = cases.map((c: { id: string; label: string; nodeIds?: string[] }, idx: number) => {
+                  if (idx === caseIndex) {
+                    return { ...c, nodeIds: [...(c.nodeIds || []), newNodeId] };
+                  }
+                  return c;
+                });
+                updateNodeData(parentContainerId, {
+                  config: { ...containerNode.data.config, cases: updatedCases }
+                });
               }
             }
           }

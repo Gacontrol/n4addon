@@ -435,11 +435,48 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
   };
   nodes.forEach(n => visit(n.id));
 
+  const caseContainerActiveCase = new Map();
+  for (const node of nodes) {
+    if (node.type === 'case-container') {
+      const containerConns = connections.filter(c => c.target === node.id);
+      let caseVal = 0;
+      for (const conn of containerConns) {
+        if (nodeValues[conn.source] !== undefined) {
+          caseVal = parseInt(nodeValues[conn.source]) || 0;
+          break;
+        }
+      }
+      caseContainerActiveCase.set(node.id, caseVal);
+      nodeValues[node.id] = caseVal;
+    }
+  }
+
   for (const nodeId of topoOrder) {
     const node = nodes.find(n => n.id === nodeId);
     if (!node) continue;
+
+    if (node.data.parentContainerId) {
+      const parentContainer = nodes.find(n => n.id === node.data.parentContainerId);
+      if (parentContainer && parentContainer.type === 'case-container') {
+        const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
+        const nodeCase = node.data.caseIndex;
+        if (nodeCase !== undefined && nodeCase !== activeCase) {
+          continue;
+        }
+      }
+    }
+
     const incomingConns = connections.filter(c => c.target === nodeId);
-    const inputVals = incomingConns.map(c => nodeValues[c.source]);
+    const inputVals = incomingConns.map(c => {
+      const sourceNode = nodes.find(n => n.id === c.source);
+      if (sourceNode && sourceNode.type === 'python-script') {
+        const portKey = `${c.source}:${c.sourcePort}`;
+        if (nodeValues[portKey] !== undefined) {
+          return nodeValues[portKey];
+        }
+      }
+      return nodeValues[c.source];
+    });
 
     const cfg = node.data.config || {};
 
@@ -517,13 +554,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       try {
         const outputs = await executePythonCode(pythonCode, inputs);
         const pythonOutputs = cfg.pythonOutputs || [];
-        if (pythonOutputs.length === 1) {
-          nodeValues[nodeId] = outputs[pythonOutputs[0].id];
-        } else {
-          nodeValues[nodeId] = outputs;
-        }
+        const firstOutput = pythonOutputs.length > 0 ? outputs[pythonOutputs[0].id] : null;
+        nodeValues[nodeId] = firstOutput;
         pythonOutputs.forEach((out, idx) => {
-          nodeValues[`${nodeId}:${idx}`] = outputs[out.id];
+          nodeValues[`${nodeId}:output-${idx}`] = outputs[out.id];
         });
       } catch (e) {
         console.error(`Python Script Fehler (${nodeId}):`, e.message);
