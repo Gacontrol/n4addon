@@ -777,7 +777,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     }}
                     data-port-id={`${node.id}-${input.id}`}
                     onClick={e => { console.log('[INPUT PORT] click', node.id, input.id); e.stopPropagation(); onPortClick(node.id, input.id, false); }}
-                    onPointerDown={e => { e.stopPropagation(); }}
+                    onPointerDown={e => { console.log('[INPUT PORT] pointerdown', node.id, input.id); e.stopPropagation(); }}
+                    onMouseEnter={() => { console.log('[INPUT PORT] mouseenter', node.id, input.id); }}
                   >
                     <div
                       className="rounded-full border-2 transition-all pointer-events-none"
@@ -841,7 +842,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     }}
                     data-port-id={`${node.id}-${output.id}`}
                     onClick={e => { console.log('[OUTPUT PORT] click', node.id, output.id); e.stopPropagation(); onPortClick(node.id, output.id, true); }}
-                    onPointerDown={e => { e.stopPropagation(); }}
+                    onPointerDown={e => { console.log('[OUTPUT PORT] pointerdown', node.id, output.id); e.stopPropagation(); }}
+                    onMouseEnter={() => { console.log('[OUTPUT PORT] mouseenter', node.id, output.id); }}
                   >
                     <div
                       className="rounded-full border-2 transition-all pointer-events-none"
