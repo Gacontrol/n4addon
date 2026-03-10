@@ -442,6 +442,13 @@ print(json.dumps(_outputs))
 async function executePageLogic(nodes, connections, manualOverrides = {}) {
   const nodeValues = {};
 
+  const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
+  const modbusDevices = modbusDriverNode?.data?.config?.modbusDevices || [];
+  const modbusDeviceMap = new Map();
+  for (const device of modbusDevices) {
+    modbusDeviceMap.set(device.id, device);
+  }
+
   const statePromises = nodes
     .filter(n => (n.type === 'ha-input') && n.data.entityId)
     .map(async (n) => {
@@ -459,7 +466,60 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       }
     });
 
-  await Promise.all(statePromises);
+  const modbusInputPromises = nodes
+    .filter(n => n.type === 'modbus-device-input')
+    .map(async (n) => {
+      const cfg = n.data.config || {};
+      const deviceId = cfg.modbusDeviceId;
+      const datapoints = cfg.modbusDatapoints || [];
+      const device = modbusDeviceMap.get(deviceId);
+
+      if (!device) {
+        console.log(`Modbus Input ${n.id}: Geraet ${deviceId} nicht gefunden`);
+        nodeValues[n.id] = null;
+        return;
+      }
+
+      const dpValues = {};
+      for (let i = 0; i < datapoints.length; i++) {
+        const dp = datapoints[i];
+        try {
+          let rawValue = await modbusReadRegister(
+            device.host,
+            device.port,
+            device.unitId,
+            dp.address,
+            dp.registerType || 'holding',
+            dp.dataType || 'uint16',
+            device.timeout || 3000
+          );
+
+          let value = rawValue;
+          if (dp.scale && dp.scale !== 1) {
+            value = value * dp.scale;
+          }
+          if (dp.offset) {
+            value = value + dp.offset;
+          }
+          if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
+            value = (rawValue >> dp.bitIndex) & 1 ? true : false;
+          }
+
+          dpValues[dp.id] = value;
+          nodeValues[`${n.id}:output-${i}`] = value;
+          console.log(`Modbus Read ${device.name}/${dp.name} (${dp.address}): ${value}`);
+        } catch (err) {
+          console.error(`Modbus Read Fehler ${device.name}/${dp.name}:`, err.message);
+          dpValues[dp.id] = null;
+          nodeValues[`${n.id}:output-${i}`] = null;
+        }
+      }
+
+      const firstValue = Object.values(dpValues)[0] ?? null;
+      nodeValues[n.id] = firstValue;
+    });
+
+  await Promise.all([...statePromises, ...modbusInputPromises]);
 
   const topoOrder = [];
   const visited = new Set();
@@ -525,7 +585,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
 
     const getInputValue = (conn) => {
       const sourceNode = nodes.find(n => n.id === conn.source);
-      if (sourceNode && sourceNode.type === 'python-script') {
+      if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
@@ -690,6 +750,63 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
             console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
             nodeValues[nodeId] = null;
           }
+        }
+      }
+    } else if (node.type === 'modbus-device-output') {
+      let allowWrite = true;
+      if (node.data.parentContainerId) {
+        const parentContainer = nodes.find(n => n.id === node.data.parentContainerId);
+        if (parentContainer && parentContainer.type === 'case-container') {
+          const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
+          const nodeCase = node.data.caseIndex;
+          if (nodeCase !== undefined && nodeCase !== activeCase) {
+            allowWrite = false;
+            console.log(`Modbus-Output ${nodeId} nicht geschrieben - Case ${nodeCase} ist inaktiv (aktiv: ${activeCase})`);
+          }
+        }
+      }
+
+      if (allowWrite) {
+        const deviceId = cfg.modbusDeviceId;
+        const datapoints = cfg.modbusDatapoints || [];
+        const device = modbusDeviceMap.get(deviceId);
+
+        if (!device) {
+          console.log(`Modbus Output ${nodeId}: Geraet ${deviceId} nicht gefunden`);
+          nodeValues[nodeId] = null;
+        } else {
+          for (let i = 0; i < datapoints.length; i++) {
+            const dp = datapoints[i];
+            const val = inputVals[i];
+
+            if (val !== null && val !== undefined) {
+              let writeValue = val;
+              if (dp.scale && dp.scale !== 1) {
+                writeValue = writeValue / dp.scale;
+              }
+              if (dp.offset) {
+                writeValue = writeValue - dp.offset;
+              }
+
+              try {
+                await modbusWriteRegister(
+                  device.host,
+                  device.port,
+                  device.unitId,
+                  dp.address,
+                  writeValue,
+                  dp.registerType || 'holding',
+                  dp.dataType || 'uint16',
+                  device.timeout || 3000
+                );
+                console.log(`Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
+                nodeValues[`${nodeId}:input-${i}`] = val;
+              } catch (err) {
+                console.error(`Modbus Write Fehler ${device.name}/${dp.name}:`, err.message);
+              }
+            }
+          }
+          nodeValues[nodeId] = inputVals[0] ?? null;
         }
       }
     }
@@ -872,6 +989,210 @@ app.post(['/blocks', '/api/blocks'], async (req, res) => {
 });
 
 const net = require('net');
+
+function modbusReadRegister(host, port, unitId, address, registerType, dataType, timeout = 3000) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    let connected = false;
+    let responseHandled = false;
+
+    const connectTimeout = setTimeout(() => {
+      if (!connected && !responseHandled) {
+        responseHandled = true;
+        socket.destroy();
+        reject(new Error('Connection timeout'));
+      }
+    }, timeout);
+
+    socket.on('connect', () => {
+      connected = true;
+      clearTimeout(connectTimeout);
+
+      let functionCode;
+      switch (registerType) {
+        case 'coil': functionCode = 0x01; break;
+        case 'discrete': functionCode = 0x02; break;
+        case 'input': functionCode = 0x04; break;
+        case 'holding':
+        default: functionCode = 0x03; break;
+      }
+
+      const count = (dataType === 'int32' || dataType === 'uint32' || dataType === 'float32') ? 2 : 1;
+
+      const transactionId = Buffer.from([0x00, Math.floor(Math.random() * 255)]);
+      const protocolId = Buffer.from([0x00, 0x00]);
+      const length = Buffer.from([0x00, 0x06]);
+      const unitIdBuf = Buffer.from([unitId]);
+      const fc = Buffer.from([functionCode]);
+      const startAddress = Buffer.from([(address >> 8) & 0xff, address & 0xff]);
+      const quantity = Buffer.from([(count >> 8) & 0xff, count & 0xff]);
+
+      const request = Buffer.concat([transactionId, protocolId, length, unitIdBuf, fc, startAddress, quantity]);
+      socket.write(request);
+    });
+
+    socket.on('data', (data) => {
+      if (responseHandled) return;
+      responseHandled = true;
+      socket.destroy();
+
+      if (data.length < 9) {
+        reject(new Error('Response too short'));
+        return;
+      }
+
+      const responseFc = data[7];
+      if (responseFc > 0x80) {
+        const errorCode = data[8];
+        reject(new Error(`Modbus error: ${errorCode}`));
+        return;
+      }
+
+      if (registerType === 'coil' || registerType === 'discrete') {
+        const byteVal = data[9];
+        resolve(byteVal & 0x01 ? true : false);
+        return;
+      }
+
+      let rawValue;
+      if (dataType === 'int32' || dataType === 'uint32' || dataType === 'float32') {
+        if (data.length < 13) {
+          reject(new Error('Response too short for 32-bit value'));
+          return;
+        }
+        rawValue = (data[9] << 24) | (data[10] << 16) | (data[11] << 8) | data[12];
+      } else {
+        rawValue = (data[9] << 8) | data[10];
+      }
+
+      let value;
+      switch (dataType) {
+        case 'bool':
+          value = rawValue !== 0;
+          break;
+        case 'int16':
+          value = rawValue > 32767 ? rawValue - 65536 : rawValue;
+          break;
+        case 'int32':
+          value = rawValue > 2147483647 ? rawValue - 4294967296 : rawValue;
+          break;
+        case 'float32':
+          const buf = Buffer.alloc(4);
+          buf.writeUInt32BE(rawValue, 0);
+          value = buf.readFloatBE(0);
+          break;
+        case 'uint16':
+        case 'uint32':
+        default:
+          value = rawValue;
+      }
+
+      resolve(value);
+    });
+
+    socket.on('error', (err) => {
+      if (responseHandled) return;
+      responseHandled = true;
+      clearTimeout(connectTimeout);
+      socket.destroy();
+      reject(err);
+    });
+
+    socket.on('timeout', () => {
+      if (responseHandled) return;
+      responseHandled = true;
+      socket.destroy();
+      reject(new Error('Socket timeout'));
+    });
+
+    socket.setTimeout(timeout);
+    socket.connect(port, host);
+  });
+}
+
+function modbusWriteRegister(host, port, unitId, address, value, registerType, dataType, timeout = 3000) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    let connected = false;
+    let responseHandled = false;
+
+    const connectTimeout = setTimeout(() => {
+      if (!connected && !responseHandled) {
+        responseHandled = true;
+        socket.destroy();
+        reject(new Error('Connection timeout'));
+      }
+    }, timeout);
+
+    socket.on('connect', () => {
+      connected = true;
+      clearTimeout(connectTimeout);
+
+      let functionCode;
+      if (registerType === 'coil') {
+        functionCode = 0x05;
+      } else {
+        functionCode = 0x06;
+      }
+
+      const transactionId = Buffer.from([0x00, Math.floor(Math.random() * 255)]);
+      const protocolId = Buffer.from([0x00, 0x00]);
+      const length = Buffer.from([0x00, 0x06]);
+      const unitIdBuf = Buffer.from([unitId]);
+      const fc = Buffer.from([functionCode]);
+      const registerAddress = Buffer.from([(address >> 8) & 0xff, address & 0xff]);
+
+      let valueBuffer;
+      if (registerType === 'coil') {
+        valueBuffer = value ? Buffer.from([0xff, 0x00]) : Buffer.from([0x00, 0x00]);
+      } else {
+        const numVal = parseInt(value) || 0;
+        valueBuffer = Buffer.from([(numVal >> 8) & 0xff, numVal & 0xff]);
+      }
+
+      const request = Buffer.concat([transactionId, protocolId, length, unitIdBuf, fc, registerAddress, valueBuffer]);
+      socket.write(request);
+    });
+
+    socket.on('data', (data) => {
+      if (responseHandled) return;
+      responseHandled = true;
+      socket.destroy();
+
+      if (data.length < 12) {
+        reject(new Error('Response too short'));
+        return;
+      }
+
+      const responseFc = data[7];
+      if (responseFc > 0x80) {
+        const errorCode = data[8];
+        reject(new Error(`Modbus error: ${errorCode}`));
+        return;
+      }
+
+      resolve(true);
+    });
+
+    socket.on('error', (err) => {
+      if (responseHandled) return;
+      responseHandled = true;
+      clearTimeout(connectTimeout);
+      socket.destroy();
+      reject(err);
+    });
+
+    socket.on('timeout', () => {
+      if (responseHandled) return;
+      responseHandled = true;
+      socket.destroy();
+      reject(new Error('Socket timeout'));
+    });
+
+    socket.setTimeout(timeout);
+    socket.connect(port, host);
+  });
+}
 
 app.post(['/modbus/ping', '/api/modbus/ping'], async (req, res) => {
   const { host, port, unitId, timeout = 3000 } = req.body;
