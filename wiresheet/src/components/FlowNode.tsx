@@ -18,6 +18,9 @@ interface FlowNodeProps {
   onContextMenu?: (nodeId: string, e: React.MouseEvent) => void;
   onMultiDragStart?: (nodeId: string, e: React.PointerEvent) => void;
   onContainerResize?: (nodeId: string, width: number, height: number) => void;
+  onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
+  onDropIntoContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
+  onDropOutOfContainer?: (nodeId: string) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -38,6 +41,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onContextMenu,
   onMultiDragStart,
   onContainerResize,
+  onCaseResize,
+  onDropIntoContainer,
+  onDropOutOfContainer,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -49,9 +55,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [resizingCaseIndex, setResizingCaseIndex] = useState<number | null>(null);
   const [dpContextMenu, setDpContextMenu] = useState<ContextMenuState | null>(null);
   const [overrideInput, setOverrideInput] = useState<string>('');
   const resizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
+  const caseResizeStartRef = useRef<{ height: number; mouseY: number; caseIndex: number } | null>(null);
   const [showOverrideInput, setShowOverrideInput] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
@@ -124,6 +132,24 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (!isDragging) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     setIsDragging(false);
+
+    if (node.type !== 'case-container' && !parentContainer) {
+      const allDropZones = document.querySelectorAll('[data-case-drop-zone]');
+      for (const zone of allDropZones) {
+        const zoneRect = zone.getBoundingClientRect();
+        if (
+          e.clientX >= zoneRect.left && e.clientX <= zoneRect.right &&
+          e.clientY >= zoneRect.top && e.clientY <= zoneRect.bottom
+        ) {
+          const containerId = zone.getAttribute('data-case-drop-zone');
+          const caseIndexStr = zone.getAttribute('data-case-index');
+          if (containerId && caseIndexStr && onDropIntoContainer) {
+            onDropIntoContainer(node.id, containerId, parseInt(caseIndexStr));
+          }
+          break;
+        }
+      }
+    }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -208,10 +234,42 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     }
   }, [isResizing]);
 
+  const handleCaseResizePointerDown = useCallback((caseIdx: number, currentHeight: number, e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingCaseIndex(caseIdx);
+    caseResizeStartRef.current = {
+      height: currentHeight,
+      mouseY: e.clientY,
+      caseIndex: caseIdx
+    };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleCaseResizePointerMove = useCallback((e: React.PointerEvent) => {
+    if (resizingCaseIndex === null || !caseResizeStartRef.current || !onCaseResize) return;
+    const dy = e.clientY - caseResizeStartRef.current.mouseY;
+    const newHeight = Math.max(80, caseResizeStartRef.current.height + dy);
+    onCaseResize(node.id, caseResizeStartRef.current.caseIndex, newHeight);
+  }, [resizingCaseIndex, node.id, onCaseResize]);
+
+  const handleCaseResizePointerUp = useCallback((e: React.PointerEvent) => {
+    if (resizingCaseIndex !== null) {
+      setResizingCaseIndex(null);
+      caseResizeStartRef.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }, [resizingCaseIndex]);
+
   if (isCaseContainer) {
     const headerHeight = 36;
-    const caseRowHeight = data.config?.caseRowHeight || 120;
-    const minHeight = headerHeight + Math.max(1, cases.length) * caseRowHeight;
+    const defaultCaseHeight = 120;
+    const getCaseHeight = (caseIdx: number) => {
+      const c = cases[caseIdx];
+      return c?.height || defaultCaseHeight;
+    };
+    const totalCasesHeight = cases.reduce((sum, c, idx) => sum + getCaseHeight(idx), 0);
+    const minHeight = headerHeight + Math.max(defaultCaseHeight, totalCasesHeight);
     const finalHeight = Math.max(containerHeight, minHeight);
 
     return (
@@ -278,13 +336,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           <div className="flex-1 flex flex-col overflow-hidden">
             {cases.map((c, idx) => {
               const isActiveCase = activeCaseValue === idx;
+              const caseHeight = getCaseHeight(idx);
               return (
                 <div
                   key={c.id}
-                  className="flex flex-col border-b last:border-b-0"
+                  className="flex flex-col relative"
                   style={{
-                    borderColor: 'rgba(99, 102, 241, 0.3)',
-                    height: caseRowHeight
+                    borderBottom: idx < cases.length - 1 ? '1px solid rgba(99, 102, 241, 0.3)' : 'none',
+                    height: caseHeight,
+                    flexShrink: 0
                   }}
                 >
                   <div
@@ -333,17 +393,27 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       backgroundSize: '20px 20px',
                       backgroundPosition: '10px 10px',
                       pointerEvents: 'auto',
-                      opacity: isSelected ? 1 : (isActiveCase ? 1 : 0.5)
+                      opacity: isSelected ? 1 : (isActiveCase ? 1 : 0.7)
                     }}
                     onPointerDown={e => e.stopPropagation()}
                   >
-                    {!isActiveCase && (
+                    {!isActiveCase && !isSelected && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="text-slate-600 text-[10px] font-medium px-2 py-1 bg-slate-800/50 rounded">
                           Inaktiv - Case {idx}
                         </div>
                       </div>
                     )}
+                  </div>
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center hover:bg-indigo-600/30 transition-colors group"
+                    style={{ zIndex: 10 }}
+                    onPointerDown={(e) => handleCaseResizePointerDown(idx, caseHeight, e)}
+                    onPointerMove={handleCaseResizePointerMove}
+                    onPointerUp={handleCaseResizePointerUp}
+                    onPointerCancel={handleCaseResizePointerUp}
+                  >
+                    <div className="w-8 h-1 bg-indigo-400/40 rounded group-hover:bg-indigo-400/80 transition-colors" />
                   </div>
                 </div>
               );

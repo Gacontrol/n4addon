@@ -40,6 +40,8 @@ interface FlowCanvasProps {
   onPaste: () => void;
   onDeleteSelected: () => void;
   onContainerResize?: (nodeId: string, width: number, height: number) => void;
+  onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
+  onMoveNodeToContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
@@ -67,6 +69,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onPaste,
   onDeleteSelected,
   onContainerResize,
+  onCaseResize,
+  onMoveNodeToContainer,
   ghostNode,
   liveValues = {},
   onOverrideChange
@@ -416,6 +420,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onContextMenu={handleNodeContextMenu}
                 onMultiDragStart={handleMultiDragStart}
                 onContainerResize={onContainerResize}
+                onCaseResize={onCaseResize}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
               />
@@ -444,9 +449,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             if (parentContainer && parentContainer.type === 'case-container') {
               const caseIndex = node.data.caseIndex ?? 0;
               const headerHeight = 36;
-              const caseRowHeight = parentContainer.data.config?.caseRowHeight || 120;
               const caseHeaderHeight = 24;
-              const caseOffsetY = caseIndex * caseRowHeight + caseHeaderHeight;
+              const cases = parentContainer.data.config?.cases || [];
+              const defaultCaseHeight = 120;
+              let caseOffsetY = 0;
+              for (let i = 0; i < caseIndex; i++) {
+                caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+              }
+              caseOffsetY += caseHeaderHeight;
 
               adjustedNode = {
                 ...node,
@@ -478,9 +488,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                   if (parentContainer && parentContainer.type === 'case-container') {
                     const caseIndex = node.data.caseIndex ?? 0;
                     const headerHeight = 36;
-                    const caseRowHeight = parentContainer.data.config?.caseRowHeight || 120;
                     const caseHeaderHeight = 24;
-                    const caseOffsetY = caseIndex * caseRowHeight + caseHeaderHeight;
+                    const cases = parentContainer.data.config?.cases || [];
+                    const defaultCaseHeight = 120;
+                    let caseOffsetY = 0;
+                    for (let i = 0; i < caseIndex; i++) {
+                      caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+                    }
+                    caseOffsetY += caseHeaderHeight;
                     const relX = x - parentContainer.position.x - 4;
                     const relY = y - parentContainer.position.y - headerHeight - caseOffsetY - 4;
                     onNodePositionChange(id, Math.max(0, relX), Math.max(0, relY));
@@ -506,6 +521,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onContextMenu={handleNodeContextMenu}
                 onMultiDragStart={handleMultiDragStart}
                 onContainerResize={onContainerResize}
+                onCaseResize={onCaseResize}
+                onDropIntoContainer={onMoveNodeToContainer}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
                 parentContainer={parentContainer}

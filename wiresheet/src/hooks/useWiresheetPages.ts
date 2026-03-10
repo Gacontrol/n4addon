@@ -326,11 +326,53 @@ export const useWiresheetPages = () => {
   }, [updateActivePage]);
 
   const deleteNode = useCallback((nodeId: string) => {
-    updateActivePage(p => ({
-      ...p,
-      nodes: p.nodes.filter(n => n.id !== nodeId),
-      connections: p.connections.filter(c => c.source !== nodeId && c.target !== nodeId)
-    }));
+    updateActivePage(p => {
+      const nodeToDelete = p.nodes.find(n => n.id === nodeId);
+
+      if (nodeToDelete?.type === 'case-container') {
+        const headerHeight = 36;
+        const caseHeaderHeight = 24;
+        const cases = nodeToDelete.data.config?.cases || [];
+        const defaultCaseHeight = 120;
+
+        const updatedNodes = p.nodes.map(n => {
+          if (n.data.parentContainerId === nodeId) {
+            const caseIndex = n.data.caseIndex ?? 0;
+            let caseOffsetY = 0;
+            for (let i = 0; i < caseIndex; i++) {
+              caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+            }
+            caseOffsetY += caseHeaderHeight;
+
+            return {
+              ...n,
+              position: {
+                x: nodeToDelete.position.x + n.position.x + 4,
+                y: nodeToDelete.position.y + headerHeight + caseOffsetY + n.position.y + 4
+              },
+              data: {
+                ...n.data,
+                parentContainerId: undefined,
+                caseIndex: undefined
+              }
+            };
+          }
+          return n;
+        });
+
+        return {
+          ...p,
+          nodes: updatedNodes.filter(n => n.id !== nodeId),
+          connections: p.connections.filter(c => c.source !== nodeId && c.target !== nodeId)
+        };
+      }
+
+      return {
+        ...p,
+        nodes: p.nodes.filter(n => n.id !== nodeId),
+        connections: p.connections.filter(c => c.source !== nodeId && c.target !== nodeId)
+      };
+    });
     setSelectedNodes(prev => {
       const next = new Set(prev);
       next.delete(nodeId);
@@ -505,6 +547,158 @@ export const useWiresheetPages = () => {
     }));
   }, [updateActivePage]);
 
+  const updateCaseSize = useCallback((nodeId: string, caseIndex: number, height: number) => {
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.map(n => {
+        if (n.id !== nodeId) return n;
+        const cases = [...(n.data.config?.cases || [])];
+        if (cases[caseIndex]) {
+          cases[caseIndex] = { ...cases[caseIndex], height };
+        }
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            config: {
+              ...n.data.config,
+              cases
+            }
+          }
+        };
+      })
+    }));
+  }, [updateActivePage]);
+
+  const moveNodeToContainer = useCallback((nodeId: string, containerId: string | null, caseIndex?: number) => {
+    updateActivePage(p => {
+      const node = p.nodes.find(n => n.id === nodeId);
+      if (!node) return p;
+
+      const oldContainerId = node.data.parentContainerId;
+      const oldCaseIndex = node.data.caseIndex;
+
+      let updatedNodes = p.nodes.map(n => {
+        if (n.id === nodeId) {
+          const containerNode = containerId ? p.nodes.find(cn => cn.id === containerId) : null;
+          let newX = node.position.x;
+          let newY = node.position.y;
+
+          if (oldContainerId && !containerId) {
+            const oldContainer = p.nodes.find(cn => cn.id === oldContainerId);
+            if (oldContainer && oldContainer.type === 'case-container') {
+              const headerHeight = 36;
+              const caseHeaderHeight = 24;
+              const cases = oldContainer.data.config?.cases || [];
+              const defaultCaseHeight = 120;
+              let caseOffsetY = 0;
+              for (let i = 0; i < (oldCaseIndex ?? 0); i++) {
+                caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+              }
+              caseOffsetY += caseHeaderHeight;
+              newX = oldContainer.position.x + node.position.x + 4;
+              newY = oldContainer.position.y + headerHeight + caseOffsetY + node.position.y + 4;
+            }
+          } else if (!oldContainerId && containerId && containerNode) {
+            const headerHeight = 36;
+            const caseHeaderHeight = 24;
+            const cases = containerNode.data.config?.cases || [];
+            const defaultCaseHeight = 120;
+            let caseOffsetY = 0;
+            for (let i = 0; i < (caseIndex ?? 0); i++) {
+              caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+            }
+            caseOffsetY += caseHeaderHeight;
+            newX = Math.max(4, node.position.x - containerNode.position.x - 4);
+            newY = Math.max(4, node.position.y - containerNode.position.y - headerHeight - caseOffsetY - 4);
+          }
+
+          return {
+            ...n,
+            position: { x: newX, y: newY },
+            data: {
+              ...n.data,
+              parentContainerId: containerId || undefined,
+              caseIndex: containerId ? caseIndex : undefined
+            }
+          };
+        }
+        return n;
+      });
+
+      if (oldContainerId) {
+        updatedNodes = updatedNodes.map(n => {
+          if (n.id === oldContainerId && n.data.config?.cases) {
+            const cases = n.data.config.cases.map((c: { id: string; label: string; nodeIds?: string[]; height?: number }, idx: number) => {
+              if (idx === oldCaseIndex && c.nodeIds) {
+                return { ...c, nodeIds: c.nodeIds.filter((id: string) => id !== nodeId) };
+              }
+              return c;
+            });
+            return { ...n, data: { ...n.data, config: { ...n.data.config, cases } } };
+          }
+          return n;
+        });
+      }
+
+      if (containerId && caseIndex !== undefined) {
+        updatedNodes = updatedNodes.map(n => {
+          if (n.id === containerId && n.data.config?.cases) {
+            const cases = n.data.config.cases.map((c: { id: string; label: string; nodeIds?: string[]; height?: number }, idx: number) => {
+              if (idx === caseIndex) {
+                return { ...c, nodeIds: [...(c.nodeIds || []), nodeId] };
+              }
+              return c;
+            });
+            return { ...n, data: { ...n.data, config: { ...n.data.config, cases } } };
+          }
+          return n;
+        });
+      }
+
+      return { ...p, nodes: updatedNodes };
+    });
+  }, [updateActivePage]);
+
+  const releaseContainerNodes = useCallback((containerId: string) => {
+    updateActivePage(p => {
+      const containerNode = p.nodes.find(n => n.id === containerId);
+      if (!containerNode || containerNode.type !== 'case-container') return p;
+
+      const headerHeight = 36;
+      const caseHeaderHeight = 24;
+      const cases = containerNode.data.config?.cases || [];
+      const defaultCaseHeight = 120;
+
+      const updatedNodes = p.nodes.map(n => {
+        if (n.data.parentContainerId === containerId) {
+          const caseIndex = n.data.caseIndex ?? 0;
+          let caseOffsetY = 0;
+          for (let i = 0; i < caseIndex; i++) {
+            caseOffsetY += (cases[i]?.height || defaultCaseHeight);
+          }
+          caseOffsetY += caseHeaderHeight;
+
+          return {
+            ...n,
+            position: {
+              x: containerNode.position.x + n.position.x + 4,
+              y: containerNode.position.y + headerHeight + caseOffsetY + n.position.y + 4
+            },
+            data: {
+              ...n.data,
+              parentContainerId: undefined,
+              caseIndex: undefined
+            }
+          };
+        }
+        return n;
+      });
+
+      return { ...p, nodes: updatedNodes };
+    });
+  }, [updateActivePage]);
+
   return {
     pages,
     activePage,
@@ -550,6 +744,9 @@ export const useWiresheetPages = () => {
     startConnection,
     endConnection,
     cancelConnection,
-    updateContainerSize
+    updateContainerSize,
+    updateCaseSize,
+    moveNodeToContainer,
+    releaseContainerNodes
   };
 };

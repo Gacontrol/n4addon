@@ -56,7 +56,9 @@ function App() {
     endConnection,
     cancelConnection,
     addConnection,
-    updateContainerSize
+    updateContainerSize,
+    updateCaseSize,
+    moveNodeToContainer
   } = useWiresheetPages();
 
   const {
@@ -506,6 +508,8 @@ function App() {
           onPaste={pasteClipboard}
           onDeleteSelected={deleteSelected}
           onContainerResize={updateContainerSize}
+          onCaseResize={updateCaseSize}
+          onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
           ghostNode={ghostNode}
           liveValues={liveValues}
           onOverrideChange={updateNodeOverride}

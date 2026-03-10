@@ -343,6 +343,38 @@ function toBool(val) {
   return !!val;
 }
 
+function getDefaultValueForNodeType(nodeType) {
+  switch (nodeType) {
+    case 'and':
+    case 'or':
+    case 'not':
+    case 'dp-boolean':
+    case 'toggle':
+    case 'rising-edge':
+    case 'falling-edge':
+      return false;
+    case 'add':
+    case 'subtract':
+    case 'multiply':
+    case 'divide':
+    case 'min':
+    case 'max':
+    case 'average':
+    case 'dp-numeric':
+    case 'scale':
+    case 'counter':
+    case 'const':
+      return 0;
+    case 'dp-enum':
+      return 0;
+    case 'compare':
+    case 'threshold':
+      return false;
+    default:
+      return null;
+  }
+}
+
 async function executePythonCode(code, inputs) {
   return new Promise((resolve, reject) => {
     const normalizedInputs = {};
@@ -481,7 +513,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
         const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
         const nodeCase = node.data.caseIndex;
         if (nodeCase !== undefined && nodeCase !== activeCase) {
-          console.log(`Node ${nodeId} uebersprungen - Case ${nodeCase} nicht aktiv (aktiv: ${activeCase})`);
+          const defaultVal = getDefaultValueForNodeType(node.type);
+          nodeValues[nodeId] = defaultVal;
+          console.log(`Node ${nodeId} inaktiv (Case ${nodeCase}) - auf Default gesetzt: ${defaultVal}`);
           continue;
         }
       }
