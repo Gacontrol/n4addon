@@ -656,6 +656,45 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'text-annotation' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Text Annotation</span>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text</label>
+              <textarea
+                value={config.textContent || ''}
+                onChange={e => updateConfig('textContent', e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-slate-500 min-h-20 resize-y"
+                placeholder="Text eingeben..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={10}
+                  max={48}
+                  value={config.fontSize || 14}
+                  onChange={e => updateConfig('fontSize', parseInt(e.target.value) || 14)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Farbe</label>
+                <input
+                  type="color"
+                  value={config.textColor || '#94a3b8'}
+                  onChange={e => updateConfig('textColor', e.target.value)}
+                  className="w-full h-8 bg-slate-700 border border-slate-600 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {node.type === 'case-container' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-indigo-400">

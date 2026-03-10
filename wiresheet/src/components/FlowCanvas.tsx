@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection, DatapointOverride } from '../types/flow';
-import { Trash2, Copy, Clipboard } from 'lucide-react';
+import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ContextMenuState {
   x: number;
@@ -43,6 +43,10 @@ interface FlowCanvasProps {
   onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
   onMoveNodeToContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   onMoveNodeOutOfContainer?: (nodeId: string) => void;
+  onDuplicateSelected?: () => void;
+  onAddTextAnnotation?: (x: number, y: number) => void;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
@@ -73,6 +77,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onCaseResize,
   onMoveNodeToContainer,
   onMoveNodeOutOfContainer,
+  onDuplicateSelected,
+  onAddTextAnnotation,
+  zoom = 1,
+  onZoomChange,
   ghostNode,
   liveValues = {},
   onOverrideChange
@@ -114,6 +122,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault();
         onPaste();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        onDuplicateSelected?.();
       } else if (e.key === 'Escape') {
         onClearSelection();
         onConnectionCancel();
@@ -123,13 +134,30 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onDeleteSelected, onCopy, onPaste, onClearSelection, onConnectionCancel]);
+  }, [onDeleteSelected, onCopy, onPaste, onDuplicateSelected, onClearSelection, onConnectionCancel]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !onZoomChange) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        const newZoom = Math.min(2, Math.max(0.25, zoom + delta));
+        onZoomChange(newZoom);
+      }
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [zoom, onZoomChange]);
 
   const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
     if (!canvasRef.current) return null;
@@ -315,7 +343,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     <div
       id="flow-canvas"
       ref={canvasRef}
-      className="flex-1 relative overflow-hidden"
+      className="flex-1 relative overflow-auto"
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -323,13 +351,47 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       style={{
         background: '#0f172a',
         backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-        backgroundSize: '24px 24px'
+        backgroundSize: `${24 * zoom}px ${24 * zoom}px`
       }}
     >
+      {onZoomChange && (
+        <div className="absolute top-3 right-3 z-50 flex items-center gap-1 bg-slate-800/90 rounded-lg px-2 py-1 border border-slate-600">
+          <button
+            onClick={() => onZoomChange(Math.max(0.25, zoom - 0.1))}
+            className="p-1 text-slate-400 hover:text-white transition-colors"
+            title="Verkleinern"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-xs text-slate-300 font-mono min-w-12 text-center">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            onClick={() => onZoomChange(Math.min(2, zoom + 0.1))}
+            className="p-1 text-slate-400 hover:text-white transition-colors"
+            title="Vergroessern"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onZoomChange(1)}
+            className="ml-1 px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+            title="Zuruecksetzen"
+          >
+            Reset
+          </button>
+        </div>
+      )}
       <svg
         id="canvas-bg"
-        className="absolute inset-0 w-full h-full"
-        style={{ zIndex: 10, pointerEvents: 'none' }}
+        className="absolute inset-0 origin-top-left"
+        style={{
+          zIndex: 10,
+          pointerEvents: 'none',
+          transform: `scale(${zoom})`,
+          width: `${100 / zoom}%`,
+          height: `${100 / zoom}%`
+        }}
       >
         <defs>
           <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -388,7 +450,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         )}
       </svg>
 
-      <div className="absolute inset-0" style={{ zIndex: 5 }}>
+      <div
+        className="absolute inset-0 origin-top-left"
+        style={{
+          zIndex: 5,
+          transform: `scale(${zoom})`,
+          width: `${100 / zoom}%`,
+          height: `${100 / zoom}%`
+        }}
+      >
         {nodes
           .filter(n => n.type === 'case-container')
           .map(node => {
@@ -587,6 +657,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 Kopieren (Ctrl+C)
               </button>
               <button
+                onClick={() => { onDuplicateSelected?.(); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors text-left"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Duplizieren (Ctrl+D)
+              </button>
+              <button
                 onClick={() => { onDeleteSelected(); setContextMenu(null); }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-slate-700 transition-colors text-left"
               >
@@ -605,18 +682,35 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             </button>
           )}
           {contextMenu.type === 'canvas' && (
-            <button
-              onClick={() => { onPaste(); setContextMenu(null); }}
-              disabled={!clipboard || clipboard.nodes.length === 0}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
-                clipboard && clipboard.nodes.length > 0
-                  ? 'text-slate-300 hover:bg-slate-700'
-                  : 'text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              <Clipboard className="w-3.5 h-3.5" />
-              Einfuegen (Ctrl+V)
-            </button>
+            <>
+              <button
+                onClick={() => { onPaste(); setContextMenu(null); }}
+                disabled={!clipboard || clipboard.nodes.length === 0}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors text-left ${
+                  clipboard && clipboard.nodes.length > 0
+                    ? 'text-slate-300 hover:bg-slate-700'
+                    : 'text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                <Clipboard className="w-3.5 h-3.5" />
+                Einfuegen (Ctrl+V)
+              </button>
+              <button
+                onClick={() => {
+                  if (canvasRef.current) {
+                    const rect = canvasRef.current.getBoundingClientRect();
+                    const x = (contextMenu.x - rect.left) / zoom;
+                    const y = (contextMenu.y - rect.top) / zoom;
+                    onAddTextAnnotation?.(x, y);
+                  }
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors text-left"
+              >
+                <Type className="w-3.5 h-3.5" />
+                Text einfuegen
+              </button>
+            </>
           )}
         </div>
       )}

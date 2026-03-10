@@ -500,6 +500,60 @@ export const useWiresheetPages = () => {
     }
   }, [selectedConnection, selectedNodes, deleteConnection, deleteNodes]);
 
+  const duplicateSelected = useCallback(() => {
+    const page = pagesRef.current.find(p => p.id === activePageId);
+    if (!page || selectedNodes.size === 0) return;
+
+    const nodesToDupe = page.nodes.filter(n => selectedNodes.has(n.id));
+    if (nodesToDupe.length === 0) return;
+
+    const idMap = new Map<string, string>();
+    const newNodes: FlowNode[] = nodesToDupe.map(n => {
+      const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      idMap.set(n.id, newId);
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + 30, y: n.position.y + 30 }
+      };
+    });
+
+    const nodeIdSet = new Set(nodesToDupe.map(n => n.id));
+    const connsToDupe = page.connections.filter(
+      c => nodeIdSet.has(c.source) && nodeIdSet.has(c.target)
+    );
+    const newConns: Connection[] = connsToDupe.map(c => ({
+      ...c,
+      id: `${idMap.get(c.source)}-${c.sourcePort}-${idMap.get(c.target)}-${c.targetPort}`,
+      source: idMap.get(c.source)!,
+      target: idMap.get(c.target)!
+    }));
+
+    addNodes(newNodes);
+    addConnections(newConns);
+    setSelectedNodes(new Set(newNodes.map(n => n.id)));
+  }, [activePageId, selectedNodes, addNodes, addConnections]);
+
+  const addTextAnnotation = useCallback((x: number, y: number) => {
+    const textNode: FlowNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'text-annotation',
+      position: { x, y },
+      data: {
+        label: 'Neuer Text',
+        inputs: [],
+        outputs: [],
+        config: {
+          textContent: 'Doppelklicken zum Bearbeiten',
+          fontSize: 14,
+          textColor: '#94a3b8'
+        }
+      }
+    };
+    addNode(textNode);
+    setSelectedNodes(new Set([textNode.id]));
+  }, [addNode]);
+
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; portId: string } | null>(null);
   const connectingFromRef = useRef<{ nodeId: string; portId: string } | null>(null);
 
@@ -741,6 +795,8 @@ export const useWiresheetPages = () => {
     copySelection,
     pasteClipboard,
     deleteSelected,
+    duplicateSelected,
+    addTextAnnotation,
     startConnection,
     endConnection,
     cancelConnection,

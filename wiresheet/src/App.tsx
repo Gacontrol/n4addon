@@ -58,7 +58,9 @@ function App() {
     addConnection,
     updateContainerSize,
     updateCaseSize,
-    moveNodeToContainer
+    moveNodeToContainer,
+    duplicateSelected,
+    addTextAnnotation
   } = useWiresheetPages();
 
   const {
@@ -79,6 +81,7 @@ function App() {
   const [sidebarTab, setSidebarTab] = useState<'nodes' | 'blocks'>('nodes');
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
+  const [zoom, setZoom] = useState(1);
   const isDraggingFromPalette = useRef(false);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
@@ -511,6 +514,10 @@ function App() {
           onCaseResize={updateCaseSize}
           onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
           onMoveNodeOutOfContainer={(nodeId) => moveNodeToContainer(nodeId, null)}
+          onDuplicateSelected={duplicateSelected}
+          onAddTextAnnotation={addTextAnnotation}
+          zoom={zoom}
+          onZoomChange={setZoom}
           ghostNode={ghostNode}
           liveValues={liveValues}
           onOverrideChange={updateNodeOverride}

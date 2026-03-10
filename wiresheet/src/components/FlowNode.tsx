@@ -73,6 +73,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
   const isCaseContainer = node.type === 'case-container';
   const isPythonScript = node.type === 'python-script';
+  const isTextAnnotation = node.type === 'text-annotation';
 
   const getNodeColor = () => {
     if (isManual) return '#dc2626';
@@ -464,6 +465,64 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
   const isDimmed = (data as { _dimmed?: boolean })._dimmed === true;
 
+  if (isTextAnnotation) {
+    const textContent = data.config?.textContent || 'Text';
+    const fontSize = data.config?.fontSize || 14;
+    const textColor = data.config?.textColor || '#94a3b8';
+
+    return (
+      <div
+        ref={nodeRef}
+        data-node-id={node.id}
+        className="absolute select-none"
+        style={{
+          left: node.position.x,
+          top: node.position.y,
+          zIndex: isSelected || isDragging ? 20 : 1,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+          opacity: isDimmed ? 0.6 : 1
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onContextMenu={handleContextMenu}
+      >
+        <div
+          className="px-3 py-2 rounded-lg"
+          style={{
+            backgroundColor: isSelected ? 'rgba(30, 41, 59, 0.9)' : 'rgba(30, 41, 59, 0.5)',
+            border: isSelected ? '1px solid rgba(148, 163, 184, 0.3)' : '1px dashed rgba(148, 163, 184, 0.2)',
+            minWidth: 60,
+            maxWidth: 400
+          }}
+        >
+          <div
+            style={{
+              fontSize: `${fontSize}px`,
+              color: textColor,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}
+          >
+            {textContent}
+          </div>
+          {isSelected && (
+            <button
+              data-action="delete"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onDelete(node.id); }}
+              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+            >
+              <Icons.X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div
@@ -584,6 +643,20 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 >
                   {displayValue}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {isPythonScript && liveValues[`${node.id}:_error`] && (
+            <div className="px-3 py-2 border-b border-red-900/50 bg-red-950/50">
+              <div className="flex items-start gap-1.5">
+                <Icons.AlertTriangle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-red-400 uppercase mb-0.5">Fehler</p>
+                  <p className="text-[9px] text-red-300 font-mono break-words whitespace-pre-wrap max-h-20 overflow-auto">
+                    {String(liveValues[`${node.id}:_error`])}
+                  </p>
+                </div>
               </div>
             </div>
           )}

@@ -633,13 +633,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
           const firstOutputId = pythonOutputs.length > 0 ? pythonOutputs[0].id.toLowerCase() : null;
           const firstOutput = firstOutputId ? outputs[firstOutputId] : null;
           nodeValues[nodeId] = firstOutput;
+          nodeValues[`${nodeId}:_error`] = null;
           pythonOutputs.forEach((out, idx) => {
             const outputId = out.id.toLowerCase();
             nodeValues[`${nodeId}:output-${idx}`] = outputs[outputId];
           });
         } catch (e) {
           console.error(`Python Script Fehler (${nodeId}):`, e.message);
+          const errorMsg = e.message || 'Unknown error';
           nodeValues[nodeId] = null;
+          nodeValues[`${nodeId}:_error`] = errorMsg;
           pythonOutputs.forEach((out, idx) => {
             nodeValues[`${nodeId}:output-${idx}`] = null;
           });
@@ -647,6 +650,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       } else {
         console.log(`Python Script ${nodeId}: Kein Code vorhanden, ueberspringe`);
         nodeValues[nodeId] = null;
+        nodeValues[`${nodeId}:_error`] = null;
       }
     } else if (node.type === 'ha-output' && node.data.entityId) {
       let allowWrite = true;
