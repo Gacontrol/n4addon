@@ -566,20 +566,49 @@ export const nodeTemplates: NodeTemplate[] = [
     }
   },
   {
-    type: 'modbus-tcp',
-    label: 'Modbus TCP',
+    type: 'modbus-driver',
+    label: 'Modbus Treiber',
     icon: 'Network',
     category: 'driver',
     color: '#059669',
     inputs: [],
-    outputs: [],
-    description: 'Modbus TCP Treiber mit Geraeten und Datenpunkten',
+    outputs: [
+      { label: 'Status', type: 'output' }
+    ],
+    description: 'Modbus TCP/RTU Treiber - verwaltet alle Modbus-Geraete',
     defaultConfig: {
-      modbusHost: '192.168.1.100',
-      modbusPort: 502,
       modbusDevices: [],
       modbusPollInterval: 1000,
-      modbusTimeout: 3000
+      modbusTimeout: 3000,
+      modbusEnabled: true
+    }
+  },
+  {
+    type: 'modbus-device-input',
+    label: 'Modbus Eingang',
+    icon: 'ArrowDownToLine',
+    category: 'driver',
+    color: '#0891b2',
+    inputs: [],
+    outputs: [],
+    description: 'Modbus Geraete-Eingaenge (UI, DI)',
+    defaultConfig: {
+      modbusDeviceId: '',
+      modbusDeviceName: ''
+    }
+  },
+  {
+    type: 'modbus-device-output',
+    label: 'Modbus Ausgang',
+    icon: 'ArrowUpFromLine',
+    category: 'driver',
+    color: '#dc2626',
+    inputs: [],
+    outputs: [],
+    description: 'Modbus Geraete-Ausgaenge (DO, AO)',
+    defaultConfig: {
+      modbusDeviceId: '',
+      modbusDeviceName: ''
     }
   }
 ];

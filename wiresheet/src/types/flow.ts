@@ -38,13 +38,24 @@ export interface ModbusDatapoint {
   offset?: number;
   unit?: string;
   writable: boolean;
+  bitIndex?: number;
 }
 
 export interface ModbusDevice {
   id: string;
   name: string;
+  host: string;
+  port: number;
   unitId: number;
+  templateId?: string;
+  enabled: boolean;
+  online?: boolean;
+  lastSeen?: number;
+  pollInterval?: number;
+  timeout?: number;
   datapoints: ModbusDatapoint[];
+  inputDatapoints?: ModbusDatapoint[];
+  outputDatapoints?: ModbusDatapoint[];
 }
 
 export interface NodeConfig {

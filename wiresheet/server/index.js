@@ -871,6 +871,227 @@ app.post(['/blocks', '/api/blocks'], async (req, res) => {
   }
 });
 
+const net = require('net');
+
+app.post(['/modbus/ping', '/api/modbus/ping'], async (req, res) => {
+  const { host, port, unitId, timeout = 3000 } = req.body;
+
+  if (!host) {
+    return res.status(400).json({ success: false, error: 'Host fehlt' });
+  }
+
+  const socket = new net.Socket();
+  let connected = false;
+
+  const connectTimeout = setTimeout(() => {
+    if (!connected) {
+      socket.destroy();
+      res.json({ success: false, error: 'Timeout' });
+    }
+  }, timeout);
+
+  socket.on('connect', () => {
+    connected = true;
+    clearTimeout(connectTimeout);
+
+    const transactionId = Buffer.from([0x00, 0x01]);
+    const protocolId = Buffer.from([0x00, 0x00]);
+    const length = Buffer.from([0x00, 0x06]);
+    const unitIdBuf = Buffer.from([unitId || 1]);
+    const functionCode = Buffer.from([0x03]);
+    const startAddress = Buffer.from([0x00, 0x00]);
+    const quantity = Buffer.from([0x00, 0x01]);
+
+    const request = Buffer.concat([
+      transactionId,
+      protocolId,
+      length,
+      unitIdBuf,
+      functionCode,
+      startAddress,
+      quantity
+    ]);
+
+    socket.write(request);
+  });
+
+  socket.on('data', (data) => {
+    socket.destroy();
+    if (data.length >= 9) {
+      res.json({ success: true, responseLength: data.length });
+    } else {
+      res.json({ success: false, error: 'Ungueltige Antwort' });
+    }
+  });
+
+  socket.on('error', (err) => {
+    clearTimeout(connectTimeout);
+    socket.destroy();
+    res.json({ success: false, error: err.message });
+  });
+
+  socket.on('timeout', () => {
+    socket.destroy();
+    res.json({ success: false, error: 'Socket timeout' });
+  });
+
+  socket.setTimeout(timeout);
+  socket.connect(port || 502, host);
+});
+
+app.post(['/modbus/read', '/api/modbus/read'], async (req, res) => {
+  const { host, port = 502, unitId = 1, address, registerType = 'holding', count = 1, timeout = 3000 } = req.body;
+
+  if (!host || address === undefined) {
+    return res.status(400).json({ success: false, error: 'Host oder Adresse fehlt' });
+  }
+
+  const socket = new net.Socket();
+  let connected = false;
+
+  const connectTimeout = setTimeout(() => {
+    if (!connected) {
+      socket.destroy();
+      res.json({ success: false, error: 'Timeout' });
+    }
+  }, timeout);
+
+  socket.on('connect', () => {
+    connected = true;
+    clearTimeout(connectTimeout);
+
+    let functionCode;
+    switch (registerType) {
+      case 'coil': functionCode = 0x01; break;
+      case 'discrete': functionCode = 0x02; break;
+      case 'input': functionCode = 0x04; break;
+      case 'holding':
+      default: functionCode = 0x03; break;
+    }
+
+    const transactionId = Buffer.from([0x00, Math.floor(Math.random() * 255)]);
+    const protocolId = Buffer.from([0x00, 0x00]);
+    const length = Buffer.from([0x00, 0x06]);
+    const unitIdBuf = Buffer.from([unitId]);
+    const fc = Buffer.from([functionCode]);
+    const startAddress = Buffer.from([(address >> 8) & 0xff, address & 0xff]);
+    const quantity = Buffer.from([(count >> 8) & 0xff, count & 0xff]);
+
+    const request = Buffer.concat([transactionId, protocolId, length, unitIdBuf, fc, startAddress, quantity]);
+    socket.write(request);
+  });
+
+  socket.on('data', (data) => {
+    socket.destroy();
+
+    if (data.length < 9) {
+      return res.json({ success: false, error: 'Antwort zu kurz' });
+    }
+
+    const responseUnitId = data[6];
+    const responseFc = data[7];
+
+    if (responseFc > 0x80) {
+      const errorCode = data[8];
+      return res.json({ success: false, error: `Modbus Fehler: ${errorCode}` });
+    }
+
+    const byteCount = data[8];
+    const values = [];
+
+    for (let i = 0; i < count; i++) {
+      const offset = 9 + i * 2;
+      if (offset + 1 < data.length) {
+        const value = (data[offset] << 8) | data[offset + 1];
+        values.push(value);
+      }
+    }
+
+    res.json({ success: true, values });
+  });
+
+  socket.on('error', (err) => {
+    clearTimeout(connectTimeout);
+    socket.destroy();
+    res.json({ success: false, error: err.message });
+  });
+
+  socket.setTimeout(timeout);
+  socket.connect(port, host);
+});
+
+app.post(['/modbus/write', '/api/modbus/write'], async (req, res) => {
+  const { host, port = 502, unitId = 1, address, value, registerType = 'holding', timeout = 3000 } = req.body;
+
+  if (!host || address === undefined || value === undefined) {
+    return res.status(400).json({ success: false, error: 'Host, Adresse oder Wert fehlt' });
+  }
+
+  const socket = new net.Socket();
+  let connected = false;
+
+  const connectTimeout = setTimeout(() => {
+    if (!connected) {
+      socket.destroy();
+      res.json({ success: false, error: 'Timeout' });
+    }
+  }, timeout);
+
+  socket.on('connect', () => {
+    connected = true;
+    clearTimeout(connectTimeout);
+
+    let functionCode;
+    if (registerType === 'coil') {
+      functionCode = 0x05;
+    } else {
+      functionCode = 0x06;
+    }
+
+    const transactionId = Buffer.from([0x00, Math.floor(Math.random() * 255)]);
+    const protocolId = Buffer.from([0x00, 0x00]);
+    const length = Buffer.from([0x00, 0x06]);
+    const unitIdBuf = Buffer.from([unitId]);
+    const fc = Buffer.from([functionCode]);
+    const registerAddress = Buffer.from([(address >> 8) & 0xff, address & 0xff]);
+
+    let valueBuffer;
+    if (registerType === 'coil') {
+      valueBuffer = value ? Buffer.from([0xff, 0x00]) : Buffer.from([0x00, 0x00]);
+    } else {
+      valueBuffer = Buffer.from([(value >> 8) & 0xff, value & 0xff]);
+    }
+
+    const request = Buffer.concat([transactionId, protocolId, length, unitIdBuf, fc, registerAddress, valueBuffer]);
+    socket.write(request);
+  });
+
+  socket.on('data', (data) => {
+    socket.destroy();
+
+    if (data.length < 12) {
+      return res.json({ success: false, error: 'Antwort zu kurz' });
+    }
+
+    const responseFc = data[7];
+    if (responseFc > 0x80) {
+      const errorCode = data[8];
+      return res.json({ success: false, error: `Modbus Fehler: ${errorCode}` });
+    }
+
+    res.json({ success: true });
+  });
+
+  socket.on('error', (err) => {
+    clearTimeout(connectTimeout);
+    socket.destroy();
+    res.json({ success: false, error: err.message });
+  });
+
+  socket.setTimeout(timeout);
+  socket.connect(port, host);
+});
+
 async function restoreRunningPages() {
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');

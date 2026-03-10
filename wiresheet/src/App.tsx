@@ -6,7 +6,7 @@ import { CustomBlockLibrary } from './components/CustomBlockLibrary';
 import { CustomBlockEditor } from './components/CustomBlockEditor';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice } from './types/flow';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid
@@ -82,6 +82,8 @@ function App() {
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [modbusDevices, setModbusDevices] = useState<ModbusDevice[]>([]);
+  const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
   const isDraggingFromPalette = useRef(false);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
@@ -285,6 +287,90 @@ function App() {
   const selectedConnectionsList = connections.filter(c =>
     selectedNodes.has(c.source) && selectedNodes.has(c.target)
   );
+
+  const handlePlaceModbusDevice = useCallback((device: ModbusDevice, type: 'input' | 'output') => {
+    const canvas = document.getElementById('flow-canvas');
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scrollLeft = canvas.scrollLeft;
+    const scrollTop = canvas.scrollTop;
+
+    const datapoints = type === 'input' ? device.inputDatapoints : device.outputDatapoints;
+    const nodeType = type === 'input' ? 'modbus-device-input' : 'modbus-device-output';
+    const color = type === 'input' ? '#0891b2' : '#dc2626';
+
+    const outputs = type === 'input'
+      ? (datapoints || []).map((dp, idx) => ({
+          id: `output-${idx}`,
+          label: dp.name,
+          type: 'output' as const
+        }))
+      : [];
+
+    const inputs = type === 'output'
+      ? (datapoints || []).map((dp, idx) => ({
+          id: `input-${idx}`,
+          label: dp.name,
+          type: 'input' as const
+        }))
+      : [];
+
+    const newNode: FlowNode = {
+      id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: nodeType,
+      position: {
+        x: (rect.width / 2 + scrollLeft) / zoom - 90,
+        y: (rect.height / 2 + scrollTop) / zoom - 40
+      },
+      data: {
+        label: `${device.name} ${type === 'input' ? 'IN' : 'OUT'}`,
+        icon: type === 'input' ? 'ArrowDownToLine' : 'ArrowUpFromLine',
+        config: {
+          modbusDeviceId: device.id,
+          modbusDeviceName: device.name,
+          modbusDatapoints: datapoints
+        },
+        inputs,
+        outputs
+      }
+    };
+
+    addNode(newNode);
+    selectNode(newNode.id);
+  }, [addNode, selectNode, zoom]);
+
+  const handlePingModbusDevice = useCallback(async (deviceId: string) => {
+    const device = modbusDevices.find(d => d.id === deviceId);
+    if (!device) return;
+
+    setModbusDeviceStatus(prev => ({
+      ...prev,
+      [deviceId]: { ...prev[deviceId], pinging: true }
+    }));
+
+    try {
+      const response = await fetch('/api/modbus/ping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host: device.host, port: device.port, unitId: device.unitId })
+      });
+      const data = await response.json();
+      setModbusDeviceStatus(prev => ({
+        ...prev,
+        [deviceId]: {
+          online: data.success,
+          lastSeen: data.success ? Date.now() : prev[deviceId]?.lastSeen,
+          pinging: false
+        }
+      }));
+    } catch {
+      setModbusDeviceStatus(prev => ({
+        ...prev,
+        [deviceId]: { ...prev[deviceId], online: false, pinging: false }
+      }));
+    }
+  }, [modbusDevices]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
@@ -533,6 +619,11 @@ function App() {
             haError={haError}
             onReloadEntities={loadHaEntities}
             liveValues={liveValues}
+            modbusDevices={modbusDevices}
+            onModbusDevicesChange={setModbusDevices}
+            onPlaceModbusDevice={handlePlaceModbusDevice}
+            onPingModbusDevice={handlePingModbusDevice}
+            modbusDeviceStatus={modbusDeviceStatus}
           />
         )}
       </div>

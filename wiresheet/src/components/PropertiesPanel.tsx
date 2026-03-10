@@ -3,7 +3,7 @@ import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevi
 import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
-import { ModbusConfig } from './ModbusConfig';
+import { ModbusDriverConfig, ModbusDeviceBlockConfig } from './ModbusConfig';
 
 interface HAEntity {
   entity_id: string;
@@ -20,6 +20,11 @@ interface PropertiesPanelProps {
   haError?: string | null;
   onReloadEntities: () => void;
   liveValues: Record<string, unknown>;
+  modbusDevices?: ModbusDevice[];
+  onModbusDevicesChange?: (devices: ModbusDevice[]) => void;
+  onPlaceModbusDevice?: (device: ModbusDevice, type: 'input' | 'output') => void;
+  onPingModbusDevice?: (deviceId: string) => void;
+  modbusDeviceStatus?: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -30,7 +35,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   haLoading,
   haError,
   onReloadEntities,
-  liveValues
+  liveValues,
+  modbusDevices = [],
+  onModbusDevicesChange,
+  onPlaceModbusDevice,
+  onPingModbusDevice,
+  modbusDeviceStatus = {}
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -1067,30 +1077,29 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
-        {node.type === 'modbus-tcp' && (
-          <ModbusConfig
-            host={config.modbusHost || '192.168.1.100'}
-            port={config.modbusPort || 502}
-            devices={config.modbusDevices || []}
-            pollInterval={config.modbusPollInterval || 1000}
-            timeout={config.modbusTimeout || 3000}
-            onHostChange={host => updateConfig('modbusHost', host)}
-            onPortChange={port => updateConfig('modbusPort', port)}
-            onDevicesChange={(devices: ModbusDevice[]) => updateConfig('modbusDevices', devices)}
-            onPollIntervalChange={interval => updateConfig('modbusPollInterval', interval)}
-            onTimeoutChange={timeout => updateConfig('modbusTimeout', timeout)}
-            onOutputsChange={outputs => {
-              const nodeOutputs = outputs.map((o, i) => ({ id: `output-${i}`, label: o.label, type: 'output' as const }));
-              onUpdateNode(node.id, { outputs: nodeOutputs });
-            }}
-            onInputsChange={inputs => {
-              const nodeInputs = inputs.map((inp, i) => ({ id: `input-${i}`, label: inp.label, type: 'input' as const }));
-              onUpdateNode(node.id, { inputs: nodeInputs });
-            }}
+        {node.type === 'modbus-driver' && onModbusDevicesChange && onPlaceModbusDevice && onPingModbusDevice && (
+          <ModbusDriverConfig
+            node={node}
+            devices={modbusDevices}
+            onDevicesChange={onModbusDevicesChange}
+            onPlaceDevice={onPlaceModbusDevice}
+            onPingDevice={onPingModbusDevice}
+            deviceStatus={modbusDeviceStatus}
           />
         )}
 
-        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && node.type !== 'modbus-tcp' && (
+        {(node.type === 'modbus-device-input' || node.type === 'modbus-device-output') && (
+          <ModbusDeviceBlockConfig
+            node={node}
+            deviceName={config.modbusDeviceName || 'Unbekanntes Geraet'}
+            datapoints={node.type === 'modbus-device-input'
+              ? (modbusDevices.find(d => d.id === config.modbusDeviceId)?.inputDatapoints || [])
+              : (modbusDevices.find(d => d.id === config.modbusDeviceId)?.outputDatapoints || [])
+            }
+          />
+        )}
+
+        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && !node.type.startsWith('modbus-') && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Ports
