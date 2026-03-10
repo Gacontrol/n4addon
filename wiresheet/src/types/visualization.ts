@@ -32,6 +32,7 @@ export type WidgetType =
 export interface WidgetBinding {
   nodeId: string;
   portId?: string;
+  paramKey?: string;
   direction: 'read' | 'write' | 'readwrite';
 }
 

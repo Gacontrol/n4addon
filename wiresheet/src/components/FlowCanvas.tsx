@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { FlowNode } from './FlowNode';
+import { FlowNode, VisuBindingInfo } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection, DatapointOverride } from '../types/flow';
+import { VisuPage } from '../types/visualization';
 import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ContextMenuState {
@@ -52,6 +53,7 @@ interface FlowCanvasProps {
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
   onModbusDatapointDrop?: (data: unknown, x: number, y: number) => void;
+  visuPages?: VisuPage[];
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -87,8 +89,28 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   ghostNode,
   liveValues = {},
   onOverrideChange,
-  onModbusDatapointDrop
+  onModbusDatapointDrop,
+  visuPages = []
 }) => {
+  const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
+    const result: VisuBindingInfo[] = [];
+    const WRITE_TYPES = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'];
+    for (const page of visuPages) {
+      for (const widget of page.widgets) {
+        if (!widget.binding || widget.binding.nodeId !== nodeId) continue;
+        const isWrite = WRITE_TYPES.includes(widget.type) || widget.binding.direction === 'write' || widget.binding.direction === 'readwrite';
+        result.push({
+          widgetLabel: widget.label || widget.type,
+          pageName: page.name,
+          portId: widget.binding.portId,
+          paramKey: widget.binding.paramKey,
+          isWrite
+        });
+      }
+    }
+    return result;
+  }, [visuPages]);
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [, forceUpdate] = useState(0);
@@ -593,6 +615,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
                 zoom={zoom}
+                visuBindings={getVisuBindingsForNode(node.id)}
               />
             );
           })}
@@ -700,6 +723,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 isDraggingMultiple={isDraggingMultiple}
                 parentContainer={parentContainer}
                 zoom={zoom}
+                visuBindings={getVisuBindingsForNode(node.id)}
               />
             );
           })}

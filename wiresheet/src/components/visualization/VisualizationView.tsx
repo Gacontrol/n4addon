@@ -268,6 +268,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           <VisuCanvas
             page={activePage}
             liveValues={liveValues}
+            logicNodes={logicNodes}
             isEditMode={isEditMode}
             selectedWidgetId={selectedWidgetId}
             onSelectWidget={(id) => {

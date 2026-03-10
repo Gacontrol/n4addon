@@ -8,6 +8,14 @@ interface ContextMenuState {
   y: number;
 }
 
+export interface VisuBindingInfo {
+  widgetLabel: string;
+  pageName: string;
+  portId?: string;
+  paramKey?: string;
+  isWrite: boolean;
+}
+
 interface FlowNodeProps {
   node: FlowNodeType;
   isSelected: boolean;
@@ -30,6 +38,7 @@ interface FlowNodeProps {
   isDraggingMultiple?: boolean;
   parentContainer?: FlowNodeType | null;
   zoom?: number;
+  visuBindings?: VisuBindingInfo[];
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -53,7 +62,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   isMultiSelected = false,
   isDraggingMultiple = false,
   parentContainer = null,
-  zoom = 1
+  zoom = 1,
+  visuBindings = []
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -793,13 +803,20 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     />
                   </div>
                   <div style={{ width: 16 }} />
-                  <div className="pr-3 flex items-center gap-1.5 min-w-0">
-                    <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
-                    {hasPortVal && (
-                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1 py-0.5 rounded leading-none max-w-16 truncate">
-                        {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '...' : String(portVal)}
+                  <div className="pr-3 flex flex-col min-w-0 gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
+                      {hasPortVal && (
+                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1 py-0.5 rounded leading-none max-w-16 truncate">
+                          {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '...' : String(portVal)}
+                        </span>
+                      )}
+                    </div>
+                    {visuBindings.filter(b => b.portId === input.id).map((b, bi) => (
+                      <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1 py-0.5 rounded leading-none truncate max-w-[120px]" title={`Visu: ${b.pageName} / ${b.widgetLabel}`}>
+                        Visu: {b.pageName} / {b.widgetLabel}
                       </span>
-                    )}
+                    ))}
                   </div>
                 </div>
               );
@@ -860,6 +877,16 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               );
             })}
           </div>
+
+          {visuBindings.filter(b => b.paramKey).length > 0 && (
+            <div className="px-2 pb-1.5 flex flex-col gap-0.5">
+              {visuBindings.filter(b => b.paramKey).map((b, bi) => (
+                <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1.5 py-0.5 rounded leading-none truncate" title={`Visu: ${b.pageName} / ${b.widgetLabel} -> ${b.paramKey}`}>
+                  Visu: {b.pageName} / {b.widgetLabel} ({b.paramKey})
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

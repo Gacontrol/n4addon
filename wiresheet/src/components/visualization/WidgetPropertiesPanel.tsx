@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Link2, Unlink, Trash2 } from 'lucide-react';
+import { X, Link2, Unlink, Trash2, Settings } from 'lucide-react';
 import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
@@ -47,6 +47,57 @@ const getNodePorts = (node: FlowNode) => {
   return ports;
 };
 
+interface ConfigParam {
+  key: string;
+  label: string;
+  type: 'number' | 'boolean' | 'string';
+}
+
+const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
+  const params: ConfigParam[] = [];
+  switch (node.type) {
+    case 'pid-controller':
+      params.push({ key: 'kp', label: 'Kp (Proportional)', type: 'number' });
+      params.push({ key: 'ki', label: 'Ki (Integral)', type: 'number' });
+      params.push({ key: 'kd', label: 'Kd (Differential)', type: 'number' });
+      params.push({ key: 'outputMin', label: 'Ausgang Min', type: 'number' });
+      params.push({ key: 'outputMax', label: 'Ausgang Max', type: 'number' });
+      break;
+    case 'scaling':
+      params.push({ key: 'inputMin', label: 'Eingang Min', type: 'number' });
+      params.push({ key: 'inputMax', label: 'Eingang Max', type: 'number' });
+      params.push({ key: 'outputMin', label: 'Ausgang Min', type: 'number' });
+      params.push({ key: 'outputMax', label: 'Ausgang Max', type: 'number' });
+      break;
+    case 'compare':
+      params.push({ key: 'compareValue', label: 'Vergleichswert', type: 'number' });
+      break;
+    case 'threshold':
+      params.push({ key: 'thresholdValue', label: 'Schwellwert', type: 'number' });
+      break;
+    case 'delay':
+      params.push({ key: 'delayMs', label: 'Verzoegerung (ms)', type: 'number' });
+      break;
+    case 'timer':
+      params.push({ key: 'timerMs', label: 'Zeitdauer (ms)', type: 'number' });
+      break;
+    case 'counter':
+      params.push({ key: 'counterMin', label: 'Zähler Min', type: 'number' });
+      params.push({ key: 'counterMax', label: 'Zähler Max', type: 'number' });
+      break;
+    case 'smoothing':
+      params.push({ key: 'smoothingDuration', label: 'Glaettungsdauer', type: 'number' });
+      params.push({ key: 'sampleIntervalMs', label: 'Abtastintervall (ms)', type: 'number' });
+      break;
+    case 'const-value':
+      params.push({ key: 'constValue', label: 'Konstantwert', type: 'number' });
+      break;
+    default:
+      break;
+  }
+  return params;
+};
+
 export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   widget,
   availableNodes,
@@ -70,6 +121,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
   const selectedNode = widget.binding ? availableNodes.find(n => n.id === widget.binding?.nodeId) : null;
   const selectedNodePorts = selectedNode ? getNodePorts(selectedNode) : [];
+  const selectedNodeConfigParams = selectedNode ? getNodeConfigParams(selectedNode) : [];
 
   const isWriteWidget = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'].includes(widget.type);
 
@@ -86,6 +138,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     const binding: WidgetBinding = {
       nodeId,
       portId: defaultPort?.id,
+      paramKey: undefined,
       direction: isWriteWidget ? 'readwrite' : 'read'
     };
     onUpdate({ binding });
@@ -93,7 +146,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
   const handlePortChange = (portId: string) => {
     if (!widget.binding) return;
-    onUpdate({ binding: { ...widget.binding, portId: portId || undefined } });
+    onUpdate({ binding: { ...widget.binding, portId: portId || undefined, paramKey: undefined } });
+  };
+
+  const handleParamChange = (paramKey: string) => {
+    if (!widget.binding) return;
+    onUpdate({ binding: { ...widget.binding, paramKey: paramKey || undefined, portId: undefined } });
+  };
+
+  const currentBindingLabel = () => {
+    if (!widget.binding) return null;
+    if (widget.binding.paramKey) {
+      const param = selectedNodeConfigParams.find(p => p.key === widget.binding?.paramKey);
+      return param?.label || widget.binding.paramKey;
+    }
+    if (widget.binding.portId) {
+      return selectedNodePorts.find(p => p.id === widget.binding?.portId)?.label || widget.binding.portId;
+    }
+    return 'Hauptwert';
   };
 
   const renderGeneralConfig = () => {
@@ -634,26 +704,40 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     ))}
                   </select>
                 </div>
-                {widget.binding && selectedNodePorts.length > 0 && (
+                {widget.binding && (selectedNodePorts.length > 0 || selectedNodeConfigParams.length > 0) && (
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Port / Ausgang</label>
+                    <label className="block text-xs text-slate-400 mb-1">Port / Parameter</label>
                     <select
-                      value={widget.binding.portId || ''}
-                      onChange={(e) => handlePortChange(e.target.value)}
+                      value={widget.binding.paramKey ? `param:${widget.binding.paramKey}` : (widget.binding.portId || '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.startsWith('param:')) {
+                          handleParamChange(val.slice(6));
+                        } else {
+                          handlePortChange(val);
+                        }
+                      }}
                       className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                     >
                       <option value="">-- Hauptwert --</option>
                       {selectedNodePorts.filter(p => p.isOutput).length > 0 && (
-                        <optgroup label="Ausgaenge">
+                        <optgroup label="Ausgaenge (lesen)">
                           {selectedNodePorts.filter(p => p.isOutput).map(p => (
                             <option key={p.id} value={p.id}>{p.label}</option>
                           ))}
                         </optgroup>
                       )}
                       {selectedNodePorts.filter(p => !p.isOutput).length > 0 && isWriteWidget && (
-                        <optgroup label="Eingaenge">
+                        <optgroup label="Eingaenge (schreiben)">
                           {selectedNodePorts.filter(p => !p.isOutput).map(p => (
                             <option key={p.id} value={p.id}>{p.label}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {selectedNodeConfigParams.length > 0 && (
+                        <optgroup label="Parameter (lesen/schreiben)">
+                          {selectedNodeConfigParams.map(p => (
+                            <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
                           ))}
                         </optgroup>
                       )}
@@ -665,7 +749,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
                       <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
-                      {widget.binding.portId && <p className="text-green-500/70">{selectedNodePorts.find(p => p.id === widget.binding?.portId)?.label || widget.binding.portId}</p>}
+                      {(widget.binding.portId || widget.binding.paramKey) && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          {widget.binding.paramKey && <Settings className="w-3 h-3 text-amber-400" />}
+                          <p className="text-green-500/70">{currentBindingLabel()}</p>
+                        </div>
+                      )}
+                      <p className="text-green-600/50 mt-0.5">
+                        {isWriteWidget ? (widget.binding.paramKey ? 'Lesen + Schreiben (Parameter)' : 'Lesen + Schreiben') : 'Nur lesen'}
+                      </p>
                     </div>
                   </div>
                 ) : (

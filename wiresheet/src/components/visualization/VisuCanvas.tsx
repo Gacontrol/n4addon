@@ -1,10 +1,12 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { VisuWidget, VisuPage } from '../../types/visualization';
+import { FlowNode } from '../../types/flow';
 import { VisuWidgetRenderer } from './VisuWidget';
 
 interface VisuCanvasProps {
   page: VisuPage;
   liveValues: Record<string, unknown>;
+  logicNodes: FlowNode[];
   isEditMode: boolean;
   selectedWidgetId: string | null;
   onSelectWidget: (widgetId: string | null) => void;
@@ -20,6 +22,7 @@ interface VisuCanvasProps {
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   page,
   liveValues,
+  logicNodes,
   isEditMode,
   selectedWidgetId,
   onSelectWidget,
@@ -52,12 +55,20 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
-    const { nodeId, portId } = widget.binding;
+    const { nodeId, portId, paramKey } = widget.binding;
+    if (paramKey) {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (node?.data.config) {
+        const val = node.data.config[paramKey];
+        if (val !== undefined) return val;
+      }
+      return null;
+    }
     if (portId) {
       return liveValues[`${nodeId}:${portId}`] ?? liveValues[nodeId];
     }
     return liveValues[nodeId];
-  }, [liveValues]);
+  }, [liveValues, logicNodes]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {

@@ -1143,7 +1143,7 @@ app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
 });
 
 app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, value } = req.body;
+  const { nodeId, paramKey, value } = req.body;
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
@@ -1154,11 +1154,18 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     for (const page of pages) {
       const node = page.nodes.find(n => n.id === nodeId);
       if (node) {
-        if (!node.data.override) {
-          node.data.override = { manual: true, value };
+        if (paramKey) {
+          if (!node.data.config) node.data.config = {};
+          node.data.config[paramKey] = value;
+          console.log(`Visu-Parameter geschrieben: ${nodeId}.${paramKey} = ${value}`);
         } else {
-          node.data.override.manual = true;
-          node.data.override.value = value;
+          if (!node.data.override) {
+            node.data.override = { manual: true, value };
+          } else {
+            node.data.override.manual = true;
+            node.data.override.value = value;
+          }
+          console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
         }
         updated = true;
         break;
@@ -1166,7 +1173,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
     if (updated) {
       await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-      console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
       res.json({ success: true });
     } else {
       res.status(404).json({ error: 'Node nicht gefunden' });

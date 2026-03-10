@@ -538,23 +538,31 @@ function App() {
     }
   }, [modbusDevices, setModbusDevices]);
 
+  const allLogicNodes = pages.flatMap(p => p.nodes);
+
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,
-    binding: { nodeId: string; portId?: string },
+    binding: { nodeId: string; portId?: string; paramKey?: string },
     value: unknown
   ) => {
     try {
       await fetch('/api/visu/write-value', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: binding.nodeId, value })
+        body: JSON.stringify({ nodeId: binding.nodeId, paramKey: binding.paramKey, value })
       });
+      if (binding.paramKey) {
+        const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === binding.nodeId);
+        if (targetNode) {
+          updateNodeData(targetNode.id, {
+            config: { ...targetNode.data.config, [binding.paramKey]: value }
+          });
+        }
+      }
     } catch (err) {
       console.error('Failed to write visu value:', err);
     }
-  }, []);
-
-  const allLogicNodes = pages.flatMap(p => p.nodes);
+  }, [pages, updateNodeData]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
@@ -828,6 +836,7 @@ function App() {
               liveValues={liveValues}
               onOverrideChange={updateNodeOverride}
               onModbusDatapointDrop={handleModbusDatapointDrop}
+              visuPages={visuPages}
             />
 
             {selectedNodeData && (
