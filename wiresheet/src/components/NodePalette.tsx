@@ -18,6 +18,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({ onNodePointerDown }) =
   const categories: Record<string, CategoryConfig> = {
     input: { label: 'HA Eingaenge', color: '#3b82f6', icon: 'ArrowRightToLine' },
     output: { label: 'HA Ausgaenge', color: '#f59e0b', icon: 'ArrowRightFromLine' },
+    driver: { label: 'Treiber', color: '#059669', icon: 'Network' },
     datapoint: { label: 'Datenpunkte', color: '#8b5cf6', icon: 'Database' },
     logic: { label: 'Logik', color: '#10b981', icon: 'GitMerge' },
     math: { label: 'Mathematik', color: '#f59e0b', icon: 'Calculator' },
@@ -25,7 +26,7 @@ export const NodePalette: React.FC<NodePaletteProps> = ({ onNodePointerDown }) =
     special: { label: 'Spezial', color: '#64748b', icon: 'Sparkles' }
   };
 
-  const categoryOrder = ['input', 'output', 'datapoint', 'logic', 'math', 'trigger', 'special'];
+  const categoryOrder = ['input', 'output', 'driver', 'datapoint', 'logic', 'math', 'trigger', 'special'];
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['input', 'output', 'logic'])

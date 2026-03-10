@@ -28,6 +28,25 @@ export interface CaseDefinition {
   height?: number;
 }
 
+export interface ModbusDatapoint {
+  id: string;
+  name: string;
+  address: number;
+  registerType: 'coil' | 'discrete' | 'holding' | 'input';
+  dataType: 'bool' | 'int16' | 'uint16' | 'int32' | 'uint32' | 'float32';
+  scale?: number;
+  offset?: number;
+  unit?: string;
+  writable: boolean;
+}
+
+export interface ModbusDevice {
+  id: string;
+  name: string;
+  unitId: number;
+  datapoints: ModbusDatapoint[];
+}
+
 export interface NodeConfig {
   delayMs?: number;
   thresholdValue?: number;
@@ -51,6 +70,11 @@ export interface NodeConfig {
   timerMs?: number;
   counterMax?: number;
   counterMin?: number;
+  modbusHost?: string;
+  modbusPort?: number;
+  modbusDevices?: ModbusDevice[];
+  modbusPollInterval?: number;
+  modbusTimeout?: number;
   [key: string]: unknown;
 }
 
@@ -103,7 +127,7 @@ export interface NodeTemplate {
   type: string;
   label: string;
   icon: string;
-  category: 'input' | 'output' | 'logic' | 'trigger' | 'datapoint' | 'custom';
+  category: 'input' | 'output' | 'logic' | 'trigger' | 'datapoint' | 'custom' | 'driver' | 'math' | 'special';
   color: string;
   inputs: Omit<NodePort, 'id'>[];
   outputs: Omit<NodePort, 'id'>[];

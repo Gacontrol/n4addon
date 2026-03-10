@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition } from '../types/flow';
+import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevice } from '../types/flow';
 import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
+import { ModbusConfig } from './ModbusConfig';
 
 interface HAEntity {
   entity_id: string;
@@ -1066,7 +1067,30 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
-        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && (
+        {node.type === 'modbus-tcp' && (
+          <ModbusConfig
+            host={config.modbusHost || '192.168.1.100'}
+            port={config.modbusPort || 502}
+            devices={config.modbusDevices || []}
+            pollInterval={config.modbusPollInterval || 1000}
+            timeout={config.modbusTimeout || 3000}
+            onHostChange={host => updateConfig('modbusHost', host)}
+            onPortChange={port => updateConfig('modbusPort', port)}
+            onDevicesChange={(devices: ModbusDevice[]) => updateConfig('modbusDevices', devices)}
+            onPollIntervalChange={interval => updateConfig('modbusPollInterval', interval)}
+            onTimeoutChange={timeout => updateConfig('modbusTimeout', timeout)}
+            onOutputsChange={outputs => {
+              const nodeOutputs = outputs.map((o, i) => ({ id: `output-${i}`, label: o.label, type: 'output' as const }));
+              onUpdateNode(node.id, { outputs: nodeOutputs });
+            }}
+            onInputsChange={inputs => {
+              const nodeInputs = inputs.map((inp, i) => ({ id: `input-${i}`, label: inp.label, type: 'input' as const }));
+              onUpdateNode(node.id, { inputs: nodeInputs });
+            }}
+          />
+        )}
+
+        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && node.type !== 'modbus-tcp' && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Ports

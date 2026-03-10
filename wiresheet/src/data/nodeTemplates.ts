@@ -564,5 +564,22 @@ export const nodeTemplates: NodeTemplate[] = [
       smoothingHours: 24,
       sampleIntervalMs: 60000
     }
+  },
+  {
+    type: 'modbus-tcp',
+    label: 'Modbus TCP',
+    icon: 'Network',
+    category: 'driver',
+    color: '#059669',
+    inputs: [],
+    outputs: [],
+    description: 'Modbus TCP Treiber mit Geraeten und Datenpunkten',
+    defaultConfig: {
+      modbusHost: '192.168.1.100',
+      modbusPort: 502,
+      modbusDevices: [],
+      modbusPollInterval: 1000,
+      modbusTimeout: 3000
+    }
   }
 ];
