@@ -7,11 +7,14 @@
 }
 
 .connecting-mode [data-node-id] {
-  pointer-events: none;
+  pointer-events: none !important;
+}
+
+.connecting-mode [data-node-id] * {
+  pointer-events: none !important;
 }
 
 .connecting-mode .node-port {
   pointer-events: auto !important;
-  position: relative;
-  z-index: 10000 !important;
+  cursor: pointer !important;
 }
