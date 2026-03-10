@@ -1,0 +1,4 @@
+#!/command/with-contenv bashio
+
+echo "Starte Nginx..."
+exec nginx -g "daemon off;"

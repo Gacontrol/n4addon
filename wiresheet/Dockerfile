@@ -39,9 +39,7 @@ WORKDIR /app
 COPY --from=builder /build/dist ./dist
 COPY --from=builder /server-build/node_modules ./node_modules
 COPY server ./server
-COPY rootfs/run.sh /run.sh
-COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY rootfs /
 
-RUN chmod +x /run.sh
-
-CMD [ "/run.sh" ]
+RUN chmod +x /etc/s6-overlay/s6-rc.d/wiresheet-server/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/nginx/run
