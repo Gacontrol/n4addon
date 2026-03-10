@@ -184,19 +184,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     };
   }, [zoom]);
 
-  const handlePortClick = (nodeId: string, portId: string, isOutput: boolean) => {
-    if (isOutput) {
-      if (connectingFrom) {
-        onConnectionCancel();
-      } else {
+  const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
+    if (!connectingFrom) {
+      if (isOutput) {
         onConnectionStart(nodeId, portId);
       }
     } else {
-      if (connectingFrom) {
-        onConnectionEnd(nodeId, portId);
+      if (isOutput) {
+        if (connectingFrom.nodeId !== nodeId) {
+          onConnectionEnd(nodeId, portId);
+        } else {
+          onConnectionCancel();
+        }
+      } else {
+        if (connectingFrom.nodeId !== nodeId) {
+          onConnectionEnd(nodeId, portId);
+        } else {
+          onConnectionCancel();
+        }
       }
     }
-  };
+  }, [connectingFrom, onConnectionStart, onConnectionEnd, onConnectionCancel]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return;
