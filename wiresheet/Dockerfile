@@ -6,19 +6,15 @@ ENV LANG=C.UTF-8 \
 
 RUN apk add --no-cache \
     nodejs \
-    npm \
     nginx && \
     mkdir -p /data/wiresheet && \
     mkdir -p /run/nginx
 
 WORKDIR /app
 
-COPY server-package.json package.json
-RUN npm install --production && \
-    npm cache clean --force
-
 COPY dist ./dist
 COPY server ./server
+COPY node_modules ./node_modules
 COPY rootfs/run.sh /run.sh
 COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
 
