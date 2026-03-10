@@ -331,16 +331,21 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           >
             <button
               type="button"
-              className="port node-port w-4 h-4 -ml-1 rounded-full border-2 transition-all flex-shrink-0"
+              className="port node-port rounded-full border-2 transition-all flex-shrink-0 relative"
               style={{
+                width: '18px',
+                height: '18px',
+                marginLeft: '-6px',
                 borderColor: isConnecting ? '#60a5fa' : '#a5b4fc',
                 backgroundColor: isConnecting ? '#1d4ed8' : '#4338ca',
                 boxShadow: isConnecting ? '0 0 12px #60a5fa' : 'none',
-                transform: isConnecting ? 'scale(1.3)' : 'scale(1)',
-                cursor: isConnecting ? 'pointer' : 'crosshair'
+                transform: isConnecting ? 'scale(1.2)' : 'scale(1)',
+                cursor: 'pointer',
+                zIndex: 10
               }}
               data-port-id={`${node.id}-input-0`}
-              onClick={e => { e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
+              onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, 'input-0', false); }}
+              onPointerDown={e => e.stopPropagation()}
             />
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Icons.Layers className="w-4 h-4 text-white flex-shrink-0" />
@@ -748,16 +753,21 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
                   <button
                     type="button"
-                    className="port node-port w-4 h-4 -ml-2 rounded-full border-2 transition-all flex-shrink-0"
+                    className="port node-port rounded-full border-2 transition-all flex-shrink-0 relative"
                     style={{
+                      width: '18px',
+                      height: '18px',
+                      marginLeft: '-9px',
                       borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
                       backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
                       boxShadow: isHighlighted ? '0 0 12px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
-                      transform: isHighlighted ? 'scale(1.3)' : 'scale(1)',
-                      cursor: isHighlighted ? 'pointer' : 'crosshair'
+                      transform: isHighlighted ? 'scale(1.2)' : 'scale(1)',
+                      cursor: 'pointer',
+                      zIndex: 10
                     }}
                     data-port-id={`${node.id}-${input.id}`}
-                    onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, input.id, false); }}
+                    onPointerDown={e => e.stopPropagation()}
                   />
                   <div style={{ width: 16 }} />
                   <div className="pr-3 flex items-center gap-1.5 min-w-0">
@@ -796,14 +806,20 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   </div>
                   <button
                     type="button"
-                    className="port node-port w-4 h-4 -mr-2 rounded-full border-2 transition-all flex-shrink-0 cursor-pointer"
+                    className="port node-port rounded-full border-2 transition-all flex-shrink-0 relative"
                     style={{
+                      width: '18px',
+                      height: '18px',
+                      marginRight: '-9px',
                       borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
                       backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
-                      boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
+                      boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none',
+                      cursor: 'pointer',
+                      zIndex: 10
                     }}
                     data-port-id={`${node.id}-${output.id}`}
-                    onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, output.id, true); }}
+                    onPointerDown={e => e.stopPropagation()}
                   />
                 </div>
               );
