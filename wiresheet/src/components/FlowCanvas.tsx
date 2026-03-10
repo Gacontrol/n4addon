@@ -31,7 +31,7 @@ interface FlowCanvasProps {
   onNodesSelect: (ids: string[]) => void;
   onNodeDelete: (id: string) => void;
   onConnectionStart: (nodeId: string, portId: string) => void;
-  onConnectionEnd: (nodeId: string, portId: string) => void;
+  onConnectionEnd: (targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => void;
   onConnectionCancel: () => void;
   onConnectionSelect: (id: string | null) => void;
   onConnectionDelete: (id: string) => void;
@@ -191,7 +191,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       }
     } else {
       if (connectingFrom.nodeId !== nodeId) {
-        onConnectionEnd(nodeId, portId);
+        onConnectionEnd(nodeId, portId, connectingFrom.nodeId, connectingFrom.portId);
       } else {
         onConnectionCancel();
       }

@@ -563,15 +563,14 @@ export const useWiresheetPages = () => {
     setConnectingFrom(newValue);
   }, []);
 
-  const endConnection = useCallback((nodeId: string, portId: string) => {
-    const connecting = connectingFromRef.current;
-    if (connecting && connecting.nodeId !== nodeId) {
+  const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => {
+    if (sourceNodeId !== targetNodeId) {
       const connection: Connection = {
-        id: `${connecting.nodeId}-${connecting.portId}-${nodeId}-${portId}`,
-        source: connecting.nodeId,
-        sourcePort: connecting.portId,
-        target: nodeId,
-        targetPort: portId
+        id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
+        source: sourceNodeId,
+        sourcePort: sourcePortId,
+        target: targetNodeId,
+        targetPort: targetPortId
       };
       addConnection(connection);
     }

@@ -30,18 +30,18 @@ export const useFlowEditor = () => {
   }, [selectedNode]);
 
   const addConnection = useCallback((connection: Connection) => {
-    const exists = connections.some(
-      conn =>
-        conn.source === connection.source &&
-        conn.sourcePort === connection.sourcePort &&
-        conn.target === connection.target &&
-        conn.targetPort === connection.targetPort
-    );
-
-    if (!exists) {
-      setConnections(prev => [...prev, connection]);
-    }
-  }, [connections]);
+    setConnections(prev => {
+      const exists = prev.some(
+        conn =>
+          conn.source === connection.source &&
+          conn.sourcePort === connection.sourcePort &&
+          conn.target === connection.target &&
+          conn.targetPort === connection.targetPort
+      );
+      if (exists) return prev;
+      return [...prev, connection];
+    });
+  }, []);
 
   const deleteConnection = useCallback((connectionId: string) => {
     setConnections(prev => prev.filter(conn => conn.id !== connectionId));
@@ -59,19 +59,19 @@ export const useFlowEditor = () => {
     setConnectingFrom({ nodeId, portId });
   }, []);
 
-  const endConnection = useCallback((nodeId: string, portId: string) => {
-    if (connectingFrom && connectingFrom.nodeId !== nodeId) {
+  const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => {
+    if (sourceNodeId !== targetNodeId) {
       const connection: Connection = {
-        id: `${connectingFrom.nodeId}-${connectingFrom.portId}-${nodeId}-${portId}`,
-        source: connectingFrom.nodeId,
-        sourcePort: connectingFrom.portId,
-        target: nodeId,
-        targetPort: portId
+        id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
+        source: sourceNodeId,
+        sourcePort: sourcePortId,
+        target: targetNodeId,
+        targetPort: targetPortId
       };
       addConnection(connection);
     }
     setConnectingFrom(null);
-  }, [connectingFrom, addConnection]);
+  }, [addConnection]);
 
   const cancelConnection = useCallback(() => {
     setConnectingFrom(null);
