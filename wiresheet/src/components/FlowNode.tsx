@@ -535,16 +535,17 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               const hasPortVal = portVal !== undefined && portVal !== null;
               const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
               return (
-                <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
+                <div key={input.id} className="flex items-center py-0.5 min-h-[28px] relative">
                   <div
-                    className="node-port relative flex-shrink-0 cursor-crosshair"
-                    style={{ width: 32, height: 32, marginLeft: -16, zIndex: 100 }}
+                    className="node-port absolute flex-shrink-0 cursor-crosshair"
+                    style={{ width: 40, height: 40, left: -20, top: '50%', transform: 'translateY(-50%)', zIndex: 9999 }}
                     data-port-id={`${node.id}-${input.id}`}
                     onPointerDown={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, input.id, false); }}
+                    onPointerUp={e => { e.stopPropagation(); e.preventDefault(); }}
                     onClick={e => { e.stopPropagation(); e.preventDefault(); }}
                   >
                     <div
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
+                      className="absolute left-1/2 top-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
                       style={{
                         borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
                         backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
@@ -556,6 +557,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-2 border-blue-400/30 animate-ping pointer-events-none" />
                     )}
                   </div>
+                  <div style={{ width: 16 }} />
                   <div className="pr-3 flex items-center gap-1.5 min-w-0">
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
                     {hasPortVal && (
