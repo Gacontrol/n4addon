@@ -151,7 +151,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return;
     const target = e.target as HTMLElement;
-    if (target === e.currentTarget || target.id === 'flow-canvas' || target.closest('#canvas-bg') || target.closest('svg')) {
+    const isOnNode = target.closest('[data-node-id]');
+    const isOnPort = target.closest('[data-port-id]');
+
+    if (!isOnNode && !isOnPort) {
       if (connectingFrom) {
         onConnectionCancel();
         return;
@@ -166,6 +169,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       setLasso({ startX: x, startY: y, currentX: x, currentY: y });
+
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
     }
   };
 
@@ -311,7 +316,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       <svg
         id="canvas-bg"
         className="absolute inset-0 w-full h-full"
-        style={{ zIndex: 0 }}
+        style={{ zIndex: 10, pointerEvents: 'none' }}
       >
         <defs>
           <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -325,25 +330,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           </marker>
         </defs>
 
-        {connections.map(conn => {
-          const start = getPortCenter(conn.source, conn.sourcePort);
-          const end = getPortCenter(conn.target, conn.targetPort);
-          if (!start || !end) return null;
-          const connValue = liveValues[conn.source];
-          const isSelected = selectedConnection === conn.id;
-          return (
-            <ConnectionLine
-              key={conn.id}
-              x1={start.x} y1={start.y}
-              x2={end.x} y2={end.y}
-              color={isSelected ? '#f59e0b' : '#10b981'}
-              liveValue={connValue}
-              isSelected={isSelected}
-              onClick={(e) => handleConnectionClick(conn.id, e)}
-              onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
-            />
-          );
-        })}
+        <g style={{ pointerEvents: 'auto' }}>
+          {connections.map(conn => {
+            const start = getPortCenter(conn.source, conn.sourcePort);
+            const end = getPortCenter(conn.target, conn.targetPort);
+            if (!start || !end) return null;
+            const connValue = liveValues[conn.source];
+            const isSelected = selectedConnection === conn.id;
+            return (
+              <ConnectionLine
+                key={conn.id}
+                x1={start.x} y1={start.y}
+                x2={end.x} y2={end.y}
+                color={isSelected ? '#f59e0b' : '#10b981'}
+                liveValue={connValue}
+                isSelected={isSelected}
+                onClick={(e) => handleConnectionClick(conn.id, e)}
+                onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
+              />
+            );
+          })}
+        </g>
 
         {connectingFrom && connectingFromPos && (
           <ConnectionLine
@@ -368,7 +375,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         )}
       </svg>
 
-      <div className="absolute inset-0" style={{ zIndex: 1 }}>
+      <div className="absolute inset-0" style={{ zIndex: 5 }}>
         {nodes.map(node => {
           const portValues: Record<string, unknown> = {};
           for (const input of node.data.inputs) {

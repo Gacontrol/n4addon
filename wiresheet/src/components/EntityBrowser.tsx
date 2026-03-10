@@ -29,10 +29,10 @@ interface EntityBrowserProps {
 }
 
 function buildHierarchy(entities: HAEntity[]): Integration[] {
-  const integrationMap = new Map<string, Map<string, HAEntity[]>>();
+  const domainMap = new Map<string, Map<string, HAEntity[]>>();
 
   for (const entity of entities) {
-    const integration = String(entity.attributes._integration || entity.entity_id.split('.')[0]);
+    const domain = entity.entity_id.split('.')[0];
 
     const deviceId = entity.attributes._device_id as string | null;
     const deviceName = entity.attributes._device_name as string | null;
@@ -48,10 +48,10 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
       deviceLabel = 'Ohne Geraet';
     }
 
-    if (!integrationMap.has(integration)) {
-      integrationMap.set(integration, new Map());
+    if (!domainMap.has(domain)) {
+      domainMap.set(domain, new Map());
     }
-    const deviceMap = integrationMap.get(integration)!;
+    const deviceMap = domainMap.get(domain)!;
     if (!deviceMap.has(deviceKey)) {
       deviceMap.set(deviceKey, []);
     }
@@ -59,7 +59,7 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
   }
 
   const integrations: Integration[] = [];
-  integrationMap.forEach((deviceMap, integrationId) => {
+  domainMap.forEach((deviceMap, domainId) => {
     const devices: Device[] = [];
     deviceMap.forEach((ents, deviceId) => {
       const firstWithName = ents.find(e => e.attributes._device_name);
@@ -73,7 +73,7 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
       if (b.id === '_no_device') return -1;
       return a.label.localeCompare(b.label);
     });
-    integrations.push({ id: integrationId, label: integrationId, devices });
+    integrations.push({ id: domainId, label: domainId, devices });
   });
   integrations.sort((a, b) => a.label.localeCompare(b.label));
   return integrations;

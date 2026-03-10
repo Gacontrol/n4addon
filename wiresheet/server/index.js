@@ -473,7 +473,13 @@ async function runPageCycle(pageId) {
     }
 
     if (page.nodes.length > 0) {
-      await executePageLogic(page.nodes, page.connections, {});
+      const manualOverrides = {};
+      for (const node of page.nodes) {
+        if (node.data.override?.manual) {
+          manualOverrides[node.id] = node.data.override.value;
+        }
+      }
+      await executePageLogic(page.nodes, page.connections, manualOverrides);
     }
 
     pageInfo.lastRun = Date.now();
