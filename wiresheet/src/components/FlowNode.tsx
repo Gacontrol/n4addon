@@ -180,8 +180,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
       const canvas = document.getElementById('flow-canvas');
       if (canvas) {
         const canvasRect = canvas.getBoundingClientRect();
-        const x = canvasRect.left + (node.position.x + 190) * zoom;
-        const y = canvasRect.top + node.position.y * zoom;
+        const scrollLeft = canvas.scrollLeft;
+        const scrollTop = canvas.scrollTop;
+        const x = canvasRect.left + (node.position.x + 190) * zoom - scrollLeft;
+        const y = canvasRect.top + node.position.y * zoom - scrollTop;
         setDpContextMenu({ x, y });
       } else {
         setDpContextMenu({ x: e.clientX, y: e.clientY });
@@ -592,8 +594,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     const canvas = document.getElementById('flow-canvas');
                     if (canvas) {
                       const canvasRect = canvas.getBoundingClientRect();
-                      const x = canvasRect.left + (node.position.x + 190) * zoom;
-                      const y = canvasRect.top + node.position.y * zoom;
+                      const scrollLeft = canvas.scrollLeft;
+                      const scrollTop = canvas.scrollTop;
+                      const x = canvasRect.left + (node.position.x + 190) * zoom - scrollLeft;
+                      const y = canvasRect.top + node.position.y * zoom - scrollTop;
                       setDpContextMenu({ x, y });
                       const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
                       setOverrideInput(currentVal);

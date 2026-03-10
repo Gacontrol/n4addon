@@ -165,9 +165,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     if (!el) return null;
     const portRect = el.getBoundingClientRect();
     const canvasRect = canvasRef.current.getBoundingClientRect();
+    const scrollLeft = canvasRef.current.scrollLeft;
+    const scrollTop = canvasRef.current.scrollTop;
     return {
-      x: (portRect.left - canvasRect.left + portRect.width / 2) / zoom,
-      y: (portRect.top - canvasRect.top + portRect.height / 2) / zoom
+      x: (portRect.left - canvasRect.left + portRect.width / 2 + scrollLeft) / zoom,
+      y: (portRect.top - canvasRect.top + portRect.height / 2 + scrollTop) / zoom
     };
   }, [zoom]);
 
