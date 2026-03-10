@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition } from '../types/flow';
 import * as Icons from 'lucide-react';
 
@@ -807,15 +808,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         </div>
       </div>
 
-      {dpContextMenu && isDPNode && (
+      {dpContextMenu && isDPNode && createPortal(
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[9998]"
             onClick={() => setDpContextMenu(null)}
             onContextMenu={e => { e.preventDefault(); setDpContextMenu(null); }}
           />
           <div
-            className="fixed z-50 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl py-1 w-40"
+            className="fixed z-[9999] bg-slate-800 border border-slate-600 rounded-lg shadow-2xl py-1 w-40"
             style={{ left: dpContextMenu.x, top: dpContextMenu.y }}
             onPointerDown={e => e.stopPropagation()}
           >
@@ -840,7 +841,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               Manuell uebersteuern
             </button>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
