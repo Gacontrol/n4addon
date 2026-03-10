@@ -215,11 +215,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     if (!isOnNode) {
-      if (!e.shiftKey && !connectingFrom) {
+      if (!e.shiftKey && !connectingFromRef.current) {
         onClearSelection();
       }
 
-      if (connectingFrom) {
+      if (connectingFromRef.current) {
         onConnectionCancel();
         return;
       }
