@@ -299,17 +299,27 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-nav-button': {
         const navCfg = widget.config as NavButtonConfig;
+        if (isEditMode) {
+          return (
+            <div
+              className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm"
+              style={{ backgroundColor: navCfg.color || '#3b82f6' }}
+            >
+              <Navigation className="w-4 h-4" />
+              {navCfg.label || 'Seite'}
+            </div>
+          );
+        }
         return (
           <button
             className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
             style={{ backgroundColor: navCfg.color || '#3b82f6' }}
             onClick={(e) => {
-              if (!isEditMode && navCfg.targetPageId) {
+              if (navCfg.targetPageId) {
                 e.stopPropagation();
                 onNavigateToPage?.(navCfg.targetPageId);
               }
             }}
-            disabled={isEditMode}
           >
             <Navigation className="w-4 h-4" />
             {navCfg.label || 'Seite'}
@@ -319,21 +329,29 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-home-button': {
         const homeCfg = widget.config as HomeButtonConfig & { homePageId?: string };
+        if (isEditMode) {
+          return (
+            <div
+              className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm"
+              style={{ backgroundColor: homeCfg.color || '#10b981' }}
+            >
+              <Home className="w-4 h-4" />
+              {homeCfg.label || 'Home'}
+            </div>
+          );
+        }
         return (
           <button
             className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
             style={{ backgroundColor: homeCfg.color || '#10b981' }}
             onClick={(e) => {
-              if (!isEditMode) {
-                e.stopPropagation();
-                if (homeCfg.homePageId) {
-                  onNavigateToPage?.(homeCfg.homePageId);
-                } else {
-                  onNavigateHome?.();
-                }
+              e.stopPropagation();
+              if (homeCfg.homePageId) {
+                onNavigateToPage?.(homeCfg.homePageId);
+              } else {
+                onNavigateHome?.();
               }
             }}
-            disabled={isEditMode}
           >
             <Home className="w-4 h-4" />
             {homeCfg.label || 'Home'}
@@ -343,17 +361,25 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-back-button': {
         const backCfg = widget.config as BackButtonConfig;
+        if (isEditMode) {
+          return (
+            <div
+              className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm"
+              style={{ backgroundColor: backCfg.color || '#64748b' }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {backCfg.label || 'Zurueck'}
+            </div>
+          );
+        }
         return (
           <button
             className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
             style={{ backgroundColor: backCfg.color || '#64748b' }}
             onClick={(e) => {
-              if (!isEditMode) {
-                e.stopPropagation();
-                onNavigateBack?.();
-              }
+              e.stopPropagation();
+              onNavigateBack?.();
             }}
-            disabled={isEditMode}
           >
             <ChevronLeft className="w-4 h-4" />
             {backCfg.label || 'Zurueck'}

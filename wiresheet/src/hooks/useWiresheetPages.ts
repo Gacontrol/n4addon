@@ -808,6 +808,7 @@ export const useWiresheetPages = () => {
     updateContainerSize,
     updateCaseSize,
     moveNodeToContainer,
-    releaseContainerNodes
+    releaseContainerNodes,
+    setLiveValue: (key: string, value: unknown) => setLiveValues(prev => ({ ...prev, [key]: value }))
   };
 };

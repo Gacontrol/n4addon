@@ -64,7 +64,8 @@ function App() {
     updateCaseSize,
     moveNodeToContainer,
     duplicateSelected,
-    addTextAnnotation
+    addTextAnnotation,
+    setLiveValue
   } = useWiresheetPages();
 
   const {
@@ -545,24 +546,28 @@ function App() {
     binding: { nodeId: string; portId?: string; paramKey?: string },
     value: unknown
   ) => {
+    if (binding.paramKey) {
+      const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === binding.nodeId);
+      if (targetNode) {
+        updateNodeData(targetNode.id, {
+          config: { ...targetNode.data.config, [binding.paramKey]: value }
+        });
+      }
+    } else {
+      const key = binding.portId ? `${binding.nodeId}:${binding.portId}` : binding.nodeId;
+      setLiveValue(key, value);
+      setLiveValue(binding.nodeId, value);
+    }
     try {
       await fetch('/api/visu/write-value', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: binding.nodeId, paramKey: binding.paramKey, value })
+        body: JSON.stringify({ nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value })
       });
-      if (binding.paramKey) {
-        const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === binding.nodeId);
-        if (targetNode) {
-          updateNodeData(targetNode.id, {
-            config: { ...targetNode.data.config, [binding.paramKey]: value }
-          });
-        }
-      }
     } catch (err) {
       console.error('Failed to write visu value:', err);
     }
-  }, [pages, updateNodeData]);
+  }, [pages, updateNodeData, setLiveValue]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
