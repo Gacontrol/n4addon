@@ -23,10 +23,9 @@ export const NodePalette: React.FC<NodePaletteProps> = ({ onNodePointerDown }) =
   }, {} as Record<string, NodeTemplate[]>);
 
   return (
-    <div className="w-72 bg-slate-800 border-r border-slate-700 overflow-y-auto flex-shrink-0">
-      <div className="p-4 border-b border-slate-700">
-        <h2 className="text-base font-bold text-white">Bausteine</h2>
-        <p className="text-xs text-slate-400 mt-1">Auf Canvas ziehen zum Hinzufügen</p>
+    <div className="h-full bg-slate-800 overflow-y-auto">
+      <div className="p-3 border-b border-slate-700">
+        <p className="text-xs text-slate-400">Auf Canvas ziehen zum Hinzufuegen</p>
       </div>
 
       <div className="p-3 space-y-5">

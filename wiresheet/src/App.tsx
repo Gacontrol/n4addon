@@ -2,11 +2,14 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
+import { CustomBlockLibrary } from './components/CustomBlockLibrary';
+import { CustomBlockEditor } from './components/CustomBlockEditor';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
-import { NodeTemplate, FlowNode } from './types/flow';
+import { useCustomBlocks } from './hooks/useCustomBlocks';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection } from './types/flow';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
-  Clock, Save, Check, AlertCircle, Pencil
+  Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid
 } from 'lucide-react';
 
 function App() {
@@ -51,14 +54,28 @@ function App() {
     deleteSelected,
     startConnection,
     endConnection,
-    cancelConnection
+    cancelConnection,
+    addConnection
   } = useWiresheetPages();
+
+  const {
+    blocks: customBlocks,
+    addBlock,
+    deleteBlock,
+    duplicateBlock,
+    importBlocks,
+    exportBlock,
+    exportAllBlocks
+  } = useCustomBlocks();
 
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
   const [showCycleEditor, setShowCycleEditor] = useState(false);
   const [cycleInput, setCycleInput] = useState(String(activePage.cycleMs));
+  const [sidebarTab, setSidebarTab] = useState<'nodes' | 'blocks'>('nodes');
+  const [showBlockEditor, setShowBlockEditor] = useState(false);
+  const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const isDraggingFromPalette = useRef(false);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
@@ -153,6 +170,62 @@ function App() {
   };
 
   const cycleOptions = [20, 50, 100, 250, 500, 1000, 2000, 5000];
+
+  const handleCreateBlockFromSelection = useCallback(() => {
+    if (selectedNodes.size < 1) return;
+    setEditingBlock(null);
+    setShowBlockEditor(true);
+  }, [selectedNodes]);
+
+  const handleEditBlock = useCallback((block: CustomBlockDefinition) => {
+    setEditingBlock(block);
+    setShowBlockEditor(true);
+  }, []);
+
+  const handleSaveBlock = useCallback((block: CustomBlockDefinition) => {
+    addBlock(block);
+    setShowBlockEditor(false);
+    setEditingBlock(null);
+  }, [addBlock]);
+
+  const handleAddBlockToCanvas = useCallback((block: CustomBlockDefinition) => {
+    const now = Date.now();
+    const idMap = new Map<string, string>();
+
+    const baseX = 200;
+    const baseY = 200;
+
+    const newNodes: FlowNode[] = block.nodes.map(node => {
+      const newId = `node-${now}-${Math.random().toString(36).substr(2, 9)}`;
+      idMap.set(node.id, newId);
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + baseX,
+          y: node.position.y + baseY
+        }
+      };
+    });
+
+    const newConns: Connection[] = block.connections.map(conn => ({
+      ...conn,
+      id: `${idMap.get(conn.source)}-${conn.sourcePort}-${idMap.get(conn.target)}-${conn.targetPort}`,
+      source: idMap.get(conn.source)!,
+      target: idMap.get(conn.target)!
+    }));
+
+    newNodes.forEach(n => addNode(n));
+    setTimeout(() => {
+      newConns.forEach(c => addConnection(c));
+      selectNodes(newNodes.map(n => n.id));
+    }, 50);
+  }, [addNode, addConnection, selectNodes]);
+
+  const selectedNodesList = nodes.filter(n => selectedNodes.has(n.id));
+  const selectedConnectionsList = connections.filter(c =>
+    selectedNodes.has(c.source) && selectedNodes.has(c.target)
+  );
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
@@ -307,7 +380,55 @@ function App() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <NodePalette onNodePointerDown={handleNodePointerDown} />
+        <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
+          <div className="flex border-b border-slate-700">
+            <button
+              onClick={() => setSidebarTab('nodes')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
+                sidebarTab === 'nodes'
+                  ? 'bg-slate-800 text-white border-b-2 border-blue-500'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Bausteine
+            </button>
+            <button
+              onClick={() => setSidebarTab('blocks')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors ${
+                sidebarTab === 'blocks'
+                  ? 'bg-slate-800 text-white border-b-2 border-cyan-500'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Blocks className="w-3.5 h-3.5" />
+              Eigene
+              {customBlocks.length > 0 && (
+                <span className="bg-cyan-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                  {customBlocks.length}
+                </span>
+              )}
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            {sidebarTab === 'nodes' ? (
+              <NodePalette onNodePointerDown={handleNodePointerDown} />
+            ) : (
+              <CustomBlockLibrary
+                blocks={customBlocks}
+                onCreateBlock={handleCreateBlockFromSelection}
+                onEditBlock={handleEditBlock}
+                onDeleteBlock={deleteBlock}
+                onDuplicateBlock={duplicateBlock}
+                onExportBlock={exportBlock}
+                onExportAll={exportAllBlocks}
+                onImportBlocks={importBlocks}
+                onAddBlockToCanvas={handleAddBlockToCanvas}
+                canCreateFromSelection={selectedNodes.size >= 1}
+              />
+            )}
+          </div>
+        </div>
 
         <FlowCanvas
           nodes={nodes}
@@ -380,6 +501,18 @@ function App() {
           </span>
         </div>
       </div>
+
+      {showBlockEditor && (
+        <CustomBlockEditor
+          block={editingBlock}
+          selectedNodes={selectedNodesList}
+          selectedConnections={selectedConnectionsList}
+          allNodes={nodes}
+          allConnections={connections}
+          onSave={handleSaveBlock}
+          onCancel={() => { setShowBlockEditor(false); setEditingBlock(null); }}
+        />
+      )}
     </div>
   );
 }

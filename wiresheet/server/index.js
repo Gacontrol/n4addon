@@ -16,6 +16,7 @@ const DATA_PATHS = [
 
 let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
+let blocksFile = path.join(dataDir, 'custom-blocks.json');
 
 const runningPages = new Map();
 let cachedDeviceRegistry = null;
@@ -587,6 +588,38 @@ app.get(['/pages/running', '/api/pages/running'], (req, res) => {
   res.json(status);
 });
 
+app.get(['/blocks', '/api/blocks'], async (req, res) => {
+  try {
+    const data = await fs.readFile(blocksFile, 'utf-8');
+    const blocks = JSON.parse(data);
+    console.log(`Geladen: ${blocks.length} Custom Blocks`);
+    res.json(blocks);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      res.json([]);
+    } else {
+      console.error('Fehler beim Laden der Blocks:', err);
+      res.status(500).json({ error: 'Fehler beim Laden der Blocks', details: err.message });
+    }
+  }
+});
+
+app.post(['/blocks', '/api/blocks'], async (req, res) => {
+  try {
+    const blocks = req.body;
+    if (!Array.isArray(blocks)) {
+      return res.status(400).json({ error: 'Ungueltige Daten - Array erwartet' });
+    }
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(blocksFile, JSON.stringify(blocks, null, 2));
+    console.log(`Gespeichert: ${blocks.length} Custom Blocks`);
+    res.json({ success: true, saved: blocks.length });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Blocks:', err);
+    res.status(500).json({ error: 'Fehler beim Speichern der Blocks', details: err.message });
+  }
+});
+
 async function restoreRunningPages() {
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');
@@ -614,6 +647,7 @@ async function start() {
   try {
     dataDir = await findWritableDataDir();
     pagesFile = path.join(dataDir, 'pages.json');
+    blocksFile = path.join(dataDir, 'custom-blocks.json');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);

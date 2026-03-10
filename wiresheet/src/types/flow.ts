@@ -76,11 +76,43 @@ export interface NodeTemplate {
   type: string;
   label: string;
   icon: string;
-  category: 'input' | 'output' | 'logic' | 'trigger' | 'datapoint';
+  category: 'input' | 'output' | 'logic' | 'trigger' | 'datapoint' | 'custom';
   color: string;
   inputs: Omit<NodePort, 'id'>[];
   outputs: Omit<NodePort, 'id'>[];
   description: string;
   defaultConfig?: NodeConfig;
   dpType?: DatapointType;
+}
+
+export interface CustomBlockPort {
+  id: string;
+  label: string;
+  type: 'input' | 'output';
+  mappedNodeId: string;
+  mappedPortId: string;
+}
+
+export interface CustomBlockDefinition {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  category: string;
+  inputs: CustomBlockPort[];
+  outputs: CustomBlockPort[];
+  nodes: FlowNode[];
+  connections: Connection[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CustomBlockInstance extends FlowNode {
+  type: 'custom-block';
+  data: FlowNode['data'] & {
+    blockDefinitionId: string;
+    instanceNodes?: FlowNode[];
+    instanceConnections?: Connection[];
+  };
 }
