@@ -267,7 +267,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
     if (connectingFromRef.current) {
+      canvasRef.current?.classList.remove('connecting-mode');
+
       const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
+      console.log('[handleCanvasPointerUp] elementsFromPoint:', elementsAtPoint.map(el => el.className || el.tagName));
+
       for (const el of elementsAtPoint) {
         const portEl = el.closest('[data-port-id]') as HTMLElement | null;
         if (portEl) {
@@ -284,6 +288,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           }
         }
       }
+
+      canvasRef.current?.classList.add('connecting-mode');
     }
 
     if (lasso) {
