@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition } from '../types/flow';
-import { X, Plus, Trash2, RefreshCw, Activity, Code, Play, Layers } from 'lucide-react';
+import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
+import { PythonEditor } from './PythonEditor';
 
 interface HAEntity {
   entity_id: string;
@@ -31,10 +32,43 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   liveValues
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
+  const [panelWidth, setPanelWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     setConfig(node.data.config || {});
   }, [node.id]);
+
+  useEffect(() => {
+    if (node.type === 'python-script') {
+      setPanelWidth(480);
+    } else {
+      setPanelWidth(320);
+    }
+  }, [node.type]);
+
+  const handleResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeRef.current = { startX: e.clientX, startWidth: panelWidth };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [panelWidth]);
+
+  const handleResizeMove = useCallback((e: React.PointerEvent) => {
+    if (!isResizing || !resizeRef.current) return;
+    const delta = resizeRef.current.startX - e.clientX;
+    const newWidth = Math.max(280, Math.min(800, resizeRef.current.startWidth + delta));
+    setPanelWidth(newWidth);
+  }, [isResizing]);
+
+  const handleResizeEnd = useCallback((e: React.PointerEvent) => {
+    if (isResizing) {
+      setIsResizing(false);
+      resizeRef.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }, [isResizing]);
 
   const isHANode = node.type === 'ha-input' || node.type === 'ha-output';
   const isDPNode = node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum';
@@ -141,8 +175,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     : '#f97316';
 
   return (
-    <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0 overflow-hidden">
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between flex-shrink-0">
+    <div
+      className="bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0 overflow-hidden relative"
+      style={{ width: panelWidth }}
+    >
+      <div
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-blue-500/30 transition-colors flex items-center justify-center z-10 group"
+        onPointerDown={handleResizeStart}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeEnd}
+        onPointerCancel={handleResizeEnd}
+      >
+        <GripVertical className="w-3 h-3 text-slate-600 group-hover:text-blue-400 transition-colors" />
+      </div>
+
+      <div className="p-4 border-b border-slate-700 flex items-center justify-between flex-shrink-0 pl-5">
         <div className="flex items-center gap-2 min-w-0">
           {isDPNode && (
             <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: dpNodeColor }} />
@@ -157,7 +204,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 pl-5 space-y-5">
 
         {hasLive && (
           <div className="bg-emerald-950/50 border border-emerald-700/50 rounded-lg px-3 py-2 flex items-center gap-2">
@@ -498,83 +545,84 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <span className="text-xs font-semibold uppercase tracking-wider">Python Script</span>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-slate-400 font-medium">Eingaenge</label>
-                <button
-                  onClick={addPythonInput}
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-600/30 text-blue-300 rounded text-xs transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-slate-400 font-medium">Eingaenge</label>
+                  <button
+                    onClick={addPythonInput}
+                    className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-600/30 text-blue-300 rounded text-xs transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {(config.pythonInputs || []).map((inp, idx) => (
+                    <div key={idx} className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                      <span className="text-[10px] text-slate-500 font-mono w-7">{inp.id}</span>
+                      <input
+                        type="text"
+                        value={inp.label}
+                        onChange={e => updatePythonPort('input', idx, e.target.value)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 min-w-0"
+                      />
+                      <button
+                        onClick={() => removePythonPort('input', idx)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(config.pythonInputs || []).length === 0 && (
+                    <p className="text-[10px] text-slate-500 text-center py-2">Keine Eingaenge</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-1">
-                {(config.pythonInputs || []).map((inp, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
-                    <span className="text-xs text-slate-500 font-mono w-8">{inp.id}</span>
-                    <input
-                      type="text"
-                      value={inp.label}
-                      onChange={e => updatePythonPort('input', idx, e.target.value)}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500"
-                    />
-                    <button
-                      onClick={() => removePythonPort('input', idx)}
-                      className="text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-slate-400 font-medium">Ausgaenge</label>
+                  <button
+                    onClick={addPythonOutput}
+                    className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-600/30 text-emerald-300 rounded text-xs transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {(config.pythonOutputs || []).map((out, idx) => (
+                    <div key={idx} className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                      <span className="text-[10px] text-slate-500 font-mono w-7">{out.id}</span>
+                      <input
+                        type="text"
+                        value={out.label}
+                        onChange={e => updatePythonPort('output', idx, e.target.value)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 min-w-0"
+                      />
+                      <button
+                        onClick={() => removePythonPort('output', idx)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(config.pythonOutputs || []).length === 0 && (
+                    <p className="text-[10px] text-slate-500 text-center py-2">Keine Ausgaenge</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-slate-400 font-medium">Ausgaenge</label>
-                <button
-                  onClick={addPythonOutput}
-                  className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-600/30 text-emerald-300 rounded text-xs transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
-              <div className="space-y-1">
-                {(config.pythonOutputs || []).map((out, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                    <span className="text-xs text-slate-500 font-mono w-8">{out.id}</span>
-                    <input
-                      type="text"
-                      value={out.label}
-                      onChange={e => updatePythonPort('output', idx, e.target.value)}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
-                    />
-                    <button
-                      onClick={() => removePythonPort('output', idx)}
-                      className="text-slate-500 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 font-medium mb-2">Python Code</label>
-              <textarea
-                value={config.pythonCode || '# Eingaenge: in1, in2, ...\n# Ausgaenge: out1, out2, ...\n\nout1 = in1'}
-                onChange={e => updateConfig('pythonCode', e.target.value)}
-                className="w-full h-48 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white font-mono outline-none focus:border-blue-500 transition-colors resize-y"
-                placeholder="Python Code hier eingeben..."
-                spellCheck={false}
-              />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Variablen: in1, in2... fuer Eingaenge, out1, out2... fuer Ausgaenge
-              </p>
-            </div>
+            <PythonEditor
+              value={config.pythonCode || '# Schreibe deinen Python Code hier\n\nout1 = in1'}
+              onChange={code => updateConfig('pythonCode', code)}
+              inputs={(config.pythonInputs || []).map(i => i.id)}
+              outputs={(config.pythonOutputs || []).map(o => o.id)}
+            />
           </div>
         )}
 
