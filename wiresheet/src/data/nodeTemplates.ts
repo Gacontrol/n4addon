@@ -84,7 +84,8 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'A = B', type: 'output' },
       { label: 'A < B', type: 'output' }
     ],
-    description: 'Vergleicht zwei Werte'
+    description: 'Vergleicht zwei Werte',
+    defaultConfig: { compareOperator: '>', compareValue: 0 }
   },
   {
     type: 'delay',
@@ -98,7 +99,8 @@ export const nodeTemplates: NodeTemplate[] = [
     outputs: [
       { label: 'Verzögert', type: 'output' }
     ],
-    description: 'Verzögert ein Signal'
+    description: 'Verzögert ein Signal',
+    defaultConfig: { delayMs: 1000 }
   },
   {
     type: 'threshold',
@@ -113,7 +115,8 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'Über', type: 'output' },
       { label: 'Unter', type: 'output' }
     ],
-    description: 'Prüft gegen Schwellwert'
+    description: 'Prüft gegen Schwellwert',
+    defaultConfig: { thresholdValue: 0 }
   },
   {
     type: 'time-trigger',

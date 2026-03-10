@@ -10,6 +10,17 @@ export interface NodePort {
   entityId?: string;
 }
 
+export interface NodeConfig {
+  delayMs?: number;
+  thresholdValue?: number;
+  compareOperator?: '>' | '>=' | '==' | '<=' | '<' | '!=';
+  compareValue?: number | string;
+  cronExpression?: string;
+  triggerState?: string;
+  customLabel?: string;
+  [key: string]: unknown;
+}
+
 export interface FlowNode {
   id: string;
   type: string;
@@ -19,9 +30,11 @@ export interface FlowNode {
     icon?: string;
     inputs: NodePort[];
     outputs: NodePort[];
-    config?: Record<string, unknown>;
+    config?: NodeConfig;
     entityId?: string;
     entityLabel?: string;
+    liveValue?: unknown;
+    liveState?: 'ok' | 'error' | 'idle';
   };
 }
 
@@ -33,6 +46,15 @@ export interface Connection {
   targetPort: string;
 }
 
+export interface WiresheetPage {
+  id: string;
+  name: string;
+  cycleMs: number;
+  running: boolean;
+  nodes: FlowNode[];
+  connections: Connection[];
+}
+
 export interface NodeTemplate {
   type: string;
   label: string;
@@ -42,4 +64,5 @@ export interface NodeTemplate {
   inputs: Omit<NodePort, 'id'>[];
   outputs: Omit<NodePort, 'id'>[];
   description: string;
+  defaultConfig?: NodeConfig;
 }

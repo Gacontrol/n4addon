@@ -16,6 +16,7 @@ interface FlowCanvasProps {
   onConnectionCancel: () => void;
   onCanvasClick: () => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
+  liveValues?: Record<string, unknown>;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -30,7 +31,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onConnectionEnd,
   onConnectionCancel,
   onCanvasClick,
-  ghostNode
+  ghostNode,
+  liveValues = {}
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -150,6 +152,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             onPortClick={handlePortClick}
             isConnecting={!!connectingFrom}
             connectingFromNodeId={connectingFrom?.nodeId}
+            liveValues={liveValues}
           />
         ))}
       </div>

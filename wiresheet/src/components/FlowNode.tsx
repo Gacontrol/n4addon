@@ -11,6 +11,7 @@ interface FlowNodeProps {
   onPortClick: (nodeId: string, portId: string, isOutput: boolean) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
+  liveValues?: Record<string, unknown>;
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -21,7 +22,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onDelete,
   onPortClick,
   isConnecting,
-  connectingFromNodeId
+  connectingFromNodeId,
+  liveValues = {}
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -77,6 +79,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   };
 
   const isHANode = node.type === 'ha-input' || node.type === 'ha-output';
+  const liveValue = liveValues[node.id];
+  const hasLive = liveValue !== undefined && liveValue !== null;
 
   return (
     <div
@@ -130,6 +134,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               <span className="text-slate-300 truncate font-mono text-[10px]">
                 {data.entityId || 'entity.id wählen...'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {hasLive && (
+          <div className="px-3 py-1 border-b border-white/5">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-950/60 border border-emerald-800/40">
+              <Icons.Activity className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" />
+              <span className="text-emerald-300 font-mono text-[10px] truncate">{String(liveValue)}</span>
             </div>
           </div>
         )}
