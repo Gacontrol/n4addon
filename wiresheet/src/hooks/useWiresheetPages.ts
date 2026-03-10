@@ -18,13 +18,17 @@ export const useWiresheetPages = () => {
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
   const [haEntities, setHaEntities] = useState<Array<{ entity_id: string; state: string; attributes: Record<string, unknown> }>>([]);
   const [haLoading, setHaLoading] = useState(false);
+  const [haError, setHaError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const cycleTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInProgress = useRef(false);
 
   const activePage = pages.find(p => p.id === activePageId) || pages[0];
 
   const loadPages = useCallback(async () => {
+    setLoadError(null);
     try {
       const res = await fetch(`${API_BASE}/pages`);
       if (res.ok) {
@@ -33,9 +37,14 @@ export const useWiresheetPages = () => {
           setPages(data);
           setActivePageId(data[0].id);
         }
+      } else {
+        const text = await res.text().catch(() => `HTTP ${res.status}`);
+        console.error('loadPages failed:', res.status, text);
+        setLoadError(`Laden fehlgeschlagen (${res.status})`);
       }
-    } catch {
-      // offline / dev mode - use defaults
+    } catch (err) {
+      console.error('loadPages error:', err);
+      setLoadError(`Verbindung fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, []);
 
@@ -43,6 +52,8 @@ export const useWiresheetPages = () => {
     setSaveStatus('saving');
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      if (saveInProgress.current) return;
+      saveInProgress.current = true;
       try {
         const res = await fetch(`${API_BASE}/pages`, {
           method: 'POST',
@@ -52,28 +63,41 @@ export const useWiresheetPages = () => {
         if (res.ok) {
           setSaveStatus('saved');
         } else {
-          console.error('Save failed:', res.status);
+          const text = await res.text().catch(() => `HTTP ${res.status}`);
+          console.error('Save failed:', res.status, text);
           setSaveStatus('error');
         }
       } catch (err) {
         console.error('Save error:', err);
         setSaveStatus('error');
+      } finally {
+        saveInProgress.current = false;
       }
-    }, 500);
+    }, 400);
   }, []);
 
   const loadHaEntities = useCallback(async () => {
     setHaLoading(true);
+    setHaError(null);
     try {
       const res = await fetch(`${API_BASE}/ha/states`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
           setHaEntities(data.sort((a, b) => a.entity_id.localeCompare(b.entity_id)));
+        } else {
+          setHaError('Ungueltige Antwort vom Server');
         }
+      } else {
+        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        const msg = body?.error || body?.details || `HTTP ${res.status}`;
+        console.error('loadHaEntities failed:', msg);
+        setHaError(msg);
       }
-    } catch {
-      // HA not available
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('loadHaEntities error:', msg);
+      setHaError(`Verbindung fehlgeschlagen: ${msg}`);
     } finally {
       setHaLoading(false);
     }
@@ -265,8 +289,10 @@ export const useWiresheetPages = () => {
     liveValues,
     haEntities,
     haLoading,
+    haError,
     loadHaEntities,
     saveStatus,
+    loadError,
     nodes: activePage.nodes,
     connections: activePage.connections,
     selectedNode,

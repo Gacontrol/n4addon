@@ -24,8 +24,10 @@ function App() {
     liveValues,
     haEntities,
     haLoading,
+    haError,
     loadHaEntities,
     saveStatus,
+    loadError,
     nodes,
     connections,
     selectedNode,
@@ -283,6 +285,14 @@ function App() {
         </div>
       </header>
 
+      {loadError && (
+        <div className="bg-red-950/80 border-b border-red-800/60 px-4 py-1.5 flex items-center gap-2 flex-shrink-0">
+          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+          <span className="text-xs text-red-300">{loadError}</span>
+          <button onClick={loadHaEntities} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">Erneut laden</button>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <NodePalette onNodePointerDown={handleNodePointerDown} />
 
@@ -310,6 +320,7 @@ function App() {
             onUpdateNode={updateNodeData}
             haEntities={haEntities}
             haLoading={haLoading}
+            haError={haError}
             onReloadEntities={loadHaEntities}
             liveValues={liveValues}
           />

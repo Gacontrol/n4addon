@@ -22,6 +22,7 @@ interface Device {
 interface EntityBrowserProps {
   haEntities: HAEntity[];
   haLoading: boolean;
+  haError?: string | null;
   selectedEntityId?: string;
   onSelect: (entity: HAEntity) => void;
   onReload: () => void;
@@ -74,6 +75,7 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
 export const EntityBrowser: React.FC<EntityBrowserProps> = ({
   haEntities,
   haLoading,
+  haError,
   selectedEntityId,
   onSelect,
   onReload
@@ -143,7 +145,17 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
         </button>
       </div>
 
-      {haEntities.length === 0 && !haLoading && (
+      {haError && !haLoading && (
+        <div className="rounded-lg bg-red-950/50 border border-red-800/50 px-3 py-2 mb-2">
+          <p className="text-xs text-red-400 font-semibold mb-0.5">Fehler beim Laden</p>
+          <p className="text-[10px] text-red-300/80 font-mono break-all">{haError}</p>
+          <button onClick={onReload} className="mt-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+            Erneut versuchen
+          </button>
+        </div>
+      )}
+
+      {haEntities.length === 0 && !haLoading && !haError && (
         <div className="text-center py-4 text-xs text-slate-500">
           <p>HA nicht verbunden</p>
           <button onClick={onReload} className="mt-1 text-blue-400 hover:text-blue-300 transition-colors">

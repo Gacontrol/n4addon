@@ -15,6 +15,7 @@ interface PropertiesPanelProps {
   onUpdateNode: (nodeId: string, updates: Partial<FlowNode['data']>) => void;
   haEntities: HAEntity[];
   haLoading: boolean;
+  haError?: string | null;
   onReloadEntities: () => void;
   liveValues: Record<string, unknown>;
 }
@@ -25,6 +26,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onUpdateNode,
   haEntities,
   haLoading,
+  haError,
   onReloadEntities,
   liveValues
 }) => {
@@ -126,6 +128,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <EntityBrowser
               haEntities={haEntities}
               haLoading={haLoading}
+              haError={haError}
               selectedEntityId={node.data.entityId}
               onSelect={handleEntitySelect}
               onReload={onReloadEntities}
