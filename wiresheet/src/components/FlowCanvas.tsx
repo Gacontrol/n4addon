@@ -50,6 +50,7 @@ interface FlowCanvasProps {
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
+  onModbusDatapointDrop?: (data: unknown, x: number, y: number) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -83,7 +84,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onZoomChange,
   ghostNode,
   liveValues = {},
-  onOverrideChange
+  onOverrideChange,
+  onModbusDatapointDrop
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -356,6 +358,33 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     height: Math.abs(lasso.currentY - lasso.startY) / zoom
   } : null;
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!canvasRef.current || !onModbusDatapointDrop) return;
+
+    const jsonData = e.dataTransfer.getData('application/json');
+    if (!jsonData) return;
+
+    try {
+      const data = JSON.parse(jsonData);
+      if (data.type === 'modbus-datapoint') {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const scrollLeft = canvasRef.current.scrollLeft;
+        const scrollTop = canvasRef.current.scrollTop;
+        const x = (e.clientX - rect.left + scrollLeft) / zoom - 90;
+        const y = (e.clientY - rect.top + scrollTop) / zoom - 30;
+        onModbusDatapointDrop(data, x, y);
+      }
+    } catch (err) {
+      console.error('Drop parse error:', err);
+    }
+  };
+
   return (
     <div
       id="flow-canvas"
@@ -366,6 +395,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
       onContextMenu={handleContextMenu}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       style={{
         background: '#0f172a',
         backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',

@@ -3,7 +3,8 @@ import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevi
 import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
-import { ModbusDriverConfig, ModbusDeviceBlockConfig } from './ModbusConfig';
+import { ModbusDeviceBlockConfig } from './ModbusConfig';
+import { ModbusDriverPanel } from './ModbusDriverPanel';
 
 interface HAEntity {
   entity_id: string;
@@ -21,10 +22,13 @@ interface PropertiesPanelProps {
   onReloadEntities: () => void;
   liveValues: Record<string, unknown>;
   modbusDevices?: ModbusDevice[];
+  modbusDriverEnabled?: boolean;
+  onModbusDriverEnabledChange?: (enabled: boolean) => void;
   onModbusDevicesChange?: (devices: ModbusDevice[]) => void;
-  onPlaceModbusDevice?: (device: ModbusDevice, type: 'input' | 'output') => void;
+  onModbusDatapointDragStart?: (device: ModbusDevice, datapoint: ModbusDevice['datapoints'][0], isOutput: boolean) => void;
   onPingModbusDevice?: (deviceId: string) => void;
   modbusDeviceStatus?: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>;
+  selectedModbusDatapointPath?: { deviceId: string; datapointId: string } | null;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -37,10 +41,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onReloadEntities,
   liveValues,
   modbusDevices = [],
+  modbusDriverEnabled = true,
+  onModbusDriverEnabledChange,
   onModbusDevicesChange,
-  onPlaceModbusDevice,
+  onModbusDatapointDragStart,
   onPingModbusDevice,
-  modbusDeviceStatus = {}
+  modbusDeviceStatus = {},
+  selectedModbusDatapointPath
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -1077,14 +1084,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
-        {node.type === 'modbus-driver' && onModbusDevicesChange && onPlaceModbusDevice && onPingModbusDevice && (
-          <ModbusDriverConfig
-            node={node}
+        {node.type === 'modbus-driver' && onModbusDevicesChange && onModbusDatapointDragStart && onPingModbusDevice && onModbusDriverEnabledChange && (
+          <ModbusDriverPanel
             devices={modbusDevices}
+            driverEnabled={modbusDriverEnabled}
+            onDriverEnabledChange={onModbusDriverEnabledChange}
             onDevicesChange={onModbusDevicesChange}
-            onPlaceDevice={onPlaceModbusDevice}
+            onDatapointDragStart={onModbusDatapointDragStart}
             onPingDevice={onPingModbusDevice}
             deviceStatus={modbusDeviceStatus}
+            selectedDatapointPath={selectedModbusDatapointPath}
           />
         )}
 

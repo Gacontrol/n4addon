@@ -83,11 +83,15 @@ function App() {
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const [zoom, setZoom] = useState(1);
   const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
+  const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
   const isDraggingFromPalette = useRef(false);
+  const isDraggingModbusDatapoint = useRef(false);
+  const modbusDatapointDragRef = useRef<{ device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean } | null>(null);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
   const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
   const modbusDevices: ModbusDevice[] = modbusDriverNode?.data.config?.modbusDevices || [];
+  const modbusDriverEnabled: boolean = modbusDriverNode?.data.config?.modbusDriverEnabled ?? true;
 
   const setModbusDevices = useCallback((devices: ModbusDevice[]) => {
     if (modbusDriverNode) {
@@ -100,9 +104,40 @@ function App() {
     }
   }, [modbusDriverNode, updateNodeData]);
 
+  const setModbusDriverEnabled = useCallback((enabled: boolean) => {
+    if (modbusDriverNode) {
+      updateNodeData(modbusDriverNode.id, {
+        config: {
+          ...modbusDriverNode.data.config,
+          modbusDriverEnabled: enabled
+        }
+      });
+    }
+  }, [modbusDriverNode, updateNodeData]);
+
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
   }, [activePageId, activePage.cycleMs]);
+
+  useEffect(() => {
+    if (selectedNodes.size === 1) {
+      const selectedId = Array.from(selectedNodes)[0];
+      const selectedNode = nodes.find(n => n.id === selectedId);
+      if (selectedNode && (selectedNode.type === 'modbus-device-input' || selectedNode.type === 'modbus-device-output')) {
+        const deviceId = selectedNode.data.config?.modbusDeviceId;
+        const datapointId = selectedNode.data.config?.modbusDatapointId;
+        if (deviceId && datapointId) {
+          setSelectedModbusDatapointPath({ deviceId, datapointId });
+        } else {
+          setSelectedModbusDatapointPath(null);
+        }
+      } else if (selectedNode?.type !== 'modbus-driver') {
+        setSelectedModbusDatapointPath(null);
+      }
+    } else {
+      setSelectedModbusDatapointPath(null);
+    }
+  }, [selectedNodes, nodes]);
 
   const handleNodePointerDown = useCallback((template: NodeTemplate, clientX: number, clientY: number) => {
     isDraggingFromPalette.current = true;
@@ -304,48 +339,39 @@ function App() {
     selectedNodes.has(c.source) && selectedNodes.has(c.target)
   );
 
-  const handlePlaceModbusDevice = useCallback((device: ModbusDevice, type: 'input' | 'output') => {
-    const canvas = document.getElementById('flow-canvas');
-    if (!canvas) return;
+  const handlePlaceModbusDatapoint = useCallback((
+    device: ModbusDevice,
+    datapoint: ModbusDevice['datapoints'][0],
+    isOutput: boolean,
+    x: number,
+    y: number
+  ) => {
+    const nodeType = isOutput ? 'modbus-device-output' : 'modbus-device-input';
 
-    const rect = canvas.getBoundingClientRect();
-    const scrollLeft = canvas.scrollLeft;
-    const scrollTop = canvas.scrollTop;
+    const outputs = !isOutput ? [{
+      id: 'output-0',
+      label: datapoint.name,
+      type: 'output' as const
+    }] : [];
 
-    const datapoints = type === 'input' ? device.inputDatapoints : device.outputDatapoints;
-    const nodeType = type === 'input' ? 'modbus-device-input' : 'modbus-device-output';
-    const color = type === 'input' ? '#0891b2' : '#dc2626';
-
-    const outputs = type === 'input'
-      ? (datapoints || []).map((dp, idx) => ({
-          id: `output-${idx}`,
-          label: dp.name,
-          type: 'output' as const
-        }))
-      : [];
-
-    const inputs = type === 'output'
-      ? (datapoints || []).map((dp, idx) => ({
-          id: `input-${idx}`,
-          label: dp.name,
-          type: 'input' as const
-        }))
-      : [];
+    const inputs = isOutput ? [{
+      id: 'input-0',
+      label: datapoint.name,
+      type: 'input' as const
+    }] : [];
 
     const newNode: FlowNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: nodeType,
-      position: {
-        x: (rect.width / 2 + scrollLeft) / zoom - 90,
-        y: (rect.height / 2 + scrollTop) / zoom - 40
-      },
+      position: { x, y },
       data: {
-        label: `${device.name} ${type === 'input' ? 'IN' : 'OUT'}`,
-        icon: type === 'input' ? 'ArrowDownToLine' : 'ArrowUpFromLine',
+        label: `${device.name} - ${datapoint.name}`,
+        icon: isOutput ? 'ArrowUpFromLine' : 'ArrowDownToLine',
         config: {
           modbusDeviceId: device.id,
           modbusDeviceName: device.name,
-          modbusDatapoints: datapoints
+          modbusDatapointId: datapoint.id,
+          modbusDatapoints: [datapoint]
         },
         inputs,
         outputs
@@ -354,7 +380,23 @@ function App() {
 
     addNode(newNode);
     selectNode(newNode.id);
-  }, [addNode, selectNode, zoom]);
+  }, [addNode, selectNode]);
+
+  const handleModbusDatapointDragStart = useCallback((
+    device: ModbusDevice,
+    datapoint: ModbusDevice['datapoints'][0],
+    isOutput: boolean
+  ) => {
+    isDraggingModbusDatapoint.current = true;
+    modbusDatapointDragRef.current = { device, datapoint, isOutput };
+  }, []);
+
+  const handleModbusDatapointDrop = useCallback((data: unknown, x: number, y: number) => {
+    const dropData = data as { device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean };
+    if (dropData.device && dropData.datapoint) {
+      handlePlaceModbusDatapoint(dropData.device, dropData.datapoint, dropData.isOutput, x, y);
+    }
+  }, [handlePlaceModbusDatapoint]);
 
   const handlePingModbusDevice = useCallback(async (deviceId: string) => {
     const device = modbusDevices.find(d => d.id === deviceId);
@@ -623,6 +665,7 @@ function App() {
           ghostNode={ghostNode}
           liveValues={liveValues}
           onOverrideChange={updateNodeOverride}
+          onModbusDatapointDrop={handleModbusDatapointDrop}
         />
 
         {selectedNodeData && (
@@ -636,10 +679,13 @@ function App() {
             onReloadEntities={loadHaEntities}
             liveValues={liveValues}
             modbusDevices={modbusDevices}
+            modbusDriverEnabled={modbusDriverEnabled}
+            onModbusDriverEnabledChange={setModbusDriverEnabled}
             onModbusDevicesChange={setModbusDevices}
-            onPlaceModbusDevice={handlePlaceModbusDevice}
+            onModbusDatapointDragStart={handleModbusDatapointDragStart}
             onPingModbusDevice={handlePingModbusDevice}
             modbusDeviceStatus={modbusDeviceStatus}
+            selectedModbusDatapointPath={selectedModbusDatapointPath}
           />
         )}
       </div>
