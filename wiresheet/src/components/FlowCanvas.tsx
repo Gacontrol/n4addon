@@ -142,7 +142,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [onDeleteSelected, onCopy, onPaste, onDuplicateSelected, onClearSelection, onConnectionCancel]);
 
   useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-context-menu]')) return;
+      setContextMenu(null);
+    };
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
@@ -666,6 +670,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
       {contextMenu && (
         <div
+          data-context-menu
           className="absolute bg-slate-800 border border-slate-600 rounded-lg shadow-xl py-1 z-50 min-w-40"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={e => e.stopPropagation()}
