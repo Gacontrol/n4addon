@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { FlowNode as FlowNodeType } from '../types/flow';
 import * as Icons from 'lucide-react';
 
@@ -27,22 +27,23 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  const template = node.data;
-  const IconComponent = template.icon
-    ? (Icons[template.icon as keyof typeof Icons] as React.FC<{ className?: string }>)
+  const { data } = node;
+  const IconComponent = data.icon
+    ? (Icons[data.icon as keyof typeof Icons] as React.FC<{ className?: string }>)
     : null;
 
   const getNodeColor = () => {
     if (node.type === 'ha-input') return '#3b82f6';
     if (node.type === 'ha-output') return '#f59e0b';
     if (node.type.includes('trigger')) return '#0ea5e9';
-    if (['and-gate', 'or-gate', 'not-gate', 'compare', 'delay', 'threshold'].includes(node.type)) return '#10b981';
-    return '#64748b';
+    return '#10b981';
   };
+  const nodeColor = getNodeColor();
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('.port')) return;
-    if ((e.target as HTMLElement).closest('button[data-action="delete"]')) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.node-port')) return;
+    if (target.closest('[data-action="delete"]')) return;
 
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -51,10 +52,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
     const rect = nodeRef.current?.getBoundingClientRect();
     if (rect) {
-      dragOffset.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      };
+      dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
   };
 
@@ -65,9 +63,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     const canvas = document.getElementById('flow-canvas');
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left - dragOffset.current.x;
-    const y = e.clientY - rect.top - dragOffset.current.y;
+    const canvasRect = canvas.getBoundingClientRect();
+    const x = e.clientX - canvasRect.left - dragOffset.current.x;
+    const y = e.clientY - canvasRect.top - dragOffset.current.y;
 
     onPositionChange(node.id, Math.max(0, x), Math.max(0, y));
   };
@@ -78,25 +76,19 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     setIsDragging(false);
   };
 
-  const handlePortClick = (portId: string, isOutput: boolean, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onPortClick(node.id, portId, isOutput);
-  };
-
-  const isHAInput = node.type === 'ha-input';
-  const isHAOutput = node.type === 'ha-output';
-  const nodeColor = getNodeColor();
+  const isHANode = node.type === 'ha-input' || node.type === 'ha-output';
 
   return (
     <div
       ref={nodeRef}
-      className={`absolute select-none ${isDragging ? 'opacity-90' : ''}`}
+      className="absolute select-none"
       style={{
-        left: `${node.position.x}px`,
-        top: `${node.position.y}px`,
-        zIndex: isSelected ? 20 : isDragging ? 15 : 1,
+        left: node.position.x,
+        top: node.position.y,
+        zIndex: isSelected || isDragging ? 20 : 1,
         cursor: isDragging ? 'grabbing' : 'grab',
-        touchAction: 'none'
+        touchAction: 'none',
+        minWidth: 180
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -104,29 +96,26 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
       onPointerCancel={handlePointerUp}
     >
       <div
-        className={`rounded-lg shadow-xl border-2 transition-shadow ${
-          isSelected
-            ? 'shadow-lg border-white/40'
-            : 'border-transparent hover:border-white/20'
-        }`}
+        className="rounded-lg overflow-visible"
         style={{
-          minWidth: isHAInput || isHAOutput ? '180px' : '160px',
-          background: 'rgba(30, 41, 59, 0.97)',
+          background: '#1e293b',
+          border: `2px solid ${isSelected ? nodeColor : 'rgba(255,255,255,0.1)'}`,
           boxShadow: isSelected
-            ? `0 0 0 2px ${nodeColor}80, 0 8px 32px rgba(0,0,0,0.5)`
-            : '0 4px 20px rgba(0,0,0,0.4)'
+            ? `0 0 0 1px ${nodeColor}40, 0 8px 32px rgba(0,0,0,0.5)`
+            : '0 4px 16px rgba(0,0,0,0.4)'
         }}
       >
         <div
-          className="px-3 py-2 rounded-t-md flex items-center justify-between gap-2"
+          className="px-3 py-2 rounded-t flex items-center justify-between gap-2"
           style={{ backgroundColor: nodeColor }}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             {IconComponent && <IconComponent className="w-3.5 h-3.5 text-white flex-shrink-0" />}
-            <span className="text-xs font-bold text-white truncate">{template.label}</span>
+            <span className="text-xs font-bold text-white truncate">{data.label}</span>
           </div>
           <button
             data-action="delete"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
             className="text-white/60 hover:text-white transition-colors flex-shrink-0"
           >
@@ -134,67 +123,54 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           </button>
         </div>
 
-        {(isHAInput || isHAOutput) && (
-          <div className="px-3 py-1.5 border-b border-slate-700">
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer hover:bg-slate-600 transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
+        {isHANode && (
+          <div className="px-3 py-1.5 border-b border-white/10">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 text-xs">
               <Icons.Link className="w-3 h-3 text-slate-400 flex-shrink-0" />
-              <span className="text-slate-300 truncate">
-                {template.entityId || template.entityLabel || 'Entity wählen...'}
+              <span className="text-slate-300 truncate font-mono text-[10px]">
+                {data.entityId || 'entity.id wählen...'}
               </span>
             </div>
           </div>
         )}
 
-        <div className="py-2 px-0">
-          {template.inputs.length > 0 && (
-            <div className="space-y-1.5 mb-1.5">
-              {template.inputs.map(input => (
-                <div key={input.id} className="flex items-center gap-0">
-                  <button
-                    className="port w-3 h-3 rounded-full border-2 flex-shrink-0 transition-all -ml-1.5"
-                    style={{
-                      borderColor: isConnecting && connectingFromNodeId !== node.id
-                        ? '#60a5fa'
-                        : '#475569',
-                      backgroundColor: isConnecting && connectingFromNodeId !== node.id
-                        ? '#2563eb'
-                        : '#334155',
-                      boxShadow: isConnecting && connectingFromNodeId !== node.id
-                        ? '0 0 6px #60a5fa80'
-                        : 'none'
-                    }}
-                    onClick={(e) => handlePortClick(input.id, false, e)}
-                    title={input.label}
-                  />
-                  <span className="text-xs text-slate-400 pl-2 pr-3">{input.label}</span>
-                </div>
-              ))}
+        <div className="py-2">
+          {data.inputs.map(input => (
+            <div key={input.id} className="flex items-center py-0.5">
+              <button
+                className="node-port w-3 h-3 rounded-full border-2 -ml-1.5 flex-shrink-0 transition-all"
+                style={{
+                  borderColor: isConnecting && connectingFromNodeId !== node.id ? '#60a5fa' : '#475569',
+                  backgroundColor: isConnecting && connectingFromNodeId !== node.id ? '#1d4ed8' : '#1e293b',
+                  boxShadow: isConnecting && connectingFromNodeId !== node.id ? '0 0 8px #60a5fa' : 'none',
+                  cursor: 'crosshair'
+                }}
+                data-port-id={`${node.id}-${input.id}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
+                title={input.label}
+              />
+              <span className="text-xs text-slate-400 pl-2 pr-3 leading-none">{input.label}</span>
             </div>
-          )}
+          ))}
 
-          {template.outputs.length > 0 && (
-            <div className="space-y-1.5">
-              {template.outputs.map(output => (
-                <div key={output.id} className="flex items-center justify-end gap-0">
-                  <span className="text-xs text-slate-400 pl-3 pr-2">{output.label}</span>
-                  <button
-                    className="port w-3 h-3 rounded-full border-2 flex-shrink-0 transition-all -mr-1.5"
-                    style={{
-                      borderColor: '#475569',
-                      backgroundColor: '#334155',
-                      cursor: isConnecting ? 'default' : 'crosshair'
-                    }}
-                    onClick={(e) => handlePortClick(output.id, true, e)}
-                    title={output.label}
-                  />
-                </div>
-              ))}
+          {data.outputs.map(output => (
+            <div key={output.id} className="flex items-center justify-end py-0.5">
+              <span className="text-xs text-slate-400 pl-3 pr-2 leading-none">{output.label}</span>
+              <button
+                className="node-port w-3 h-3 rounded-full border-2 -mr-1.5 flex-shrink-0 transition-all"
+                style={{
+                  borderColor: '#475569',
+                  backgroundColor: '#1e293b',
+                  cursor: 'crosshair'
+                }}
+                data-port-id={`${node.id}-${output.id}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
+                title={output.label}
+              />
             </div>
-          )}
+          ))}
         </div>
       </div>
     </div>

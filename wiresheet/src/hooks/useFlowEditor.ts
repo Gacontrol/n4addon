@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { FlowNode, Connection, Position } from '../types/flow';
+import { FlowNode, Connection } from '../types/flow';
 
 export const useFlowEditor = () => {
   const [nodes, setNodes] = useState<FlowNode[]>([]);
@@ -11,10 +11,10 @@ export const useFlowEditor = () => {
     setNodes(prev => [...prev, node]);
   }, []);
 
-  const updateNodePosition = useCallback((nodeId: string, position: Position) => {
+  const updateNodePosition = useCallback((nodeId: string, x: number, y: number) => {
     setNodes(prev =>
       prev.map(node =>
-        node.id === nodeId ? { ...node, position } : node
+        node.id === nodeId ? { ...node, position: { x, y } } : node
       )
     );
   }, []);

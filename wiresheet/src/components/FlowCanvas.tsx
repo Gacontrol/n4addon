@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection } from '../types/flow';
@@ -34,65 +34,33 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if ((connectingFrom || ghostNode) && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        setMousePos({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        });
-      }
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    return () => document.removeEventListener('mousemove', handleMouseMove);
-  }, [connectingFrom, ghostNode]);
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
-      if ((connectingFrom || ghostNode) && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        setMousePos({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        });
-      }
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
-
     document.addEventListener('pointermove', handlePointerMove);
     return () => document.removeEventListener('pointermove', handlePointerMove);
-  }, [connectingFrom, ghostNode]);
+  }, []);
 
-  const getPortPosition = (nodeId: string, portId: string, isOutput: boolean) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return { x: 0, y: 0 };
+  useEffect(() => {
+    forceUpdate(n => n + 1);
+  }, [nodes]);
 
-    const portEl = document.querySelector(`[data-port-id="${nodeId}-${portId}"]`);
-    if (portEl && canvasRef.current) {
-      const portRect = portEl.getBoundingClientRect();
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      return {
-        x: portRect.left - canvasRect.left + portRect.width / 2,
-        y: portRect.top - canvasRect.top + portRect.height / 2
-      };
-    }
-
-    const portIndex = isOutput
-      ? node.data.outputs.findIndex(p => p.id === portId)
-      : node.data.inputs.findIndex(p => p.id === portId);
-
-    const headerH = 30;
-    const entityH = node.type === 'ha-input' || node.type === 'ha-output' ? 32 : 0;
-    const paddingTop = 8;
-    const rowHeight = 22;
-
+  const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
+    if (!canvasRef.current) return null;
+    const el = canvasRef.current.querySelector(`[data-port-id="${nodeId}-${portId}"]`);
+    if (!el) return null;
+    const portRect = el.getBoundingClientRect();
+    const canvasRect = canvasRef.current.getBoundingClientRect();
     return {
-      x: node.position.x + (isOutput ? 160 : 0),
-      y: node.position.y + headerH + entityH + paddingTop + portIndex * rowHeight + 6
+      x: portRect.left - canvasRect.left + portRect.width / 2,
+      y: portRect.top - canvasRect.top + portRect.height / 2
     };
-  };
+  }, []);
 
   const handlePortClick = (nodeId: string, portId: string, isOutput: boolean) => {
     if (isOutput) {
@@ -108,75 +76,69 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   };
 
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget || (e.target as HTMLElement).id === 'flow-canvas') {
+  const handleCanvasPointerDown = (e: React.PointerEvent) => {
+    const target = e.target as HTMLElement;
+    if (target === e.currentTarget || target.id === 'flow-canvas' || target.closest('#canvas-bg')) {
       onCanvasClick();
-      if (connectingFrom) {
-        onConnectionCancel();
-      }
+      if (connectingFrom) onConnectionCancel();
     }
   };
+
+  const connectingFromPos = connectingFrom
+    ? getPortCenter(connectingFrom.nodeId, connectingFrom.portId)
+    : null;
 
   return (
     <div
       id="flow-canvas"
       ref={canvasRef}
       className="flex-1 relative overflow-hidden"
-      onClick={handleCanvasClick}
+      onPointerDown={handleCanvasPointerDown}
       style={{
         background: '#0f172a',
-        backgroundImage: `
-          radial-gradient(circle, #1e293b 1px, transparent 1px)
-        `,
+        backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
         backgroundSize: '24px 24px'
       }}
     >
       <svg
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 0 }}
+        id="canvas-bg"
+        className="absolute inset-0 w-full h-full"
+        style={{ zIndex: 0, pointerEvents: 'none' }}
       >
         <defs>
-          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill="#10b981" opacity="0.8" />
           </marker>
-          <marker id="arrowhead-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#60a5fa" opacity="0.9" />
+          <marker id="arr-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#60a5fa" />
           </marker>
         </defs>
 
         {connections.map(conn => {
-          const sourceNode = nodes.find(n => n.id === conn.source);
-          const targetNode = nodes.find(n => n.id === conn.target);
-          if (!sourceNode || !targetNode) return null;
-
-          const start = getPortPosition(conn.source, conn.sourcePort, true);
-          const end = getPortPosition(conn.target, conn.targetPort, false);
-
+          const start = getPortCenter(conn.source, conn.sourcePort);
+          const end = getPortCenter(conn.target, conn.targetPort);
+          if (!start || !end) return null;
           return (
             <ConnectionLine
               key={conn.id}
-              x1={start.x}
-              y1={start.y}
-              x2={end.x}
-              y2={end.y}
+              x1={start.x} y1={start.y}
+              x2={end.x} y2={end.y}
               color="#10b981"
             />
           );
         })}
 
-        {connectingFrom && (
+        {connectingFrom && connectingFromPos && (
           <ConnectionLine
-            x1={getPortPosition(connectingFrom.nodeId, connectingFrom.portId, true).x}
-            y1={getPortPosition(connectingFrom.nodeId, connectingFrom.portId, true).y}
-            x2={mousePos.x}
-            y2={mousePos.y}
+            x1={connectingFromPos.x} y1={connectingFromPos.y}
+            x2={mousePos.x} y2={mousePos.y}
             color="#60a5fa"
             isActive
           />
         )}
       </svg>
 
-      <div className="relative" style={{ zIndex: 1 }}>
+      <div className="absolute inset-0" style={{ zIndex: 1 }}>
         {nodes.map(node => (
           <FlowNode
             key={node.id}
@@ -201,8 +163,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           <div
             className="absolute pointer-events-none rounded-lg px-3 py-2 text-xs text-white font-medium"
             style={{
-              left: cx,
-              top: cy,
+              left: cx, top: cy,
               background: '#1e293b',
               border: `2px dashed ${isOver ? '#60a5fa' : '#475569'}`,
               opacity: isOver ? 0.85 : 0.4,
@@ -217,16 +178,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       })()}
 
       {connectingFrom && (
-        <div className="absolute top-3 left-1/2 transform -translate-x-1/2 bg-blue-600/90 text-white px-4 py-1.5 rounded-full shadow-lg z-50 pointer-events-none">
-          <p className="text-xs font-medium">Eingangs-Port auswählen</p>
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-blue-600/90 text-white px-4 py-1.5 rounded-full text-xs font-medium pointer-events-none" style={{ zIndex: 60 }}>
+          Eingangs-Port auswählen — Klick auf Canvas zum Abbrechen
         </div>
       )}
 
-      {nodes.length === 0 && (
+      {nodes.length === 0 && !ghostNode && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center">
-            <div className="text-slate-600 text-5xl mb-3">⬡</div>
-            <p className="text-slate-500 text-sm">Bausteine aus der linken Palette hierher ziehen</p>
+          <div className="text-center opacity-40">
+            <p className="text-slate-400 text-sm">Bausteine aus der Palette links hierher ziehen</p>
           </div>
         </div>
       )}
