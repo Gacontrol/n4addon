@@ -81,40 +81,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
       setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
 
-    const handleGlobalPointerUp = (e: PointerEvent) => {
-      if (!connectingFrom || !canvasRef.current) return;
-      const target = e.target as HTMLElement;
-      const portEl = target.closest('[data-port-id]');
-      if (portEl) {
-        const portId = portEl.getAttribute('data-port-id');
-        if (portId) {
-          const parts = portId.split('-');
-          const nodeId = parts[0];
-          const inputId = parts.slice(1).join('-');
-          const targetNode = nodes.find(n => n.id === nodeId);
-          if (targetNode) {
-            const isInputPort = targetNode.data.inputs.some(inp => inp.id === inputId);
-            if (isInputPort && nodeId !== connectingFrom.nodeId) {
-              onConnectionEnd(nodeId, inputId);
-            }
-          }
-        }
-      }
-    };
-
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handleGlobalPointerUp);
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handleGlobalPointerUp);
-    };
-  }, [connectingFrom, nodes, onConnectionEnd]);
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   useEffect(() => {
     forceUpdate(n => n + 1);
@@ -180,7 +155,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     if (e.button === 2) return;
     const target = e.target as HTMLElement;
     const isOnNode = target.closest('[data-node-id]');
-    const isOnPort = target.closest('[data-port-id]') || target.closest('.node-port');
+    const isOnPort = target.closest('.port') || target.closest('.node-port');
 
     if (isOnPort) {
       return;
@@ -192,6 +167,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       }
 
       if (connectingFrom) {
+        onConnectionCancel();
         return;
       }
 
@@ -228,7 +204,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   };
 
-  const handleCanvasPointerUp = (e: React.PointerEvent) => {
+  const handleCanvasPointerUp = () => {
     if (lasso) {
       const minX = Math.min(lasso.startX, lasso.currentX);
       const maxX = Math.max(lasso.startX, lasso.currentX);
@@ -255,26 +231,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       setIsDraggingMultiple(false);
       dragStartPositions.current.clear();
       dragStartMouse.current = null;
-    }
-
-    if (connectingFrom) {
-      const target = e.target as HTMLElement;
-      const portEl = target.closest('[data-port-id]');
-      if (portEl) {
-        const portId = portEl.getAttribute('data-port-id');
-        if (portId) {
-          const [nodeId, ...rest] = portId.split('-');
-          const inputId = rest.join('-');
-          const targetNode = nodes.find(n => n.id === nodeId);
-          if (targetNode) {
-            const isInputPort = targetNode.data.inputs.some(inp => inp.id === inputId);
-            if (isInputPort && nodeId !== connectingFrom.nodeId) {
-              onConnectionEnd(nodeId, inputId);
-              return;
-            }
-          }
-        }
-      }
     }
   };
 
