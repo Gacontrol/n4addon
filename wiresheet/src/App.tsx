@@ -82,10 +82,23 @@ function App() {
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [modbusDevices, setModbusDevices] = useState<ModbusDevice[]>([]);
   const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
   const isDraggingFromPalette = useRef(false);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
+
+  const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
+  const modbusDevices: ModbusDevice[] = modbusDriverNode?.data.config?.modbusDevices || [];
+
+  const setModbusDevices = useCallback((devices: ModbusDevice[]) => {
+    if (modbusDriverNode) {
+      updateNodeData(modbusDriverNode.id, {
+        config: {
+          ...modbusDriverNode.data.config,
+          modbusDevices: devices
+        }
+      });
+    }
+  }, [modbusDriverNode, updateNodeData]);
 
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));

@@ -98,7 +98,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      const scrollLeft = canvasRef.current.scrollLeft;
+      const scrollTop = canvasRef.current.scrollTop;
+      setMousePos({
+        x: e.clientX - rect.left + scrollLeft,
+        y: e.clientY - rect.top + scrollTop
+      });
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -386,13 +391,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       )}
       <svg
         id="canvas-bg"
-        className="absolute inset-0 origin-top-left"
+        className="origin-top-left"
         style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
           zIndex: 10,
           pointerEvents: 'none',
           transform: `scale(${zoom})`,
-          width: `${100 / zoom}%`,
-          height: `${100 / zoom}%`
+          transformOrigin: '0 0',
+          width: '5000px',
+          height: '5000px',
+          minWidth: `${100 / zoom}%`,
+          minHeight: `${100 / zoom}%`
         }}
       >
         <defs>
@@ -453,12 +464,18 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       </svg>
 
       <div
-        className="absolute inset-0 origin-top-left"
+        className="origin-top-left"
         style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
           zIndex: 5,
           transform: `scale(${zoom})`,
-          width: `${100 / zoom}%`,
-          height: `${100 / zoom}%`
+          transformOrigin: '0 0',
+          width: '5000px',
+          height: '5000px',
+          minWidth: `${100 / zoom}%`,
+          minHeight: `${100 / zoom}%`
         }}
       >
         {nodes

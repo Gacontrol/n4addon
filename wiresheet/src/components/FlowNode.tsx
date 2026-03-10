@@ -177,17 +177,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     e.stopPropagation();
 
     if (isDPNode) {
-      const canvas = document.getElementById('flow-canvas');
-      if (canvas) {
-        const canvasRect = canvas.getBoundingClientRect();
-        const scrollLeft = canvas.scrollLeft;
-        const scrollTop = canvas.scrollTop;
-        const x = canvasRect.left + (node.position.x + 190) * zoom - scrollLeft;
-        const y = canvasRect.top + node.position.y * zoom - scrollTop;
-        setDpContextMenu({ x, y });
-      } else {
-        setDpContextMenu({ x: e.clientX, y: e.clientY });
-      }
+      setDpContextMenu({ x: e.clientX, y: e.clientY });
       const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
       setOverrideInput(currentVal);
     } else {
@@ -591,17 +581,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => {
                     e.stopPropagation();
-                    const canvas = document.getElementById('flow-canvas');
-                    if (canvas) {
-                      const canvasRect = canvas.getBoundingClientRect();
-                      const scrollLeft = canvas.scrollLeft;
-                      const scrollTop = canvas.scrollTop;
-                      const x = canvasRect.left + (node.position.x + 190) * zoom - scrollLeft;
-                      const y = canvasRect.top + node.position.y * zoom - scrollTop;
-                      setDpContextMenu({ x, y });
-                      const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
-                      setOverrideInput(currentVal);
-                    }
+                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                    setDpContextMenu({ x: rect.right + 5, y: rect.top });
+                    const currentVal = data.override?.manual ? String(data.override.value ?? '') : String(liveValues[node.id] ?? '');
+                    setOverrideInput(currentVal);
                   }}
                   className="text-white/60 hover:text-white transition-colors"
                   title="Manuell / Auto"
