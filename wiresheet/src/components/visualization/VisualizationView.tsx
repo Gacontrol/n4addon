@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Edit3, Eye, Grid, Plus, Trash2, Settings } from 'lucide-react';
+import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { VisuCanvas } from './VisuCanvas';
