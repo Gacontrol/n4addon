@@ -17,6 +17,6 @@ COPY dist ./dist
 COPY server ./server
 COPY rootfs /
 
-RUN chmod a+x /run.sh
+RUN chmod +x /run.sh
 
 CMD [ "/run.sh" ]

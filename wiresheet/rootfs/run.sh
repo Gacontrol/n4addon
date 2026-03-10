@@ -1,16 +1,15 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/env bashio
 
-bashio::log.info "Starte Wiresheet Flow Editor..."
+echo "Starte Wiresheet Flow Editor..."
 
 CONFIG_PATH=/data/options.json
-LOG_LEVEL=$(bashio::config 'log_level')
 
-bashio::log.info "Log Level: ${LOG_LEVEL}"
+echo "Konfiguration geladen"
 
 cd /app
 
-bashio::log.info "Starte Node.js Server..."
+echo "Starte Node.js Server..."
 node server/index.js &
 
-bashio::log.info "Starte Nginx..."
+echo "Starte Nginx..."
 exec nginx -g "daemon off;"
