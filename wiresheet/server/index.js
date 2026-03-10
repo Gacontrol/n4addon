@@ -1,5 +1,6 @@
 const express = require('express');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
 
@@ -42,11 +43,22 @@ async function findWritableDataDir() {
 }
 
 function getToken() {
-  return process.env.SUPERVISOR_TOKEN || null;
+  if (process.env.SUPERVISOR_TOKEN) {
+    return process.env.SUPERVISOR_TOKEN;
+  }
+  if (process.env.HASSIO_TOKEN) {
+    return process.env.HASSIO_TOKEN;
+  }
+  try {
+    if (fsSync.existsSync('/run/secrets/supervisor_token')) {
+      return fsSync.readFileSync('/run/secrets/supervisor_token', 'utf8').trim();
+    }
+  } catch {}
+  return null;
 }
 
 function getHaBaseUrl() {
-  if (process.env.SUPERVISOR_TOKEN) {
+  if (getToken()) {
     return 'http://supervisor/core/api';
   }
   return null;
@@ -276,7 +288,23 @@ async function start() {
     pagesFile = path.join(dataDir, 'pages.json');
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
-    console.log(`SUPERVISOR_TOKEN: ${getToken() ? 'vorhanden' : 'FEHLT'}`);
+
+    const token = getToken();
+    console.log(`SUPERVISOR_TOKEN env: ${process.env.SUPERVISOR_TOKEN ? 'ja' : 'nein'}`);
+    console.log(`HASSIO_TOKEN env: ${process.env.HASSIO_TOKEN ? 'ja' : 'nein'}`);
+    console.log(`Token gefunden: ${token ? 'ja' : 'NEIN'}`);
+
+    if (token) {
+      try {
+        const testRes = await axios.get('http://supervisor/core/api/config', {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        });
+        console.log(`HA Verbindung OK - Version: ${testRes.data?.version || 'unbekannt'}`);
+      } catch (err) {
+        console.error(`HA Verbindungstest fehlgeschlagen: ${err.message}`);
+      }
+    }
 
     app.listen(PORT, () => {
       console.log(`Wiresheet API Server auf Port ${PORT}`);
