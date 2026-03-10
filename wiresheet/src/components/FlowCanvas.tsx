@@ -95,11 +95,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
-  const connectingFromRef = useRef(connectingFrom);
-
-  useEffect(() => {
-    connectingFromRef.current = connectingFrom;
-  }, [connectingFrom]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -190,21 +185,18 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [zoom]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
-    const cf = connectingFromRef.current;
-    if (!cf) {
+    if (!connectingFrom) {
       if (isOutput) {
         onConnectionStart(nodeId, portId);
-      } else {
-        // clicking input port with no active connection: do nothing
       }
     } else {
-      if (cf.nodeId !== nodeId) {
+      if (connectingFrom.nodeId !== nodeId) {
         onConnectionEnd(nodeId, portId);
       } else {
         onConnectionCancel();
       }
     }
-  }, [onConnectionStart, onConnectionEnd, onConnectionCancel]);
+  }, [connectingFrom, onConnectionStart, onConnectionEnd, onConnectionCancel]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return;
@@ -217,11 +209,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     if (!isOnNode) {
-      if (!e.shiftKey && !connectingFromRef.current) {
+      if (!e.shiftKey && !connectingFrom) {
         onClearSelection();
       }
 
-      if (connectingFromRef.current) {
+      if (connectingFrom) {
         onConnectionCancel();
         return;
       }
