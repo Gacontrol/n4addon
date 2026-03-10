@@ -43,6 +43,189 @@ const dataTypes = [
   { value: 'float32', label: 'Float32' }
 ];
 
+interface DatapointEditFormProps {
+  deviceId: string;
+  datapoint: ModbusDatapoint;
+  registerTypes: { value: string; label: string; desc: string }[];
+  dataTypes: { value: string; label: string }[];
+  onUpdate: (deviceId: string, dpId: string, updates: Partial<ModbusDatapoint>) => void;
+}
+
+const DatapointEditForm: React.FC<DatapointEditFormProps> = ({
+  deviceId,
+  datapoint,
+  registerTypes,
+  dataTypes,
+  onUpdate
+}) => {
+  const [localName, setLocalName] = useState(datapoint.name);
+  const [localUnit, setLocalUnit] = useState(datapoint.unit || '');
+  const [localAddress, setLocalAddress] = useState(String(datapoint.address));
+  const [localBitIndex, setLocalBitIndex] = useState(String(datapoint.bitIndex ?? -1));
+  const [localScale, setLocalScale] = useState(String(datapoint.scale || 1));
+  const [localOffset, setLocalOffset] = useState(String(datapoint.offset || 0));
+
+  React.useEffect(() => {
+    setLocalName(datapoint.name);
+    setLocalUnit(datapoint.unit || '');
+    setLocalAddress(String(datapoint.address));
+    setLocalBitIndex(String(datapoint.bitIndex ?? -1));
+    setLocalScale(String(datapoint.scale || 1));
+    setLocalOffset(String(datapoint.offset || 0));
+  }, [datapoint.id]);
+
+  const handleNameBlur = () => {
+    if (localName !== datapoint.name) {
+      onUpdate(deviceId, datapoint.id, { name: localName });
+    }
+  };
+
+  const handleUnitBlur = () => {
+    if (localUnit !== (datapoint.unit || '')) {
+      onUpdate(deviceId, datapoint.id, { unit: localUnit });
+    }
+  };
+
+  const handleAddressBlur = () => {
+    const val = parseInt(localAddress) || 0;
+    if (val !== datapoint.address) {
+      onUpdate(deviceId, datapoint.id, { address: val });
+    }
+  };
+
+  const handleBitIndexBlur = () => {
+    const val = parseInt(localBitIndex);
+    const newBitIndex = val >= 0 ? val : undefined;
+    if (newBitIndex !== datapoint.bitIndex) {
+      onUpdate(deviceId, datapoint.id, { bitIndex: newBitIndex });
+    }
+  };
+
+  const handleScaleBlur = () => {
+    const val = parseFloat(localScale) || 1;
+    if (val !== datapoint.scale) {
+      onUpdate(deviceId, datapoint.id, { scale: val });
+    }
+  };
+
+  const handleOffsetBlur = () => {
+    const val = parseFloat(localOffset) || 0;
+    if (val !== datapoint.offset) {
+      onUpdate(deviceId, datapoint.id, { offset: val });
+    }
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Name</label>
+          <input
+            type="text"
+            value={localName}
+            onChange={e => setLocalName(e.target.value)}
+            onBlur={handleNameBlur}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Einheit</label>
+          <input
+            type="text"
+            value={localUnit}
+            onChange={e => setLocalUnit(e.target.value)}
+            onBlur={handleUnitBlur}
+            placeholder="z.B. degC, %"
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] text-slate-400 mb-1">Register-Typ</label>
+        <select
+          value={datapoint.registerType}
+          onChange={e => onUpdate(deviceId, datapoint.id, { registerType: e.target.value as ModbusDatapoint['registerType'] })}
+          className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+        >
+          {registerTypes.map(rt => (
+            <option key={rt.value} value={rt.value}>{rt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Register-Adresse</label>
+          <input
+            type="number"
+            min={0}
+            value={localAddress}
+            onChange={e => setLocalAddress(e.target.value)}
+            onBlur={handleAddressBlur}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white font-mono outline-none focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Datentyp</label>
+          <select
+            value={datapoint.dataType}
+            onChange={e => onUpdate(deviceId, datapoint.id, { dataType: e.target.value as ModbusDatapoint['dataType'] })}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+          >
+            {dataTypes.map(dt => (
+              <option key={dt.value} value={dt.value}>{dt.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {(datapoint.registerType === 'holding' || datapoint.registerType === 'input') && (
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Bit-Index (optional, fuer Digital I/O)</label>
+          <input
+            type="number"
+            min={-1}
+            max={15}
+            value={localBitIndex}
+            onChange={e => setLocalBitIndex(e.target.value)}
+            onBlur={handleBitIndexBlur}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white font-mono outline-none focus:border-blue-500"
+          />
+          <p className="text-[9px] text-slate-500 mt-1">-1 = kein Bit-Zugriff, 0-15 = Bit-Position im Register</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Skalierung (Faktor)</label>
+          <input
+            type="number"
+            step="0.001"
+            value={localScale}
+            onChange={e => setLocalScale(e.target.value)}
+            onBlur={handleScaleBlur}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+          />
+          <p className="text-[9px] text-slate-500 mt-0.5">Wert = Register * Faktor</p>
+        </div>
+        <div>
+          <label className="block text-[10px] text-slate-400 mb-1">Offset</label>
+          <input
+            type="number"
+            step="0.1"
+            value={localOffset}
+            onChange={e => setLocalOffset(e.target.value)}
+            onBlur={handleOffsetBlur}
+            className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
+          />
+          <p className="text-[9px] text-slate-500 mt-0.5">Wert = (Register * Faktor) + Offset</p>
+        </div>
+      </div>
+    </>
+  );
+};
+
 export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
   devices,
   driverEnabled,
@@ -574,110 +757,13 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
           </div>
 
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={currentDatapoint.name}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { name: e.target.value })}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Einheit</label>
-                <input
-                  type="text"
-                  value={currentDatapoint.unit || ''}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { unit: e.target.value })}
-                  placeholder="z.B. degC, %"
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Register-Typ</label>
-              <select
-                value={currentDatapoint.registerType}
-                onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { registerType: e.target.value as ModbusDatapoint['registerType'] })}
-                className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-              >
-                {registerTypes.map(rt => (
-                  <option key={rt.value} value={rt.value}>{rt.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Register-Adresse</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={currentDatapoint.address}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { address: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white font-mono outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Datentyp</label>
-                <select
-                  value={currentDatapoint.dataType}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { dataType: e.target.value as ModbusDatapoint['dataType'] })}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-                >
-                  {dataTypes.map(dt => (
-                    <option key={dt.value} value={dt.value}>{dt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {(currentDatapoint.registerType === 'holding' || currentDatapoint.registerType === 'input') && (
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Bit-Index (optional, fuer Digital I/O)</label>
-                <input
-                  type="number"
-                  min={-1}
-                  max={15}
-                  value={currentDatapoint.bitIndex ?? -1}
-                  onChange={e => {
-                    const val = parseInt(e.target.value);
-                    updateDatapoint(currentDevice.id, currentDatapoint.id, {
-                      bitIndex: val >= 0 ? val : undefined
-                    });
-                  }}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white font-mono outline-none focus:border-blue-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-1">-1 = kein Bit-Zugriff, 0-15 = Bit-Position im Register</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Skalierung (Faktor)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={currentDatapoint.scale || 1}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { scale: parseFloat(e.target.value) || 1 })}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-0.5">Wert = Register * Faktor</p>
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Offset</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={currentDatapoint.offset || 0}
-                  onChange={e => updateDatapoint(currentDevice.id, currentDatapoint.id, { offset: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-0.5">Wert = (Register * Faktor) + Offset</p>
-              </div>
-            </div>
+            <DatapointEditForm
+              deviceId={currentDevice.id}
+              datapoint={currentDatapoint}
+              registerTypes={registerTypes}
+              dataTypes={dataTypes}
+              onUpdate={updateDatapoint}
+            />
           </div>
         </div>
 

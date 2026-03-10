@@ -258,6 +258,20 @@ function App() {
     };
   }, [addNode, selectNode, nodes, updateNodeData]);
 
+  const handleNodeSelectWithModbusRedirect = useCallback((nodeId: string, addToSelection?: boolean) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node && (node.type === 'modbus-device-input' || node.type === 'modbus-device-output')) {
+      const deviceId = node.data.config?.modbusDeviceId;
+      const datapointId = node.data.config?.modbusDatapointId;
+      if (modbusDriverNode && deviceId && datapointId) {
+        selectNode(modbusDriverNode.id, addToSelection);
+        setSelectedModbusDatapointPath({ deviceId, datapointId });
+        return;
+      }
+    }
+    selectNode(nodeId, addToSelection);
+  }, [nodes, modbusDriverNode, selectNode]);
+
   const selectedNodeData = selectedNodes.size === 1
     ? nodes.find(n => selectedNodes.has(n.id)) || null
     : null;
@@ -644,7 +658,7 @@ function App() {
           clipboard={clipboard}
           onNodePositionChange={updateNodePosition}
           onMultipleNodePositionsChange={updateMultipleNodePositions}
-          onNodeSelect={selectNode}
+          onNodeSelect={handleNodeSelectWithModbusRedirect}
           onNodesSelect={selectNodes}
           onNodeDelete={deleteNode}
           onConnectionStart={startConnection}
