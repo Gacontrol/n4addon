@@ -5,8 +5,15 @@ const axios = require('axios');
 
 const app = express();
 const PORT = 8100;
-const DATA_DIR = '/data/wiresheet';
-const PAGES_FILE = path.join(DATA_DIR, 'pages.json');
+
+const DATA_PATHS = [
+  '/data/wiresheet',
+  '/config/wiresheet',
+  path.join(__dirname, '../data')
+];
+
+let dataDir = DATA_PATHS[0];
+let pagesFile = path.join(dataDir, 'pages.json');
 
 app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
@@ -17,70 +24,111 @@ app.use((req, res, next) => {
   next();
 });
 
-async function ensureDataDir() {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.error('Fehler beim Erstellen des Data-Verzeichnisses:', err);
+async function findWritableDataDir() {
+  for (const dir of DATA_PATHS) {
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      const testFile = path.join(dir, '.write-test');
+      await fs.writeFile(testFile, 'test');
+      await fs.unlink(testFile);
+      console.log(`Nutze Data-Verzeichnis: ${dir}`);
+      return dir;
+    } catch (err) {
+      console.log(`Verzeichnis ${dir} nicht schreibbar:`, err.message);
+    }
   }
+  throw new Error('Kein schreibbares Data-Verzeichnis gefunden');
 }
 
 function getToken() {
   return process.env.SUPERVISOR_TOKEN || null;
 }
 
-async function haGet(path) {
+function getHaBaseUrl() {
+  if (process.env.SUPERVISOR_TOKEN) {
+    return 'http://supervisor/core/api';
+  }
+  return null;
+}
+
+async function haGet(apiPath) {
   const token = getToken();
-  if (!token) throw new Error('Kein SUPERVISOR_TOKEN');
-  const response = await axios.get(`http://supervisor/core/api${path}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const baseUrl = getHaBaseUrl();
+  if (!token || !baseUrl) {
+    throw new Error('Kein SUPERVISOR_TOKEN - laeuft das Addon in Home Assistant?');
+  }
+  const response = await axios.get(`${baseUrl}${apiPath}`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    timeout: 10000
   });
   return response.data;
 }
 
-async function haPost(path, body) {
+async function haPost(apiPath, body) {
   const token = getToken();
-  if (!token) throw new Error('Kein SUPERVISOR_TOKEN');
-  const response = await axios.post(`http://supervisor/core/api${path}`, body, {
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const baseUrl = getHaBaseUrl();
+  if (!token || !baseUrl) {
+    throw new Error('Kein SUPERVISOR_TOKEN - laeuft das Addon in Home Assistant?');
+  }
+  const response = await axios.post(`${baseUrl}${apiPath}`, body, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    timeout: 10000
   });
   return response.data;
 }
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    dataDir,
+    haConnected: !!getToken(),
+    supervisorToken: getToken() ? 'vorhanden' : 'fehlt'
+  });
+});
 
 app.get(['/pages', '/api/pages'], async (req, res) => {
   try {
-    const data = await fs.readFile(PAGES_FILE, 'utf-8');
-    res.json(JSON.parse(data));
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    console.log(`Geladen: ${pages.length} Seiten aus ${pagesFile}`);
+    res.json(pages);
   } catch (err) {
     if (err.code === 'ENOENT') {
+      console.log('Keine Seiten-Datei gefunden, verwende Standard');
       const defaultPages = [
         { id: 'page-1', name: 'Seite 1', cycleMs: 1000, running: false, nodes: [], connections: [] }
       ];
       res.json(defaultPages);
     } else {
-      res.status(500).json({ error: 'Fehler beim Laden der Seiten' });
+      console.error('Fehler beim Laden:', err);
+      res.status(500).json({ error: 'Fehler beim Laden der Seiten', details: err.message });
     }
   }
 });
 
 app.post(['/pages', '/api/pages'], async (req, res) => {
   try {
-    await ensureDataDir();
-    await fs.writeFile(PAGES_FILE, JSON.stringify(req.body, null, 2));
-    res.json({ success: true });
+    const pages = req.body;
+    if (!Array.isArray(pages)) {
+      return res.status(400).json({ error: 'Ungueltige Daten - Array erwartet' });
+    }
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+    console.log(`Gespeichert: ${pages.length} Seiten nach ${pagesFile}`);
+    res.json({ success: true, saved: pages.length });
   } catch (err) {
-    console.error('Fehler beim Speichern der Seiten:', err);
-    res.status(500).json({ error: 'Fehler beim Speichern der Seiten' });
+    console.error('Fehler beim Speichern:', err);
+    res.status(500).json({ error: 'Fehler beim Speichern der Seiten', details: err.message });
   }
 });
 
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
   try {
     const data = await haGet('/states');
+    console.log(`HA States geladen: ${data.length} Entities`);
     res.json(data);
   } catch (err) {
     console.error('Fehler beim Abrufen der HA States:', err.message);
-    res.status(503).json({ error: 'Home Assistant nicht erreichbar', details: err.message });
+    res.status(503).json({ error: err.message });
   }
 });
 
@@ -163,6 +211,8 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
 
       if (manualOverrides[nodeId] !== undefined) {
         nodeValues[nodeId] = manualOverrides[nodeId];
+      } else if (node.type === 'ha-input') {
+        // already loaded above
       } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
         nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
       } else if (node.type === 'and-gate') {
@@ -205,6 +255,7 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
             }
             nodeValues[nodeId] = val;
           } catch (e) {
+            console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
             nodeValues[nodeId] = null;
           }
         }
@@ -219,10 +270,20 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
 });
 
 async function start() {
-  await ensureDataDir();
-  app.listen(PORT, () => {
-    console.log(`Wiresheet API Server auf Port ${PORT}`);
-  });
+  try {
+    dataDir = await findWritableDataDir();
+    pagesFile = path.join(dataDir, 'pages.json');
+    console.log(`Data-Verzeichnis: ${dataDir}`);
+    console.log(`Pages-Datei: ${pagesFile}`);
+    console.log(`SUPERVISOR_TOKEN: ${getToken() ? 'vorhanden' : 'FEHLT'}`);
+
+    app.listen(PORT, () => {
+      console.log(`Wiresheet API Server auf Port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Start fehlgeschlagen:', err);
+    process.exit(1);
+  }
 }
 
 start().catch(console.error);

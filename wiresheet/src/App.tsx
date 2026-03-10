@@ -28,6 +28,7 @@ function App() {
     loadHaEntities,
     saveStatus,
     loadError,
+    loadPages,
     nodes,
     connections,
     selectedNode,
@@ -289,7 +290,7 @@ function App() {
         <div className="bg-red-950/80 border-b border-red-800/60 px-4 py-1.5 flex items-center gap-2 flex-shrink-0">
           <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
           <span className="text-xs text-red-300">{loadError}</span>
-          <button onClick={loadHaEntities} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">Erneut laden</button>
+          <button onClick={() => { loadPages(); loadHaEntities(); }} className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors">Erneut laden</button>
         </div>
       )}
 
@@ -333,11 +334,19 @@ function App() {
             {nodes.length} Knoten &middot; {connections.length} Verbindungen
             {activePage.running && (
               <span className="ml-2 text-emerald-400 font-medium">
-                Läuft ({activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`} Zyklus)
+                Laeuft ({activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`} Zyklus)
               </span>
             )}
           </span>
-          <span>{activePage.name}</span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <span className={`w-1.5 h-1.5 rounded-full ${haEntities.length > 0 ? 'bg-emerald-400' : haError ? 'bg-red-400' : 'bg-amber-400'}`} />
+              <span className={haEntities.length > 0 ? 'text-emerald-400' : haError ? 'text-red-400' : 'text-amber-400'}>
+                {haEntities.length > 0 ? `HA: ${haEntities.length}` : haError ? 'HA: Fehler' : 'HA: ...'}
+              </span>
+            </span>
+            <span>{activePage.name}</span>
+          </span>
         </div>
       </div>
     </div>

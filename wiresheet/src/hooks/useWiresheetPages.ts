@@ -293,6 +293,7 @@ export const useWiresheetPages = () => {
     loadHaEntities,
     saveStatus,
     loadError,
+    loadPages,
     nodes: activePage.nodes,
     connections: activePage.connections,
     selectedNode,
