@@ -95,6 +95,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
+  const connectingFromRef = useRef(connectingFrom);
+  connectingFromRef.current = connectingFrom;
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -185,8 +187,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [zoom]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
-    console.log('[handlePortClick]', { nodeId, portId, isOutput, connectingFrom });
-    if (!connectingFrom) {
+    const currentConnecting = connectingFromRef.current;
+    console.log('[handlePortClick]', { nodeId, portId, isOutput, currentConnecting });
+    if (!currentConnecting) {
       if (isOutput) {
         console.log('[handlePortClick] Starting connection from output:', nodeId, portId);
         onConnectionStart(nodeId, portId);
@@ -194,16 +197,16 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         console.log('[handlePortClick] Clicked input but no connection in progress - ignoring');
       }
     } else {
-      console.log('[handlePortClick] Connection in progress from:', connectingFrom);
-      if (connectingFrom.nodeId !== nodeId) {
+      console.log('[handlePortClick] Connection in progress from:', currentConnecting);
+      if (currentConnecting.nodeId !== nodeId) {
         console.log('[handlePortClick] Completing connection to:', nodeId, portId);
-        onConnectionEnd(nodeId, portId, connectingFrom.nodeId, connectingFrom.portId);
+        onConnectionEnd(nodeId, portId, currentConnecting.nodeId, currentConnecting.portId);
       } else {
         console.log('[handlePortClick] Same node clicked - canceling');
         onConnectionCancel();
       }
     }
-  }, [connectingFrom, onConnectionStart, onConnectionEnd, onConnectionCancel]);
+  }, [onConnectionStart, onConnectionEnd, onConnectionCancel]);
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return;
