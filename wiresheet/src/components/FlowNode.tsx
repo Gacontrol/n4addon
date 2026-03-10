@@ -763,12 +763,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               return (
                 <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
                   <div
-                    className="port node-port flex-shrink-0 relative"
+                    className="port node-port flex-shrink-0 relative cursor-pointer"
                     style={{
                       width: '36px',
                       height: '36px',
                       marginLeft: '-18px',
-                      cursor: 'pointer',
                       zIndex: 100,
                       display: 'flex',
                       alignItems: 'center',
@@ -779,15 +778,14 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     onPointerDown={e => { e.stopPropagation(); }}
                   >
                     <div
-                      className="rounded-full border-2 transition-all"
+                      className="rounded-full border-2 transition-all pointer-events-none"
                       style={{
                         width: '16px',
                         height: '16px',
                         borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
                         backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
                         boxShadow: isHighlighted ? '0 0 12px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
-                        transform: isHighlighted ? 'scale(1.2)' : 'scale(1)',
-                        pointerEvents: 'none'
+                        transform: isHighlighted ? 'scale(1.2)' : 'scale(1)'
                       }}
                     />
                   </div>
@@ -827,12 +825,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
                   </div>
                   <div
-                    className="port node-port flex-shrink-0 relative"
+                    className="port node-port flex-shrink-0 relative cursor-pointer"
                     style={{
                       width: '36px',
                       height: '36px',
                       marginRight: '-18px',
-                      cursor: 'pointer',
                       zIndex: 100,
                       display: 'flex',
                       alignItems: 'center',
@@ -843,14 +840,13 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     onPointerDown={e => { e.stopPropagation(); }}
                   >
                     <div
-                      className="rounded-full border-2 transition-all"
+                      className="rounded-full border-2 transition-all pointer-events-none"
                       style={{
                         width: '16px',
                         height: '16px',
                         borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
                         backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
-                        boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none',
-                        pointerEvents: 'none'
+                        boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
                       }}
                     />
                   </div>
