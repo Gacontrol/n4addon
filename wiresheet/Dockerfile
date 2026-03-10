@@ -1,4 +1,28 @@
 ARG BUILD_FROM
+
+FROM node:18-alpine AS builder
+
+WORKDIR /build
+
+COPY package.json package-lock.json ./
+RUN npm ci --production=false
+
+COPY src ./src
+COPY index.html ./
+COPY vite.config.ts ./
+COPY tsconfig.json ./
+COPY tsconfig.app.json ./
+COPY tsconfig.node.json ./
+COPY postcss.config.js ./
+COPY tailwind.config.js ./
+
+RUN npm run build
+
+WORKDIR /server-build
+
+COPY server-package.json ./package.json
+RUN npm install --production
+
 FROM $BUILD_FROM
 
 ENV LANG=C.UTF-8 \
@@ -12,13 +36,12 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-COPY dist ./dist
+COPY --from=builder /build/dist ./dist
+COPY --from=builder /server-build/node_modules ./node_modules
 COPY server ./server
-COPY node_modules ./node_modules
 COPY rootfs/run.sh /run.sh
 COPY rootfs/etc/nginx/nginx.conf /etc/nginx/nginx.conf
 
-RUN chmod +x /run.sh && \
-    chown -R root:root /app
+RUN chmod +x /run.sh
 
 CMD [ "/run.sh" ]

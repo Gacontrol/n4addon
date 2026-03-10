@@ -1,12 +1,9 @@
 .git
 .gitignore
-*.md
 .vscode
 .idea
 npm-debug.log
 yarn-error.log
 .env
 .DS_Store
-src
-server-package.json
-package-lock.json
+node_modules
