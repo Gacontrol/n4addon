@@ -364,21 +364,29 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
   const [librarySearch, setLibrarySearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const lastSelectedPathRef = React.useRef<{ deviceId: string; datapointId: string } | null>(null);
 
   React.useEffect(() => {
     if (selectedDatapointPath) {
-      const device = devices.find(d => d.id === selectedDatapointPath.deviceId);
-      if (device) {
-        const isOutput = device.outputDatapoints?.some(dp => dp.id === selectedDatapointPath.datapointId);
-        setNav({
-          level: 'datapoint',
-          deviceId: selectedDatapointPath.deviceId,
-          datapointId: selectedDatapointPath.datapointId,
-          isOutput
-        });
+      const isSamePath = lastSelectedPathRef.current &&
+        lastSelectedPathRef.current.deviceId === selectedDatapointPath.deviceId &&
+        lastSelectedPathRef.current.datapointId === selectedDatapointPath.datapointId;
+
+      if (!isSamePath) {
+        const device = devices.find(d => d.id === selectedDatapointPath.deviceId);
+        if (device) {
+          const isOutput = device.outputDatapoints?.some(dp => dp.id === selectedDatapointPath.datapointId);
+          setNav({
+            level: 'datapoint',
+            deviceId: selectedDatapointPath.deviceId,
+            datapointId: selectedDatapointPath.datapointId,
+            isOutput
+          });
+          lastSelectedPathRef.current = { ...selectedDatapointPath };
+        }
       }
     }
-  }, [selectedDatapointPath, devices]);
+  }, [selectedDatapointPath]);
 
   const currentDevice = nav.deviceId ? devices.find(d => d.id === nav.deviceId) : null;
   const currentDatapoint = currentDevice && nav.datapointId

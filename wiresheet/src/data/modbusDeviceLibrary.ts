@@ -53,6 +53,12 @@ const UI_FILTER_OPTIONS: ModbusConfigOption[] = [
   { value: 20, label: '60 Sekunden' },
 ];
 
+const UI_RESOLUTION_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: '0.1 (Standard)' },
+  { value: 1, label: '0.01' },
+  { value: 2, label: '1' },
+];
+
 export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
   {
     id: 'isma-mix18-ip',
@@ -85,18 +91,23 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     configDatapoints: [
       { name: 'UI1 Sensortyp', address: 150, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI1' },
       { name: 'UI1 Filterzeit', address: 160, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI1 Resolution', address: 190, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
       { name: 'UI1 Offset', address: 170, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
       { name: 'UI2 Sensortyp', address: 151, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI2' },
       { name: 'UI2 Filterzeit', address: 161, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI2 Resolution', address: 191, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
       { name: 'UI2 Offset', address: 171, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
       { name: 'UI3 Sensortyp', address: 152, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI3' },
       { name: 'UI3 Filterzeit', address: 162, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI3 Resolution', address: 192, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
       { name: 'UI3 Offset', address: 172, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
       { name: 'UI4 Sensortyp', address: 153, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI4' },
       { name: 'UI4 Filterzeit', address: 163, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI4 Resolution', address: 193, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
       { name: 'UI4 Offset', address: 173, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
       { name: 'UI5 Sensortyp', address: 154, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI5' },
       { name: 'UI5 Filterzeit', address: 164, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI5 Resolution', address: 194, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
       { name: 'UI5 Offset', address: 174, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
       { name: 'DI1 Entprellzeit', address: 180, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI1' },
       { name: 'DI2 Entprellzeit', address: 181, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI2' },

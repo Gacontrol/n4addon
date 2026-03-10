@@ -824,6 +824,48 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
           nodeValues[nodeId] = inputVals[0] ?? null;
         }
       }
+    } else if (node.type === 'modbus-driver') {
+      const devices = cfg.modbusDevices || [];
+      let anyOffline = false;
+      for (const device of devices) {
+        if (!device.enabled) continue;
+        try {
+          await new Promise((resolve, reject) => {
+            const pingSocket = new net.Socket();
+            let pingHandled = false;
+            const pingTimeout = setTimeout(() => {
+              if (!pingHandled) {
+                pingHandled = true;
+                pingSocket.destroy();
+                reject(new Error('Timeout'));
+              }
+            }, 2000);
+            pingSocket.on('connect', () => {
+              if (pingHandled) return;
+              pingHandled = true;
+              clearTimeout(pingTimeout);
+              pingSocket.destroy();
+              resolve();
+            });
+            pingSocket.on('error', (err) => {
+              if (pingHandled) return;
+              pingHandled = true;
+              clearTimeout(pingTimeout);
+              pingSocket.destroy();
+              reject(err);
+            });
+            pingSocket.connect(device.port || 502, device.host);
+          });
+        } catch {
+          anyOffline = true;
+          console.log(`Modbus Treiber: Geraet ${device.name} (${device.host}) ist offline`);
+          break;
+        }
+      }
+      const statusValue = anyOffline ? 1 : 0;
+      nodeValues[nodeId] = statusValue;
+      nodeValues[`${nodeId}:output-0`] = statusValue;
+      console.log(`Modbus Treiber Status: ${anyOffline ? 'Stoerung (1)' : 'Normal (0)'}`);
     }
   }
 
@@ -1303,9 +1345,11 @@ app.post(['/modbus/ping', '/api/modbus/ping'], async (req, res) => {
 
   const socket = new net.Socket();
   let connected = false;
+  let responseHandled = false;
 
   const connectTimeout = setTimeout(() => {
-    if (!connected) {
+    if (!connected && !responseHandled) {
+      responseHandled = true;
       socket.destroy();
       res.json({ success: false, error: 'Timeout' });
     }
@@ -1337,21 +1381,32 @@ app.post(['/modbus/ping', '/api/modbus/ping'], async (req, res) => {
   });
 
   socket.on('data', (data) => {
+    if (responseHandled) return;
+    responseHandled = true;
+    clearTimeout(connectTimeout);
     socket.destroy();
-    if (data.length >= 9) {
+    const responseFc = data.length > 7 ? data[7] : 0;
+    if (data.length >= 9 && responseFc < 0x80) {
       res.json({ success: true, responseLength: data.length });
+    } else if (responseFc >= 0x80) {
+      res.json({ success: false, error: `Modbus Fehler Code: ${data[8] || 'unbekannt'}` });
     } else {
       res.json({ success: false, error: 'Ungueltige Antwort' });
     }
   });
 
   socket.on('error', (err) => {
+    if (responseHandled) return;
+    responseHandled = true;
     clearTimeout(connectTimeout);
     socket.destroy();
     res.json({ success: false, error: err.message });
   });
 
   socket.on('timeout', () => {
+    if (responseHandled) return;
+    responseHandled = true;
+    clearTimeout(connectTimeout);
     socket.destroy();
     res.json({ success: false, error: 'Socket timeout' });
   });
@@ -1439,6 +1494,43 @@ app.post(['/modbus/read', '/api/modbus/read'], async (req, res) => {
 
   socket.setTimeout(timeout);
   socket.connect(port, host);
+});
+
+app.post(['/modbus/read-config', '/api/modbus/read-config'], async (req, res) => {
+  const { host, port = 502, unitId = 1, address, registerType = 'holding', dataType = 'uint16', scale = 1, timeout = 3000 } = req.body;
+
+  if (!host || address === undefined) {
+    return res.status(400).json({ success: false, error: 'Host oder Adresse fehlt' });
+  }
+
+  try {
+    let value = await modbusReadRegister(host, port, unitId, address, registerType, dataType, timeout);
+    if (scale && scale !== 1) {
+      value = value * scale;
+    }
+    res.json({ success: true, value });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
+app.post(['/modbus/write-config', '/api/modbus/write-config'], async (req, res) => {
+  const { host, port = 502, unitId = 1, address, value, registerType = 'holding', dataType = 'uint16', scale = 1, timeout = 3000 } = req.body;
+
+  if (!host || address === undefined || value === undefined) {
+    return res.status(400).json({ success: false, error: 'Host, Adresse oder Wert fehlt' });
+  }
+
+  try {
+    let writeValue = value;
+    if (scale && scale !== 1) {
+      writeValue = value / scale;
+    }
+    await modbusWriteRegister(host, port, unitId, address, writeValue, registerType, dataType, timeout);
+    res.json({ success: true });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
 });
 
 app.post(['/modbus/write', '/api/modbus/write'], async (req, res) => {

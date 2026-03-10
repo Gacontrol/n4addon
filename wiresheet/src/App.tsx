@@ -459,6 +459,85 @@ function App() {
     }
   }, [modbusDevices]);
 
+  const handleReadConfigValue = useCallback(async (deviceId: string, datapointId: string) => {
+    const device = modbusDevices.find(d => d.id === deviceId);
+    if (!device) return;
+    const datapoint = device.configDatapoints?.find(dp => dp.id === datapointId);
+    if (!datapoint) return;
+
+    try {
+      const response = await fetch('/api/modbus/read-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: device.host,
+          port: device.port,
+          unitId: device.unitId,
+          address: datapoint.address,
+          registerType: datapoint.registerType,
+          dataType: datapoint.dataType,
+          scale: datapoint.scale || 1
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        const updatedDevices = modbusDevices.map(d => {
+          if (d.id !== deviceId) return d;
+          return {
+            ...d,
+            configDatapoints: d.configDatapoints?.map(dp => {
+              if (dp.id !== datapointId) return dp;
+              return { ...dp, currentValue: data.value, lastReadAt: Date.now() };
+            })
+          };
+        });
+        setModbusDevices(updatedDevices);
+      }
+    } catch (err) {
+      console.error('Config read error:', err);
+    }
+  }, [modbusDevices, setModbusDevices]);
+
+  const handleWriteConfigValue = useCallback(async (deviceId: string, datapointId: string, value: number | string | boolean) => {
+    const device = modbusDevices.find(d => d.id === deviceId);
+    if (!device) return;
+    const datapoint = device.configDatapoints?.find(dp => dp.id === datapointId);
+    if (!datapoint) return;
+
+    try {
+      const response = await fetch('/api/modbus/write-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: device.host,
+          port: device.port,
+          unitId: device.unitId,
+          address: datapoint.address,
+          value: Number(value),
+          registerType: datapoint.registerType,
+          dataType: datapoint.dataType,
+          scale: datapoint.scale || 1
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        const updatedDevices = modbusDevices.map(d => {
+          if (d.id !== deviceId) return d;
+          return {
+            ...d,
+            configDatapoints: d.configDatapoints?.map(dp => {
+              if (dp.id !== datapointId) return dp;
+              return { ...dp, currentValue: Number(value), pendingValue: undefined, lastReadAt: Date.now() };
+            })
+          };
+        });
+        setModbusDevices(updatedDevices);
+      }
+    } catch (err) {
+      console.error('Config write error:', err);
+    }
+  }, [modbusDevices, setModbusDevices]);
+
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,
     binding: { nodeId: string; portId?: string },
@@ -770,6 +849,8 @@ function App() {
                 modbusDeviceStatus={modbusDeviceStatus}
                 selectedModbusDatapointPath={selectedModbusDatapointPath}
                 allNodes={nodes}
+                onReadConfigValue={handleReadConfigValue}
+                onWriteConfigValue={handleWriteConfigValue}
               />
             )}
           </div>
