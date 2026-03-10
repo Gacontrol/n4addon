@@ -29,6 +29,7 @@ interface PropertiesPanelProps {
   onPingModbusDevice?: (deviceId: string) => void;
   modbusDeviceStatus?: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>;
   selectedModbusDatapointPath?: { deviceId: string; datapointId: string } | null;
+  allNodes?: FlowNode[];
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -47,7 +48,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onModbusDatapointDragStart,
   onPingModbusDevice,
   modbusDeviceStatus = {},
-  selectedModbusDatapointPath
+  selectedModbusDatapointPath,
+  allNodes = []
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -1094,6 +1096,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             onPingDevice={onPingModbusDevice}
             deviceStatus={modbusDeviceStatus}
             selectedDatapointPath={selectedModbusDatapointPath}
+            allNodes={allNodes}
           />
         )}
 

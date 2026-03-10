@@ -1,4 +1,4 @@
-import { ModbusDevice, ModbusDatapoint } from '../types/flow';
+import { ModbusDevice, ModbusDatapoint, ModbusConfigOption } from '../types/flow';
 
 export interface ModbusDeviceTemplate {
   id: string;
@@ -8,8 +8,50 @@ export interface ModbusDeviceTemplate {
   category: string;
   inputDatapoints?: Omit<ModbusDatapoint, 'id'>[];
   outputDatapoints?: Omit<ModbusDatapoint, 'id'>[];
+  configDatapoints?: Omit<ModbusDatapoint, 'id'>[];
   datapoints: Omit<ModbusDatapoint, 'id'>[];
 }
+
+const UI_SENSOR_TYPES: ModbusConfigOption[] = [
+  { value: 0, label: 'Kein Sensor (deaktiviert)' },
+  { value: 1, label: 'NTC 10k (Siemens QAC)' },
+  { value: 2, label: 'NTC 10k (Type 2)' },
+  { value: 3, label: 'NTC 10k (Type 3)' },
+  { value: 4, label: 'NTC 20k' },
+  { value: 5, label: 'PT100' },
+  { value: 6, label: 'PT500' },
+  { value: 7, label: 'PT1000' },
+  { value: 8, label: 'NI1000' },
+  { value: 9, label: 'NI1000 LG' },
+  { value: 10, label: '0-10V Analog' },
+  { value: 11, label: '0-5V Analog' },
+  { value: 12, label: '2-10V Analog' },
+  { value: 13, label: '0-20mA Analog' },
+  { value: 14, label: '4-20mA Analog' },
+  { value: 15, label: 'Digital (Kontakt)' },
+  { value: 16, label: 'Zaehler (Counter)' },
+];
+
+const DI_DEBOUNCE_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: 'Kein Entprellen' },
+  { value: 1, label: '10 ms' },
+  { value: 2, label: '20 ms' },
+  { value: 3, label: '50 ms' },
+  { value: 4, label: '100 ms' },
+  { value: 5, label: '200 ms' },
+  { value: 6, label: '500 ms' },
+  { value: 7, label: '1000 ms' },
+];
+
+const UI_FILTER_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: 'Kein Filter' },
+  { value: 1, label: '1 Sekunde' },
+  { value: 2, label: '2 Sekunden' },
+  { value: 3, label: '5 Sekunden' },
+  { value: 5, label: '10 Sekunden' },
+  { value: 10, label: '30 Sekunden' },
+  { value: 20, label: '60 Sekunden' },
+];
 
 export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
   {
@@ -39,6 +81,36 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
       { name: 'AO2', address: 121, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
       { name: 'AO3', address: 122, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
       { name: 'AO4', address: 123, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
+    ],
+    configDatapoints: [
+      { name: 'UI1 Sensortyp', address: 150, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI1' },
+      { name: 'UI1 Filterzeit', address: 160, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI1 Offset', address: 170, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
+      { name: 'UI2 Sensortyp', address: 151, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI2' },
+      { name: 'UI2 Filterzeit', address: 161, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI2 Offset', address: 171, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
+      { name: 'UI3 Sensortyp', address: 152, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI3' },
+      { name: 'UI3 Filterzeit', address: 162, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI3 Offset', address: 172, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
+      { name: 'UI4 Sensortyp', address: 153, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI4' },
+      { name: 'UI4 Filterzeit', address: 163, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI4 Offset', address: 173, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
+      { name: 'UI5 Sensortyp', address: 154, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI5' },
+      { name: 'UI5 Filterzeit', address: 164, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
+      { name: 'UI5 Offset', address: 174, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
+      { name: 'DI1 Entprellzeit', address: 180, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI1' },
+      { name: 'DI2 Entprellzeit', address: 181, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI2' },
+      { name: 'DI3 Entprellzeit', address: 182, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI3' },
+      { name: 'DI4 Entprellzeit', address: 183, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI4' },
+      { name: 'DI5 Entprellzeit', address: 184, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI5' },
+      { name: 'AO1 Minimum', address: 200, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
+      { name: 'AO1 Maximum', address: 201, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
+      { name: 'AO2 Minimum', address: 202, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
+      { name: 'AO2 Maximum', address: 203, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
+      { name: 'AO3 Minimum', address: 204, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
+      { name: 'AO3 Maximum', address: 205, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
+      { name: 'AO4 Minimum', address: 206, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
+      { name: 'AO4 Maximum', address: 207, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
     ],
     datapoints: [
       { name: 'UI1', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },

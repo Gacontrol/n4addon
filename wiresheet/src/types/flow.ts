@@ -28,6 +28,11 @@ export interface CaseDefinition {
   height?: number;
 }
 
+export interface ModbusConfigOption {
+  value: number | string;
+  label: string;
+}
+
 export interface ModbusDatapoint {
   id: string;
   name: string;
@@ -39,6 +44,12 @@ export interface ModbusDatapoint {
   unit?: string;
   writable: boolean;
   bitIndex?: number;
+  isConfig?: boolean;
+  configOptions?: ModbusConfigOption[];
+  configDescription?: string;
+  currentValue?: number | string | boolean;
+  pendingValue?: number | string | boolean;
+  lastReadAt?: number;
 }
 
 export interface ModbusDevice {
@@ -56,6 +67,7 @@ export interface ModbusDevice {
   datapoints: ModbusDatapoint[];
   inputDatapoints?: ModbusDatapoint[];
   outputDatapoints?: ModbusDatapoint[];
+  configDatapoints?: ModbusDatapoint[];
 }
 
 export interface NodeConfig {

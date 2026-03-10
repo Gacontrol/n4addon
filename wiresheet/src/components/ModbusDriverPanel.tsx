@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { ModbusDevice, ModbusDatapoint, NodeTemplate } from '../types/flow';
+import { ModbusDevice, ModbusDatapoint, NodeTemplate, FlowNode } from '../types/flow';
 import {
   Server, ChevronDown, ChevronRight, Settings, Library, X, Search,
   Radio, Power, PowerOff, ArrowDownToLine, ArrowUpFromLine,
-  GripVertical, Trash2, Plus, Save, RotateCcw
+  GripVertical, Trash2, Plus, Save, RotateCcw, Sliders, Link2, RefreshCw,
+  Download, Upload, AlertCircle
 } from 'lucide-react';
 import { modbusDeviceLibrary, ModbusDeviceTemplate, getDeviceCategories } from '../data/modbusDeviceLibrary';
 
@@ -16,6 +17,9 @@ interface ModbusDriverPanelProps {
   onPingDevice: (deviceId: string) => void;
   deviceStatus: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>;
   selectedDatapointPath?: { deviceId: string; datapointId: string } | null;
+  allNodes?: FlowNode[];
+  onReadConfigValue?: (deviceId: string, datapointId: string) => void;
+  onWriteConfigValue?: (deviceId: string, datapointId: string, value: number | string | boolean) => void;
 }
 
 type ViewLevel = 'driver' | 'device' | 'datapoint';
@@ -226,6 +230,122 @@ const DatapointEditForm: React.FC<DatapointEditFormProps> = ({
   );
 };
 
+interface ConfigDatapointRowProps {
+  deviceId: string;
+  datapoint: ModbusDatapoint;
+  onUpdate: (deviceId: string, dpId: string, value: number | string | boolean) => void;
+  onRead?: (deviceId: string, dpId: string) => void;
+}
+
+const ConfigDatapointRow: React.FC<ConfigDatapointRowProps> = ({
+  deviceId,
+  datapoint,
+  onUpdate,
+  onRead
+}) => {
+  const [localValue, setLocalValue] = useState<string>(
+    String(datapoint.pendingValue ?? datapoint.currentValue ?? '')
+  );
+  const [isEditing, setIsEditing] = useState(false);
+
+  React.useEffect(() => {
+    if (!isEditing) {
+      setLocalValue(String(datapoint.pendingValue ?? datapoint.currentValue ?? ''));
+    }
+  }, [datapoint.currentValue, datapoint.pendingValue, isEditing]);
+
+  const hasOptions = datapoint.configOptions && datapoint.configOptions.length > 0;
+  const hasPendingChange = datapoint.pendingValue !== undefined &&
+    datapoint.pendingValue !== datapoint.currentValue;
+
+  const handleSelectChange = (value: string) => {
+    const numVal = parseInt(value);
+    onUpdate(deviceId, datapoint.id, numVal);
+  };
+
+  const handleInputBlur = () => {
+    setIsEditing(false);
+    const numVal = parseFloat(localValue);
+    if (!isNaN(numVal) && numVal !== datapoint.currentValue) {
+      onUpdate(deviceId, datapoint.id, numVal);
+    }
+  };
+
+  const displayValue = datapoint.currentValue !== undefined
+    ? (hasOptions
+        ? datapoint.configOptions?.find(o => o.value === datapoint.currentValue)?.label || String(datapoint.currentValue)
+        : `${datapoint.currentValue}${datapoint.unit ? ` ${datapoint.unit}` : ''}`)
+    : '---';
+
+  return (
+    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs text-white truncate">{datapoint.name}</span>
+          {hasPendingChange && (
+            <span className="text-[9px] text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded flex-shrink-0">
+              Ungespeichert
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => onRead?.(deviceId, datapoint.id)}
+          className="p-1 text-slate-500 hover:text-purple-400 transition-colors flex-shrink-0"
+          title="Wert vom Geraet lesen"
+        >
+          <Download className="w-3 h-3" />
+        </button>
+      </div>
+
+      {datapoint.configDescription && (
+        <p className="text-[9px] text-slate-500">{datapoint.configDescription}</p>
+      )}
+
+      <div className="flex items-center gap-2">
+        {hasOptions ? (
+          <select
+            value={String(datapoint.pendingValue ?? datapoint.currentValue ?? '')}
+            onChange={e => handleSelectChange(e.target.value)}
+            className="flex-1 bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-purple-500"
+          >
+            <option value="">-- Waehlen --</option>
+            {datapoint.configOptions?.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="number"
+            step={datapoint.scale && datapoint.scale < 1 ? datapoint.scale : 1}
+            value={localValue}
+            onChange={e => {
+              setIsEditing(true);
+              setLocalValue(e.target.value);
+            }}
+            onBlur={handleInputBlur}
+            onKeyDown={e => e.key === 'Enter' && handleInputBlur()}
+            className="flex-1 bg-slate-700/50 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-purple-500"
+          />
+        )}
+        {datapoint.unit && !hasOptions && (
+          <span className="text-[10px] text-slate-400">{datapoint.unit}</span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between text-[9px]">
+        <span className="text-slate-500">
+          Addr: {datapoint.address} | Aktuell: {displayValue}
+        </span>
+        {datapoint.lastReadAt && (
+          <span className="text-slate-600">
+            {new Date(datapoint.lastReadAt).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
   devices,
   driverEnabled,
@@ -234,7 +354,10 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
   onDatapointDragStart,
   onPingDevice,
   deviceStatus,
-  selectedDatapointPath
+  selectedDatapointPath,
+  allNodes = [],
+  onReadConfigValue,
+  onWriteConfigValue
 }) => {
   const [nav, setNav] = useState<NavigationState>({ level: 'driver' });
   const [showLibrary, setShowLibrary] = useState(false);
@@ -262,6 +385,14 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
     ? [...(currentDevice.inputDatapoints || []), ...(currentDevice.outputDatapoints || [])].find(dp => dp.id === nav.datapointId)
     : null;
 
+  const getDatapointUsage = useCallback((deviceId: string, datapointId: string): FlowNode | null => {
+    return allNodes.find(node =>
+      (node.type === 'modbus-device-input' || node.type === 'modbus-device-output') &&
+      node.data.config?.modbusDeviceId === deviceId &&
+      node.data.config?.modbusDatapointId === datapointId
+    ) || null;
+  }, [allNodes]);
+
   const addDeviceFromLibrary = (template: ModbusDeviceTemplate) => {
     const inputDps = (template.inputDatapoints || template.datapoints.filter(dp => !dp.writable)).map((dp, idx) => ({
       ...dp,
@@ -270,6 +401,10 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
     const outputDps = (template.outputDatapoints || template.datapoints.filter(dp => dp.writable)).map((dp, idx) => ({
       ...dp,
       id: `dp-out-${Date.now()}-${idx}`
+    }));
+    const configDps = (template.configDatapoints || []).map((dp, idx) => ({
+      ...dp,
+      id: `dp-cfg-${Date.now()}-${idx}`
     }));
 
     const newDevice: ModbusDevice = {
@@ -284,7 +419,8 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
       timeout: 3000,
       datapoints: [...inputDps, ...outputDps],
       inputDatapoints: inputDps,
-      outputDatapoints: outputDps
+      outputDatapoints: outputDps,
+      configDatapoints: configDps
     };
 
     onDevicesChange([...devices, newDevice]);
@@ -358,9 +494,26 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
         ...d,
         datapoints: d.datapoints.map(dp => dp.id === dpId ? { ...dp, ...updates } : dp),
         inputDatapoints: updateDpList(d.inputDatapoints),
-        outputDatapoints: updateDpList(d.outputDatapoints)
+        outputDatapoints: updateDpList(d.outputDatapoints),
+        configDatapoints: updateDpList(d.configDatapoints)
       };
     }));
+  };
+
+  const updateConfigValue = (deviceId: string, dpId: string, value: number | string | boolean) => {
+    updateDatapoint(deviceId, dpId, { pendingValue: value });
+    if (onWriteConfigValue) {
+      onWriteConfigValue(deviceId, dpId, value);
+    }
+  };
+
+  const readAllConfigValues = (deviceId: string) => {
+    const device = devices.find(d => d.id === deviceId);
+    if (device && device.configDatapoints && onReadConfigValue) {
+      device.configDatapoints.forEach(dp => {
+        onReadConfigValue(deviceId, dp.id);
+      });
+    }
   };
 
   const removeDatapoint = (deviceId: string, dpId: string) => {
@@ -656,25 +809,33 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
             </button>
           </div>
           <div className="space-y-1">
-            {(currentDevice.inputDatapoints || []).map(dp => (
-              <div
-                key={dp.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, currentDevice, dp, false)}
-                onClick={() => setNav({ level: 'datapoint', deviceId: currentDevice.id, datapointId: dp.id, isOutput: false })}
-                className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 rounded-lg cursor-grab active:cursor-grabbing group transition-colors"
-              >
-                <GripVertical className="w-3 h-3 text-cyan-400/50 group-hover:text-cyan-400" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white truncate">{dp.name}</div>
-                  <div className="text-[10px] text-slate-400">
-                    Addr: {dp.address} | {dp.registerType} | {dp.dataType}
-                    {dp.unit && ` | ${dp.unit}`}
+            {(currentDevice.inputDatapoints || []).map(dp => {
+              const usedInNode = getDatapointUsage(currentDevice.id, dp.id);
+              return (
+                <div
+                  key={dp.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, currentDevice, dp, false)}
+                  onClick={() => setNav({ level: 'datapoint', deviceId: currentDevice.id, datapointId: dp.id, isOutput: false })}
+                  className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 rounded-lg cursor-grab active:cursor-grabbing group transition-colors"
+                >
+                  <GripVertical className="w-3 h-3 text-cyan-400/50 group-hover:text-cyan-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs text-white">
+                      <span className="truncate">{dp.name}</span>
+                      {usedInNode && (
+                        <Link2 className="w-3 h-3 text-emerald-400 flex-shrink-0" title="Im Wiresheet verwendet" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Addr: {dp.address} | {dp.registerType} | {dp.dataType}
+                      {dp.unit && ` | ${dp.unit}`}
+                    </div>
                   </div>
+                  <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-white" />
                 </div>
-                <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-white" />
-              </div>
-            ))}
+              );
+            })}
             {(!currentDevice.inputDatapoints || currentDevice.inputDatapoints.length === 0) && (
               <div className="text-center py-4 text-[10px] text-slate-500 bg-slate-700/20 rounded-lg border border-dashed border-slate-600">
                 Keine Eingaenge konfiguriert
@@ -697,25 +858,33 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
             </button>
           </div>
           <div className="space-y-1">
-            {(currentDevice.outputDatapoints || []).map(dp => (
-              <div
-                key={dp.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, currentDevice, dp, true)}
-                onClick={() => setNav({ level: 'datapoint', deviceId: currentDevice.id, datapointId: dp.id, isOutput: true })}
-                className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 rounded-lg cursor-grab active:cursor-grabbing group transition-colors"
-              >
-                <GripVertical className="w-3 h-3 text-orange-400/50 group-hover:text-orange-400" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-white truncate">{dp.name}</div>
-                  <div className="text-[10px] text-slate-400">
-                    Addr: {dp.address} | {dp.registerType} | {dp.dataType}
-                    {dp.unit && ` | ${dp.unit}`}
+            {(currentDevice.outputDatapoints || []).map(dp => {
+              const usedInNode = getDatapointUsage(currentDevice.id, dp.id);
+              return (
+                <div
+                  key={dp.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, currentDevice, dp, true)}
+                  onClick={() => setNav({ level: 'datapoint', deviceId: currentDevice.id, datapointId: dp.id, isOutput: true })}
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 rounded-lg cursor-grab active:cursor-grabbing group transition-colors"
+                >
+                  <GripVertical className="w-3 h-3 text-orange-400/50 group-hover:text-orange-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs text-white">
+                      <span className="truncate">{dp.name}</span>
+                      {usedInNode && (
+                        <Link2 className="w-3 h-3 text-emerald-400 flex-shrink-0" title="Im Wiresheet verwendet" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Addr: {dp.address} | {dp.registerType} | {dp.dataType}
+                      {dp.unit && ` | ${dp.unit}`}
+                    </div>
                   </div>
+                  <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-white" />
                 </div>
-                <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-white" />
-              </div>
-            ))}
+              );
+            })}
             {(!currentDevice.outputDatapoints || currentDevice.outputDatapoints.length === 0) && (
               <div className="text-center py-4 text-[10px] text-slate-500 bg-slate-700/20 rounded-lg border border-dashed border-slate-600">
                 Keine Ausgaenge konfiguriert
@@ -723,6 +892,35 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
             )}
           </div>
         </div>
+
+        {currentDevice.configDatapoints && currentDevice.configDatapoints.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-medium text-slate-300">Konfiguration ({currentDevice.configDatapoints.length})</span>
+              </div>
+              <button
+                onClick={() => readAllConfigValues(currentDevice.id)}
+                className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                title="Alle Konfigurationswerte vom Geraet lesen"
+              >
+                <Download className="w-3 h-3" /> Alle lesen
+              </button>
+            </div>
+            <div className="space-y-1">
+              {currentDevice.configDatapoints.map(dp => (
+                <ConfigDatapointRow
+                  key={dp.id}
+                  deviceId={currentDevice.id}
+                  datapoint={dp}
+                  onUpdate={updateConfigValue}
+                  onRead={onReadConfigValue}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="pt-2 border-t border-slate-600/50">
           <p className="text-[10px] text-slate-500 text-center">

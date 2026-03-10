@@ -702,6 +702,7 @@ function App() {
             onPingModbusDevice={handlePingModbusDevice}
             modbusDeviceStatus={modbusDeviceStatus}
             selectedModbusDatapointPath={selectedModbusDatapointPath}
+            allNodes={nodes}
           />
         )}
       </div>
