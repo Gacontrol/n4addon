@@ -20,6 +20,7 @@ let pagesFile = path.join(dataDir, 'pages.json');
 const runningPages = new Map();
 let cachedDeviceRegistry = null;
 let cachedEntityRegistry = null;
+let cachedConfigEntries = null;
 let registryCacheTime = 0;
 const REGISTRY_CACHE_TTL = 60000;
 
@@ -114,15 +115,15 @@ async function haWsCommand(msgType, payload = {}) {
 
 async function loadRegistries() {
   const now = Date.now();
-  if (cachedDeviceRegistry && cachedEntityRegistry && now - registryCacheTime < REGISTRY_CACHE_TTL) {
-    return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry };
+  if (cachedDeviceRegistry && cachedEntityRegistry && cachedConfigEntries && now - registryCacheTime < REGISTRY_CACHE_TTL) {
+    return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry, configEntries: cachedConfigEntries };
   }
 
   try {
     const token = getToken();
     if (!token) throw new Error('Kein Token');
 
-    const [devRes, entRes] = await Promise.all([
+    const [devRes, entRes, configRes] = await Promise.all([
       axios.get('http://supervisor/core/api/config/device_registry', {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000
@@ -130,21 +131,27 @@ async function loadRegistries() {
       axios.get('http://supervisor/core/api/config/entity_registry', {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000
+      }).catch(() => ({ data: [] })),
+      axios.get('http://supervisor/core/api/config/config_entries', {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
       }).catch(() => ({ data: [] }))
     ]);
 
     cachedDeviceRegistry = Array.isArray(devRes.data) ? devRes.data : [];
     cachedEntityRegistry = Array.isArray(entRes.data) ? entRes.data : [];
+    cachedConfigEntries = Array.isArray(configRes.data) ? configRes.data : [];
     registryCacheTime = now;
 
-    console.log(`Registry geladen: ${cachedDeviceRegistry.length} Devices, ${cachedEntityRegistry.length} Entity-Eintraege`);
+    console.log(`Registry geladen: ${cachedDeviceRegistry.length} Devices, ${cachedEntityRegistry.length} Entity-Eintraege, ${cachedConfigEntries.length} Config-Entries`);
   } catch (err) {
     console.log('Registry-Laden fehlgeschlagen:', err.message);
     cachedDeviceRegistry = cachedDeviceRegistry || [];
     cachedEntityRegistry = cachedEntityRegistry || [];
+    cachedConfigEntries = cachedConfigEntries || [];
   }
 
-  return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry };
+  return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry, configEntries: cachedConfigEntries };
 }
 
 app.get('/api/status', (req, res) => {
@@ -233,16 +240,36 @@ app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
       entityRegMap.set(e.entity_id, e);
     });
 
+    const configEntryMap = new Map();
+    registry.configEntries.forEach(ce => {
+      configEntryMap.set(ce.entry_id, ce);
+    });
+
     const enrichedStates = states.map(state => {
       const regEntry = entityRegMap.get(state.entity_id);
       let deviceInfo = null;
       let integrationName = null;
+      let integrationTitle = null;
 
       if (regEntry) {
         if (regEntry.device_id) {
           deviceInfo = deviceMap.get(regEntry.device_id);
         }
         integrationName = regEntry.platform || null;
+
+        if (regEntry.config_entry_id) {
+          const configEntry = configEntryMap.get(regEntry.config_entry_id);
+          if (configEntry) {
+            integrationTitle = configEntry.title || configEntry.domain || integrationName;
+          }
+        }
+
+        if (!integrationTitle && deviceInfo && deviceInfo.config_entries && deviceInfo.config_entries.length > 0) {
+          const configEntry = configEntryMap.get(deviceInfo.config_entries[0]);
+          if (configEntry) {
+            integrationTitle = configEntry.title || configEntry.domain || integrationName;
+          }
+        }
       }
 
       return {
@@ -251,7 +278,7 @@ app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
           ...state.attributes,
           _device_id: regEntry?.device_id || null,
           _device_name: deviceInfo?.name_by_user || deviceInfo?.name || null,
-          _integration: integrationName || state.entity_id.split('.')[0],
+          _integration: integrationTitle || integrationName || state.entity_id.split('.')[0],
           _area_id: deviceInfo?.area_id || regEntry?.area_id || null
         }
       };
