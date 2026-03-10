@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { WiresheetPage, FlowNode, Connection } from '../types/flow';
+import { WiresheetPage, FlowNode, Connection, DatapointOverride } from '../types/flow';
 
 const API_BASE = '/api';
 
@@ -128,11 +128,19 @@ export const useWiresheetPages = () => {
   const executePage = useCallback(async (pageId: string) => {
     const page = pages.find(p => p.id === pageId);
     if (!page) return;
+
+    const manualOverrides: Record<string, unknown> = {};
+    for (const node of page.nodes) {
+      if (node.data.override?.manual) {
+        manualOverrides[node.id] = node.data.override.value;
+      }
+    }
+
     try {
       const res = await fetch(`${API_BASE}/pages/${pageId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: page.nodes, connections: page.connections })
+        body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides })
       });
       if (res.ok) {
         const { nodeValues } = await res.json();
@@ -207,6 +215,13 @@ export const useWiresheetPages = () => {
     updateActivePage(p => ({ ...p, connections: p.connections.filter(c => c.id !== connectionId) }));
   }, [updateActivePage]);
 
+  const updateNodeOverride = useCallback((nodeId: string, override: DatapointOverride) => {
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, override } } : n)
+    }));
+  }, [updateActivePage]);
+
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; portId: string } | null>(null);
 
@@ -256,6 +271,7 @@ export const useWiresheetPages = () => {
     deleteNode,
     addConnection,
     deleteConnection,
+    updateNodeOverride,
     startConnection,
     endConnection,
     cancelConnection,

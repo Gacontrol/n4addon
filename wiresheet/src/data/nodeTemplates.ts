@@ -26,6 +26,59 @@ export const nodeTemplates: NodeTemplate[] = [
     description: 'Schreibt einen HA Entity-Wert'
   },
   {
+    type: 'dp-boolean',
+    label: 'Boolean Datenpunkt',
+    icon: 'ToggleLeft',
+    category: 'datapoint',
+    color: '#8b5cf6',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Virtueller Boolean-Datenpunkt',
+    dpType: 'boolean',
+    defaultConfig: { dpFacet: '' }
+  },
+  {
+    type: 'dp-numeric',
+    label: 'Numerischer Datenpunkt',
+    icon: 'Hash',
+    category: 'datapoint',
+    color: '#06b6d4',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Virtueller Numerischer Datenpunkt',
+    dpType: 'numeric',
+    defaultConfig: { dpUnit: '' }
+  },
+  {
+    type: 'dp-enum',
+    label: 'Enum Datenpunkt',
+    icon: 'List',
+    category: 'datapoint',
+    color: '#f97316',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Virtueller Enum-Datenpunkt (Stufen)',
+    dpType: 'enum',
+    defaultConfig: {
+      dpEnumStages: [
+        { value: 0, label: 'Aus' },
+        { value: 1, label: 'Ein' }
+      ]
+    }
+  },
+  {
     type: 'and-gate',
     label: 'UND',
     icon: 'GitMerge',

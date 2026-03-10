@@ -10,6 +10,11 @@ export interface NodePort {
   entityId?: string;
 }
 
+export interface EnumStage {
+  value: number;
+  label: string;
+}
+
 export interface NodeConfig {
   delayMs?: number;
   thresholdValue?: number;
@@ -18,7 +23,17 @@ export interface NodeConfig {
   cronExpression?: string;
   triggerState?: string;
   customLabel?: string;
+  dpUnit?: string;
+  dpFacet?: string;
+  dpEnumStages?: EnumStage[];
   [key: string]: unknown;
+}
+
+export type DatapointType = 'boolean' | 'numeric' | 'enum';
+
+export interface DatapointOverride {
+  manual: boolean;
+  value: unknown;
 }
 
 export interface FlowNode {
@@ -35,6 +50,8 @@ export interface FlowNode {
     entityLabel?: string;
     liveValue?: unknown;
     liveState?: 'ok' | 'error' | 'idle';
+    dpType?: DatapointType;
+    override?: DatapointOverride;
   };
 }
 
@@ -59,10 +76,11 @@ export interface NodeTemplate {
   type: string;
   label: string;
   icon: string;
-  category: 'input' | 'output' | 'logic' | 'trigger';
+  category: 'input' | 'output' | 'logic' | 'trigger' | 'datapoint';
   color: string;
   inputs: Omit<NodePort, 'id'>[];
   outputs: Omit<NodePort, 'id'>[];
   description: string;
   defaultConfig?: NodeConfig;
+  dpType?: DatapointType;
 }

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
-import { FlowNode as FlowNodeType, Connection } from '../types/flow';
+import { FlowNode as FlowNodeType, Connection, DatapointOverride } from '../types/flow';
 
 interface FlowCanvasProps {
   nodes: FlowNodeType[];
@@ -17,6 +17,7 @@ interface FlowCanvasProps {
   onCanvasClick: () => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
+  onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -32,7 +33,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onConnectionCancel,
   onCanvasClick,
   ghostNode,
-  liveValues = {}
+  liveValues = {},
+  onOverrideChange
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -150,6 +152,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             onSelect={onNodeSelect}
             onDelete={onNodeDelete}
             onPortClick={handlePortClick}
+            onOverrideChange={onOverrideChange}
             isConnecting={!!connectingFrom}
             connectingFromNodeId={connectingFrom?.nodeId}
             liveValues={liveValues}

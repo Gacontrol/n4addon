@@ -9,8 +9,9 @@ interface NodePaletteProps {
 
 export const NodePalette: React.FC<NodePaletteProps> = ({ onNodePointerDown }) => {
   const categories: Record<string, { label: string; color: string }> = {
-    input: { label: 'Eingänge', color: 'bg-blue-500' },
-    output: { label: 'Ausgänge', color: 'bg-amber-500' },
+    input: { label: 'HA Eingänge', color: 'bg-blue-500' },
+    output: { label: 'HA Ausgänge', color: 'bg-amber-500' },
+    datapoint: { label: 'Datenpunkte', color: 'bg-violet-500' },
     logic: { label: 'Logik', color: 'bg-emerald-500' },
     trigger: { label: 'Trigger', color: 'bg-sky-500' }
   };

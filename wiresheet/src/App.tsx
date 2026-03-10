@@ -33,6 +33,7 @@ function App() {
     addNode,
     updateNodePosition,
     updateNodeData,
+    updateNodeOverride,
     deleteNode,
     startConnection,
     endConnection,
@@ -299,6 +300,7 @@ function App() {
           onCanvasClick={() => setSelectedNode(null)}
           ghostNode={ghostNode}
           liveValues={liveValues}
+          onOverrideChange={updateNodeOverride}
         />
 
         {selectedNodeData && (

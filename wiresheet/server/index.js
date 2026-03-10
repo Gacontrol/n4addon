@@ -123,9 +123,10 @@ app.post('/ha/call', async (req, res) => {
 });
 
 app.post('/pages/:pageId/execute', async (req, res) => {
-  const { nodes, connections } = req.body;
+  const { nodes, connections, manualOverrides = {} } = req.body;
   try {
     const nodeValues = {};
+
     const statePromises = nodes
       .filter(n => (n.type === 'ha-input') && n.data.entityId)
       .map(async (n) => {
@@ -160,7 +161,11 @@ app.post('/pages/:pageId/execute', async (req, res) => {
 
       const cfg = node.data.config || {};
 
-      if (node.type === 'and-gate') {
+      if (manualOverrides[nodeId] !== undefined) {
+        nodeValues[nodeId] = manualOverrides[nodeId];
+      } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
+        nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
+      } else if (node.type === 'and-gate') {
         nodeValues[nodeId] = inputVals.length > 0 && inputVals.every(v => !!v);
       } else if (node.type === 'or-gate') {
         nodeValues[nodeId] = inputVals.some(v => !!v);
