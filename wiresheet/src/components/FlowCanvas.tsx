@@ -194,6 +194,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     if (!cf) {
       if (isOutput) {
         onConnectionStart(nodeId, portId);
+      } else {
+        // clicking input port with no active connection: do nothing
       }
     } else {
       if (cf.nodeId !== nodeId) {
