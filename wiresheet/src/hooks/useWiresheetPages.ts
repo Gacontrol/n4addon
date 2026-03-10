@@ -480,6 +480,23 @@ export const useWiresheetPages = () => {
 
   const cancelConnection = useCallback(() => setConnectingFrom(null), []);
 
+  const updateContainerSize = useCallback((nodeId: string, width: number, height: number) => {
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.map(n => n.id === nodeId ? {
+        ...n,
+        data: {
+          ...n.data,
+          config: {
+            ...n.data.config,
+            containerWidth: width,
+            containerHeight: height
+          }
+        }
+      } : n)
+    }));
+  }, [updateActivePage]);
+
   return {
     pages,
     activePage,
@@ -524,6 +541,7 @@ export const useWiresheetPages = () => {
     deleteSelected,
     startConnection,
     endConnection,
-    cancelConnection
+    cancelConnection,
+    updateContainerSize
   };
 };

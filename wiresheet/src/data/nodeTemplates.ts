@@ -91,7 +91,8 @@ export const nodeTemplates: NodeTemplate[] = [
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Logisches UND (A AND B)'
+    description: 'Logisches UND (A AND B)',
+    defaultConfig: { inputCount: 2 }
   },
   {
     type: 'or-gate',
@@ -106,7 +107,24 @@ export const nodeTemplates: NodeTemplate[] = [
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Logisches ODER (A OR B)'
+    description: 'Logisches ODER (A OR B)',
+    defaultConfig: { inputCount: 2 }
+  },
+  {
+    type: 'xor-gate',
+    label: 'XOR',
+    icon: 'Split',
+    category: 'logic',
+    color: '#10b981',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Exklusiv ODER (XOR)',
+    defaultConfig: { inputCount: 2 }
   },
   {
     type: 'not-gate',
@@ -121,6 +139,246 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'Ausgang', type: 'output' }
     ],
     description: 'Logisches NICHT (NOT)'
+  },
+  {
+    type: 'switch',
+    label: 'Switch',
+    icon: 'ToggleRight',
+    category: 'logic',
+    color: '#10b981',
+    inputs: [
+      { label: 'Wert', type: 'input' },
+      { label: 'Schalter', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Schaltet Wert durch wenn Schalter true'
+  },
+  {
+    type: 'select',
+    label: 'Select',
+    icon: 'ArrowLeftRight',
+    category: 'logic',
+    color: '#10b981',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' },
+      { label: 'Auswahl', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Waehlt A (0/false) oder B (1/true)'
+  },
+  {
+    type: 'math-add',
+    label: 'Addition',
+    icon: 'Plus',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Summe', type: 'output' }
+    ],
+    description: 'A + B'
+  },
+  {
+    type: 'math-sub',
+    label: 'Subtraktion',
+    icon: 'Minus',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Differenz', type: 'output' }
+    ],
+    description: 'A - B'
+  },
+  {
+    type: 'math-mul',
+    label: 'Multiplikation',
+    icon: 'X',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Produkt', type: 'output' }
+    ],
+    description: 'A * B'
+  },
+  {
+    type: 'math-div',
+    label: 'Division',
+    icon: 'Divide',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Quotient', type: 'output' }
+    ],
+    description: 'A / B'
+  },
+  {
+    type: 'math-min',
+    label: 'Minimum',
+    icon: 'ChevronDown',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Min', type: 'output' }
+    ],
+    description: 'Kleinerer Wert'
+  },
+  {
+    type: 'math-max',
+    label: 'Maximum',
+    icon: 'ChevronUp',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Max', type: 'output' }
+    ],
+    description: 'Groesserer Wert'
+  },
+  {
+    type: 'math-avg',
+    label: 'Durchschnitt',
+    icon: 'TrendingUp',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'A', type: 'input' },
+      { label: 'B', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Avg', type: 'output' }
+    ],
+    description: 'Durchschnittswert',
+    defaultConfig: { inputCount: 2 }
+  },
+  {
+    type: 'math-abs',
+    label: 'Absolutwert',
+    icon: 'Maximize2',
+    category: 'math',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'Wert', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Abs', type: 'output' }
+    ],
+    description: '|Wert|'
+  },
+  {
+    type: 'const-value',
+    label: 'Konstante',
+    icon: 'Hash',
+    category: 'special',
+    color: '#64748b',
+    inputs: [],
+    outputs: [
+      { label: 'Wert', type: 'output' }
+    ],
+    description: 'Konstanter Wert',
+    defaultConfig: { constValue: 0 }
+  },
+  {
+    type: 'rising-edge',
+    label: 'Steigende Flanke',
+    icon: 'TrendingUp',
+    category: 'special',
+    color: '#64748b',
+    inputs: [
+      { label: 'Signal', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Trigger', type: 'output' }
+    ],
+    description: 'Erkennt 0->1 Wechsel'
+  },
+  {
+    type: 'falling-edge',
+    label: 'Fallende Flanke',
+    icon: 'TrendingDown',
+    category: 'special',
+    color: '#64748b',
+    inputs: [
+      { label: 'Signal', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Trigger', type: 'output' }
+    ],
+    description: 'Erkennt 1->0 Wechsel'
+  },
+  {
+    type: 'sr-flipflop',
+    label: 'SR Flipflop',
+    icon: 'FlipHorizontal',
+    category: 'special',
+    color: '#64748b',
+    inputs: [
+      { label: 'Set', type: 'input' },
+      { label: 'Reset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Q', type: 'output' }
+    ],
+    description: 'Set-Reset Speicher'
+  },
+  {
+    type: 'counter',
+    label: 'Zaehler',
+    icon: 'ListOrdered',
+    category: 'special',
+    color: '#64748b',
+    inputs: [
+      { label: 'Impuls', type: 'input' },
+      { label: 'Reset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Wert', type: 'output' }
+    ],
+    description: 'Zaehlt Impulse',
+    defaultConfig: { counterMax: 100, counterMin: 0 }
+  },
+  {
+    type: 'timer',
+    label: 'Timer',
+    icon: 'Timer',
+    category: 'special',
+    color: '#64748b',
+    inputs: [
+      { label: 'Start', type: 'input' },
+      { label: 'Reset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Aktiv', type: 'output' },
+      { label: 'Fertig', type: 'output' }
+    ],
+    description: 'Einschaltverzoegerung',
+    defaultConfig: { timerMs: 1000 }
   },
   {
     type: 'compare',

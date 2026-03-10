@@ -292,6 +292,106 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {(node.type === 'and-gate' || node.type === 'or-gate' || node.type === 'xor-gate') && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Anzahl Eingaenge
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={2}
+                max={16}
+                value={config.inputCount ?? 2}
+                onChange={e => {
+                  const count = Math.max(2, Math.min(16, parseInt(e.target.value) || 2));
+                  updateConfig('inputCount', count);
+                  const labels = 'ABCDEFGHIJKLMNOP'.split('');
+                  const newInputs = Array.from({ length: count }, (_, i) => ({
+                    id: `input-${i}`,
+                    label: labels[i] || `In${i + 1}`,
+                    type: 'input' as const
+                  }));
+                  onUpdateNode(node.id, { inputs: newInputs });
+                }}
+                className="w-20 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 transition-colors text-center"
+              />
+              <span className="text-xs text-slate-400">Eingaenge (2-16)</span>
+            </div>
+          </div>
+        )}
+
+        {node.type === 'const-value' && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Konstanter Wert
+            </label>
+            <input
+              type="text"
+              value={config.constValue !== undefined ? String(config.constValue) : '0'}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === 'true' || val === 'false') {
+                  updateConfig('constValue', val === 'true');
+                } else if (!isNaN(Number(val)) && val !== '') {
+                  updateConfig('constValue', Number(val));
+                } else {
+                  updateConfig('constValue', val);
+                }
+              }}
+              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors font-mono"
+            />
+            <p className="text-xs text-slate-500 mt-1">Zahl, true/false, oder Text</p>
+          </div>
+        )}
+
+        {node.type === 'timer' && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Timer Dauer
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={100}
+                step={100}
+                value={config.timerMs ?? 1000}
+                onChange={e => updateConfig('timerMs', parseInt(e.target.value) || 1000)}
+                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+              />
+              <span className="text-xs text-slate-400 flex-shrink-0">ms</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">{((config.timerMs ?? 1000) / 1000).toFixed(1)} Sekunden</p>
+          </div>
+        )}
+
+        {node.type === 'counter' && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Zaehler Min
+              </label>
+              <input
+                type="number"
+                value={config.counterMin ?? 0}
+                onChange={e => updateConfig('counterMin', parseInt(e.target.value) || 0)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Zaehler Max
+              </label>
+              <input
+                type="number"
+                value={config.counterMax ?? 100}
+                onChange={e => updateConfig('counterMax', parseInt(e.target.value) || 100)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+          </div>
+        )}
+
         {node.type === 'delay' && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">

@@ -456,8 +456,40 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       }
     } else if (node.type === 'or-gate') {
       nodeValues[nodeId] = inputVals.some(v => toBool(v));
+    } else if (node.type === 'xor-gate') {
+      const trueCount = inputVals.filter(v => toBool(v)).length;
+      nodeValues[nodeId] = trueCount % 2 === 1;
     } else if (node.type === 'not-gate') {
       nodeValues[nodeId] = !toBool(inputVals[0]);
+    } else if (node.type === 'switch') {
+      const val = inputVals[0];
+      const sw = toBool(inputVals[1]);
+      nodeValues[nodeId] = sw ? val : null;
+    } else if (node.type === 'select') {
+      const a = inputVals[0];
+      const b = inputVals[1];
+      const sel = toBool(inputVals[2]);
+      nodeValues[nodeId] = sel ? b : a;
+    } else if (node.type === 'math-add') {
+      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) + (parseFloat(inputVals[1]) || 0);
+    } else if (node.type === 'math-sub') {
+      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) - (parseFloat(inputVals[1]) || 0);
+    } else if (node.type === 'math-mul') {
+      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) * (parseFloat(inputVals[1]) || 0);
+    } else if (node.type === 'math-div') {
+      const divisor = parseFloat(inputVals[1]) || 0;
+      nodeValues[nodeId] = divisor !== 0 ? (parseFloat(inputVals[0]) || 0) / divisor : 0;
+    } else if (node.type === 'math-min') {
+      nodeValues[nodeId] = Math.min(parseFloat(inputVals[0]) || 0, parseFloat(inputVals[1]) || 0);
+    } else if (node.type === 'math-max') {
+      nodeValues[nodeId] = Math.max(parseFloat(inputVals[0]) || 0, parseFloat(inputVals[1]) || 0);
+    } else if (node.type === 'math-avg') {
+      const validVals = inputVals.filter(v => v !== null && v !== undefined).map(v => parseFloat(v) || 0);
+      nodeValues[nodeId] = validVals.length > 0 ? validVals.reduce((a, b) => a + b, 0) / validVals.length : 0;
+    } else if (node.type === 'math-abs') {
+      nodeValues[nodeId] = Math.abs(parseFloat(inputVals[0]) || 0);
+    } else if (node.type === 'const-value') {
+      nodeValues[nodeId] = cfg.constValue !== undefined ? cfg.constValue : 0;
     } else if (node.type === 'compare') {
       const a = parseFloat(inputVals[0]) || 0;
       const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);

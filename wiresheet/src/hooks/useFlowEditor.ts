@@ -77,6 +77,24 @@ export const useFlowEditor = () => {
     setConnectingFrom(null);
   }, []);
 
+  const updateContainerSize = useCallback((nodeId: string, width: number, height: number) => {
+    setNodes(prev =>
+      prev.map(node =>
+        node.id === nodeId ? {
+          ...node,
+          data: {
+            ...node.data,
+            config: {
+              ...node.data.config,
+              containerWidth: width,
+              containerHeight: height
+            }
+          }
+        } : node
+      )
+    );
+  }, []);
+
   return {
     nodes,
     connections,
@@ -91,6 +109,7 @@ export const useFlowEditor = () => {
     startConnection,
     endConnection,
     cancelConnection,
-    setSelectedNode
+    setSelectedNode,
+    updateContainerSize
   };
 };

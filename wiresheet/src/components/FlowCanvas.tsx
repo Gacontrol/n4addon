@@ -39,6 +39,7 @@ interface FlowCanvasProps {
   onCopy: () => void;
   onPaste: () => void;
   onDeleteSelected: () => void;
+  onContainerResize?: (nodeId: string, width: number, height: number) => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
@@ -65,6 +66,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onCopy,
   onPaste,
   onDeleteSelected,
+  onContainerResize,
   ghostNode,
   liveValues = {},
   onOverrideChange
@@ -152,9 +154,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     if (e.button === 2) return;
     const target = e.target as HTMLElement;
     const isOnNode = target.closest('[data-node-id]');
-    const isOnPort = target.closest('[data-port-id]');
+    const isOnPort = target.closest('[data-port-id]') || target.closest('.node-port');
 
-    if (!isOnNode && !isOnPort) {
+    if (isOnPort) {
+      return;
+    }
+
+    if (!isOnNode) {
       if (connectingFrom) {
         onConnectionCancel();
         return;
@@ -406,6 +412,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               portValues={portValues}
               onContextMenu={handleNodeContextMenu}
               onMultiDragStart={handleMultiDragStart}
+              onContainerResize={onContainerResize}
               isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
               isDraggingMultiple={isDraggingMultiple}
             />

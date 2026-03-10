@@ -44,6 +44,11 @@ export interface NodeConfig {
   activeCase?: number;
   containerWidth?: number;
   containerHeight?: number;
+  inputCount?: number;
+  constValue?: number | string | boolean;
+  timerMs?: number;
+  counterMax?: number;
+  counterMin?: number;
   [key: string]: unknown;
 }
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition } from '../types/flow';
 import * as Icons from 'lucide-react';
 
@@ -17,6 +17,7 @@ interface FlowNodeProps {
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
   onContextMenu?: (nodeId: string, e: React.MouseEvent) => void;
   onMultiDragStart?: (nodeId: string, e: React.PointerEvent) => void;
+  onContainerResize?: (nodeId: string, width: number, height: number) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -35,6 +36,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onOverrideChange,
   onContextMenu,
   onMultiDragStart,
+  onContainerResize,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -44,8 +46,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [dpContextMenu, setDpContextMenu] = useState<ContextMenuState | null>(null);
   const [overrideInput, setOverrideInput] = useState<string>('');
+  const resizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
   const [showOverrideInput, setShowOverrideInput] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
@@ -172,11 +176,47 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
   const displayValue = node.type === 'dp-enum' ? getEnumLabel(liveValue) : String(liveValue);
 
+  const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartRef.current = {
+      width: containerWidth,
+      height: containerHeight,
+      mouseX: e.clientX,
+      mouseY: e.clientY
+    };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [containerWidth, containerHeight]);
+
+  const handleResizePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isResizing || !resizeStartRef.current || !onContainerResize) return;
+    const dx = e.clientX - resizeStartRef.current.mouseX;
+    const dy = e.clientY - resizeStartRef.current.mouseY;
+    const newWidth = Math.max(250, resizeStartRef.current.width + dx);
+    const newHeight = Math.max(150, resizeStartRef.current.height + dy);
+    onContainerResize(node.id, newWidth, newHeight);
+  }, [isResizing, node.id, onContainerResize]);
+
+  const handleResizePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isResizing) {
+      setIsResizing(false);
+      resizeStartRef.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }, [isResizing]);
+
   if (isCaseContainer) {
+    const caseRowHeight = 36;
+    const headerHeight = 44;
+    const calculatedHeight = headerHeight + (cases.length * caseRowHeight) + 8;
+    const finalHeight = Math.max(containerHeight, calculatedHeight);
+
     return (
       <div
         ref={nodeRef}
         data-node-id={node.id}
+        data-case-container="true"
         className="absolute select-none"
         style={{
           left: node.position.x,
@@ -185,7 +225,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           cursor: isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
           width: containerWidth,
-          height: containerHeight
+          height: finalHeight
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -194,81 +234,100 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
         onContextMenu={handleContextMenu}
       >
         <div
-          className="w-full h-full rounded-xl overflow-hidden"
+          className="w-full h-full rounded-xl overflow-hidden flex flex-col"
           style={{
-            background: 'rgba(99, 102, 241, 0.08)',
-            border: `2px ${isSelected ? 'solid' : 'dashed'} ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.4)'}`,
-            boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3)' : 'none'
+            background: 'rgba(30, 41, 59, 0.95)',
+            border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.5)'}`,
+            boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.3)'
           }}
         >
           <div
-            className="px-3 py-2 flex items-center justify-between gap-2"
-            style={{ backgroundColor: 'rgba(99, 102, 241, 0.9)' }}
+            className="px-3 py-2.5 flex items-center gap-3 flex-shrink-0"
+            style={{ backgroundColor: '#6366f1' }}
           >
-            <div className="flex items-center gap-1.5">
-              <Icons.Layers className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold text-white">{data.label}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1">
-                {cases.map((c, idx) => (
-                  <button
-                    key={c.id}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                      activeCaseValue === idx
-                        ? 'bg-white text-indigo-700'
-                        : 'bg-white/20 text-white/80 hover:bg-white/30'
-                    }`}
-                    onPointerDown={e => e.stopPropagation()}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                data-action="delete"
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onDelete(node.id); }}
-                className="text-white/60 hover:text-white transition-colors"
-              >
-                <Icons.X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center px-3 py-1.5 bg-indigo-950/50 border-b border-indigo-500/30">
             <div
-              className="relative -ml-3 flex-shrink-0"
-              style={{ width: 24, height: 24 }}
+              className="node-port relative flex-shrink-0 cursor-crosshair"
+              style={{ width: 28, height: 28, marginLeft: -8 }}
+              data-port-id={`${node.id}-input-0`}
+              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+              onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, 'input-0', false); }}
             >
-              <button
-                className="node-port absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all"
-                style={{
-                  borderColor: isConnecting ? '#60a5fa' : '#6366f1',
-                  backgroundColor: isConnecting ? '#1d4ed8' : '#312e81',
-                  boxShadow: isConnecting ? '0 0 8px #60a5fa' : 'none',
-                  cursor: 'crosshair'
-                }}
-                data-port-id={`${node.id}-input-0`}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
-                title="Case Eingang"
-              />
               <div
-                className="absolute inset-0 cursor-crosshair"
-                data-port-id={`${node.id}-input-0`}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => { e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
+                style={{
+                  borderColor: isConnecting ? '#60a5fa' : '#a5b4fc',
+                  backgroundColor: isConnecting ? '#1d4ed8' : '#4338ca',
+                  boxShadow: isConnecting ? '0 0 12px #60a5fa' : 'none',
+                  transform: isConnecting ? 'translate(-50%, -50%) scale(1.3)' : 'translate(-50%, -50%) scale(1)'
+                }}
               />
             </div>
-            <span className="text-xs text-indigo-300">Case: {activeCaseValue}</span>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Icons.Layers className="w-4 h-4 text-white flex-shrink-0" />
+              <span className="text-sm font-bold text-white truncate">{data.label}</span>
+              <span className="text-xs text-white/70 bg-white/20 px-1.5 py-0.5 rounded font-mono flex-shrink-0">
+                ={activeCaseValue}
+              </span>
+            </div>
+            <button
+              data-action="delete"
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onDelete(node.id); }}
+              className="text-white/60 hover:text-white transition-colors flex-shrink-0"
+            >
+              <Icons.X className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 p-2 relative" style={{ minHeight: containerHeight - 80 }}>
-            <p className="text-[10px] text-indigo-400/60 text-center absolute inset-0 flex items-center justify-center pointer-events-none">
-              Nodes hier platzieren
-            </p>
+
+          <div className="flex-1 overflow-hidden">
+            {cases.map((c, idx) => {
+              const isActive = activeCaseValue === idx;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center border-b last:border-b-0 transition-colors"
+                  style={{
+                    height: caseRowHeight,
+                    backgroundColor: isActive ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                    borderColor: 'rgba(99, 102, 241, 0.2)'
+                  }}
+                >
+                  <div
+                    className="w-10 h-full flex items-center justify-center flex-shrink-0 font-mono text-xs border-r"
+                    style={{
+                      backgroundColor: isActive ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.1)',
+                      borderColor: 'rgba(99, 102, 241, 0.2)',
+                      color: isActive ? '#a5b4fc' : '#64748b'
+                    }}
+                  >
+                    {idx}
+                  </div>
+                  <div className="flex-1 px-3 flex items-center gap-2 min-w-0">
+                    <span className={`text-xs truncate ${isActive ? 'text-indigo-200 font-medium' : 'text-slate-400'}`}>
+                      {c.label}
+                    </span>
+                    {isActive && (
+                      <Icons.ArrowRight className="w-3 h-3 text-indigo-400 flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="px-2 flex-shrink-0">
+                    {isActive && (
+                      <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="absolute bottom-1 right-1 w-4 h-4 cursor-se-resize opacity-30 hover:opacity-60 transition-opacity">
-            <Icons.GripHorizontal className="w-4 h-4 text-indigo-400 rotate-45" />
+
+          <div
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize flex items-center justify-center hover:bg-indigo-600/30 rounded-tl transition-colors"
+            onPointerDown={handleResizePointerDown}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+            onPointerCancel={handleResizePointerUp}
+          >
+            <Icons.GripHorizontal className="w-3 h-3 text-indigo-400/60 rotate-[-45deg]" />
           </div>
         </div>
       </div>
@@ -472,31 +531,28 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             {data.inputs.map(input => {
               const portVal = portValues[input.id];
               const hasPortVal = portVal !== undefined && portVal !== null;
+              const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
               return (
-                <div key={input.id} className="flex items-center py-0.5 min-h-[22px]">
+                <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
                   <div
-                    className="relative -ml-3 flex-shrink-0"
-                    style={{ width: 24, height: 24 }}
+                    className="node-port relative flex-shrink-0 cursor-crosshair"
+                    style={{ width: 32, height: 32, marginLeft: -16 }}
+                    data-port-id={`${node.id}-${input.id}`}
+                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, input.id, false); }}
                   >
-                    <button
-                      className="node-port absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all"
-                      style={{
-                        borderColor: isConnecting && connectingFromNodeId !== node.id ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
-                        backgroundColor: isConnecting && connectingFromNodeId !== node.id ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
-                        boxShadow: isConnecting && connectingFromNodeId !== node.id ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
-                        cursor: 'crosshair'
-                      }}
-                      data-port-id={`${node.id}-${input.id}`}
-                      onPointerDown={e => e.stopPropagation()}
-                      onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
-                      title={`${input.label}${hasPortVal ? ': ' + String(portVal) : ''}`}
-                    />
                     <div
-                      className="absolute inset-0 cursor-crosshair"
-                      data-port-id={`${node.id}-${input.id}`}
-                      onPointerDown={e => e.stopPropagation()}
-                      onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
+                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
+                      style={{
+                        borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
+                        backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
+                        boxShadow: isHighlighted ? '0 0 12px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
+                        transform: isHighlighted ? 'translate(-50%, -50%) scale(1.3)' : 'translate(-50%, -50%) scale(1)'
+                      }}
                     />
+                    {isHighlighted && (
+                      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-2 border-blue-400/30 animate-ping pointer-events-none" />
+                    )}
                   </div>
                   <div className="pr-3 flex items-center gap-1.5 min-w-0">
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
@@ -514,7 +570,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               const outVal = isManual ? data.override?.value : liveValues[node.id];
               const hasOutVal = outVal !== undefined && outVal !== null;
               return (
-                <div key={output.id} className="flex items-center justify-end py-0.5 min-h-[22px]">
+                <div key={output.id} className="flex items-center justify-end py-0.5 min-h-[28px]">
                   <div className="pl-3 flex items-center gap-1.5 min-w-0">
                     {hasOutVal && (
                       <span className={`text-[9px] font-mono px-1 py-0.5 rounded leading-none max-w-16 truncate ${
@@ -526,27 +582,19 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
                   </div>
                   <div
-                    className="relative -mr-3 flex-shrink-0"
-                    style={{ width: 24, height: 24 }}
+                    className="node-port relative flex-shrink-0 cursor-crosshair"
+                    style={{ width: 32, height: 32, marginRight: -16 }}
+                    data-port-id={`${node.id}-${output.id}`}
+                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, output.id, true); }}
                   >
-                    <button
-                      className="node-port absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all"
+                    <div
+                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
                       style={{
                         borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
                         backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
-                        boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none',
-                        cursor: 'crosshair'
+                        boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
                       }}
-                      data-port-id={`${node.id}-${output.id}`}
-                      onPointerDown={e => e.stopPropagation()}
-                      onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
-                      title={`${output.label}${hasOutVal ? ': ' + String(outVal) : ''}`}
-                    />
-                    <div
-                      className="absolute inset-0 cursor-crosshair"
-                      data-port-id={`${node.id}-${output.id}`}
-                      onPointerDown={e => e.stopPropagation()}
-                      onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
                     />
                   </div>
                 </div>
