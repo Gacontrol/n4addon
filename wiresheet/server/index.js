@@ -189,6 +189,17 @@ app.post(['/ha/call', '/api/ha/call'], async (req, res) => {
   }
 });
 
+function toBool(val) {
+  if (val === true || val === 1) return true;
+  if (val === false || val === 0) return false;
+  if (typeof val === 'string') {
+    const lower = val.toLowerCase();
+    if (lower === 'on' || lower === 'true' || lower === '1') return true;
+    if (lower === 'off' || lower === 'false' || lower === '0') return false;
+  }
+  return !!val;
+}
+
 app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
   const { nodes, connections, manualOverrides = {} } = req.body;
   try {
@@ -199,8 +210,13 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
       .map(async (n) => {
         try {
           const state = await haGet(`/states/${n.data.entityId}`);
-          const val = parseFloat(state.state);
-          nodeValues[n.id] = isNaN(val) ? state.state : val;
+          const rawState = state.state;
+          const numVal = parseFloat(rawState);
+          if (!isNaN(numVal)) {
+            nodeValues[n.id] = numVal;
+          } else {
+            nodeValues[n.id] = rawState;
+          }
         } catch {
           nodeValues[n.id] = null;
         }
@@ -231,15 +247,18 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
       if (manualOverrides[nodeId] !== undefined) {
         nodeValues[nodeId] = manualOverrides[nodeId];
       } else if (node.type === 'ha-input') {
-        // already loaded above
       } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
         nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
       } else if (node.type === 'and-gate') {
-        nodeValues[nodeId] = inputVals.length > 0 && inputVals.every(v => !!v);
+        if (inputVals.length === 0) {
+          nodeValues[nodeId] = false;
+        } else {
+          nodeValues[nodeId] = inputVals.every(v => toBool(v));
+        }
       } else if (node.type === 'or-gate') {
-        nodeValues[nodeId] = inputVals.some(v => !!v);
+        nodeValues[nodeId] = inputVals.some(v => toBool(v));
       } else if (node.type === 'not-gate') {
-        nodeValues[nodeId] = !inputVals[0];
+        nodeValues[nodeId] = !toBool(inputVals[0]);
       } else if (node.type === 'compare') {
         const a = parseFloat(inputVals[0]) || 0;
         const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
@@ -262,17 +281,21 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
         if (val !== null && val !== undefined) {
           const entityId = node.data.entityId;
           const [domain] = entityId.split('.');
+          const boolVal = toBool(val);
           try {
             if (domain === 'light') {
-              await haPost(`/services/light/${val ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
             } else if (domain === 'switch') {
-              await haPost(`/services/switch/${val ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
             } else if (domain === 'input_boolean') {
-              await haPost(`/services/input_boolean/${val ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
             } else if (domain === 'input_number') {
-              await haPost('/services/input_number/set_value', { entity_id: entityId, value: val });
+              const numVal = parseFloat(val);
+              if (!isNaN(numVal)) {
+                await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
+              }
             }
-            nodeValues[nodeId] = val;
+            nodeValues[nodeId] = boolVal;
           } catch (e) {
             console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
             nodeValues[nodeId] = null;
