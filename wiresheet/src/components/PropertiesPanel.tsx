@@ -888,6 +888,113 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'smoothing' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sky-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Glaettung</span>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Methode</label>
+              <select
+                value={config.smoothingMethod ?? 'average'}
+                onChange={e => updateConfig('smoothingMethod', e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+              >
+                <option value="average">Gleitender Durchschnitt</option>
+                <option value="exponential">Exponentiell gewichtet</option>
+                <option value="median">Median</option>
+              </select>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Glaettungszeitraum</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={config.smoothingHours ?? 24}
+                    onChange={e => {
+                      const hours = parseInt(e.target.value) || 1;
+                      const unit = config.smoothingUnit ?? 'hours';
+                      let ms = hours * 3600000;
+                      if (unit === 'minutes') ms = hours * 60000;
+                      if (unit === 'days') ms = hours * 86400000;
+                      updateConfig('smoothingHours', hours);
+                      updateConfig('smoothingDuration', ms);
+                    }}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                  />
+                </div>
+                <div>
+                  <select
+                    value={config.smoothingUnit ?? 'hours'}
+                    onChange={e => {
+                      const unit = e.target.value;
+                      const value = config.smoothingHours ?? 24;
+                      let ms = value * 3600000;
+                      if (unit === 'minutes') ms = value * 60000;
+                      if (unit === 'days') ms = value * 86400000;
+                      updateConfig('smoothingUnit', unit);
+                      updateConfig('smoothingDuration', ms);
+                    }}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                  >
+                    <option value="minutes">Minuten</option>
+                    <option value="hours">Stunden</option>
+                    <option value="days">Tage</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Abtastintervall</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1000}
+                  step={1000}
+                  value={config.sampleIntervalMs ?? 60000}
+                  onChange={e => updateConfig('sampleIntervalMs', parseInt(e.target.value) || 60000)}
+                  className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-sky-500"
+                />
+                <span className="text-xs text-slate-400">ms</span>
+              </div>
+              <p className="text-[9px] text-slate-500 mt-1">
+                {((config.sampleIntervalMs ?? 60000) / 1000).toFixed(0)} Sek. = {Math.round((config.smoothingDuration ?? 86400000) / (config.sampleIntervalMs ?? 60000))} Samples
+              </p>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-slate-400">Ausgaenge:</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-slate-300">Geglaettet</span>
+                <span className="text-slate-500">- Durchschnitt/Median</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="text-slate-300">Min</span>
+                <span className="text-slate-500">- Minimum im Zeitraum</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <div className="w-2 h-2 rounded-full bg-orange-400" />
+                <span className="text-slate-300">Max</span>
+                <span className="text-slate-500">- Maximum im Zeitraum</span>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Ideal fuer Aussentemperatur oder andere schwankende Messwerte. Speichert Werte ueber den eingestellten Zeitraum.
+            </p>
+          </div>
+        )}
+
         {node.type === 'case-container' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-indigo-400">

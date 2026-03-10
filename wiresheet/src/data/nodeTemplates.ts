@@ -541,5 +541,28 @@ export const nodeTemplates: NodeTemplate[] = [
       inverted: false,
       clamp: true
     }
+  },
+  {
+    type: 'smoothing',
+    label: 'Glaettung',
+    icon: 'Waves',
+    category: 'math',
+    color: '#0ea5e9',
+    inputs: [
+      { label: 'Eingang', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Geglaettet', type: 'output' },
+      { label: 'Min', type: 'output' },
+      { label: 'Max', type: 'output' }
+    ],
+    description: 'Glaettet Werte ueber eine einstellbare Zeitspanne',
+    defaultConfig: {
+      smoothingMethod: 'average',
+      smoothingDuration: 86400000,
+      smoothingUnit: 'hours',
+      smoothingHours: 24,
+      sampleIntervalMs: 60000
+    }
   }
 ];
