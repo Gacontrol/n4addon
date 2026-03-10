@@ -166,10 +166,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const portRect = el.getBoundingClientRect();
     const canvasRect = canvasRef.current.getBoundingClientRect();
     return {
-      x: portRect.left - canvasRect.left + portRect.width / 2,
-      y: portRect.top - canvasRect.top + portRect.height / 2
+      x: (portRect.left - canvasRect.left + portRect.width / 2) / zoom,
+      y: (portRect.top - canvasRect.top + portRect.height / 2) / zoom
     };
-  }, []);
+  }, [zoom]);
 
   const handlePortClick = (nodeId: string, portId: string, isOutput: boolean) => {
     if (isOutput) {
@@ -430,7 +430,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         {connectingFrom && connectingFromPos && (
           <ConnectionLine
             x1={connectingFromPos.x} y1={connectingFromPos.y}
-            x2={mousePos.x} y2={mousePos.y}
+            x2={mousePos.x / zoom} y2={mousePos.y / zoom}
             color="#60a5fa"
             isActive
           />
