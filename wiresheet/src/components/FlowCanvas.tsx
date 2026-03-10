@@ -42,6 +42,7 @@ interface FlowCanvasProps {
   onContainerResize?: (nodeId: string, width: number, height: number) => void;
   onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
   onMoveNodeToContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
+  onMoveNodeOutOfContainer?: (nodeId: string) => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
@@ -71,6 +72,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onContainerResize,
   onCaseResize,
   onMoveNodeToContainer,
+  onMoveNodeOutOfContainer,
   ghostNode,
   liveValues = {},
   onOverrideChange
@@ -523,6 +525,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onContainerResize={onContainerResize}
                 onCaseResize={onCaseResize}
                 onDropIntoContainer={onMoveNodeToContainer}
+                onDropOutOfContainer={onMoveNodeOutOfContainer}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
                 parentContainer={parentContainer}

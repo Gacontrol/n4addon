@@ -510,6 +510,7 @@ function App() {
           onContainerResize={updateContainerSize}
           onCaseResize={updateCaseSize}
           onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
+          onMoveNodeOutOfContainer={(nodeId) => moveNodeToContainer(nodeId, null)}
           ghostNode={ghostNode}
           liveValues={liveValues}
           onOverrideChange={updateNodeOverride}

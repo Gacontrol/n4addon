@@ -133,20 +133,37 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     e.currentTarget.releasePointerCapture(e.pointerId);
     setIsDragging(false);
 
-    if (node.type !== 'case-container' && !parentContainer) {
-      const allDropZones = document.querySelectorAll('[data-case-drop-zone]');
-      for (const zone of allDropZones) {
-        const zoneRect = zone.getBoundingClientRect();
-        if (
-          e.clientX >= zoneRect.left && e.clientX <= zoneRect.right &&
-          e.clientY >= zoneRect.top && e.clientY <= zoneRect.bottom
-        ) {
-          const containerId = zone.getAttribute('data-case-drop-zone');
-          const caseIndexStr = zone.getAttribute('data-case-index');
-          if (containerId && caseIndexStr && onDropIntoContainer) {
-            onDropIntoContainer(node.id, containerId, parseInt(caseIndexStr));
+    if (node.type !== 'case-container') {
+      if (parentContainer) {
+        const containerEl = document.querySelector(`[data-node-id="${parentContainer.id}"]`);
+        if (containerEl) {
+          const containerRect = containerEl.getBoundingClientRect();
+          const isOutsideContainer =
+            e.clientX < containerRect.left ||
+            e.clientX > containerRect.right ||
+            e.clientY < containerRect.top ||
+            e.clientY > containerRect.bottom;
+
+          if (isOutsideContainer && onDropOutOfContainer) {
+            onDropOutOfContainer(node.id);
+            return;
           }
-          break;
+        }
+      } else {
+        const allDropZones = document.querySelectorAll('[data-case-drop-zone]');
+        for (const zone of allDropZones) {
+          const zoneRect = zone.getBoundingClientRect();
+          if (
+            e.clientX >= zoneRect.left && e.clientX <= zoneRect.right &&
+            e.clientY >= zoneRect.top && e.clientY <= zoneRect.bottom
+          ) {
+            const containerId = zone.getAttribute('data-case-drop-zone');
+            const caseIndexStr = zone.getAttribute('data-case-index');
+            if (containerId && caseIndexStr && onDropIntoContainer) {
+              onDropIntoContainer(node.id, containerId, parseInt(caseIndexStr));
+            }
+            break;
+          }
         }
       }
     }
@@ -386,20 +403,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     data-case-drop-zone={node.id}
                     data-case-index={idx}
                     style={{
-                      backgroundColor: isActiveCase ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.6)',
+                      backgroundColor: isSelected
+                        ? (isActiveCase ? 'rgba(30, 41, 59, 0.95)' : 'rgba(30, 41, 59, 0.85)')
+                        : (isActiveCase ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.7)'),
                       backgroundImage: `
-                        radial-gradient(circle, ${isActiveCase ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.1)'} 1px, transparent 1px)
+                        radial-gradient(circle, ${isActiveCase ? 'rgba(99, 102, 241, 0.4)' : 'rgba(99, 102, 241, 0.15)'} 1px, transparent 1px)
                       `,
                       backgroundSize: '20px 20px',
                       backgroundPosition: '10px 10px',
                       pointerEvents: 'auto',
-                      opacity: isSelected ? 1 : (isActiveCase ? 1 : 0.7)
+                      border: isSelected ? `1px solid ${isActiveCase ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.3)'}` : 'none'
                     }}
                     onPointerDown={e => e.stopPropagation()}
                   >
                     {!isActiveCase && !isSelected && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="text-slate-600 text-[10px] font-medium px-2 py-1 bg-slate-800/50 rounded">
+                        <div className="text-slate-500 text-[10px] font-medium px-2 py-1 bg-slate-800/70 rounded">
                           Inaktiv - Case {idx}
                         </div>
                       </div>
@@ -458,7 +477,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           cursor: isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
           minWidth: 180,
-          opacity: isDimmed ? 0.35 : 1
+          opacity: isDimmed ? 0.6 : 1
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

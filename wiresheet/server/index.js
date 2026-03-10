@@ -649,28 +649,43 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
         nodeValues[nodeId] = null;
       }
     } else if (node.type === 'ha-output' && node.data.entityId) {
-      const val = inputVals[0];
-      if (val !== null && val !== undefined) {
-        const entityId = node.data.entityId;
-        const [domain] = entityId.split('.');
-        const boolVal = toBool(val);
-        try {
-          if (domain === 'light') {
-            await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-          } else if (domain === 'switch') {
-            await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-          } else if (domain === 'input_boolean') {
-            await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-          } else if (domain === 'input_number') {
-            const numVal = parseFloat(val);
-            if (!isNaN(numVal)) {
-              await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
-            }
+      let allowWrite = true;
+      if (node.data.parentContainerId) {
+        const parentContainer = nodes.find(n => n.id === node.data.parentContainerId);
+        if (parentContainer && parentContainer.type === 'case-container') {
+          const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
+          const nodeCase = node.data.caseIndex;
+          if (nodeCase !== undefined && nodeCase !== activeCase) {
+            allowWrite = false;
+            console.log(`HA-Output ${nodeId} nicht geschrieben - Case ${nodeCase} ist inaktiv (aktiv: ${activeCase})`);
           }
-          nodeValues[nodeId] = boolVal;
-        } catch (e) {
-          console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
-          nodeValues[nodeId] = null;
+        }
+      }
+
+      if (allowWrite) {
+        const val = inputVals[0];
+        if (val !== null && val !== undefined) {
+          const entityId = node.data.entityId;
+          const [domain] = entityId.split('.');
+          const boolVal = toBool(val);
+          try {
+            if (domain === 'light') {
+              await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+            } else if (domain === 'switch') {
+              await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+            } else if (domain === 'input_boolean') {
+              await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+            } else if (domain === 'input_number') {
+              const numVal = parseFloat(val);
+              if (!isNaN(numVal)) {
+                await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
+              }
+            }
+            nodeValues[nodeId] = boolVal;
+          } catch (e) {
+            console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
+            nodeValues[nodeId] = null;
+          }
         }
       }
     }
