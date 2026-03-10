@@ -346,34 +346,92 @@ function toBool(val) {
 
 function getDefaultValueForNodeType(nodeType) {
   switch (nodeType) {
-    case 'and':
-    case 'or':
-    case 'not':
+    case 'and-gate':
+    case 'or-gate':
+    case 'xor-gate':
+    case 'not-gate':
     case 'dp-boolean':
-    case 'toggle':
     case 'rising-edge':
     case 'falling-edge':
+    case 'compare':
+    case 'switch':
       return false;
-    case 'add':
-    case 'subtract':
-    case 'multiply':
-    case 'divide':
-    case 'min':
-    case 'max':
-    case 'average':
+    case 'math-add':
+    case 'math-sub':
+    case 'math-mul':
+    case 'math-div':
+    case 'math-min':
+    case 'math-max':
+    case 'math-avg':
+    case 'math-abs':
     case 'dp-numeric':
-    case 'scale':
+    case 'scaling':
+    case 'smoothing':
+    case 'pid-controller':
     case 'counter':
-    case 'const':
+    case 'const-value':
+    case 'timer':
       return 0;
     case 'dp-enum':
       return 0;
-    case 'compare':
     case 'threshold':
-      return false;
+      return 'below';
+    case 'delay':
+    case 'select':
+    case 'sr-flipflop':
+    case 'python-script':
+    case 'ha-input':
+    case 'ha-output':
+    case 'modbus-device-input':
+    case 'modbus-device-output':
+      return null;
     default:
       return null;
   }
+}
+
+function getDefaultOutputsForNodeType(node) {
+  const nodeType = node.type;
+  const outputs = node.data && node.data.outputs ? node.data.outputs : [];
+  const defaults = {};
+
+  switch (nodeType) {
+    case 'pid-controller':
+      defaults['output-0'] = 0;
+      break;
+    case 'threshold':
+      defaults['output-0'] = 'below';
+      defaults['output-1'] = null;
+      break;
+    case 'timer':
+      defaults['output-0'] = false;
+      defaults['output-1'] = false;
+      break;
+    case 'counter':
+      defaults['output-0'] = 0;
+      break;
+    case 'sr-flipflop':
+      defaults['output-0'] = false;
+      break;
+    case 'rising-edge':
+    case 'falling-edge':
+      defaults['output-0'] = false;
+      break;
+    case 'python-script': {
+      const pythonOutputs = (node.data && node.data.config && node.data.config.pythonOutputs) || [];
+      pythonOutputs.forEach((_, idx) => {
+        defaults[`output-${idx}`] = null;
+      });
+      defaults['_error'] = null;
+      break;
+    }
+    default:
+      outputs.forEach((_, idx) => {
+        defaults[`output-${idx}`] = null;
+      });
+  }
+
+  return defaults;
 }
 
 async function executePythonCode(code, inputs) {
@@ -576,7 +634,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
         if (nodeCase !== undefined && nodeCase !== activeCase) {
           const defaultVal = getDefaultValueForNodeType(node.type);
           nodeValues[nodeId] = defaultVal;
-          console.log(`Node ${nodeId} inaktiv (Case ${nodeCase}) - auf Default gesetzt: ${defaultVal}`);
+          const outputDefaults = getDefaultOutputsForNodeType(node);
+          for (const [portKey, portVal] of Object.entries(outputDefaults)) {
+            nodeValues[`${nodeId}:${portKey}`] = portVal;
+          }
+          console.log(`Node ${nodeId} (${node.type}) inaktiv - Case ${nodeCase} != aktiver Case ${activeCase} - auf Default gesetzt`);
           continue;
         }
       }
