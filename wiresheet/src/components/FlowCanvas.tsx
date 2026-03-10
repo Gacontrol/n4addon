@@ -265,7 +265,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   };
 
-  const handleCanvasPointerUp = () => {
+  const handleCanvasPointerUp = (e: React.PointerEvent) => {
+    if (connectingFromRef.current) {
+      const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
+      for (const el of elementsAtPoint) {
+        const portEl = el.closest('[data-port-id]') as HTMLElement | null;
+        if (portEl) {
+          const portIdAttr = portEl.getAttribute('data-port-id');
+          if (portIdAttr) {
+            const parts = portIdAttr.split('-');
+            const portId = parts.slice(-2).join('-');
+            const nodeId = parts.slice(0, -2).join('-');
+            if (nodeId !== connectingFromRef.current.nodeId) {
+              console.log('[handleCanvasPointerUp] Found port under cursor:', nodeId, portId);
+              onConnectionEnd(nodeId, portId, connectingFromRef.current.nodeId, connectingFromRef.current.portId);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     if (lasso) {
       const minX = Math.min(lasso.startX, lasso.currentX) / zoom;
       const maxX = Math.max(lasso.startX, lasso.currentX) / zoom;
