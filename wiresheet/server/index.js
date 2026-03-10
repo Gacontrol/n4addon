@@ -467,15 +467,25 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
     }
 
     const incomingConns = connections.filter(c => c.target === nodeId);
-    const inputVals = incomingConns.map(c => {
-      const sourceNode = nodes.find(n => n.id === c.source);
+
+    const getInputValue = (conn) => {
+      const sourceNode = nodes.find(n => n.id === conn.source);
       if (sourceNode && sourceNode.type === 'python-script') {
-        const portKey = `${c.source}:${c.sourcePort}`;
+        const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
         }
       }
-      return nodeValues[c.source];
+      return nodeValues[conn.source];
+    };
+
+    const nodeInputs = node.data.inputs || [];
+    const inputVals = nodeInputs.map((inputPort, idx) => {
+      const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
+      if (conn) {
+        return getInputValue(conn);
+      }
+      return undefined;
     });
 
     const cfg = node.data.config || {};
@@ -547,22 +557,38 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
+      const pythonOutputs = cfg.pythonOutputs || [];
       const inputs = {};
+
       pythonInputs.forEach((inp, idx) => {
-        const val = inputVals[idx] !== undefined ? inputVals[idx] : null;
+        const conn = incomingConns.find(c => c.targetPort === `input-${idx}`);
+        let val = null;
+        if (conn) {
+          val = getInputValue(conn);
+        }
         inputs[inp.id] = val;
         nodeValues[`${nodeId}:input-${idx}`] = val;
       });
-      try {
-        const outputs = await executePythonCode(pythonCode, inputs);
-        const pythonOutputs = cfg.pythonOutputs || [];
-        const firstOutput = pythonOutputs.length > 0 ? outputs[pythonOutputs[0].id] : null;
-        nodeValues[nodeId] = firstOutput;
-        pythonOutputs.forEach((out, idx) => {
-          nodeValues[`${nodeId}:output-${idx}`] = outputs[out.id];
-        });
-      } catch (e) {
-        console.error(`Python Script Fehler (${nodeId}):`, e.message);
+
+      console.log(`Python Script ${nodeId}: Code=${pythonCode ? pythonCode.substring(0, 50) + '...' : 'leer'}, Inputs=`, inputs);
+      if (pythonCode && pythonCode.trim()) {
+        try {
+          const outputs = await executePythonCode(pythonCode, inputs);
+          console.log(`Python Script ${nodeId} Outputs:`, outputs);
+          const firstOutput = pythonOutputs.length > 0 ? outputs[pythonOutputs[0].id] : null;
+          nodeValues[nodeId] = firstOutput;
+          pythonOutputs.forEach((out, idx) => {
+            nodeValues[`${nodeId}:output-${idx}`] = outputs[out.id];
+          });
+        } catch (e) {
+          console.error(`Python Script Fehler (${nodeId}):`, e.message);
+          nodeValues[nodeId] = null;
+          pythonOutputs.forEach((out, idx) => {
+            nodeValues[`${nodeId}:output-${idx}`] = null;
+          });
+        }
+      } else {
+        console.log(`Python Script ${nodeId}: Kein Code vorhanden, ueberspringe`);
         nodeValues[nodeId] = null;
       }
     } else if (node.type === 'case-container') {

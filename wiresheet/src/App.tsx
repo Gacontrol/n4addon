@@ -137,8 +137,9 @@ function App() {
             const containerNode = nodes.find(n => n.id === parentContainerId);
             if (containerNode && containerNode.type === 'case-container') {
               const dropZoneRect = dropZone.getBoundingClientRect();
-              x = Math.max(0, e.clientX - dropZoneRect.left - 90);
-              y = Math.max(0, e.clientY - dropZoneRect.top - 20);
+              x = Math.max(4, e.clientX - dropZoneRect.left - 90);
+              y = Math.max(4, e.clientY - dropZoneRect.top - 30);
+              console.log('Drop in case container:', { parentContainerId, caseIndex, x, y, dropZoneRect: { left: dropZoneRect.left, top: dropZoneRect.top } });
             }
           }
 
