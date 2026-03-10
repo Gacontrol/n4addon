@@ -248,10 +248,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           >
             <div
               className="node-port relative flex-shrink-0 cursor-crosshair"
-              style={{ width: 28, height: 28, marginLeft: -8 }}
+              style={{ width: 28, height: 28, marginLeft: -8, zIndex: 100 }}
               data-port-id={`${node.id}-input-0`}
-              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-              onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, 'input-0', false); }}
+              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, 'input-0', false); }}
+              onClick={e => { e.stopPropagation(); e.preventDefault(); }}
             >
               <div
                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
@@ -309,8 +309,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             data-case-drop-zone={node.id}
             style={{
               backgroundImage: 'radial-gradient(circle, rgba(99, 102, 241, 0.1) 1px, transparent 1px)',
-              backgroundSize: '16px 16px'
+              backgroundSize: '16px 16px',
+              pointerEvents: 'auto'
             }}
+            onPointerDown={e => e.stopPropagation()}
           >
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center opacity-30">
@@ -536,10 +538,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
                   <div
                     className="node-port relative flex-shrink-0 cursor-crosshair"
-                    style={{ width: 32, height: 32, marginLeft: -16 }}
+                    style={{ width: 32, height: 32, marginLeft: -16, zIndex: 100 }}
                     data-port-id={`${node.id}-${input.id}`}
-                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, input.id, false); }}
+                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, input.id, false); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); }}
                   >
                     <div
                       className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"
@@ -583,10 +585,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   </div>
                   <div
                     className="node-port relative flex-shrink-0 cursor-crosshair"
-                    style={{ width: 32, height: 32, marginRight: -16 }}
+                    style={{ width: 32, height: 32, marginRight: -16, zIndex: 100 }}
                     data-port-id={`${node.id}-${output.id}`}
-                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); }}
-                    onClick={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, output.id, true); }}
+                    onPointerDown={e => { e.stopPropagation(); e.preventDefault(); onPortClick(node.id, output.id, true); }}
+                    onClick={e => { e.stopPropagation(); e.preventDefault(); }}
                   >
                     <div
                       className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border-2 transition-all pointer-events-none"

@@ -116,20 +116,24 @@ function App() {
           let x = e.clientX - rect.left - 90;
           let y = e.clientY - rect.top - 30;
 
-          const dropZone = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-case-drop-zone]');
+          const elements = document.elementsFromPoint(e.clientX, e.clientY);
+          let dropZone: Element | null = null;
+          for (const el of elements) {
+            const zone = el.closest('[data-case-drop-zone]');
+            if (zone) {
+              dropZone = zone;
+              break;
+            }
+          }
           let parentContainerId: string | undefined;
 
           if (dropZone) {
             parentContainerId = dropZone.getAttribute('data-case-drop-zone') || undefined;
             const containerNode = nodes.find(n => n.id === parentContainerId);
             if (containerNode) {
-              const containerEl = document.querySelector(`[data-node-id="${parentContainerId}"]`);
-              if (containerEl) {
-                const containerRect = containerEl.getBoundingClientRect();
-                const dropZoneRect = dropZone.getBoundingClientRect();
-                x = e.clientX - dropZoneRect.left;
-                y = e.clientY - dropZoneRect.top;
-              }
+              const dropZoneRect = dropZone.getBoundingClientRect();
+              x = e.clientX - dropZoneRect.left;
+              y = e.clientY - dropZoneRect.top;
             }
           }
 
