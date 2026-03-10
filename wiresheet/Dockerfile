@@ -30,7 +30,8 @@ ENV LANG=C.UTF-8 \
 
 RUN apk add --no-cache \
     nodejs \
-    nginx && \
+    nginx \
+    python3 && \
     mkdir -p /data/wiresheet && \
     mkdir -p /run/nginx
 

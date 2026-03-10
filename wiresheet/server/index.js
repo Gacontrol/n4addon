@@ -345,7 +345,11 @@ function toBool(val) {
 
 async function executePythonCode(code, inputs) {
   return new Promise((resolve, reject) => {
-    const inputJson = JSON.stringify(inputs);
+    const normalizedInputs = {};
+    for (const [key, value] of Object.entries(inputs)) {
+      normalizedInputs[key.toLowerCase()] = value;
+    }
+    const inputJson = JSON.stringify(normalizedInputs);
 
     const wrappedCode = `
 import json
@@ -353,7 +357,7 @@ import sys
 
 _inputs = json.loads('''${inputJson}''')
 
-${Object.keys(inputs).map(k => `${k} = _inputs.get('${k}')`).join('\n')}
+${Object.keys(normalizedInputs).map(k => `${k} = _inputs.get('${k}')`).join('\n')}
 
 ${code}
 
@@ -364,6 +368,8 @@ for name in dir():
 
 print(json.dumps(_outputs))
 `;
+
+    console.log('Python wrappedCode:', wrappedCode);
 
     const python = spawn('python3', ['-c', wrappedCode], {
       timeout: 5000,
@@ -590,10 +596,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
         try {
           const outputs = await executePythonCode(pythonCode, inputs);
           console.log(`Python Script ${nodeId} Outputs:`, outputs);
-          const firstOutput = pythonOutputs.length > 0 ? outputs[pythonOutputs[0].id] : null;
+          const firstOutputId = pythonOutputs.length > 0 ? pythonOutputs[0].id.toLowerCase() : null;
+          const firstOutput = firstOutputId ? outputs[firstOutputId] : null;
           nodeValues[nodeId] = firstOutput;
           pythonOutputs.forEach((out, idx) => {
-            nodeValues[`${nodeId}:output-${idx}`] = outputs[out.id];
+            const outputId = out.id.toLowerCase();
+            nodeValues[`${nodeId}:output-${idx}`] = outputs[outputId];
           });
         } catch (e) {
           console.error(`Python Script Fehler (${nodeId}):`, e.message);
