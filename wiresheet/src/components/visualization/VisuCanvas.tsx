@@ -70,6 +70,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return liveValues[nodeId];
   }, [liveValues, logicNodes]);
 
+  const getWidgetStatusValue = useCallback((widget: VisuWidget): unknown => {
+    if (!widget.statusBinding) return undefined;
+    const { nodeId, portId } = widget.statusBinding;
+    if (portId) {
+      return liveValues[`${nodeId}:${portId}`] ?? liveValues[nodeId];
+    }
+    return liveValues[nodeId];
+  }, [liveValues]);
+
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
@@ -232,6 +241,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           <VisuWidgetRenderer
             widget={widget}
             value={getWidgetValue(widget)}
+            statusValue={getWidgetStatusValue(widget)}
             onValueChange={(value) => onWidgetValueChange(widget.id, value)}
             isEditMode={isEditMode}
             isSelected={selectedWidgetId === widget.id}

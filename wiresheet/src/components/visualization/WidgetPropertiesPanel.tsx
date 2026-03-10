@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Link2, Unlink, Trash2, Settings } from 'lucide-react';
-import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig } from '../../types/visualization';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor } from 'lucide-react';
+import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
 interface WidgetPropertiesPanelProps {
@@ -201,6 +201,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full h-8 rounded cursor-pointer"
               />
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Standardwert</label>
+              <select
+                value={switchCfg.defaultValue ? 'true' : 'false'}
+                onChange={(e) => onUpdate({ config: { ...config, defaultValue: e.target.value === 'true' } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="false">Aus (0)</option>
+                <option value="true">Ein (1)</option>
+              </select>
+            </div>
           </>
         );
 
@@ -226,6 +237,32 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full h-8 rounded cursor-pointer"
               />
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Drucken-Wert</label>
+                <input
+                  type="text"
+                  value={String(btnCfg.pressValue ?? btnCfg.defaultPressValue ?? 'true')}
+                  onChange={(e) => {
+                    const v = e.target.value === 'true' ? true : e.target.value === 'false' ? false : isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value);
+                    onUpdate({ config: { ...config, pressValue: v, defaultPressValue: v } });
+                  }}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Loslassen-Wert</label>
+                <input
+                  type="text"
+                  value={String(btnCfg.releaseValue ?? btnCfg.defaultReleaseValue ?? 'false')}
+                  onChange={(e) => {
+                    const v = e.target.value === 'true' ? true : e.target.value === 'false' ? false : isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value);
+                    onUpdate({ config: { ...config, releaseValue: v, defaultReleaseValue: v } });
+                  }}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -233,7 +270,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 onChange={(e) => onUpdate({ config: { ...config, holdMode: e.target.checked } })}
                 className="rounded"
               />
-              <label className="text-xs text-slate-400">Haltemodus (Wert bleibt)</label>
+              <label className="text-xs text-slate-400">Haltemodus (Wert bleibt nach Loslassen)</label>
             </div>
           </>
         );
@@ -580,12 +617,25 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-home-button': {
-        const homeCfg = config as HomeButtonConfig;
+        const homeCfg = config as HomeButtonConfig & { homePageId?: string };
         return (
           <>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Label</label>
               <input type="text" value={homeCfg.label || 'Home'} onChange={(e) => onUpdate({ config: { ...config, label: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Startseite (leer = erste Seite)</label>
+              <select
+                value={(homeCfg as { homePageId?: string }).homePageId || ''}
+                onChange={(e) => onUpdate({ config: { ...config, homePageId: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="">-- Erste Seite (Standard) --</option>
+                {visuPages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
@@ -606,6 +656,91 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
               <input type="color" value={backCfg.color || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-multistate': {
+        const msCfg = config as MultistateConfig;
+        const options: MultistateOption[] = msCfg.options || [];
+        return (
+          <>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-400">Zustande</label>
+                <button
+                  onClick={() => {
+                    const newOptions = [...options, { value: options.length, label: `Zustand ${options.length + 1}`, color: '#3b82f6' }];
+                    onUpdate({ config: { ...config, options: newOptions } });
+                  }}
+                  className="flex items-center gap-1 px-2 py-0.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 rounded transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  Hinzufuegen
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {options.map((opt, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5 p-2 bg-slate-800 rounded border border-slate-700">
+                    <input
+                      type="color"
+                      value={opt.color || '#3b82f6'}
+                      onChange={(e) => {
+                        const updated = options.map((o, i) => i === idx ? { ...o, color: e.target.value } : o);
+                        onUpdate({ config: { ...config, options: updated } });
+                      }}
+                      className="w-6 h-6 rounded cursor-pointer flex-shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={opt.label}
+                      placeholder="Label"
+                      onChange={(e) => {
+                        const updated = options.map((o, i) => i === idx ? { ...o, label: e.target.value } : o);
+                        onUpdate({ config: { ...config, options: updated } });
+                      }}
+                      className="flex-1 min-w-0 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+                    />
+                    <input
+                      type="text"
+                      value={String(opt.value)}
+                      placeholder="Wert"
+                      onChange={(e) => {
+                        const v = isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value);
+                        const updated = options.map((o, i) => i === idx ? { ...o, value: v } : o);
+                        onUpdate({ config: { ...config, options: updated } });
+                      }}
+                      className="w-14 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+                    />
+                    <button
+                      onClick={() => {
+                        const updated = options.filter((_, i) => i !== idx);
+                        onUpdate({ config: { ...config, options: updated } });
+                      }}
+                      className="text-red-400 hover:text-red-300 flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Standardwert</label>
+              <select
+                value={String(msCfg.defaultValue ?? '')}
+                onChange={(e) => {
+                  const v = isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value);
+                  onUpdate({ config: { ...config, defaultValue: v } });
+                }}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="">-- Kein Standard --</option>
+                {options.map((o, i) => (
+                  <option key={i} value={String(o.value)}>{o.label} ({String(o.value)})</option>
+                ))}
+              </select>
             </div>
           </>
         );
@@ -756,7 +891,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                         </div>
                       )}
                       <p className="text-green-600/50 mt-0.5">
-                        {isWriteWidget ? (widget.binding.paramKey ? 'Lesen + Schreiben (Parameter)' : 'Lesen + Schreiben') : 'Nur lesen'}
+                        {isWriteWidget ? (widget.binding.paramKey ? 'Lesen + Schreiben (Parameter)' : 'Nur schreiben (Eingang)') : 'Nur lesen'}
                       </p>
                     </div>
                   </div>
@@ -765,6 +900,76 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <Unlink className="w-4 h-4 text-slate-500" />
                     <span className="text-xs text-slate-400">Keine Verknuepfung</span>
                   </div>
+                )}
+
+                {['visu-switch', 'visu-button', 'visu-multistate'].includes(widget.type) && (
+                  <>
+                    <hr className="border-slate-700" />
+                    <div className="flex items-center gap-2 mb-1">
+                      <Monitor className="w-3.5 h-3.5 text-sky-400" />
+                      <label className="text-xs text-sky-400 font-medium">Status-Rueckmeldung (optional)</label>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Status-Baustein</label>
+                      <select
+                        value={widget.statusBinding?.nodeId || ''}
+                        onChange={(e) => {
+                          if (!e.target.value) {
+                            onUpdate({ statusBinding: undefined });
+                            return;
+                          }
+                          const node = availableNodes.find(n => n.id === e.target.value);
+                          const ports = node ? getNodePorts(node) : [];
+                          const outPort = ports.find(p => p.isOutput);
+                          onUpdate({ statusBinding: { nodeId: e.target.value, portId: outPort?.id, direction: 'read' } });
+                        }}
+                        className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                      >
+                        <option value="">-- Kein Status --</option>
+                        {Object.entries(nodesByCategory).map(([cat, nodes]) => (
+                          <optgroup key={cat} label={cat}>
+                            {nodes.map((node) => (
+                              <option key={node.id} value={node.id}>{getNodeLabel(node)}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                    {widget.statusBinding && (() => {
+                      const statusNode = availableNodes.find(n => n.id === widget.statusBinding?.nodeId);
+                      const statusPorts = statusNode ? getNodePorts(statusNode) : [];
+                      return statusPorts.filter(p => p.isOutput).length > 0 ? (
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Status-Port</label>
+                          <select
+                            value={widget.statusBinding.portId || ''}
+                            onChange={(e) => onUpdate({ statusBinding: { ...widget.statusBinding!, portId: e.target.value || undefined } })}
+                            className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                          >
+                            <option value="">-- Hauptwert --</option>
+                            {statusPorts.filter(p => p.isOutput).map(p => (
+                              <option key={p.id} value={p.id}>{p.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null;
+                    })()}
+                    {widget.statusBinding && (
+                      <div className="flex items-center gap-2 p-2 bg-sky-900/20 border border-sky-700 rounded">
+                        <Monitor className="w-4 h-4 text-sky-400" />
+                        <div className="text-xs text-sky-400">
+                          <p className="font-medium">Status verknuepft</p>
+                          <p className="text-sky-500/70">{getNodeLabel(availableNodes.find(n => n.id === widget.statusBinding?.nodeId)!)}</p>
+                        </div>
+                        <button
+                          onClick={() => onUpdate({ statusBinding: undefined })}
+                          className="ml-auto text-slate-400 hover:text-red-400"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

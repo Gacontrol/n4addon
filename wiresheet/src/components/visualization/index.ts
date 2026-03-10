@@ -3,6 +3,7 @@ export { VisuButton } from './VisuButton';
 export { VisuSlider } from './VisuSlider';
 export { VisuIncrementer } from './VisuIncrementer';
 export { VisuInput } from './VisuInput';
+export { VisuMultistate } from './VisuMultistate';
 export { VisuGauge } from './VisuGauge';
 export { VisuDisplay } from './VisuDisplay';
 export { VisuLed } from './VisuLed';

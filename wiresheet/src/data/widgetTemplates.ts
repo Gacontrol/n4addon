@@ -43,6 +43,32 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'write'
   },
   {
+    type: 'visu-multistate',
+    label: 'Mehrfachschalter',
+    icon: 'List',
+    category: 'control',
+    defaultSize: { width: 160, height: 50 },
+    defaultConfig: {
+      options: [
+        { value: 0, label: 'Aus', color: '#64748b' },
+        { value: 1, label: 'Ein', color: '#22c55e' },
+        { value: 2, label: 'Auto', color: '#3b82f6' }
+      ],
+      defaultValue: 0
+    },
+    defaultStyle: {
+      showLabel: true,
+      labelPosition: 'top',
+      backgroundColor: '#1e293b',
+      borderColor: '#374151',
+      textColor: '#e2e8f0',
+      accentColor: '#3b82f6'
+    },
+    description: 'Dropdown fuer mehrere Zustaende',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
     type: 'visu-slider',
     label: 'Schieberegler',
     icon: 'SlidersHorizontal',

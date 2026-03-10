@@ -14,6 +14,7 @@ export type WidgetType =
   | 'visu-slider'
   | 'visu-incrementer'
   | 'visu-input'
+  | 'visu-multistate'
   | 'visu-gauge'
   | 'visu-display'
   | 'visu-led'
@@ -52,6 +53,18 @@ export interface SwitchConfig {
   offLabel?: string;
   onColor?: string;
   offColor?: string;
+  defaultValue?: boolean;
+}
+
+export interface MultistateOption {
+  value: number | string;
+  label: string;
+  color?: string;
+}
+
+export interface MultistateConfig {
+  options: MultistateOption[];
+  defaultValue?: number | string;
 }
 
 export interface SliderConfig {
@@ -142,6 +155,8 @@ export interface ButtonConfig {
   releaseValue?: unknown;
   holdMode?: boolean;
   color?: string;
+  defaultPressValue?: unknown;
+  defaultReleaseValue?: unknown;
 }
 
 export interface RectConfig {
@@ -194,6 +209,7 @@ export type WidgetConfig =
   | SliderConfig
   | IncrementerConfig
   | InputConfig
+  | MultistateConfig
   | GaugeConfig
   | DisplayConfig
   | LedConfig
@@ -217,6 +233,7 @@ export interface VisuWidget {
   size: Size;
   label: string;
   binding?: WidgetBinding;
+  statusBinding?: WidgetBinding;
   config: WidgetConfig;
   style: WidgetStyle;
   locked?: boolean;

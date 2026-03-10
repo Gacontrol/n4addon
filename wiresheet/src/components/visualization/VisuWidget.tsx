@@ -7,6 +7,7 @@ import {
   SliderConfig,
   IncrementerConfig,
   InputConfig,
+  MultistateConfig,
   GaugeConfig,
   DisplayConfig,
   LedConfig,
@@ -34,12 +35,14 @@ import {
   VisuBar,
   VisuTank,
   VisuThermometer,
-  VisuLabel
+  VisuLabel,
+  VisuMultistate
 } from './index';
 
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
+  statusValue?: unknown;
   onValueChange: (value: unknown) => void;
   isEditMode: boolean;
   isSelected: boolean;
@@ -48,11 +51,13 @@ interface VisuWidgetProps {
   onNavigateToPage?: (pageId: string) => void;
   onNavigateBack?: () => void;
   onNavigateHome?: () => void;
+  visuPages?: { id: string; name: string }[];
 }
 
 export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   widget,
   value,
+  statusValue,
   onValueChange,
   isEditMode,
   isSelected,
@@ -60,27 +65,46 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onDoubleClick,
   onNavigateToPage,
   onNavigateBack,
-  onNavigateHome
+  onNavigateHome,
+  visuPages = []
 }) => {
   const renderWidget = () => {
     switch (widget.type) {
-      case 'visu-switch':
+      case 'visu-switch': {
+        const swCfg = widget.config as SwitchConfig;
+        const isWriteOnly = !!widget.binding && !widget.binding.paramKey;
         return (
           <VisuSwitch
-            value={Boolean(value)}
+            value={Boolean(isWriteOnly ? (statusValue ?? swCfg.defaultValue ?? false) : value)}
+            statusValue={widget.statusBinding ? Boolean(statusValue) : undefined}
             onChange={onValueChange}
-            config={widget.config as SwitchConfig}
+            config={swCfg}
             style={widget.style}
             label={widget.label}
             disabled={isEditMode}
+            writeOnly={isWriteOnly && !widget.statusBinding}
           />
         );
+      }
 
       case 'visu-button':
         return (
           <VisuButton
             onValueChange={onValueChange}
             config={widget.config as ButtonConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+            statusValue={statusValue}
+          />
+        );
+
+      case 'visu-multistate':
+        return (
+          <VisuMultistate
+            value={value as number | string | null}
+            onChange={onValueChange}
+            config={widget.config as MultistateConfig}
             style={widget.style}
             label={widget.label}
             disabled={isEditMode}
@@ -294,7 +318,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       }
 
       case 'visu-home-button': {
-        const homeCfg = widget.config as HomeButtonConfig;
+        const homeCfg = widget.config as HomeButtonConfig & { homePageId?: string };
         return (
           <button
             className="w-full h-full flex items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all active:scale-95"
@@ -302,7 +326,11 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             onClick={(e) => {
               if (!isEditMode) {
                 e.stopPropagation();
-                onNavigateHome?.();
+                if (homeCfg.homePageId) {
+                  onNavigateToPage?.(homeCfg.homePageId);
+                } else {
+                  onNavigateHome?.();
+                }
               }
             }}
             disabled={isEditMode}
