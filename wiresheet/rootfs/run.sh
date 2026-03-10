@@ -1,4 +1,5 @@
-#!/usr/bin/env bashio
+#!/bin/sh
+set -e
 
 echo "Starte Wiresheet Flow Editor..."
 
