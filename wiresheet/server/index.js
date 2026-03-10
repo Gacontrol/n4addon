@@ -91,10 +91,16 @@ async function haPost(apiPath, body) {
 }
 
 app.get('/api/status', (req, res) => {
+  const envKeys = Object.keys(process.env).filter(k =>
+    k.includes('SUPER') || k.includes('HASSIO') || k.includes('HA_') || k.includes('HOME')
+  );
   res.json({
     dataDir,
     haConnected: !!getToken(),
-    supervisorToken: getToken() ? 'vorhanden' : 'fehlt'
+    supervisorToken: getToken() ? 'vorhanden' : 'fehlt',
+    envVars: envKeys,
+    supervisorTokenPresent: !!process.env.SUPERVISOR_TOKEN,
+    hassioTokenPresent: !!process.env.HASSIO_TOKEN
   });
 });
 
@@ -286,13 +292,21 @@ async function start() {
   try {
     dataDir = await findWritableDataDir();
     pagesFile = path.join(dataDir, 'pages.json');
+    console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
 
+    console.log(`--- Umgebungsvariablen ---`);
+    console.log(`SUPERVISOR_TOKEN: ${process.env.SUPERVISOR_TOKEN ? 'ja (' + process.env.SUPERVISOR_TOKEN.substring(0,10) + '...)' : 'NEIN'}`);
+    console.log(`HASSIO_TOKEN: ${process.env.HASSIO_TOKEN ? 'ja' : 'nein'}`);
+
+    const allEnvKeys = Object.keys(process.env).filter(k =>
+      k.includes('SUPER') || k.includes('HASSIO') || k.includes('HA_') || k.includes('HOME')
+    );
+    console.log(`Relevante Env-Vars: ${allEnvKeys.join(', ') || 'keine'}`);
+
     const token = getToken();
-    console.log(`SUPERVISOR_TOKEN env: ${process.env.SUPERVISOR_TOKEN ? 'ja' : 'nein'}`);
-    console.log(`HASSIO_TOKEN env: ${process.env.HASSIO_TOKEN ? 'ja' : 'nein'}`);
-    console.log(`Token gefunden: ${token ? 'ja' : 'NEIN'}`);
+    console.log(`Token gefunden: ${token ? 'JA' : 'NEIN'}`);
 
     if (token) {
       try {
@@ -304,10 +318,13 @@ async function start() {
       } catch (err) {
         console.error(`HA Verbindungstest fehlgeschlagen: ${err.message}`);
       }
+    } else {
+      console.log(`WARNUNG: Ohne Token kann nicht auf Home Assistant zugegriffen werden!`);
+      console.log(`Stelle sicher dass config.json "homeassistant_api": true hat`);
     }
 
     app.listen(PORT, () => {
-      console.log(`Wiresheet API Server auf Port ${PORT}`);
+      console.log(`=== Wiresheet API Server laeuft auf Port ${PORT} ===`);
     });
   } catch (err) {
     console.error('Start fehlgeschlagen:', err);
