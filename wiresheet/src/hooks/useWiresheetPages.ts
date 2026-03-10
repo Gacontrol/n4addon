@@ -1,7 +1,20 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { WiresheetPage, FlowNode, Connection, DatapointOverride } from '../types/flow';
 
-const API_BASE = '/api';
+function getApiBase(): string {
+  const path = window.location.pathname;
+  const match = path.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+  if (match) {
+    return `${match[1]}/api`;
+  }
+  const appMatch = path.match(/^(\/app\/[^/]+)/);
+  if (appMatch) {
+    return `${appMatch[1]}/api`;
+  }
+  return '/api';
+}
+
+const API_BASE = getApiBase();
 
 const defaultPage = (): WiresheetPage => ({
   id: `page-${Date.now()}`,

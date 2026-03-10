@@ -9,6 +9,7 @@ const PORT = 8100;
 const DATA_PATHS = [
   '/data/wiresheet',
   '/config/wiresheet',
+  '/share/wiresheet',
   path.join(__dirname, '../data')
 ];
 
