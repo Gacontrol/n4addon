@@ -35,7 +35,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
   const truncated = displayVal && displayVal.length > 10 ? displayVal.slice(0, 10) + '...' : displayVal;
 
   return (
-    <g style={{ cursor: onClick ? 'pointer' : 'default' }}>
+    <g style={{ cursor: onClick ? 'pointer' : 'default', pointerEvents: isActive ? 'none' : 'auto' }}>
       <path
         d={path}
         stroke="transparent"
@@ -43,7 +43,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
         fill="none"
         onClick={onClick}
         onContextMenu={onContextMenu}
-        style={{ pointerEvents: 'stroke' }}
+        style={{ pointerEvents: isActive ? 'none' : 'stroke' }}
       />
       <path
         d={path}
