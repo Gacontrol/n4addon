@@ -86,9 +86,35 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const rect = canvasRef.current.getBoundingClientRect();
       setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
+
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (!connectingFrom || !canvasRef.current) return;
+      const target = e.target as HTMLElement;
+      const portEl = target.closest('[data-port-id]');
+      if (portEl) {
+        const portId = portEl.getAttribute('data-port-id');
+        if (portId) {
+          const parts = portId.split('-');
+          const nodeId = parts[0];
+          const inputId = parts.slice(1).join('-');
+          const targetNode = nodes.find(n => n.id === nodeId);
+          if (targetNode) {
+            const isInputPort = targetNode.data.inputs.some(inp => inp.id === inputId);
+            if (isInputPort && nodeId !== connectingFrom.nodeId) {
+              onConnectionEnd(nodeId, inputId);
+            }
+          }
+        }
+      }
+    };
+
     document.addEventListener('pointermove', handlePointerMove);
-    return () => document.removeEventListener('pointermove', handlePointerMove);
-  }, []);
+    document.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handleGlobalPointerUp);
+    };
+  }, [connectingFrom, nodes, onConnectionEnd]);
 
   useEffect(() => {
     forceUpdate(n => n + 1);
@@ -202,7 +228,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   };
 
-  const handleCanvasPointerUp = () => {
+  const handleCanvasPointerUp = (e: React.PointerEvent) => {
     if (lasso) {
       const minX = Math.min(lasso.startX, lasso.currentX);
       const maxX = Math.max(lasso.startX, lasso.currentX);
@@ -229,6 +255,26 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       setIsDraggingMultiple(false);
       dragStartPositions.current.clear();
       dragStartMouse.current = null;
+    }
+
+    if (connectingFrom) {
+      const target = e.target as HTMLElement;
+      const portEl = target.closest('[data-port-id]');
+      if (portEl) {
+        const portId = portEl.getAttribute('data-port-id');
+        if (portId) {
+          const [nodeId, ...rest] = portId.split('-');
+          const inputId = rest.join('-');
+          const targetNode = nodes.find(n => n.id === nodeId);
+          if (targetNode) {
+            const isInputPort = targetNode.data.inputs.some(inp => inp.id === inputId);
+            if (isInputPort && nodeId !== connectingFrom.nodeId) {
+              onConnectionEnd(nodeId, inputId);
+              return;
+            }
+          }
+        }
+      }
     }
   };
 
