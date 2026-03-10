@@ -763,15 +763,17 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               return (
                 <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
                   <div
-                    className="port node-port flex-shrink-0 relative cursor-pointer"
+                    className="port node-port flex-shrink-0 cursor-pointer"
                     style={{
                       width: '36px',
                       height: '36px',
                       marginLeft: '-18px',
-                      zIndex: 100,
+                      position: 'relative',
+                      zIndex: 9999,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      isolation: 'isolate'
                     }}
                     data-port-id={`${node.id}-${input.id}`}
                     onClick={e => { console.log('[INPUT PORT] click', node.id, input.id); e.stopPropagation(); onPortClick(node.id, input.id, false); }}
@@ -825,15 +827,17 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
                   </div>
                   <div
-                    className="port node-port flex-shrink-0 relative cursor-pointer"
+                    className="port node-port flex-shrink-0 cursor-pointer"
                     style={{
                       width: '36px',
                       height: '36px',
                       marginRight: '-18px',
-                      zIndex: 100,
+                      position: 'relative',
+                      zIndex: 9999,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      isolation: 'isolate'
                     }}
                     data-port-id={`${node.id}-${output.id}`}
                     onClick={e => { console.log('[OUTPUT PORT] click', node.id, output.id); e.stopPropagation(); onPortClick(node.id, output.id, true); }}

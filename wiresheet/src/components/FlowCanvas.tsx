@@ -419,7 +419,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     <div
       id="flow-canvas"
       ref={canvasRef}
-      className="flex-1 relative overflow-auto"
+      className={`flex-1 relative overflow-auto ${connectingFrom ? 'connecting-mode' : ''}`}
       data-zoom={zoom}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}

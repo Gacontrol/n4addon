@@ -5,3 +5,13 @@
 .node-port {
   cursor: pointer !important;
 }
+
+.connecting-mode [data-node-id] {
+  pointer-events: none;
+}
+
+.connecting-mode .node-port {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10000 !important;
+}
