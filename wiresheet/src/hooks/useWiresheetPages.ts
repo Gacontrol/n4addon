@@ -37,6 +37,7 @@ export const useWiresheetPages = () => {
   const cycleTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInProgress = useRef(false);
+  const pagesRef = useRef<WiresheetPage[]>(pages);
 
   const activePage = pages.find(p => p.id === activePageId) || pages[0];
 
@@ -94,17 +95,28 @@ export const useWiresheetPages = () => {
     setHaError(null);
     try {
       const res = await fetch(`${API_BASE}/ha/states`);
+      const text = await res.text();
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setHaEntities(data.sort((a, b) => a.entity_id.localeCompare(b.entity_id)));
-        } else {
-          setHaError('Ungueltige Antwort vom Server');
+        try {
+          const data = JSON.parse(text);
+          if (Array.isArray(data)) {
+            setHaEntities(data.sort((a, b) => a.entity_id.localeCompare(b.entity_id)));
+          } else {
+            setHaError('Ungueltige Antwort vom Server');
+          }
+        } catch {
+          console.error('JSON parse error:', text.substring(0, 200));
+          setHaError('Server-Antwort ist kein gueltiges JSON');
         }
       } else {
-        const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        const msg = body?.error || body?.details || `HTTP ${res.status}`;
-        console.error('loadHaEntities failed:', msg);
+        let msg = `HTTP ${res.status}`;
+        try {
+          const body = JSON.parse(text);
+          msg = body?.error || body?.details || msg;
+        } catch {
+          msg = text.substring(0, 100) || msg;
+        }
+        console.error('loadHaEntities failed:', res.status, msg);
         setHaError(msg);
       }
     } catch (err) {
@@ -120,6 +132,10 @@ export const useWiresheetPages = () => {
     loadPages();
     loadHaEntities();
   }, [loadPages, loadHaEntities]);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
 
   const updatePages = useCallback((updater: (prev: WiresheetPage[]) => WiresheetPage[]) => {
     setPages(prev => {
@@ -169,7 +185,7 @@ export const useWiresheetPages = () => {
   }, [pages, updatePages]);
 
   const executePage = useCallback(async (pageId: string) => {
-    const page = pages.find(p => p.id === pageId);
+    const page = pagesRef.current.find(p => p.id === pageId);
     if (!page) return;
 
     const manualOverrides: Record<string, unknown> = {};
@@ -192,16 +208,16 @@ export const useWiresheetPages = () => {
     } catch {
       // silent
     }
-  }, [pages]);
+  }, []);
 
   const startPage = useCallback((pageId: string) => {
     updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: true } : p));
-    const page = pages.find(p => p.id === pageId);
+    const page = pagesRef.current.find(p => p.id === pageId);
     if (!page) return;
     if (cycleTimers.current[pageId]) clearInterval(cycleTimers.current[pageId]);
     executePage(pageId);
     cycleTimers.current[pageId] = setInterval(() => executePage(pageId), page.cycleMs);
-  }, [pages, updatePages, executePage]);
+  }, [updatePages, executePage]);
 
   const stopPage = useCallback((pageId: string) => {
     updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: false } : p));
