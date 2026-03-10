@@ -549,7 +549,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       const pythonCode = cfg.pythonCode || '';
       const inputs = {};
       pythonInputs.forEach((inp, idx) => {
-        inputs[inp.id] = inputVals[idx] !== undefined ? inputVals[idx] : null;
+        const val = inputVals[idx] !== undefined ? inputVals[idx] : null;
+        inputs[inp.id] = val;
+        nodeValues[`${nodeId}:input-${idx}`] = val;
       });
       try {
         const outputs = await executePythonCode(pythonCode, inputs);

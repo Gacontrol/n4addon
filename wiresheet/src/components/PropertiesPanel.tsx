@@ -638,6 +638,20 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               onChange={code => updateConfig('pythonCode', code)}
               inputs={(config.pythonInputs || []).map(i => i.id)}
               outputs={(config.pythonOutputs || []).map(o => o.id)}
+              liveInputValues={(() => {
+                const vals: Record<string, unknown> = {};
+                (config.pythonInputs || []).forEach((inp, idx) => {
+                  vals[inp.id] = liveValues[`${node.id}:input-${idx}`] ?? liveValues[node.id];
+                });
+                return vals;
+              })()}
+              liveOutputValues={(() => {
+                const vals: Record<string, unknown> = {};
+                (config.pythonOutputs || []).forEach((out, idx) => {
+                  vals[out.id] = liveValues[`${node.id}:output-${idx}`];
+                });
+                return vals;
+              })()}
             />
           </div>
         )}

@@ -209,10 +209,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   }, [isResizing]);
 
   if (isCaseContainer) {
-    const headerHeight = 40;
-    const caseColumnWidth = Math.max(200, (containerWidth - 20) / Math.max(1, cases.length));
-    const minContentHeight = 200;
-    const finalHeight = Math.max(containerHeight, headerHeight + minContentHeight);
+    const headerHeight = 36;
+    const caseRowHeight = data.config?.caseRowHeight || 120;
+    const minHeight = headerHeight + Math.max(1, cases.length) * caseRowHeight;
+    const finalHeight = Math.max(containerHeight, minHeight);
 
     return (
       <div
@@ -233,7 +233,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           className="w-full h-full rounded-xl overflow-hidden flex flex-col"
           style={{
             background: 'rgba(30, 41, 59, 0.95)',
-            border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.4)'}`,
+            border: `2px solid ${isSelected ? '#6366f1' : 'rgba(99, 102, 241, 0.3)'}`,
             boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.3), 0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.3)'
           }}
         >
@@ -262,7 +262,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               <Icons.Layers className="w-4 h-4 text-white flex-shrink-0" />
               <span className="text-sm font-bold text-white truncate">{data.label}</span>
               <span className="text-xs text-white/70 bg-white/20 px-1.5 py-0.5 rounded font-mono flex-shrink-0">
-                Case={activeCaseValue}
+                ={activeCaseValue}
               </span>
             </div>
             <button
@@ -275,51 +275,62 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </button>
           </div>
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
             {cases.map((c, idx) => {
-              const isActive = activeCaseValue === idx;
+              const isActiveCase = activeCaseValue === idx;
               return (
                 <div
                   key={c.id}
-                  className="flex-1 flex flex-col min-w-0 border-r last:border-r-0"
+                  className="flex-1 flex flex-col min-h-0 border-b last:border-b-0"
                   style={{
                     borderColor: 'rgba(99, 102, 241, 0.2)',
-                    backgroundColor: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                    opacity: isActive ? 1 : 0.5
+                    backgroundColor: isActiveCase ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                    minHeight: caseRowHeight
                   }}
                 >
                   <div
-                    className="px-2 py-1.5 flex items-center justify-between gap-1 flex-shrink-0"
+                    className="px-2 py-1 flex items-center gap-2 flex-shrink-0"
                     style={{
-                      backgroundColor: isActive ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.1)',
-                      borderBottom: '1px solid rgba(99, 102, 241, 0.2)'
+                      backgroundColor: isActiveCase ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.05)',
+                      borderBottom: '1px solid rgba(99, 102, 241, 0.15)'
                     }}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-mono text-[10px] text-indigo-400 bg-indigo-950/50 px-1 py-0.5 rounded">{idx}</span>
-                      <span className="text-xs font-medium text-slate-300 truncate">{c.label}</span>
-                    </div>
-                    {isActive && <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse flex-shrink-0" />}
+                    <span
+                      className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: isActiveCase ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
+                        color: isActiveCase ? 'white' : '#a5b4fc'
+                      }}
+                    >
+                      {idx}
+                    </span>
+                    <span
+                      className="text-xs font-medium truncate"
+                      style={{ color: isActiveCase ? '#e0e7ff' : '#64748b' }}
+                    >
+                      {c.label}
+                    </span>
+                    {isActiveCase && (
+                      <div className="ml-auto flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] text-emerald-400">aktiv</span>
+                      </div>
+                    )}
                   </div>
                   <div
                     className="flex-1 relative"
                     data-case-drop-zone={node.id}
                     data-case-index={idx}
                     style={{
-                      backgroundImage: isActive
-                        ? 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 1px, transparent 1px)'
-                        : 'radial-gradient(circle, rgba(99, 102, 241, 0.05) 1px, transparent 1px)',
-                      backgroundSize: '12px 12px',
-                      pointerEvents: 'auto'
+                      backgroundImage: isActiveCase
+                        ? 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 1px, transparent 1px)'
+                        : 'radial-gradient(circle, rgba(99, 102, 241, 0.04) 1px, transparent 1px)',
+                      backgroundSize: '16px 16px',
+                      pointerEvents: 'auto',
+                      opacity: isSelected ? 1 : (isActiveCase ? 0.8 : 0.4)
                     }}
                     onPointerDown={e => e.stopPropagation()}
-                  >
-                    {!isActive && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <Icons.EyeOff className="w-5 h-5 text-slate-600" />
-                      </div>
-                    )}
-                  </div>
+                  />
                 </div>
               );
             })}
@@ -348,19 +359,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     );
   }
 
+  const isDimmed = (data as { _dimmed?: boolean })._dimmed === true;
+
   return (
     <>
       <div
         ref={nodeRef}
         data-node-id={node.id}
-        className="absolute select-none"
+        className="absolute select-none transition-opacity duration-200"
         style={{
           left: node.position.x,
           top: node.position.y,
           zIndex: isSelected || isDragging ? 20 : 1,
           cursor: isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
-          minWidth: 180
+          minWidth: 180,
+          opacity: isDimmed ? 0.35 : 1
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -574,8 +588,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               );
             })}
 
-            {data.outputs.map(output => {
-              const outVal = isManual ? data.override?.value : liveValues[node.id];
+            {data.outputs.map((output, outputIndex) => {
+              let outVal;
+              if (isManual) {
+                outVal = data.override?.value;
+              } else if (isPythonScript) {
+                outVal = liveValues[`${node.id}:${output.id}`] ?? liveValues[node.id];
+              } else {
+                outVal = liveValues[node.id];
+              }
               const hasOutVal = outVal !== undefined && outVal !== null;
               return (
                 <div key={output.id} className="flex items-center justify-end py-0.5 min-h-[28px]">

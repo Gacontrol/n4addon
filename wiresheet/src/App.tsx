@@ -135,10 +135,10 @@ function App() {
               caseIndex = parseInt(caseIndexAttr);
             }
             const containerNode = nodes.find(n => n.id === parentContainerId);
-            if (containerNode) {
+            if (containerNode && containerNode.type === 'case-container') {
               const dropZoneRect = dropZone.getBoundingClientRect();
-              x = e.clientX - dropZoneRect.left;
-              y = e.clientY - dropZoneRect.top;
+              x = Math.max(0, e.clientX - dropZoneRect.left - 90);
+              y = Math.max(0, e.clientY - dropZoneRect.top - 20);
             }
           }
 

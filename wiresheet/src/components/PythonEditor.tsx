@@ -6,6 +6,8 @@ interface PythonEditorProps {
   onChange: (value: string) => void;
   inputs: string[];
   outputs: string[];
+  liveInputValues?: Record<string, unknown>;
+  liveOutputValues?: Record<string, unknown>;
 }
 
 interface SyntaxError {
@@ -29,7 +31,9 @@ export const PythonEditor: React.FC<PythonEditorProps> = ({
   value,
   onChange,
   inputs,
-  outputs
+  outputs,
+  liveInputValues = {},
+  liveOutputValues = {}
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [errors, setErrors] = useState<SyntaxError[]>([]);
@@ -218,8 +222,53 @@ export const PythonEditor: React.FC<PythonEditorProps> = ({
 
   const lineNumbers = value.split('\n').map((_, i) => i + 1);
 
+  const hasAnyLiveValue = Object.keys(liveInputValues).length > 0 || Object.keys(liveOutputValues).length > 0;
+
   return (
     <div className="space-y-2">
+      {hasAnyLiveValue && (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs text-slate-400 font-semibold">Live-Werte</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[10px] text-blue-400 uppercase tracking-wide mb-1">Eingaenge</div>
+              {inputs.map(inp => {
+                const val = liveInputValues[inp];
+                const hasVal = val !== undefined && val !== null;
+                return (
+                  <div key={inp} className="flex items-center justify-between py-0.5">
+                    <span className="text-xs font-mono text-blue-300">{inp}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${hasVal ? 'bg-blue-900/50 text-blue-200' : 'text-slate-500'}`}>
+                      {hasVal ? String(val) : '-'}
+                    </span>
+                  </div>
+                );
+              })}
+              {inputs.length === 0 && <span className="text-[10px] text-slate-500">-</span>}
+            </div>
+            <div>
+              <div className="text-[10px] text-emerald-400 uppercase tracking-wide mb-1">Ausgaenge</div>
+              {outputs.map(out => {
+                const val = liveOutputValues[out];
+                const hasVal = val !== undefined && val !== null;
+                return (
+                  <div key={out} className="flex items-center justify-between py-0.5">
+                    <span className="text-xs font-mono text-emerald-300">{out}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${hasVal ? 'bg-emerald-900/50 text-emerald-200' : 'text-slate-500'}`}>
+                      {hasVal ? String(val) : '-'}
+                    </span>
+                  </div>
+                );
+              })}
+              {outputs.length === 0 && <span className="text-[10px] text-slate-500">-</span>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <div className="flex rounded-lg overflow-hidden border border-slate-600 focus-within:border-blue-500 transition-colors">
           <div className="bg-slate-950 text-slate-500 text-xs font-mono py-2 px-2 select-none text-right border-r border-slate-700 flex-shrink-0" style={{ minWidth: 32 }}>

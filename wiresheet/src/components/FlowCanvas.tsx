@@ -440,20 +440,23 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
               : null;
 
             let adjustedNode = node;
+            const isContainerSelected = parentContainer ? selectedNodes.has(parentContainer.id) : false;
             if (parentContainer && parentContainer.type === 'case-container') {
-              const cases = parentContainer.data.config?.cases || [];
               const caseIndex = node.data.caseIndex ?? 0;
-              const containerWidth = parentContainer.data.config?.containerWidth || 400;
-              const caseColumnWidth = cases.length > 0 ? containerWidth / cases.length : containerWidth;
-              const caseOffsetX = caseIndex * caseColumnWidth;
-              const headerHeight = 40;
-              const caseHeaderHeight = 28;
+              const headerHeight = 36;
+              const caseRowHeight = parentContainer.data.config?.caseRowHeight || 120;
+              const caseHeaderHeight = 24;
+              const caseOffsetY = caseIndex * caseRowHeight + caseHeaderHeight;
 
               adjustedNode = {
                 ...node,
                 position: {
-                  x: parentContainer.position.x + caseOffsetX + node.position.x + 2,
-                  y: parentContainer.position.y + headerHeight + caseHeaderHeight + node.position.y + 2
+                  x: parentContainer.position.x + node.position.x + 4,
+                  y: parentContainer.position.y + headerHeight + caseOffsetY + node.position.y + 4
+                },
+                data: {
+                  ...node.data,
+                  _dimmed: !isContainerSelected
                 }
               };
             } else if (parentContainer) {
@@ -473,15 +476,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 isSelected={selectedNodes.has(node.id)}
                 onPositionChange={(id, x, y) => {
                   if (parentContainer && parentContainer.type === 'case-container') {
-                    const cases = parentContainer.data.config?.cases || [];
                     const caseIndex = node.data.caseIndex ?? 0;
-                    const containerWidth = parentContainer.data.config?.containerWidth || 400;
-                    const caseColumnWidth = cases.length > 0 ? containerWidth / cases.length : containerWidth;
-                    const caseOffsetX = caseIndex * caseColumnWidth;
-                    const headerHeight = 40;
-                    const caseHeaderHeight = 28;
-                    const relX = x - parentContainer.position.x - caseOffsetX - 2;
-                    const relY = y - parentContainer.position.y - headerHeight - caseHeaderHeight - 2;
+                    const headerHeight = 36;
+                    const caseRowHeight = parentContainer.data.config?.caseRowHeight || 120;
+                    const caseHeaderHeight = 24;
+                    const caseOffsetY = caseIndex * caseRowHeight + caseHeaderHeight;
+                    const relX = x - parentContainer.position.x - 4;
+                    const relY = y - parentContainer.position.y - headerHeight - caseOffsetY - 4;
                     onNodePositionChange(id, Math.max(0, relX), Math.max(0, relY));
                   } else if (parentContainer) {
                     const relX = x - parentContainer.position.x - 4;
