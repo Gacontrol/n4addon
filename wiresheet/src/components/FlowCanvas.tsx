@@ -238,8 +238,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
     if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const dx = (e.clientX - rect.left - dragStartMouse.current.x) / zoom;
-      const dy = (e.clientY - rect.top - dragStartMouse.current.y) / zoom;
+      const scrollLeft = canvasRef.current.scrollLeft;
+      const scrollTop = canvasRef.current.scrollTop;
+      const currentX = e.clientX - rect.left + scrollLeft;
+      const currentY = e.clientY - rect.top + scrollTop;
+      const dx = (currentX - dragStartMouse.current.x) / zoom;
+      const dy = (currentY - dragStartMouse.current.y) / zoom;
 
       const updates: Array<{ id: string; x: number; y: number }> = [];
       dragStartPositions.current.forEach((pos, id) => {
@@ -330,7 +334,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const handleMultiDragStart = (nodeId: string, e: React.PointerEvent) => {
     if (selectedNodes.size > 1 && selectedNodes.has(nodeId) && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      dragStartMouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const scrollLeft = canvasRef.current.scrollLeft;
+      const scrollTop = canvasRef.current.scrollTop;
+      dragStartMouse.current = {
+        x: e.clientX - rect.left + scrollLeft,
+        y: e.clientY - rect.top + scrollTop
+      };
       dragStartPositions.current.clear();
       nodes.filter(n => selectedNodes.has(n.id)).forEach(n => {
         dragStartPositions.current.set(n.id, { x: n.position.x, y: n.position.y });
