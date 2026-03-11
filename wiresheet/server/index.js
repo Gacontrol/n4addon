@@ -21,6 +21,15 @@ let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 
 const runningPages = new Map();
+const pageNodeStates = new Map();
+
+function getNodeState(pageId, nodeId) {
+  if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
+  const ps = pageNodeStates.get(pageId);
+  if (!ps[nodeId]) ps[nodeId] = {};
+  return ps[nodeId];
+}
+
 let cachedDeviceRegistry = null;
 let cachedEntityRegistry = null;
 let cachedConfigEntries = null;
@@ -405,7 +414,6 @@ function getDefaultOutputsForNodeType(node) {
       break;
     case 'timer':
       defaults['output-0'] = false;
-      defaults['output-1'] = false;
       break;
     case 'counter':
       defaults['output-0'] = 0;
@@ -498,7 +506,7 @@ print(json.dumps(_outputs))
   });
 }
 
-async function executePageLogic(nodes, connections, manualOverrides = {}, visuOverrides = {}) {
+async function executePageLogic(nodes, connections, manualOverrides = {}, visuOverrides = {}, pageId = null) {
   const nodeValues = {};
 
   const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
@@ -742,8 +750,114 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const val = parseFloat(inputVals[0]) || 0;
       const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
       nodeValues[nodeId] = val > thr ? 'above' : 'below';
+    } else if (node.type === 'timer') {
+      const inputVal = toBool(inputVals[0]);
+      const timerOnMs = cfg.timerOnMs !== undefined ? cfg.timerOnMs : (cfg.timerMs || 1000);
+      const timerOffMs = cfg.timerOffMs !== undefined ? cfg.timerOffMs : 0;
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__timerState || (node.__timerState = {});
+      if (st.prevInput === undefined) {
+        st.prevInput = inputVal;
+        st.output = false;
+        st.pendingTs = null;
+        st.pendingTarget = null;
+      }
+      const risingEdge = inputVal && !st.prevInput;
+      const fallingEdge = !inputVal && st.prevInput;
+      if (risingEdge) {
+        if (timerOnMs <= 0) {
+          st.output = true;
+          st.pendingTs = null;
+          st.pendingTarget = null;
+        } else {
+          st.pendingTs = now;
+          st.pendingTarget = 'on';
+        }
+      } else if (fallingEdge) {
+        if (timerOffMs <= 0) {
+          st.output = false;
+          st.pendingTs = null;
+          st.pendingTarget = null;
+        } else {
+          st.pendingTs = now;
+          st.pendingTarget = 'off';
+        }
+      }
+      if (st.pendingTarget === 'on' && st.pendingTs !== null) {
+        if (now - st.pendingTs >= timerOnMs) {
+          st.output = true;
+          st.pendingTs = null;
+          st.pendingTarget = null;
+        }
+      } else if (st.pendingTarget === 'off' && st.pendingTs !== null) {
+        if (now - st.pendingTs >= timerOffMs) {
+          st.output = false;
+          st.pendingTs = null;
+          st.pendingTarget = null;
+        }
+      }
+      if (!inputVal && st.pendingTarget === 'on') {
+        st.pendingTs = null;
+        st.pendingTarget = null;
+      }
+      if (inputVal && st.pendingTarget === 'off') {
+        st.pendingTs = null;
+        st.pendingTarget = null;
+      }
+      st.prevInput = inputVal;
+      nodeValues[nodeId] = st.output;
+      nodeValues[`${nodeId}:output-0`] = st.output;
     } else if (node.type === 'delay') {
-      nodeValues[nodeId] = inputVals[0];
+      const now = Date.now();
+      const delayMs = cfg.delayMs !== undefined ? cfg.delayMs : 1000;
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__delayState || (node.__delayState = {});
+      if (!st.queue) st.queue = [];
+      if (inputVals[0] !== undefined && inputVals[0] !== null) {
+        st.queue.push({ value: inputVals[0], sendAt: now + delayMs });
+      }
+      st.queue = st.queue.filter(e => e.sendAt <= now + delayMs * 10);
+      const ready = st.queue.filter(e => e.sendAt <= now);
+      const latest = ready.length > 0 ? ready[ready.length - 1] : null;
+      if (latest !== null) {
+        st.lastOutput = latest.value;
+        st.queue = st.queue.filter(e => e.sendAt > now);
+      }
+      nodeValues[nodeId] = st.lastOutput !== undefined ? st.lastOutput : null;
+    } else if (node.type === 'smoothing') {
+      const inputVal = parseFloat(inputVals[0]);
+      const now = Date.now();
+      const durationMs = cfg.smoothingDuration !== undefined ? cfg.smoothingDuration : 86400000;
+      const method = cfg.smoothingMethod || 'average';
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__smoothingState || (node.__smoothingState = {});
+      if (!st.history) st.history = [];
+      if (!isNaN(inputVal)) {
+        st.history.push({ value: inputVal, ts: now });
+      }
+      const cutoff = now - durationMs;
+      st.history = st.history.filter(e => e.ts >= cutoff);
+      const vals = st.history.map(e => e.value);
+      let smoothed = null, minVal = null, maxVal = null;
+      if (vals.length > 0) {
+        minVal = Math.min(...vals);
+        maxVal = Math.max(...vals);
+        if (method === 'average') {
+          smoothed = vals.reduce((a, b) => a + b, 0) / vals.length;
+        } else if (method === 'exponential') {
+          const alpha = Math.min(1, 2 / (vals.length + 1));
+          smoothed = vals[0];
+          for (let i = 1; i < vals.length; i++) {
+            smoothed = alpha * vals[i] + (1 - alpha) * smoothed;
+          }
+        } else if (method === 'median') {
+          const sorted = [...vals].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          smoothed = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+        }
+      }
+      nodeValues[nodeId] = smoothed;
+      nodeValues[`${nodeId}:output-0`] = smoothed;
+      nodeValues[`${nodeId}:output-1`] = minVal;
+      nodeValues[`${nodeId}:output-2`] = maxVal;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
@@ -947,9 +1061,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 }
 
 app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
+  const { pageId } = req.params;
   const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
   try {
-    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides);
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides, pageId);
     res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
@@ -979,7 +1094,7 @@ async function runPageCycle(pageId) {
           manualOverrides[node.id] = node.data.override.value;
         }
       }
-      await executePageLogic(page.nodes, page.connections, manualOverrides);
+      await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
     }
 
     pageInfo.lastRun = Date.now();
@@ -1022,6 +1137,7 @@ function stopPage(pageId) {
       clearTimeout(pageInfo.timeout);
     }
     runningPages.delete(pageId);
+    pageNodeStates.delete(pageId);
     console.log(`Seite ${pageId} gestoppt`);
   }
 }

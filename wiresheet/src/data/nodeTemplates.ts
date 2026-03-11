@@ -370,15 +370,13 @@ export const nodeTemplates: NodeTemplate[] = [
     category: 'special',
     color: '#64748b',
     inputs: [
-      { label: 'Start', type: 'input' },
-      { label: 'Reset', type: 'input' }
+      { label: 'Eingang', type: 'input' }
     ],
     outputs: [
-      { label: 'Aktiv', type: 'output' },
-      { label: 'Fertig', type: 'output' }
+      { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Einschaltverzoegerung',
-    defaultConfig: { timerMs: 1000 }
+    description: 'Einschalt- und Ausschaltverzögerung',
+    defaultConfig: { timerOnMs: 1000, timerOffMs: 0, timerMode: 'on' }
   },
   {
     type: 'compare',
@@ -561,8 +559,7 @@ export const nodeTemplates: NodeTemplate[] = [
       smoothingMethod: 'average',
       smoothingDuration: 86400000,
       smoothingUnit: 'hours',
-      smoothingHours: 24,
-      sampleIntervalMs: 60000
+      smoothingValue: 24
     }
   },
   {
