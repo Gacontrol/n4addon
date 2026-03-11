@@ -750,6 +750,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         console.log(`DP Node ${nodeId} auf Visu-Wert gesetzt: ${visuVal}`);
         delete visuOverrides[visuKey];
         delete visuOverrides[nodeId];
+        for (const key of Object.keys(visuOverrides)) {
+          if (key.startsWith(`${nodeId}:`)) {
+            delete visuOverrides[key];
+          }
+        }
       } else if (inputVals[0] !== undefined) {
         if (canInputOverwriteDpValue(nodeId)) {
           nodeValues[nodeId] = inputVals[0];
@@ -1385,11 +1390,15 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       clientVisuOverrides.set('global', {});
     }
     const overrides = clientVisuOverrides.get('global');
+
+    for (const key of Object.keys(overrides)) {
+      if (key === nodeId || key.startsWith(`${nodeId}:`)) {
+        delete overrides[key];
+      }
+    }
+
     overrides[overrideKey] = value;
     overrides[nodeId] = value;
-    if (portId) {
-      overrides[`${nodeId}:${portId}`] = value;
-    }
 
     setPersistentDpValue(nodeId, value, true);
 
@@ -1405,12 +1414,6 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
   }
   for (const [nodeId, value] of persistentDpValues) {
     merged[nodeId] = value;
-  }
-  const globalOverrides = clientVisuOverrides.get('global') || {};
-  for (const [key, value] of Object.entries(globalOverrides)) {
-    if (!key.includes(':')) {
-      merged[key] = value;
-    }
   }
   res.json(merged);
 });
