@@ -28,8 +28,8 @@ const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
-const visuWriteLockTimestamps = new Map();
-const VISU_WRITE_LOCK_MS = 5000;
+const dpValueTimestamps = new Map();
+const VISU_WRITE_LOCK_MS = 3000;
 let dpValuesSaveTimeout = null;
 
 async function loadPersistentDpValues() {
@@ -64,9 +64,19 @@ function savePersistentDpValues() {
   }, 500);
 }
 
-function setPersistentDpValue(nodeId, value) {
+function setPersistentDpValue(nodeId, value, isVisuWrite = false) {
+  const now = Date.now();
+  if (isVisuWrite) {
+    dpValueTimestamps.set(nodeId, now);
+  }
   persistentDpValues.set(nodeId, value);
   savePersistentDpValues();
+}
+
+function canInputOverwriteDpValue(nodeId) {
+  const ts = dpValueTimestamps.get(nodeId);
+  if (!ts) return true;
+  return (Date.now() - ts) >= VISU_WRITE_LOCK_MS;
 }
 
 function getNodeState(pageId, nodeId) {
@@ -736,19 +746,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
       if (visuVal !== undefined) {
         nodeValues[nodeId] = visuVal;
-        setPersistentDpValue(nodeId, visuVal);
-        visuWriteLockTimestamps.set(nodeId, Date.now());
+        setPersistentDpValue(nodeId, visuVal, true);
         console.log(`DP Node ${nodeId} auf Visu-Wert gesetzt: ${visuVal}`);
         delete visuOverrides[visuKey];
         delete visuOverrides[nodeId];
       } else if (inputVals[0] !== undefined) {
-        const lockTs = visuWriteLockTimestamps.get(nodeId);
-        const isLocked = lockTs && (Date.now() - lockTs < VISU_WRITE_LOCK_MS);
-        if (isLocked) {
-          nodeValues[nodeId] = persistentVal !== undefined ? persistentVal : (node.type === 'dp-boolean' ? false : 0);
-        } else {
+        if (canInputOverwriteDpValue(nodeId)) {
           nodeValues[nodeId] = inputVals[0];
-          setPersistentDpValue(nodeId, inputVals[0]);
+          setPersistentDpValue(nodeId, inputVals[0], false);
+        } else {
+          nodeValues[nodeId] = persistentVal !== undefined ? persistentVal : (node.type === 'dp-boolean' ? false : 0);
         }
       } else if (persistentVal !== undefined) {
         nodeValues[nodeId] = persistentVal;
@@ -1384,8 +1391,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       overrides[`${nodeId}:${portId}`] = value;
     }
 
-    setPersistentDpValue(nodeId, value);
-    visuWriteLockTimestamps.set(nodeId, Date.now());
+    setPersistentDpValue(nodeId, value, true);
 
     console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value} (wird im naechsten Zyklus verarbeitet)`);
     res.json({ success: true });
