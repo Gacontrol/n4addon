@@ -135,6 +135,14 @@ export const useVisualization = () => {
     }));
   }, [updateVisuPages]);
 
+  const setAllVisuPages = useCallback((newPages: VisuPage[]) => {
+    const safe = newPages.length > 0 ? newPages : [defaultVisuPage()];
+    setVisuPages(safe);
+    setActiveVisuPageId(safe[0].id);
+    setSaveStatus('unsaved');
+    saveVisuPages(safe);
+  }, [saveVisuPages]);
+
   const activeVisuPage = visuPages.find(p => p.id === activeVisuPageId) || visuPages[0];
 
   return {
@@ -150,6 +158,7 @@ export const useVisualization = () => {
     updateWidget,
     deleteWidget,
     saveStatus,
-    loadVisuPages
+    loadVisuPages,
+    setAllVisuPages
   };
 };

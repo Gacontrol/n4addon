@@ -5,14 +5,16 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { CustomBlockLibrary } from './components/CustomBlockLibrary';
 import { CustomBlockEditor } from './components/CustomBlockEditor';
 import { VisualizationView } from './components/visualization/VisualizationView';
+import { BackupModal } from './components/BackupModal';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage } from './types/flow';
+import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu
+  Monitor, Cpu, DatabaseBackup
 } from 'lucide-react';
 
 function App() {
@@ -66,7 +68,8 @@ function App() {
     duplicateSelected,
     addTextAnnotation,
     setLiveValue,
-    executeAllPages
+    executeAllPages,
+    setAllPages
   } = useWiresheetPages();
 
   const {
@@ -86,7 +89,8 @@ function App() {
     addVisuPage,
     deleteVisuPage,
     renameVisuPage,
-    updateVisuPage
+    updateVisuPage,
+    setAllVisuPages
   } = useVisualization();
 
   const [mainView, setMainView] = useState<'logic' | 'visu'>('logic');
@@ -98,6 +102,7 @@ function App() {
   const [sidebarTab, setSidebarTab] = useState<'nodes' | 'blocks'>('nodes');
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
+  const [showBackupModal, setShowBackupModal] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
   const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
@@ -754,6 +759,15 @@ function App() {
           {mainView === 'visu' && (
             <div className="flex-1" />
           )}
+
+          <button
+            onClick={() => setShowBackupModal(true)}
+            title="Backup & Import"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border border-slate-700 hover:border-slate-600"
+          >
+            <DatabaseBackup className="w-3.5 h-3.5" />
+            Backup
+          </button>
         </div>
       </header>
 
@@ -937,6 +951,20 @@ function App() {
           liveValues={liveValues}
           logicNodes={allLogicNodes}
           onWidgetValueChange={handleVisuWidgetValueChange}
+        />
+      )}
+
+      {showBackupModal && (
+        <BackupModal
+          wiresheets={pages}
+          visuPages={visuPages}
+          customBlocks={customBlocks}
+          onImport={(newWiresheets, newVisuPages, newBlocks) => {
+            setAllPages(newWiresheets as WiresheetPage[]);
+            setAllVisuPages(newVisuPages as VisuPage[]);
+            importBlocks(newBlocks as CustomBlockDefinition[]);
+          }}
+          onClose={() => setShowBackupModal(false)}
         />
       )}
     </div>

@@ -813,6 +813,13 @@ export const useWiresheetPages = () => {
     updateCaseSize,
     moveNodeToContainer,
     releaseContainerNodes,
+    setAllPages: (newPages: WiresheetPage[]) => {
+      const safePages = newPages.length > 0 ? newPages : [defaultPage()];
+      setPages(safePages);
+      setActivePageId(safePages[0].id);
+      setSaveStatus('unsaved');
+      savePages(safePages);
+    },
     setLiveValue: (key: string, value: unknown) => {
       visuOverridesRef.current = { ...visuOverridesRef.current, [key]: value };
       setLiveValues(prev => ({ ...prev, [key]: value }));
