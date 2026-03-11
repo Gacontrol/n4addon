@@ -23,6 +23,8 @@ let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
+const visuWriteLocks = new Map();
+const VISU_WRITE_LOCK_MS = 2000;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -1096,7 +1098,15 @@ async function runPageCycle(pageId) {
         }
       }
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
-      lastNodeValues.set(pageId, nodeValues);
+      const now = Date.now();
+      const pageLocks = visuWriteLocks.get(pageId) || {};
+      const merged = { ...nodeValues };
+      for (const [key, expiry] of Object.entries(pageLocks)) {
+        if (now < expiry && lastNodeValues.has(pageId) && key in lastNodeValues.get(pageId)) {
+          merged[key] = lastNodeValues.get(pageId)[key];
+        }
+      }
+      lastNodeValues.set(pageId, merged);
     }
 
     pageInfo.lastRun = Date.now();
@@ -1293,6 +1303,8 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           const liveKey = `${nodeId}:param:${paramKey}`;
           if (!lastNodeValues.has(page.id)) lastNodeValues.set(page.id, {});
           lastNodeValues.get(page.id)[liveKey] = value;
+          if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
+          visuWriteLocks.get(page.id)[liveKey] = Date.now() + VISU_WRITE_LOCK_MS;
         } else {
           if (!node.data.override) {
             node.data.override = { manual: true, value };
@@ -1303,6 +1315,8 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
           if (!lastNodeValues.has(page.id)) lastNodeValues.set(page.id, {});
           lastNodeValues.get(page.id)[nodeId] = value;
+          if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
+          visuWriteLocks.get(page.id)[nodeId] = Date.now() + VISU_WRITE_LOCK_MS;
         }
         updated = true;
         foundPageId = page.id;
