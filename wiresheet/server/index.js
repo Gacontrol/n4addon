@@ -201,10 +201,7 @@ app.get('/api/status', (req, res) => {
 function getRequestSource(req) {
   const visuPort = req.headers['x-visu-port'];
   if (visuPort === '8098') return 'port8098';
-  if (visuPort === '8099') return 'port8099';
-  const path = req.path || '';
-  if (path.includes('/hassio_ingress/')) return 'addon';
-  const forwarded = req.headers['x-forwarded-for'] || '';
+  if (visuPort === '8099') return 'addon';
   const origin = req.headers['origin'] || req.headers['referer'] || '';
   if (origin.includes(':8098')) return 'port8098';
   return 'addon';
