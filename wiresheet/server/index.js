@@ -27,7 +27,7 @@ const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
 const visuOverrideTimestamps = new Map();
-const VISU_OVERRIDE_HOLD_MS = 500;
+const VISU_OVERRIDE_HOLD_MS = 3000;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
