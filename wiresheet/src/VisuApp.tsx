@@ -13,6 +13,7 @@ function getApiBase(): string {
 
 const POLL_INTERVAL = 1000;
 const WRITE_HOLD_MS = 2000;
+const WRITE_DEBOUNCE_MS = 300;
 
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
@@ -25,6 +26,7 @@ export function VisuApp() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const pendingWritesRef = useRef<Map<string, { value: unknown; timestamp: number }>>(new Map());
+  const lastWriteRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
 
   visuPagesRef.current = visuPages;
@@ -93,6 +95,14 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
+    const now = Date.now();
+    const lastWrite = lastWriteRef.current.get(widgetId) || 0;
+    if (now - lastWrite < WRITE_DEBOUNCE_MS) {
+      console.log('[VisuApp] handleWidgetValueChange DEBOUNCED:', widgetId, value);
+      return;
+    }
+    lastWriteRef.current.set(widgetId, now);
+
     console.log('[VisuApp] handleWidgetValueChange called:', widgetId, value);
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
@@ -108,7 +118,6 @@ export function VisuApp() {
       return;
     }
 
-    const now = Date.now();
     const pending = pendingWritesRef.current;
     pending.set(binding.nodeId, { value, timestamp: now });
     if (binding.portId) {
