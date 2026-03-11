@@ -552,6 +552,9 @@ print(json.dumps(_outputs))
 }
 
 async function executePageLogic(nodes, connections, manualOverrides = {}, visuOverrides = {}, pageId = null) {
+  console.log(`[EXEC DEBUG] executePageLogic gestartet fuer pageId=${pageId}`);
+  console.log(`[EXEC DEBUG] visuOverrides empfangen:`, JSON.stringify(visuOverrides));
+  console.log(`[EXEC DEBUG] visuControlledDps aktuell:`, JSON.stringify([...visuControlledDps.entries()]));
   const nodeValues = {};
 
   const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
@@ -733,7 +736,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
       const visuControlledVal = visuControlledDps.get(nodeId);
 
+      console.log(`[DP-EVAL DEBUG] Node: ${nodeId} (${node.type})`);
+      console.log(`[DP-EVAL DEBUG]   visuKey=${visuKey}`);
+      console.log(`[DP-EVAL DEBUG]   visuOverrides[visuKey]=${visuOverrides[visuKey]}, visuOverrides[nodeId]=${visuOverrides[nodeId]}`);
+      console.log(`[DP-EVAL DEBUG]   visuVal=${visuVal} (type: ${typeof visuVal})`);
+      console.log(`[DP-EVAL DEBUG]   visuControlledVal=${visuControlledVal} (type: ${typeof visuControlledVal})`);
+      console.log(`[DP-EVAL DEBUG]   inputVals[0]=${inputVals[0]}`);
+      console.log(`[DP-EVAL DEBUG]   visuControlledDps size=${visuControlledDps.size}`);
+
       if (visuVal !== undefined) {
+        console.log(`[DP-EVAL DEBUG]   -> NEUER VISU-WERT: ${visuVal}`);
         visuControlledDps.set(nodeId, visuVal);
         nodeValues[nodeId] = visuVal;
         setPersistentDpValue(nodeId, visuVal);
@@ -745,19 +757,24 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
           }
         }
       } else if (visuControlledVal !== undefined) {
+        console.log(`[DP-EVAL DEBUG]   -> VISU-KONTROLLE AKTIV: ${visuControlledVal}`);
         nodeValues[nodeId] = visuControlledVal;
       } else if (inputVals[0] !== undefined) {
+        console.log(`[DP-EVAL DEBUG]   -> INPUT-WERT: ${inputVals[0]}`);
         nodeValues[nodeId] = inputVals[0];
         setPersistentDpValue(nodeId, inputVals[0]);
       } else {
         const persistentVal = persistentDpValues.get(nodeId);
         if (persistentVal !== undefined) {
+          console.log(`[DP-EVAL DEBUG]   -> PERSISTENTER WERT: ${persistentVal}`);
           visuControlledDps.set(nodeId, persistentVal);
           nodeValues[nodeId] = persistentVal;
         } else {
+          console.log(`[DP-EVAL DEBUG]   -> DEFAULT-WERT`);
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
         }
       }
+      console.log(`[DP-EVAL DEBUG]   ERGEBNIS nodeValues[${nodeId}]=${nodeValues[nodeId]}`);
     } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = visuOverrides[nodeId];
       delete visuOverrides[nodeId];
@@ -1163,8 +1180,9 @@ async function runPageCycle(pageId) {
         }
       }
 
-      const now = Date.now();
       const allOverrides = clientVisuOverrides.get('global') || {};
+      console.log(`[CYCLE DEBUG] Page ${pageId} - clientVisuOverrides.get('global'):`, JSON.stringify(allOverrides));
+      console.log(`[CYCLE DEBUG] Page ${pageId} - visuControlledDps:`, JSON.stringify([...visuControlledDps.entries()]));
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
     }
@@ -1377,10 +1395,15 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
   } else {
     const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
 
+    console.log(`[WRITE-VALUE DEBUG] Empfangen: nodeId=${nodeId}, portId=${portId}, value=${value}, type=${typeof value}`);
+    console.log(`[WRITE-VALUE DEBUG] overrideKey=${overrideKey}`);
+
     if (!clientVisuOverrides.has('global')) {
       clientVisuOverrides.set('global', {});
     }
     const overrides = clientVisuOverrides.get('global');
+
+    console.log(`[WRITE-VALUE DEBUG] Overrides VORHER:`, JSON.stringify(overrides));
 
     for (const key of Object.keys(overrides)) {
       if (key === nodeId || key.startsWith(`${nodeId}:`)) {
@@ -1391,10 +1414,15 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     overrides[overrideKey] = value;
     overrides[nodeId] = value;
 
+    console.log(`[WRITE-VALUE DEBUG] Overrides NACHHER:`, JSON.stringify(overrides));
+
     visuControlledDps.set(nodeId, value);
+    console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}`);
+    console.log(`[WRITE-VALUE DEBUG] visuControlledDps Map:`, JSON.stringify([...visuControlledDps.entries()]));
+
     setPersistentDpValue(nodeId, value);
 
-    console.log(`Visu-Wert geschrieben: ${nodeId} = ${value} (Visu hat jetzt Kontrolle)`);
+    console.log(`[WRITE-VALUE DEBUG] FERTIG - Visu-Wert geschrieben: ${nodeId} = ${value}`);
     res.json({ success: true });
   }
 });

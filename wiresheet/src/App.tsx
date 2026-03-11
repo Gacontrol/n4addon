@@ -562,6 +562,10 @@ function App() {
     binding: { nodeId: string; portId?: string; paramKey?: string },
     value: unknown
   ) => {
+    console.log('[VISU FRONTEND DEBUG] handleVisuWidgetValueChange aufgerufen');
+    console.log('[VISU FRONTEND DEBUG]   widgetId:', _widgetId);
+    console.log('[VISU FRONTEND DEBUG]   binding:', JSON.stringify(binding));
+    console.log('[VISU FRONTEND DEBUG]   value:', value, 'type:', typeof value);
     if (binding.paramKey) {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === binding.nodeId);
       if (targetNode) {
@@ -581,13 +585,19 @@ function App() {
         const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
         return m ? `${m[1]}/api` : '/api';
       })();
-      await fetch(`${apiBase}/visu/write-value`, {
+      const payload = { nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value };
+      console.log('[VISU FRONTEND DEBUG] Sende an Server:', apiBase + '/visu/write-value');
+      console.log('[VISU FRONTEND DEBUG] Payload:', JSON.stringify(payload));
+      const resp = await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value })
+        body: JSON.stringify(payload)
       });
+      console.log('[VISU FRONTEND DEBUG] Server Response Status:', resp.status);
+      const respData = await resp.json();
+      console.log('[VISU FRONTEND DEBUG] Server Response Body:', JSON.stringify(respData));
     } catch (err) {
-      console.error('Failed to write visu value:', err);
+      console.error('[VISU FRONTEND DEBUG] Failed to write visu value:', err);
     }
   }, [pages, updateNodeData, setLiveValue]);
 

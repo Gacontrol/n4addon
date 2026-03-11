@@ -85,9 +85,13 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
+    console.log('[VISUAPP 8098 DEBUG] handleWidgetValueChange aufgerufen');
+    console.log('[VISUAPP 8098 DEBUG]   widgetId:', widgetId);
+    console.log('[VISUAPP 8098 DEBUG]   value:', value, 'type:', typeof value);
     const now = Date.now();
     const lastWrite = lastWriteRef.current.get(widgetId) || 0;
     if (now - lastWrite < WRITE_DEBOUNCE_MS) {
+      console.log('[VISUAPP 8098 DEBUG] Debounced - zu schnell!');
       return;
     }
     lastWriteRef.current.set(widgetId, now);
@@ -102,8 +106,10 @@ export function VisuApp() {
       }
     }
     if (!binding) {
+      console.log('[VISUAPP 8098 DEBUG] Kein Binding gefunden fuer Widget:', widgetId);
       return;
     }
+    console.log('[VISUAPP 8098 DEBUG] Binding gefunden:', JSON.stringify(binding));
 
     setLiveValues(prev => {
       const updates: Record<string, unknown> = { [binding!.nodeId]: value };
@@ -114,17 +120,19 @@ export function VisuApp() {
     });
 
     try {
-      await fetch(`${apiBase}/visu/write-value`, {
+      const payload = { nodeId: binding.nodeId, portId: binding.portId, value };
+      console.log('[VISUAPP 8098 DEBUG] Sende an Server:', apiBase + '/visu/write-value');
+      console.log('[VISUAPP 8098 DEBUG] Payload:', JSON.stringify(payload));
+      const resp = await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nodeId: binding.nodeId,
-          portId: binding.portId,
-          value
-        })
+        body: JSON.stringify(payload)
       });
+      console.log('[VISUAPP 8098 DEBUG] Server Response Status:', resp.status);
+      const respData = await resp.json();
+      console.log('[VISUAPP 8098 DEBUG] Server Response Body:', JSON.stringify(respData));
     } catch (err) {
-      console.error('[VisuApp] write value error:', err);
+      console.error('[VISUAPP 8098 DEBUG] write value error:', err);
     }
   }, [apiBase]);
 
