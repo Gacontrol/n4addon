@@ -963,17 +963,24 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           />
         );
 
-      case 'dash-toggle-card':
+      case 'dash-toggle-card': {
+        const dtCfg = widget.config as DashToggleCardConfig;
+        const dtWriteOnly = !!widget.binding && widget.binding.direction === 'write';
+        const dtValue = dtWriteOnly
+          ? Boolean(statusValue ?? false)
+          : Boolean(value ?? false);
         return (
           <DashToggleCard
-            value={Boolean(value)}
+            value={dtValue}
+            statusValue={widget.statusBinding ? Boolean(statusValue) : undefined}
             onChange={onValueChange}
-            config={widget.config as DashToggleCardConfig}
+            config={dtCfg}
             style={widget.style}
             label={widget.label}
             disabled={isEditMode}
           />
         );
+      }
 
       case 'dash-battery':
         return (

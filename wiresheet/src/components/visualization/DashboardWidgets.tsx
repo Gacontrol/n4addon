@@ -195,27 +195,31 @@ export const DashValueCard: React.FC<DashValueCardProps> = ({ value, config, lab
 /* ─── Dash Toggle Card ─── */
 interface DashToggleCardProps extends BaseProps {
   value: boolean;
+  statusValue?: boolean | null;
   onChange: (v: boolean) => void;
   config: DashToggleCardConfig;
   disabled?: boolean;
 }
 
-export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange, config, label, style, disabled }) => {
+export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, statusValue, onChange, config, label, style, disabled }) => {
   const onColor = config.onColor ?? '#22c55e';
   const offColor = config.offColor ?? '#64748b';
   const showLabel = style.showLabel !== false;
-  const color = value ? onColor : offColor;
+
+  const hasFeedback = statusValue !== null && statusValue !== undefined;
+  const displayValue = hasFeedback ? Boolean(statusValue) : value;
+  const color = displayValue ? onColor : offColor;
 
   return (
     <div
       className="w-full h-full rounded-xl overflow-hidden flex flex-col p-3 cursor-pointer transition-all duration-200"
       style={{
-        background: value
+        background: displayValue
           ? `linear-gradient(135deg, ${onColor}18 0%, ${onColor}08 100%)`
           : 'rgba(255,255,255,0.03)',
         border: `1px solid ${color}30`
       }}
-      onClick={() => !disabled && onChange(!value)}
+      onClick={() => !disabled && onChange(!displayValue)}
     >
       <div className="flex items-start justify-between">
         <div className="rounded-lg p-2" style={{ backgroundColor: `${color}20` }}>
@@ -223,11 +227,11 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
         </div>
         <div
           className="relative rounded-full transition-all duration-300 flex-shrink-0"
-          style={{ width: 42, height: 24, backgroundColor: value ? onColor : 'rgba(255,255,255,0.1)' }}
+          style={{ width: 42, height: 24, backgroundColor: displayValue ? onColor : 'rgba(255,255,255,0.1)' }}
         >
           <div
             className="absolute top-1 rounded-full bg-white shadow transition-all duration-300"
-            style={{ width: 16, height: 16, left: value ? 22 : 4 }}
+            style={{ width: 16, height: 16, left: displayValue ? 22 : 4 }}
           />
         </div>
       </div>
@@ -236,7 +240,7 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
           <div className="text-xs text-slate-400 truncate mb-0.5">{label}</div>
         )}
         <div className="text-sm font-bold" style={{ color }}>
-          {value ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
+          {displayValue ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
         </div>
       </div>
     </div>
