@@ -1,121 +1,147 @@
-import express from "express";
-import fetch from "node-fetch";
-import WebSocket from "ws";
+const express = require('express');
+const fs = require('fs').promises;
+const path = require('path');
+const axios = require('axios');
 
 const app = express();
+const PORT = 8100;
+const DATA_DIR = '/data/wiresheet';
+const FLOWS_FILE = path.join(DATA_DIR, 'flows.json');
+
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+async function ensureDataDir() {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.error('Fehler beim Erstellen des Data-Verzeichnisses:', err);
+  }
+}
 
-const HA_URL = process.env.HA_URL || "http://homeassistant:8123";
-const HA_TOKEN = process.env.HA_TOKEN;
+async function getHomeAssistantToken() {
+  try {
+    const token = process.env.SUPERVISOR_TOKEN;
+    return token;
+  } catch (err) {
+    console.error('Fehler beim Abrufen des HA Tokens:', err);
+    return null;
+  }
+}
 
-let clients = [];
-
-/* -------------------------
-   Home Assistant Websocket
-------------------------- */
-
-const ws = new WebSocket(`${HA_URL.replace("http", "ws")}/api/websocket`);
-
-ws.on("open", () => {
-  console.log("Connected to Home Assistant WebSocket");
+app.get('/flows', async (req, res) => {
+  try {
+    const data = await fs.readFile(FLOWS_FILE, 'utf-8');
+    res.json(JSON.parse(data));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      res.json({ nodes: [], connections: [] });
+    } else {
+      res.status(500).json({ error: 'Fehler beim Laden der Flows' });
+    }
+  }
 });
 
-ws.on("message", (data) => {
-  const msg = JSON.parse(data);
-
-  if (msg.type === "auth_required") {
-    ws.send(JSON.stringify({
-      type: "auth",
-      access_token: HA_TOKEN
-    }));
+app.post('/flows', async (req, res) => {
+  try {
+    await fs.writeFile(FLOWS_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Flows:', err);
+    res.status(500).json({ error: 'Fehler beim Speichern der Flows' });
   }
+});
 
-  if (msg.type === "auth_ok") {
-    console.log("HA authentication successful");
+app.get('/ha/states', async (req, res) => {
+  try {
+    const token = await getHomeAssistantToken();
+    if (!token) {
+      return res.status(401).json({ error: 'Kein HA Token verfügbar' });
+    }
 
-    ws.send(JSON.stringify({
-      id: 1,
-      type: "subscribe_events",
-      event_type: "state_changed"
-    }));
-  }
-
-  if (msg.type === "event" && msg.event?.event_type === "state_changed") {
-
-    const payload = {
-      entity_id: msg.event.data.entity_id,
-      state: msg.event.data.new_state
-    };
-
-    clients.forEach(res => {
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    const response = await axios.get('http://supervisor/core/api/states', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
 
+    res.json(response.data);
+  } catch (err) {
+    console.error('Fehler beim Abrufen der HA States:', err);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Home Assistant States' });
   }
 });
 
-/* -------------------------
-   SSE Stream für Visus
-------------------------- */
-
-app.get("/events", (req, res) => {
-
-  res.set({
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive"
-  });
-
-  res.flushHeaders();
-
-  clients.push(res);
-
-  req.on("close", () => {
-    clients = clients.filter(c => c !== res);
-  });
-
-});
-
-/* -------------------------
-   REST Proxy (wie vorher)
-------------------------- */
-
-app.get("/ha/states", async (req, res) => {
-
-  const r = await fetch(`${HA_URL}/api/states`, {
-    headers: {
-      Authorization: `Bearer ${HA_TOKEN}`,
-      "Content-Type": "application/json"
+app.get('/ha/services', async (req, res) => {
+  try {
+    const token = await getHomeAssistantToken();
+    if (!token) {
+      return res.status(401).json({ error: 'Kein HA Token verfügbar' });
     }
+
+    const response = await axios.get('http://supervisor/core/api/services', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    res.json(response.data);
+  } catch (err) {
+    console.error('Fehler beim Abrufen der HA Services:', err);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Home Assistant Services' });
+  }
+});
+
+app.post('/ha/services/:domain/:service', async (req, res) => {
+  try {
+    const token = await getHomeAssistantToken();
+    if (!token) {
+      return res.status(401).json({ error: 'Kein HA Token verfügbar' });
+    }
+
+    const { domain, service } = req.params;
+    const response = await axios.post(
+      `http://supervisor/core/api/services/${domain}/${service}`,
+      req.body,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.json(response.data);
+  } catch (err) {
+    console.error('Fehler beim Aufrufen des HA Service:', err);
+    res.status(500).json({ error: 'Fehler beim Aufrufen des Home Assistant Service' });
+  }
+});
+
+app.post('/flows/execute', async (req, res) => {
+  try {
+    const { nodes, connections } = req.body;
+
+    console.log('Führe Flow aus mit', nodes.length, 'Nodes und', connections.length, 'Verbindungen');
+
+    res.json({
+      success: true,
+      message: 'Flow wird ausgeführt',
+      executed: nodes.length
+    });
+  } catch (err) {
+    console.error('Fehler beim Ausführen des Flows:', err);
+    res.status(500).json({ error: 'Fehler beim Ausführen des Flows' });
+  }
+});
+
+async function start() {
+  await ensureDataDir();
+
+  app.listen(PORT, () => {
+    console.log(`Wiresheet API Server läuft auf Port ${PORT}`);
   });
+}
 
-  const data = await r.json();
-  res.json(data);
-
-});
-
-app.post("/ha/services/:domain/:service", async (req, res) => {
-
-  const { domain, service } = req.params;
-
-  const r = await fetch(`${HA_URL}/api/services/${domain}/${service}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${HA_TOKEN}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(req.body)
-  });
-
-  const data = await r.json();
-  res.json(data);
-
-});
-
-/* ------------------------- */
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+start().catch(console.error);

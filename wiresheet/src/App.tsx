@@ -141,13 +141,6 @@ function App() {
     setCycleInput(String(activePage.cycleMs));
   }, [activePageId, activePage.cycleMs]);
 
-  const getApiBase = () => {
-    const p = window.location.pathname;
-    const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
-    return m ? `${m[1]}/api` : '/api';
-  };
-
-
   useEffect(() => {
     if (mainView !== 'visu') return;
     executeAllPages();
@@ -577,11 +570,10 @@ function App() {
         });
       }
     } else {
-      setLiveValue(binding.nodeId, value);
-      setLiveValue(`${binding.nodeId}:output-0`, value);
       if (binding.portId) {
         setLiveValue(`${binding.nodeId}:${binding.portId}`, value);
       }
+      setLiveValue(binding.nodeId, value);
     }
     try {
       const apiBase = (() => {
@@ -973,7 +965,6 @@ function App() {
           wiresheets={pages}
           visuPages={visuPages}
           customBlocks={customBlocks}
-          apiBase={(() => { const p = window.location.pathname; const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/); return m ? `${m[1]}/api` : '/api'; })()}
           onImport={(newWiresheets, newVisuPages, newBlocks) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);

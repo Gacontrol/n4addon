@@ -14,8 +14,6 @@ function getApiBase(): string {
   return m ? m[1] : '';
 }
 
-let globalWidgetClipboard: VisuWidget | null = null;
-
 interface VisualizationViewProps {
   visuPages: VisuPage[];
   activeVisuPageId: string;
@@ -46,7 +44,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [showProperties, setShowProperties] = useState(false);
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
-  const [hasClipboard, setHasClipboard] = useState(false);
+  const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
@@ -128,10 +126,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const handleCopyWidget = useCallback((widgetId: string) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
-    if (widget) {
-      globalWidgetClipboard = widget;
-      setHasClipboard(true);
-    }
+    if (widget) setClipboard(widget);
   }, [activePage.widgets]);
 
   const handleDuplicateWidget = useCallback((widgetId: string) => {
@@ -152,21 +147,20 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   }, [activePage, onUpdateVisuPage]);
 
   const handlePasteWidget = useCallback(() => {
-    if (!globalWidgetClipboard) return;
-    const cb = globalWidgetClipboard;
+    if (!clipboard) return;
     const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newWidget: VisuWidget = {
-      ...cb,
+      ...clipboard,
       id: newId,
-      position: { x: cb.position.x + 20, y: cb.position.y + 20 },
-      config: cb.type === 'visu-polyline'
-        ? { ...(cb.config as PolylineConfig), points: (cb.config as PolylineConfig).points.map(p => ({ ...p })) }
-        : { ...cb.config },
+      position: { x: clipboard.position.x + 20, y: clipboard.position.y + 20 },
+      config: clipboard.type === 'visu-polyline'
+        ? { ...(clipboard.config as PolylineConfig), points: (clipboard.config as PolylineConfig).points.map(p => ({ ...p })) }
+        : { ...clipboard.config },
       zIndex: activePage.widgets.length + 1
     };
     onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
     setSelectedWidgetId(newId);
-  }, [activePage, onUpdateVisuPage]);
+  }, [clipboard, activePage, onUpdateVisuPage]);
 
   const handleWidgetValueChange = useCallback((widgetId: string, value: unknown) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
@@ -432,7 +426,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             logicNodes={logicNodes}
             isEditMode={isEditMode}
             selectedWidgetId={selectedWidgetId}
-            clipboard={globalWidgetClipboard}
+            clipboard={clipboard}
             onSelectWidget={(id) => {
               setSelectedWidgetId(id);
               if (id) setShowProperties(true);

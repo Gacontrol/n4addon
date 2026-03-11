@@ -26,15 +26,14 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
   const offColor = config.offColor || '#64748b';
 
   const hasFeedback = statusValue !== null && statusValue !== undefined;
-  const actualStatus = hasFeedback ? Boolean(statusValue) : Boolean(value);
-  const displayValue = actualStatus;
+  const displayValue = writeOnly ? (statusValue ?? (config.defaultValue ?? false)) : value;
 
   const knobValue = displayValue;
-  const colorValue = displayValue;
+  const colorValue = hasFeedback ? Boolean(statusValue) : displayValue;
 
   const currentColor = colorValue ? onColor : offColor;
 
-  const isPending = false;
+  const isPending = hasFeedback && !writeOnly && value !== Boolean(statusValue);
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -45,7 +44,7 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
         <button
           onClick={() => {
             if (!disabled) {
-              const newVal = !actualStatus;
+              const newVal = !displayValue;
               onChange(newVal);
             }
           }}

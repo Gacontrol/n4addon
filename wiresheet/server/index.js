@@ -23,8 +23,6 @@ let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
-const visuWriteLocks = new Map();
-const VISU_WRITE_LOCK_MS = 1500;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -195,7 +193,6 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-
 app.get(['/pages', '/api/pages'], async (req, res) => {
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');
@@ -228,27 +225,6 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
     const pages = req.body;
     if (!Array.isArray(pages)) {
       return res.status(400).json({ error: 'Ungueltige Daten - Array erwartet' });
-    }
-    let existingOverrides = {};
-    try {
-      const existingData = await fs.readFile(pagesFile, 'utf-8');
-      const existingPages = JSON.parse(existingData);
-      for (const ep of existingPages) {
-        for (const en of (ep.nodes || [])) {
-          if (en.data?.override?.manual) {
-            existingOverrides[`${ep.id}:${en.id}`] = en.data.override;
-          }
-        }
-      }
-    } catch {}
-    for (const page of pages) {
-      for (const node of (page.nodes || [])) {
-        const key = `${page.id}:${node.id}`;
-        if (existingOverrides[key] && !node.data.override?.manual) {
-          if (!node.data) node.data = {};
-          node.data.override = existingOverrides[key];
-        }
-      }
     }
     await fs.mkdir(dataDir, { recursive: true });
     await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
@@ -449,11 +425,6 @@ function getDefaultOutputsForNodeType(node) {
     case 'rising-edge':
     case 'falling-edge':
       defaults['output-0'] = false;
-      break;
-    case 'compare':
-      defaults['output-0'] = false;
-      defaults['output-1'] = false;
-      defaults['output-2'] = false;
       break;
     case 'python-script': {
       const pythonOutputs = (node.data && node.data.config && node.data.config.pythonOutputs) || [];
@@ -685,7 +656,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const incomingConns = connections.filter(c => c.target === nodeId);
 
     const getInputValue = (conn) => {
-      if (conn.sourcePort) {
+      const sourceNode = nodes.find(n => n.id === conn.source);
+      if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
@@ -711,18 +683,14 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
     if (manualOverrides[nodeId] !== undefined) {
       nodeValues[nodeId] = manualOverrides[nodeId];
-      nodeValues[`${nodeId}:output-0`] = manualOverrides[nodeId];
     } else if (node.type === 'ha-input') {
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
       const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
       const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
       if (visuVal !== undefined) {
         nodeValues[nodeId] = visuVal;
-        nodeValues[`${nodeId}:output-0`] = visuVal;
       } else {
-        const val = inputVals[0] !== undefined ? inputVals[0] : null;
-        nodeValues[nodeId] = val;
-        nodeValues[`${nodeId}:output-0`] = val;
+        nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
       }
     } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = visuOverrides[nodeId];
@@ -769,17 +737,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'const-value') {
       nodeValues[nodeId] = cfg.constValue !== undefined ? cfg.constValue : 0;
     } else if (node.type === 'compare') {
-      const rawA = inputVals[0];
-      const rawB = inputVals[1];
-      const a = rawA !== undefined && rawA !== null ? (isNaN(Number(rawA)) ? 0 : Number(rawA)) : 0;
-      const b = cfg.compareValue !== undefined ? Number(cfg.compareValue) : (rawB !== undefined && rawB !== null ? (isNaN(Number(rawB)) ? 0 : Number(rawB)) : 0);
-      const gtResult = a > b;
-      const eqResult = a === b;
-      const ltResult = a < b;
-      nodeValues[`${nodeId}:output-0`] = gtResult;
-      nodeValues[`${nodeId}:output-1`] = eqResult;
-      nodeValues[`${nodeId}:output-2`] = ltResult;
-      nodeValues[nodeId] = gtResult;
+      const a = parseFloat(inputVals[0]) || 0;
+      const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
+      const op = cfg.compareOperator || '>';
+      if (op === '>') nodeValues[nodeId] = a > b;
+      else if (op === '>=') nodeValues[nodeId] = a >= b;
+      else if (op === '==') nodeValues[nodeId] = a == b;
+      else if (op === '<=') nodeValues[nodeId] = a <= b;
+      else if (op === '<') nodeValues[nodeId] = a < b;
+      else if (op === '!=') nodeValues[nodeId] = a != b;
+      else nodeValues[nodeId] = false;
     } else if (node.type === 'threshold') {
       const val = parseFloat(inputVals[0]) || 0;
       const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
@@ -1098,30 +1065,8 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
   const { pageId } = req.params;
   const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
   try {
-    const finalOverrides = { ...manualOverrides };
-    try {
-      const fileData = await fs.readFile(pagesFile, 'utf-8');
-      const filePages = JSON.parse(fileData);
-      const filePage = filePages.find(p => p.id === pageId);
-      if (filePage) {
-        for (const node of filePage.nodes) {
-          if (node.data.override?.manual && finalOverrides[node.id] === undefined) {
-            finalOverrides[node.id] = node.data.override.value;
-          }
-        }
-      }
-    } catch {}
-    const nodeValues = await executePageLogic(nodes, connections, finalOverrides, visuOverrides, pageId);
-    const now = Date.now();
-    const pageLocks = visuWriteLocks.get(pageId) || {};
-    const merged = { ...nodeValues };
-    for (const [key, expiry] of Object.entries(pageLocks)) {
-      if (now < expiry && lastNodeValues.has(pageId) && key in lastNodeValues.get(pageId)) {
-        merged[key] = lastNodeValues.get(pageId)[key];
-      }
-    }
-    lastNodeValues.set(pageId, merged);
-    res.json({ success: true, nodeValues: merged });
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides, pageId);
+    res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1151,15 +1096,7 @@ async function runPageCycle(pageId) {
         }
       }
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
-      const now = Date.now();
-      const pageLocks = visuWriteLocks.get(pageId) || {};
-      const merged = { ...nodeValues };
-      for (const [key, expiry] of Object.entries(pageLocks)) {
-        if (now < expiry && lastNodeValues.has(pageId) && key in lastNodeValues.get(pageId)) {
-          merged[key] = lastNodeValues.get(pageId)[key];
-        }
-      }
-      lastNodeValues.set(pageId, merged);
+      lastNodeValues.set(pageId, nodeValues);
     }
 
     pageInfo.lastRun = Date.now();
@@ -1337,7 +1274,7 @@ app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
 });
 
 app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, portId, paramKey, value } = req.body;
+  const { nodeId, paramKey, value } = req.body;
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
@@ -1345,7 +1282,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     const data = await fs.readFile(pagesFile, 'utf-8');
     const pages = JSON.parse(data);
     let updated = false;
-    let foundPageId = null;
     for (const page of pages) {
       const node = page.nodes.find(n => n.id === nodeId);
       if (node) {
@@ -1353,11 +1289,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           if (!node.data.config) node.data.config = {};
           node.data.config[paramKey] = value;
           console.log(`Visu-Parameter geschrieben: ${nodeId}.${paramKey} = ${value}`);
-          const liveKey = `${nodeId}:param:${paramKey}`;
-          if (!lastNodeValues.has(page.id)) lastNodeValues.set(page.id, {});
-          lastNodeValues.get(page.id)[liveKey] = value;
-          if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
-          visuWriteLocks.get(page.id)[liveKey] = Date.now() + VISU_WRITE_LOCK_MS;
         } else {
           if (!node.data.override) {
             node.data.override = { manual: true, value };
@@ -1366,34 +1297,13 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
             node.data.override.value = value;
           }
           console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
-          if (!lastNodeValues.has(page.id)) lastNodeValues.set(page.id, {});
-          lastNodeValues.get(page.id)[nodeId] = value;
-          if (portId) {
-            lastNodeValues.get(page.id)[`${nodeId}:${portId}`] = value;
-          }
-          lastNodeValues.get(page.id)[`${nodeId}:output-0`] = value;
-          if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
-          visuWriteLocks.get(page.id)[nodeId] = Date.now() + VISU_WRITE_LOCK_MS;
-          if (portId) {
-            visuWriteLocks.get(page.id)[`${nodeId}:${portId}`] = Date.now() + VISU_WRITE_LOCK_MS;
-          }
-          visuWriteLocks.get(page.id)[`${nodeId}:output-0`] = Date.now() + VISU_WRITE_LOCK_MS;
         }
         updated = true;
-        foundPageId = page.id;
         break;
       }
     }
     if (updated) {
       await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-      if (foundPageId && runningPages.has(foundPageId)) {
-        const pageInfo = runningPages.get(foundPageId);
-        if (pageInfo && pageInfo.timeout) {
-          clearTimeout(pageInfo.timeout);
-          pageInfo.timeout = null;
-        }
-        setImmediate(() => runPageCycle(foundPageId));
-      }
       res.json({ success: true });
     } else {
       res.status(404).json({ error: 'Node nicht gefunden' });
@@ -2064,7 +1974,6 @@ async function start() {
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
-
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);

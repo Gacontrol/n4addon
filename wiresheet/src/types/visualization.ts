@@ -501,7 +501,6 @@ export interface DashToggleCardConfig {
   onColor?: string;
   offColor?: string;
   icon?: string;
-  defaultValue?: boolean;
 }
 
 export interface DashBatteryConfig {

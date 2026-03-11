@@ -12,16 +12,13 @@ import {
   createBackup,
   downloadBackup,
   parseBackupFile,
-  applyImport,
-  fetchImagesForBackup,
-  restoreImagesFromBackup
+  applyImport
 } from '../utils/backup';
 
 interface BackupModalProps {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
-  apiBase: string;
   onImport: (
     wiresheets: WiresheetPage[],
     visuPages: VisuPage[],
@@ -42,7 +39,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   wiresheets,
   visuPages,
   customBlocks,
-  apiBase,
   onImport,
   onClose
 }) => {
@@ -64,8 +60,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const [wiresheetsOpen, setWiresheetsOpen] = useState(true);
   const [visuOpen, setVisuOpen] = useState(true);
   const [blocksOpen, setBlocksOpen] = useState(true);
-  const [exportingImages, setExportingImages] = useState(false);
-  const [importingImages, setImportingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,19 +115,16 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
     const selectedWiresheets = wiresheets.filter(w => exportSelection.wiresheets.includes(w.id));
     const selectedVisus = visuPages.filter(v => exportSelection.visuPages.includes(v.id));
     const selectedBlocks = customBlocks.filter(b => exportSelection.customBlocks.includes(b.id));
-    setExportingImages(true);
-    const images = await fetchImagesForBackup(apiBase);
-    setExportingImages(false);
-    const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images);
+    const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks);
     downloadBackup(backup);
     onClose();
   };
 
-  const handleImportConfirm = async () => {
+  const handleImportConfirm = () => {
     if (!loadedBackup) return;
     const result = applyImport(
       importSelection,
@@ -144,11 +135,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       importMode
     );
     onImport(result.wiresheets, result.visuPages, result.customBlocks);
-    if (loadedBackup.images && loadedBackup.images.length > 0) {
-      setImportingImages(true);
-      await restoreImagesFromBackup(apiBase, loadedBackup.images);
-      setImportingImages(false);
-    }
     setImportDone(true);
     setTimeout(() => onClose(), 1200);
   };
@@ -475,33 +461,25 @@ export const BackupModal: React.FC<BackupModalProps> = ({
 
             {view === 'export' && (
               <button
-                disabled={totalExportSelected === 0 || exportingImages}
+                disabled={totalExportSelected === 0}
                 onClick={handleExport}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#3b82f6' }}
               >
-                {exportingImages ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Download className="w-3.5 h-3.5" />
-                )}
-                {exportingImages ? 'Bilder werden geladen...' : `Backup speichern (${totalExportSelected})`}
+                <Download className="w-3.5 h-3.5" />
+                Backup speichern ({totalExportSelected})
               </button>
             )}
 
             {view === 'import-select' && loadedBackup && (
               <button
-                disabled={totalImportSelected === 0 || importingImages}
+                disabled={totalImportSelected === 0}
                 onClick={handleImportConfirm}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ backgroundColor: '#10b981' }}
               >
-                {importingImages ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Upload className="w-3.5 h-3.5" />
-                )}
-                {importingImages ? 'Bilder werden wiederhergestellt...' : `Importieren (${totalImportSelected})`}
+                <Upload className="w-3.5 h-3.5" />
+                Importieren ({totalImportSelected})
               </button>
             )}
           </div>

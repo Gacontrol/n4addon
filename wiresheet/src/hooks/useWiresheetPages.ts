@@ -39,7 +39,6 @@ export const useWiresheetPages = () => {
   const saveInProgress = useRef(false);
   const pagesRef = useRef<WiresheetPage[]>(pages);
   const visuOverridesRef = useRef<Record<string, unknown>>({});
-  const visuWriteLockRef = useRef<Map<string, number>>(new Map());
 
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
@@ -74,13 +73,6 @@ export const useWiresheetPages = () => {
                   }
                 }
 
-                const now = Date.now();
-                for (const [k, ts] of visuWriteLockRef.current.entries()) {
-                  if (now >= ts) {
-                    visuWriteLockRef.current.delete(k);
-                    delete visuOverridesRef.current[k];
-                  }
-                }
                 const visuOverrides = { ...visuOverridesRef.current };
                 fetch(`${API_BASE}/pages/${page.id}/execute`, {
                   method: 'POST',
@@ -90,14 +82,7 @@ export const useWiresheetPages = () => {
                   .then(r => r.ok ? r.json() : null)
                   .then(result => {
                     if (result?.nodeValues) {
-                      const lockedOverrides: Record<string, unknown> = {};
-                      const nowInner = Date.now();
-                      for (const [k, ts] of visuWriteLockRef.current.entries()) {
-                        if (nowInner < ts && k in visuOverridesRef.current) {
-                          lockedOverrides[k] = visuOverridesRef.current[k];
-                        }
-                      }
-                      setLiveValues(prev => ({ ...prev, ...result.nodeValues, ...lockedOverrides }));
+                      setLiveValues(prev => ({ ...prev, ...result.nodeValues, ...visuOverridesRef.current }));
                     }
                   })
                   .catch(() => {});
@@ -255,13 +240,6 @@ export const useWiresheetPages = () => {
       }
     }
 
-    const now = Date.now();
-    for (const [k, ts] of visuWriteLockRef.current.entries()) {
-      if (now >= ts) {
-        visuWriteLockRef.current.delete(k);
-        delete visuOverridesRef.current[k];
-      }
-    }
     const visuOverrides = { ...visuOverridesRef.current };
 
     try {
@@ -272,14 +250,7 @@ export const useWiresheetPages = () => {
       });
       if (res.ok) {
         const { nodeValues } = await res.json();
-        const lockedOverrides: Record<string, unknown> = {};
-        const nowInner = Date.now();
-        for (const [k, ts] of visuWriteLockRef.current.entries()) {
-          if (nowInner < ts && k in visuOverridesRef.current) {
-            lockedOverrides[k] = visuOverridesRef.current[k];
-          }
-        }
-        setLiveValues(prev => ({ ...prev, ...nodeValues, ...lockedOverrides }));
+        setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
       }
     } catch {
     }
@@ -851,7 +822,6 @@ export const useWiresheetPages = () => {
     },
     setLiveValue: (key: string, value: unknown) => {
       visuOverridesRef.current = { ...visuOverridesRef.current, [key]: value };
-      visuWriteLockRef.current.set(key, Date.now() + 2000);
       setLiveValues(prev => ({ ...prev, [key]: value }));
     },
     executeAllPages: async () => {
@@ -863,13 +833,6 @@ export const useWiresheetPages = () => {
             manualOverrides[node.id] = node.data.override.value;
           }
         }
-        const now = Date.now();
-        for (const [k, ts] of visuWriteLockRef.current.entries()) {
-          if (now >= ts) {
-            visuWriteLockRef.current.delete(k);
-            delete visuOverridesRef.current[k];
-          }
-        }
         const visuOverrides = { ...visuOverridesRef.current };
         try {
           const res = await fetch(`${API_BASE}/pages/${page.id}/execute`, {
@@ -879,14 +842,7 @@ export const useWiresheetPages = () => {
           });
           if (res.ok) {
             const { nodeValues } = await res.json();
-            const lockedOverrides: Record<string, unknown> = {};
-            const nowInner = Date.now();
-            for (const [k, ts] of visuWriteLockRef.current.entries()) {
-              if (nowInner < ts && k in visuOverridesRef.current) {
-                lockedOverrides[k] = visuOverridesRef.current[k];
-              }
-            }
-            setLiveValues(prev => ({ ...prev, ...nodeValues, ...lockedOverrides }));
+            setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
           }
         } catch { }
       }

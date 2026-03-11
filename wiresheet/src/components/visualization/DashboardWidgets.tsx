@@ -198,23 +198,19 @@ interface DashToggleCardProps extends BaseProps {
   onChange: (v: boolean) => void;
   config: DashToggleCardConfig;
   disabled?: boolean;
-  statusValue?: boolean | null;
 }
 
-export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange, config, label, style, disabled, statusValue }) => {
+export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange, config, label, style, disabled }) => {
   const onColor = config.onColor ?? '#22c55e';
   const offColor = config.offColor ?? '#64748b';
   const showLabel = style.showLabel !== false;
-  const hasFeedback = statusValue !== undefined && statusValue !== null;
-  const displayValue = hasFeedback ? Boolean(statusValue) : value;
-  const isPending = hasFeedback && value !== Boolean(statusValue);
-  const color = displayValue ? onColor : offColor;
+  const color = value ? onColor : offColor;
 
   return (
     <div
-      className={`w-full h-full rounded-xl overflow-hidden flex flex-col p-3 cursor-pointer transition-all duration-200 ${isPending ? 'animate-pulse' : ''}`}
+      className="w-full h-full rounded-xl overflow-hidden flex flex-col p-3 cursor-pointer transition-all duration-200"
       style={{
-        background: displayValue
+        background: value
           ? `linear-gradient(135deg, ${onColor}18 0%, ${onColor}08 100%)`
           : 'rgba(255,255,255,0.03)',
         border: `1px solid ${color}30`
@@ -225,23 +221,14 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
         <div className="rounded-lg p-2" style={{ backgroundColor: `${color}20` }}>
           <DashIcon name={config.icon} size={16} color={color} />
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div
+          className="relative rounded-full transition-all duration-300 flex-shrink-0"
+          style={{ width: 42, height: 24, backgroundColor: value ? onColor : 'rgba(255,255,255,0.1)' }}
+        >
           <div
-            className="relative rounded-full transition-all duration-300 flex-shrink-0"
-            style={{ width: 42, height: 24, backgroundColor: displayValue ? onColor : 'rgba(255,255,255,0.1)' }}
-          >
-            <div
-              className="absolute top-1 rounded-full bg-white shadow transition-all duration-300"
-              style={{ width: 16, height: 16, left: displayValue ? 22 : 4 }}
-            />
-          </div>
-          {hasFeedback && (
-            <div
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: Boolean(statusValue) ? onColor : offColor }}
-              title={`Rückmeldung: ${Boolean(statusValue) ? 'Ein' : 'Aus'}`}
-            />
-          )}
+            className="absolute top-1 rounded-full bg-white shadow transition-all duration-300"
+            style={{ width: 16, height: 16, left: value ? 22 : 4 }}
+          />
         </div>
       </div>
       <div className="mt-auto">
@@ -249,7 +236,7 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
           <div className="text-xs text-slate-400 truncate mb-0.5">{label}</div>
         )}
         <div className="text-sm font-bold" style={{ color }}>
-          {displayValue ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
+          {value ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
         </div>
       </div>
     </div>

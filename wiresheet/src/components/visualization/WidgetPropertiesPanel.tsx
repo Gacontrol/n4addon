@@ -69,8 +69,7 @@ const SHAPE_TYPES = new Set([
   'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'
 ]);
 
-const getNodeLabel = (node: FlowNode | undefined) => {
-  if (!node) return '(Geloeschter Node)';
+const getNodeLabel = (node: FlowNode) => {
   const customLabel = node.data.config?.customLabel as string | undefined;
   return customLabel || node.data.label || node.type;
 };
@@ -131,9 +130,7 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
       params.push({ key: 'delayMs', label: 'Verzoegerung (ms)', type: 'number' });
       break;
     case 'timer':
-      params.push({ key: 'timerOnMs', label: 'Einschaltverzögerung (ms)', type: 'number' });
-      params.push({ key: 'timerOffMs', label: 'Ausschaltverzögerung (ms)', type: 'number' });
-      params.push({ key: 'timerMs', label: 'Zeitdauer allgemein (ms)', type: 'number' });
+      params.push({ key: 'timerMs', label: 'Zeitdauer (ms)', type: 'number' });
       break;
     case 'counter':
       params.push({ key: 'counterMin', label: 'Zähler Min', type: 'number' });
@@ -182,7 +179,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isWriteWidget = [
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
     'modern-switch', 'modern-button', 'modern-incrementer',
-    'dash-toggle', 'dash-toggle-card', 'dash-multistate'
+    'dash-toggle'
   ].includes(widget.type);
 
   const handleNodeChange = (nodeId: string) => {
@@ -1313,45 +1310,13 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <FileManager
                 apiBase={getApiBase()}
                 pickerMode
-                onSelectImage={(url, rawUrl) => {
-                  const storeUrl = rawUrl ?? url;
-                  onUpdate({ config: { ...imgCfg, imageUrl: storeUrl, storagePath: storeUrl } });
+                onSelectImage={(url) => {
+                  onUpdate({ config: { ...imgCfg, imageUrl: url, storagePath: url } });
                   setShowImagePicker(false);
                 }}
                 onClose={() => setShowImagePicker(false)}
               />
             )}
-          </>
-        );
-      }
-
-      case 'dash-toggle-card': {
-        const dtCfg = config as import('../../types/visualization').DashToggleCardConfig;
-        return (
-          <>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Ein-Label</label>
-              <input type="text" value={dtCfg.onLabel || 'Aktiv'} onChange={(e) => onUpdate({ config: { ...config, onLabel: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Aus-Label</label>
-              <input type="text" value={dtCfg.offLabel || 'Inaktiv'} onChange={(e) => onUpdate({ config: { ...config, offLabel: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Ein-Farbe</label>
-              <input type="color" value={dtCfg.onColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, onColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Aus-Farbe</label>
-              <input type="color" value={dtCfg.offColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, offColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Standardwert</label>
-              <select value={dtCfg.defaultValue ? 'true' : 'false'} onChange={(e) => onUpdate({ config: { ...config, defaultValue: e.target.value === 'true' } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
-                <option value="false">Aus</option>
-                <option value="true">Ein</option>
-              </select>
-            </div>
           </>
         );
       }
@@ -1469,7 +1434,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
                       <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -1571,7 +1536,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
                       {(widget.binding.portId || widget.binding.paramKey) && (
                         <div className="flex items-center gap-1 mt-0.5">
                           {widget.binding.paramKey && <Settings className="w-3 h-3 text-amber-400" />}

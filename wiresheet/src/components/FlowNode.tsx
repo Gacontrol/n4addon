@@ -915,9 +915,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               let outVal;
               if (isManual) {
                 outVal = data.override?.value;
+              } else if (isPythonScript) {
+                outVal = liveValues[`${node.id}:${output.id}`] ?? liveValues[node.id];
               } else {
-                const portKey = `${node.id}:${output.id}`;
-                outVal = liveValues[portKey] !== undefined ? liveValues[portKey] : liveValues[node.id];
+                outVal = liveValues[node.id];
               }
               const hasOutVal = outVal !== undefined && outVal !== null;
               return (
