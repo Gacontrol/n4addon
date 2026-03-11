@@ -989,6 +989,63 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       st.prevInput = inputVal;
       nodeValues[nodeId] = fallingEdge;
       nodeValues[`${nodeId}:output-0`] = fallingEdge;
+    } else if (node.type === 'time-trigger') {
+      const cronExpr = cfg.cronExpression || '0 * * * *';
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__timeTrigState || (node.__timeTrigState = {});
+      if (st.lastFired === undefined) st.lastFired = null;
+      const now = new Date();
+      let fired = false;
+      try {
+        const parts = cronExpr.trim().split(/\s+/);
+        if (parts.length === 5) {
+          const [min, hour, dom, mon, dow] = parts;
+          const matchField = (field, val, min0, max0) => {
+            if (field === '*') return true;
+            return field.split(',').some(p => {
+              if (p.includes('/')) {
+                const [range, step] = p.split('/');
+                const s = parseInt(step);
+                const start = range === '*' ? min0 : parseInt(range);
+                return ((val - start) % s === 0) && val >= start;
+              }
+              if (p.includes('-')) {
+                const [a, b] = p.split('-').map(Number);
+                return val >= a && val <= b;
+              }
+              return parseInt(p) === val;
+            });
+          };
+          const matches = matchField(min, now.getMinutes(), 0, 59) &&
+                          matchField(hour, now.getHours(), 0, 23) &&
+                          matchField(dom, now.getDate(), 1, 31) &&
+                          matchField(mon, now.getMonth() + 1, 1, 12) &&
+                          matchField(dow, now.getDay(), 0, 6);
+          const currentMinuteKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+          if (matches && st.lastFired !== currentMinuteKey) {
+            fired = true;
+            st.lastFired = currentMinuteKey;
+          }
+        }
+      } catch (e) {
+        console.error(`time-trigger cron parse error: ${e.message}`);
+      }
+      nodeValues[nodeId] = fired;
+      nodeValues[`${nodeId}:output-0`] = fired;
+    } else if (node.type === 'state-trigger') {
+      const inputVal = inputVals[0];
+      const triggerState = cfg.triggerState !== undefined ? String(cfg.triggerState) : null;
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__stateTrigState || (node.__stateTrigState = {});
+      if (st.prevVal === undefined) st.prevVal = inputVal;
+      let triggered = false;
+      const changed = inputVal !== st.prevVal;
+      if (changed) {
+        if (triggerState === null || triggerState === '' || String(inputVal) === triggerState) {
+          triggered = true;
+        }
+        st.prevVal = inputVal;
+      }
+      nodeValues[nodeId] = triggered;
+      nodeValues[`${nodeId}:output-0`] = triggered;
     } else if (node.type === 'scaling') {
       const inputVal = parseFloat(inputVals[0]);
       const inMin = cfg.scalingInMin !== undefined ? parseFloat(cfg.scalingInMin) : 0;
