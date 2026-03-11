@@ -60,8 +60,13 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
   const isPending = localValue !== null && localValue !== serverValue;
 
   const handleClick = () => {
-    if (disabled) return;
+    console.log('[VisuSwitch] Click - disabled:', disabled, 'displayValue:', displayValue);
+    if (disabled) {
+      console.log('[VisuSwitch] Click blocked - disabled');
+      return;
+    }
     const newVal = !displayValue;
+    console.log('[VisuSwitch] Setting newVal:', newVal);
     setLocalValue(newVal);
     onChange(newVal);
 

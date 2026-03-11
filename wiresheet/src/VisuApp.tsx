@@ -82,6 +82,7 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
+    console.log('[VisuApp] handleWidgetValueChange called:', widgetId, value);
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
     for (const page of pages) {
@@ -91,10 +92,14 @@ export function VisuApp() {
         break;
       }
     }
-    if (!binding) return;
+    if (!binding) {
+      console.log('[VisuApp] No binding found for widget:', widgetId);
+      return;
+    }
 
+    console.log('[VisuApp] Sending to API:', apiBase, binding, value);
     try {
-      await fetch(`${apiBase}/visu/write-value`, {
+      const response = await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,8 +108,10 @@ export function VisuApp() {
           value
         })
       });
+      const result = await response.json();
+      console.log('[VisuApp] API response:', response.status, result);
     } catch (err) {
-      console.error('write value error:', err);
+      console.error('[VisuApp] write value error:', err);
     }
   }, [apiBase]);
 
