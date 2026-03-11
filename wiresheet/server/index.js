@@ -1361,6 +1361,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
+  const visuSource = req.headers['x-visu-source'];
+  if (visuSource && visuSource !== visuMode) {
+    return res.status(403).json({ error: 'Visu-Modus stimmt nicht ueberein. Eingaben sind gesperrt.' });
+  }
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');
     const pages = JSON.parse(data);

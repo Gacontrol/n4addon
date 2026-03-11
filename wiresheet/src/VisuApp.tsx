@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
-import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
+import { Monitor, ChevronLeft, Home, Maximize2, Lock } from 'lucide-react';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -24,6 +24,7 @@ export function VisuApp() {
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [addonVisuDisabled, setAddonVisuDisabled] = useState(false);
+  const [visuMode, setVisuMode] = useState<'addon' | 'port8098'>('addon');
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
@@ -101,12 +102,19 @@ export function VisuApp() {
   }, [loadData]);
 
   useEffect(() => {
-    if (IS_PORT_8098) return;
     const checkMode = () => {
       fetch(`${apiBase}/visu-mode`)
         .then(r => r.json())
-        .then(d => { setAddonVisuDisabled(d.mode === 'port8098'); })
-        .catch(() => { setAddonVisuDisabled(false); });
+        .then(d => {
+          const mode = d.mode as 'addon' | 'port8098';
+          setVisuMode(mode);
+          if (!IS_PORT_8098) {
+            setAddonVisuDisabled(mode === 'port8098');
+          }
+        })
+        .catch(() => {
+          if (!IS_PORT_8098) setAddonVisuDisabled(false);
+        });
     };
     checkMode();
     const interval = setInterval(checkMode, 3000);
@@ -122,6 +130,9 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
+    if (IS_PORT_8098 && visuMode !== 'port8098') return;
+    if (!IS_PORT_8098 && visuMode !== 'addon') return;
+
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
     for (const page of pages) {
@@ -159,7 +170,10 @@ export function VisuApp() {
     try {
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Visu-Source': IS_PORT_8098 ? 'port8098' : 'addon'
+        },
         body: JSON.stringify(body)
       });
     } catch (err) {
@@ -167,7 +181,7 @@ export function VisuApp() {
       writeLockRef.current.delete(liveKey);
       if (portLiveKey) writeLockRef.current.delete(portLiveKey);
     }
-  }, [apiBase]);
+  }, [apiBase, visuMode]);
 
   const handleNavigateTo = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
@@ -242,6 +256,8 @@ export function VisuApp() {
     );
   }
 
+  const isReadOnly = (IS_PORT_8098 && visuMode !== 'port8098') || (!IS_PORT_8098 && visuMode !== 'addon');
+
   if (!activePage) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
@@ -306,6 +322,17 @@ export function VisuApp() {
         </div>
       )}
 
+      {isReadOnly && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-950/80 border-b border-amber-800/60" style={{ flexShrink: 0 }}>
+          <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="text-xs text-amber-300">
+            {IS_PORT_8098
+              ? 'Visu gesperrt – Addon-Modus aktiv. Wechsle im Editor auf "Port 8098" um Eingaben zu erlauben.'
+              : 'Visu gesperrt – Port 8098 Modus aktiv. Eingaben sind deaktiviert.'}
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 overflow-hidden">
         <VisuCanvas
           page={activePage}
@@ -320,7 +347,7 @@ export function VisuApp() {
           onDuplicateWidget={() => {}}
           onCopyWidget={() => {}}
           onPasteWidget={() => {}}
-          onWidgetValueChange={handleWidgetValueChange}
+          onWidgetValueChange={isReadOnly ? () => {} : handleWidgetValueChange}
           onEditWidgetProperties={() => {}}
           onNavigateToPage={handleNavigateTo}
           onNavigateBack={handleNavigateBack}
