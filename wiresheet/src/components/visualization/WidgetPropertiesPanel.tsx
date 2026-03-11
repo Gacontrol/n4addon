@@ -178,7 +178,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
   const isWriteWidget = [
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
-    'modern-switch', 'modern-button', 'modern-incrementer',
+    'modern-switch', 'modern-button', 'modern-incrementer', 'modern-multistate',
     'dash-toggle', 'dash-toggle-card', 'dash-multistate'
   ].includes(widget.type);
 
