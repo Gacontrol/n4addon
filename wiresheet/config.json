@@ -9,6 +9,12 @@
   "init": false,
   "ingress": true,
   "ingress_port": 8099,
+  "ports": {
+    "8098/tcp": 8098
+  },
+  "ports_description": {
+    "8098/tcp": "Visualization Dashboard (direct access)"
+  },
   "panel_icon": "mdi:sitemap",
   "panel_title": "Wiresheet",
   "hassio_api": true,
