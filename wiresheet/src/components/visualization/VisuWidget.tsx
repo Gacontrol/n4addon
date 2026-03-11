@@ -28,7 +28,18 @@ import {
   HomeButtonConfig,
   BackButtonConfig,
   FrameConfig,
-  ImageConfig
+  ImageConfig,
+  ModernSwitchConfig,
+  ModernButtonConfig,
+  ModernGaugeConfig,
+  ModernDisplayConfig,
+  ModernBarConfig,
+  ModernLedConfig,
+  ModernSliderConfig,
+  DashStatConfig,
+  DashProgressConfig,
+  DashValueCardConfig,
+  DashToggleCardConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuImage } from './VisuImage';
@@ -48,6 +59,21 @@ import {
   VisuLabel,
   VisuMultistate
 } from './index';
+import {
+  ModernSwitch,
+  ModernButton,
+  ModernGauge,
+  ModernDisplay,
+  ModernBar,
+  ModernLed,
+  ModernSlider
+} from './ModernWidgets';
+import {
+  DashStat,
+  DashProgress,
+  DashValueCard,
+  DashToggleCard
+} from './DashboardWidgets';
 
 interface VisuWidgetProps {
   widget: VisuWidgetType;
@@ -782,6 +808,128 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'modern-switch': {
+        const mswCfg = widget.config as ModernSwitchConfig;
+        const mswVal = Boolean(value ?? mswCfg.defaultValue ?? false);
+        return (
+          <ModernSwitch
+            value={mswVal}
+            onChange={onValueChange}
+            config={mswCfg}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+          />
+        );
+      }
+
+      case 'modern-button':
+        return (
+          <ModernButton
+            onValueChange={onValueChange}
+            config={widget.config as ModernButtonConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+          />
+        );
+
+      case 'modern-gauge':
+        return (
+          <ModernGauge
+            value={typeof value === 'number' ? value : 0}
+            config={widget.config as ModernGaugeConfig}
+            style={widget.style}
+            label={widget.label}
+            size={widget.size}
+          />
+        );
+
+      case 'modern-display':
+        return (
+          <ModernDisplay
+            value={value as number | string | boolean | null}
+            config={widget.config as ModernDisplayConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'modern-bar':
+        return (
+          <ModernBar
+            value={typeof value === 'number' ? value : 0}
+            config={widget.config as ModernBarConfig}
+            style={widget.style}
+            label={widget.label}
+            size={widget.size}
+          />
+        );
+
+      case 'modern-led':
+        return (
+          <ModernLed
+            value={Boolean(value)}
+            config={widget.config as ModernLedConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'modern-slider':
+        return (
+          <ModernSlider
+            value={typeof value === 'number' ? value : 0}
+            onChange={(v) => onValueChange(v)}
+            config={widget.config as ModernSliderConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+          />
+        );
+
+      case 'dash-stat':
+        return (
+          <DashStat
+            value={value as number | string | null}
+            config={widget.config as DashStatConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-progress':
+        return (
+          <DashProgress
+            value={typeof value === 'number' ? value : 0}
+            config={widget.config as DashProgressConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-value-card':
+        return (
+          <DashValueCard
+            value={value as number | string | null}
+            config={widget.config as DashValueCardConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-toggle-card':
+        return (
+          <DashToggleCard
+            value={Boolean(value)}
+            onChange={onValueChange}
+            config={widget.config as DashToggleCardConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+          />
+        );
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
@@ -789,6 +937,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
   const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
   const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button', 'visu-frame', 'visu-image'].includes(widget.type);
+  const isModernWidget = widget.type.startsWith('modern-');
+  const isDashWidget = widget.type.startsWith('dash-');
   const isVertexWidget = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
   const showResizeHandles = isEditMode && isSelected && !isVertexWidget;
   const showSelectionBorder = isSelected && !isVertexWidget && !['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
@@ -798,22 +948,28 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const resolvedBorderRadius = widget.style.borderRadius ?? themeVars.borderRadius;
   const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 
+  const isTransparentWidget = isDrawingWidget || isModernWidget || isDashWidget;
+
   return (
     <div
-      className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget ? '' : 'flex items-center justify-center'}`}
+      className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
         width: widget.size.width,
         height: widget.size.height,
         zIndex: widget.zIndex || 1,
-        backgroundColor: isDrawingWidget ? 'transparent' : resolvedBg,
+        backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
-        border: showSelectionBorder ? '2px solid #3b82f6' : (!isDrawingWidget ? `1px solid ${resolvedBorderColor}` : 'none'),
-        boxShadow: (!isDrawingWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
-        backdropFilter: (!isDrawingWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        WebkitBackdropFilter: (!isDrawingWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget ? 0 : 8
+        border: showSelectionBorder
+          ? '2px solid #3b82f6'
+          : (isEditMode && !isTransparentWidget && !isNavWidget)
+            ? '1px dashed rgba(255,255,255,0.08)'
+            : 'none',
+        boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
+        backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
+        WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? 0 : 8
       } as React.CSSProperties}
       onClick={(e) => {
         if (isEditMode) {

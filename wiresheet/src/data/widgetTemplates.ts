@@ -553,6 +553,138 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Bild / Logo / Grundriss von PC hochladen',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'modern-switch',
+    label: 'Schalter Modern',
+    icon: 'ToggleLeft',
+    category: 'modern',
+    defaultSize: { width: 200, height: 64 },
+    defaultConfig: { onLabel: 'Ein', offLabel: 'Aus', onColor: '#22c55e', offColor: '#475569', defaultValue: false },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Schlanker moderner Toggle-Schalter',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'modern-button',
+    label: 'Taster Modern',
+    icon: 'Square',
+    category: 'modern',
+    defaultSize: { width: 160, height: 56 },
+    defaultConfig: { label: 'Taster', pressValue: true, releaseValue: false, color: '#3b82f6' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Flacher moderner Button mit Ripple-Effekt',
+    supportsBinding: true,
+    bindingDirection: 'write'
+  },
+  {
+    type: 'modern-gauge',
+    label: 'Gauge Modern',
+    icon: 'Gauge',
+    category: 'modern',
+    defaultSize: { width: 160, height: 160 },
+    defaultConfig: { min: 0, max: 100, unit: '%', showValue: true, thresholds: [{ value: 70, color: '#22c55e' }, { value: 85, color: '#eab308' }, { value: 100, color: '#ef4444' }] },
+    defaultStyle: { showLabel: true, labelPosition: 'bottom' },
+    description: 'Kreisfoermiges Gauge im modernen Stil',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'modern-display',
+    label: 'Anzeige Modern',
+    icon: 'MonitorDot',
+    category: 'modern',
+    defaultSize: { width: 160, height: 80 },
+    defaultConfig: { unit: '', decimals: 1, prefix: '', suffix: '' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Grosser Wert mit Einheit im Clean-Look',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'modern-bar',
+    label: 'Balken Modern',
+    icon: 'BarChart3',
+    category: 'modern',
+    defaultSize: { width: 220, height: 48 },
+    defaultConfig: { min: 0, max: 100, unit: '%', showValue: true, color: '#3b82f6', orientation: 'horizontal' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Schlanke Fortschrittsanzeige mit Prozentbalken',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'modern-led',
+    label: 'Status Modern',
+    icon: 'Lightbulb',
+    category: 'modern',
+    defaultSize: { width: 120, height: 48 },
+    defaultConfig: { onColor: '#22c55e', offColor: '#475569', label: 'Status', size: 'md' },
+    defaultStyle: { showLabel: false },
+    description: 'Status-Badge mit rundem Leuchtpunkt',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'modern-slider',
+    label: 'Slider Modern',
+    icon: 'SlidersHorizontal',
+    category: 'modern',
+    defaultSize: { width: 240, height: 64 },
+    defaultConfig: { min: 0, max: 100, step: 1, unit: '', showValue: true, color: '#3b82f6' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Moderner Schieberegler mit Wertanzeige',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'dash-stat',
+    label: 'Statistik Karte',
+    icon: 'TrendingUp',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 100 },
+    defaultConfig: { unit: '', decimals: 1, icon: 'Activity', color: '#3b82f6' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Dashboard Statistik-Karte mit Wert und Einheit',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-progress',
+    label: 'Progress Karte',
+    icon: 'Activity',
+    category: 'dashboard',
+    defaultSize: { width: 220, height: 80 },
+    defaultConfig: { min: 0, max: 100, unit: '%', color: '#3b82f6', showValue: true, thresholds: [{ value: 60, color: '#22c55e' }, { value: 80, color: '#eab308' }, { value: 100, color: '#ef4444' }] },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Dashboard Progress-Balken mit Grenzwert-Farben',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-value-card',
+    label: 'Wert Karte',
+    icon: 'MonitorDot',
+    category: 'dashboard',
+    defaultSize: { width: 180, height: 110 },
+    defaultConfig: { unit: '', decimals: 1, color: '#0ea5e9', icon: 'Zap' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Weisse Dashboard-Karte mit Icon und grossem Wert',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-toggle-card',
+    label: 'Toggle Karte',
+    icon: 'ToggleLeft',
+    category: 'dashboard',
+    defaultSize: { width: 180, height: 110 },
+    defaultConfig: { onLabel: 'Aktiv', offLabel: 'Inaktiv', onColor: '#22c55e', offColor: '#64748b', icon: 'Power' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Dashboard-Karte mit grossem Toggle-Schalter',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 

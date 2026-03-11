@@ -35,7 +35,18 @@ export type WidgetType =
   | 'visu-home-button'
   | 'visu-back-button'
   | 'visu-frame'
-  | 'visu-image';
+  | 'visu-image'
+  | 'modern-switch'
+  | 'modern-button'
+  | 'modern-gauge'
+  | 'modern-display'
+  | 'modern-bar'
+  | 'modern-led'
+  | 'modern-slider'
+  | 'dash-stat'
+  | 'dash-progress'
+  | 'dash-value-card'
+  | 'dash-toggle-card';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -339,7 +350,18 @@ export type WidgetConfig =
   | HomeButtonConfig
   | BackButtonConfig
   | FrameConfig
-  | ImageConfig;
+  | ImageConfig
+  | ModernSwitchConfig
+  | ModernButtonConfig
+  | ModernGaugeConfig
+  | ModernDisplayConfig
+  | ModernBarConfig
+  | ModernLedConfig
+  | ModernSliderConfig
+  | DashStatConfig
+  | DashProgressConfig
+  | DashValueCardConfig
+  | DashToggleCardConfig;
 
 export interface VisuWidget {
   id: string;
@@ -364,11 +386,102 @@ export interface VisuPage {
   showGrid?: boolean;
 }
 
+export interface ModernSwitchConfig {
+  onLabel?: string;
+  offLabel?: string;
+  onColor?: string;
+  offColor?: string;
+  defaultValue?: boolean;
+}
+
+export interface ModernButtonConfig {
+  label: string;
+  pressValue?: unknown;
+  releaseValue?: unknown;
+  holdMode?: boolean;
+  color?: string;
+  icon?: string;
+}
+
+export interface ModernGaugeConfig {
+  min: number;
+  max: number;
+  unit?: string;
+  thresholds?: { value: number; color: string }[];
+  showValue?: boolean;
+}
+
+export interface ModernDisplayConfig {
+  unit?: string;
+  decimals?: number;
+  prefix?: string;
+  suffix?: string;
+  icon?: string;
+}
+
+export interface ModernBarConfig {
+  min: number;
+  max: number;
+  unit?: string;
+  showValue?: boolean;
+  color?: string;
+  orientation?: 'horizontal' | 'vertical';
+}
+
+export interface ModernLedConfig {
+  onColor?: string;
+  offColor?: string;
+  label?: string;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export interface ModernSliderConfig {
+  min: number;
+  max: number;
+  step: number;
+  unit?: string;
+  showValue?: boolean;
+  color?: string;
+}
+
+export interface DashStatConfig {
+  unit?: string;
+  decimals?: number;
+  icon?: string;
+  color?: string;
+  trendBinding?: boolean;
+}
+
+export interface DashProgressConfig {
+  min: number;
+  max: number;
+  unit?: string;
+  color?: string;
+  showValue?: boolean;
+  thresholds?: { value: number; color: string }[];
+}
+
+export interface DashValueCardConfig {
+  unit?: string;
+  decimals?: number;
+  color?: string;
+  icon?: string;
+  format?: string;
+}
+
+export interface DashToggleCardConfig {
+  onLabel?: string;
+  offLabel?: string;
+  onColor?: string;
+  offColor?: string;
+  icon?: string;
+}
+
 export interface WidgetTemplate {
   type: WidgetType;
   label: string;
   icon: string;
-  category: 'control' | 'display' | 'indicator' | 'decoration';
+  category: 'control' | 'display' | 'indicator' | 'decoration' | 'modern' | 'dashboard';
   defaultSize: Size;
   defaultConfig: WidgetConfig;
   defaultStyle: WidgetStyle;
