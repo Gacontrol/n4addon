@@ -20,12 +20,14 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
     if (!file) return;
     setUploading(true);
     setError(null);
+    if (fileRef.current) fileRef.current.value = '';
 
     try {
+      const formData = new FormData();
+      formData.append('image', file);
       const response = await fetch('/api/images/upload', {
         method: 'POST',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
+        body: formData,
       });
 
       if (!response.ok) throw new Error('Upload fehlgeschlagen');
@@ -60,7 +62,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
         style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
         onClick={() => fileRef.current?.click()}
       >
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff,image/ico,image/x-icon,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico" className="hidden" onChange={handleFileChange} />
         {uploading ? (
           <div className="flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -111,7 +113,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
             <X className="w-3 h-3" />
             Entfernen
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff,image/ico,image/x-icon,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico" className="hidden" onChange={handleFileChange} />
         </div>
       )}
       {uploading && (

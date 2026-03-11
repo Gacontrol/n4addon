@@ -384,6 +384,8 @@ export interface VisuPage {
   backgroundColor?: string;
   gridSize?: number;
   showGrid?: boolean;
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 export interface ModernSwitchConfig {

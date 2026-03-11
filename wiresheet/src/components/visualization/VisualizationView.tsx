@@ -1,11 +1,18 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { VisuCanvas } from './VisuCanvas';
 import { WidgetPalette } from './WidgetPalette';
 import { WidgetPropertiesPanel } from './WidgetPropertiesPanel';
+import { FileManager } from './FileManager';
 import { getWidgetTemplate } from '../../data/widgetTemplates';
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
 
 interface VisualizationViewProps {
   visuPages: VisuPage[];
@@ -39,6 +46,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
+  const [showFileManager, setShowFileManager] = useState(false);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
 
   const handleNavigateToPage = useCallback((pageId: string) => {
@@ -215,6 +223,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     : null;
 
   return (
+    <>
     <div className="flex flex-col h-full bg-slate-950">
       <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700 bg-slate-900">
         <div className="flex items-center gap-2">
@@ -274,13 +283,22 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
         <div className="flex items-center gap-2">
           {isEditMode && (
-            <button
-              onClick={() => setShowLayerPanel(!showLayerPanel)}
-              className={`p-2 rounded transition-colors ${showLayerPanel ? 'bg-slate-700 text-slate-200' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
-              title="Ebenen"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
+            <>
+              <button
+                onClick={() => setShowLayerPanel(!showLayerPanel)}
+                className={`p-2 rounded transition-colors ${showLayerPanel ? 'bg-slate-700 text-slate-200' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+                title="Ebenen"
+              >
+                <Layers className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowFileManager(true)}
+                className="p-2 rounded transition-colors text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                title="Datei-Manager"
+              >
+                <FolderOpen className="w-4 h-4" />
+              </button>
+            </>
           )}
           <button
             onClick={() => setShowPageSettings(!showPageSettings)}
@@ -350,6 +368,45 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               className="w-8 h-6 rounded cursor-pointer"
             />
           </div>
+          <div className="w-px h-4 bg-slate-600" />
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-400">Breite:</label>
+            <input
+              type="number"
+              min="400"
+              max="7680"
+              step="10"
+              placeholder="Auto"
+              value={activePage.canvasWidth || ''}
+              onChange={(e) => onUpdateVisuPage(activePage.id, { canvasWidth: e.target.value ? parseInt(e.target.value) : undefined })}
+              className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 placeholder-slate-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-400">Hoehe:</label>
+            <input
+              type="number"
+              min="300"
+              max="4320"
+              step="10"
+              placeholder="Auto"
+              value={activePage.canvasHeight || ''}
+              onChange={(e) => onUpdateVisuPage(activePage.id, { canvasHeight: e.target.value ? parseInt(e.target.value) : undefined })}
+              className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 placeholder-slate-500"
+            />
+          </div>
+          <button
+            onClick={() => onUpdateVisuPage(activePage.id, { canvasWidth: 1920, canvasHeight: 900 })}
+            className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors"
+          >
+            1920×900
+          </button>
+          <button
+            onClick={() => onUpdateVisuPage(activePage.id, { canvasWidth: undefined, canvasHeight: undefined })}
+            className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors"
+          >
+            Auto
+          </button>
         </div>
       )}
 
@@ -359,7 +416,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         )}
 
         <div
-          className="flex-1 relative overflow-hidden"
+          className="flex-1 relative overflow-auto"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
@@ -483,5 +540,13 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         )}
       </div>
     </div>
+
+    {showFileManager && (
+      <FileManager
+        apiBase={getApiBase()}
+        onClose={() => setShowFileManager(false)}
+      />
+    )}
+    </>
   );
 };

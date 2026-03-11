@@ -511,11 +511,20 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const drawingCursor = drawingState ? 'crosshair' : undefined;
 
+  const hasFixedSize = page.canvasWidth && page.canvasHeight;
+
   return (
     <div
       ref={canvasRef}
-      className="relative w-full h-full overflow-auto"
-      style={{ backgroundColor: page.backgroundColor || '#0f172a', cursor: drawingCursor }}
+      className="relative overflow-auto"
+      style={{
+        backgroundColor: page.backgroundColor || '#0f172a',
+        cursor: drawingCursor,
+        width: hasFixedSize ? page.canvasWidth : '100%',
+        height: hasFixedSize ? page.canvasHeight : '100%',
+        minWidth: hasFixedSize ? page.canvasWidth : '100%',
+        minHeight: hasFixedSize ? page.canvasHeight : '100%',
+      }}
       onClick={handleCanvasClick}
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}

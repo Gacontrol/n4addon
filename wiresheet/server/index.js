@@ -1828,29 +1828,106 @@ let imagesDir = '/data/wiresheet/images';
 
 app.post('/api/images/upload', async (req, res) => {
   try {
-    const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', async () => {
-      try {
-        await fs.mkdir(imagesDir, { recursive: true });
-        const contentType = req.headers['content-type'] || 'image/png';
-        const ext = contentType.split('/')[1]?.split(';')[0] || 'png';
-        const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const filePath = path.join(imagesDir, filename);
-        await fs.writeFile(filePath, Buffer.concat(chunks));
-        res.json({ url: `/api/images/${filename}` });
-      } catch (err) {
-        console.error('Bild Upload Fehler:', err);
-        res.status(500).json({ error: 'Upload fehlgeschlagen' });
-      }
-    });
-    req.on('error', (err) => {
-      console.error('Request Fehler:', err);
-      res.status(500).json({ error: 'Upload fehlgeschlagen' });
-    });
+    await fs.mkdir(imagesDir, { recursive: true });
+    const contentType = req.headers['content-type'] || '';
+
+    const mimeExtMap = {
+      'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+      'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+      'image/bmp': 'bmp', 'image/tiff': 'tif', 'image/x-icon': 'ico',
+      'image/ico': 'ico'
+    };
+
+    if (contentType.includes('multipart/form-data')) {
+      const boundary = contentType.split('boundary=')[1]?.trim();
+      if (!boundary) return res.status(400).json({ error: 'Kein boundary' });
+
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', async () => {
+        try {
+          const buf = Buffer.concat(chunks);
+          const boundaryBuf = Buffer.from('--' + boundary);
+          const parts = [];
+          let start = 0;
+          while (start < buf.length) {
+            const bIdx = buf.indexOf(boundaryBuf, start);
+            if (bIdx === -1) break;
+            const after = bIdx + boundaryBuf.length;
+            if (buf[after] === 45 && buf[after + 1] === 45) break;
+            const headerEnd = buf.indexOf('\r\n\r\n', after);
+            if (headerEnd === -1) break;
+            const headerStr = buf.slice(after + 2, headerEnd).toString();
+            const endBoundary = buf.indexOf(boundaryBuf, headerEnd + 4);
+            const dataEnd = endBoundary === -1 ? buf.length : endBoundary - 2;
+            const data = buf.slice(headerEnd + 4, dataEnd);
+            parts.push({ headers: headerStr, data });
+            start = endBoundary === -1 ? buf.length : endBoundary;
+          }
+
+          if (parts.length === 0) return res.status(400).json({ error: 'Keine Datei gefunden' });
+          const part = parts[0];
+          const ctMatch = part.headers.match(/Content-Type:\s*([^\r\n]+)/i);
+          const mime = ctMatch ? ctMatch[1].trim() : 'image/png';
+          const ext = mimeExtMap[mime] || 'png';
+
+          const nameMatch = part.headers.match(/filename="([^"]+)"/i);
+          const origExt = nameMatch ? path.extname(nameMatch[1]).slice(1).toLowerCase() : null;
+          const finalExt = origExt && ['png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff','ico'].includes(origExt) ? origExt : ext;
+
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${finalExt}`;
+          const filePath = path.join(imagesDir, filename);
+          await fs.writeFile(filePath, part.data);
+          res.json({ url: `/api/images/${filename}`, filename, size: part.data.length });
+        } catch (err) {
+          console.error('Multipart Upload Fehler:', err);
+          res.status(500).json({ error: 'Upload fehlgeschlagen' });
+        }
+      });
+      req.on('error', () => res.status(500).json({ error: 'Upload fehlgeschlagen' }));
+    } else {
+      const mimeType = contentType.split(';')[0].trim();
+      const ext = mimeExtMap[mimeType] || 'png';
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', async () => {
+        try {
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const filePath = path.join(imagesDir, filename);
+          await fs.writeFile(filePath, Buffer.concat(chunks));
+          res.json({ url: `/api/images/${filename}`, filename });
+        } catch (err) {
+          console.error('Raw Upload Fehler:', err);
+          res.status(500).json({ error: 'Upload fehlgeschlagen' });
+        }
+      });
+      req.on('error', () => res.status(500).json({ error: 'Upload fehlgeschlagen' }));
+    }
   } catch (err) {
     console.error('Bild Upload Fehler:', err);
     res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+app.get('/api/images', async (req, res) => {
+  try {
+    await fs.mkdir(imagesDir, { recursive: true });
+    const files = await fs.readdir(imagesDir);
+    const imageExts = ['png','jpg','jpeg','gif','webp','svg','bmp','tif','tiff','ico'];
+    const imageFiles = files.filter(f => imageExts.includes(path.extname(f).slice(1).toLowerCase()));
+    const items = await Promise.all(imageFiles.map(async (filename) => {
+      try {
+        const stat = await fs.stat(path.join(imagesDir, filename));
+        return { filename, url: `/api/images/${filename}`, size: stat.size, mtime: stat.mtime };
+      } catch {
+        return { filename, url: `/api/images/${filename}`, size: 0, mtime: null };
+      }
+    }));
+    items.sort((a, b) => new Date(b.mtime || 0).getTime() - new Date(a.mtime || 0).getTime());
+    res.json(items);
+  } catch (err) {
+    console.error('Bilder Liste Fehler:', err);
+    res.status(500).json({ error: 'Liste fehlgeschlagen' });
   }
 });
 
