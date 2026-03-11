@@ -1337,7 +1337,7 @@ app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
 });
 
 app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, paramKey, value } = req.body;
+  const { nodeId, portId, paramKey, value } = req.body;
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
@@ -1368,8 +1368,16 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
           if (!lastNodeValues.has(page.id)) lastNodeValues.set(page.id, {});
           lastNodeValues.get(page.id)[nodeId] = value;
+          if (portId) {
+            lastNodeValues.get(page.id)[`${nodeId}:${portId}`] = value;
+          }
+          lastNodeValues.get(page.id)[`${nodeId}:output-0`] = value;
           if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
           visuWriteLocks.get(page.id)[nodeId] = Date.now() + VISU_WRITE_LOCK_MS;
+          if (portId) {
+            visuWriteLocks.get(page.id)[`${nodeId}:${portId}`] = Date.now() + VISU_WRITE_LOCK_MS;
+          }
+          visuWriteLocks.get(page.id)[`${nodeId}:output-0`] = Date.now() + VISU_WRITE_LOCK_MS;
         }
         updated = true;
         foundPageId = page.id;

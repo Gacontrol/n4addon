@@ -577,10 +577,11 @@ function App() {
         });
       }
     } else {
+      setLiveValue(binding.nodeId, value);
+      setLiveValue(`${binding.nodeId}:output-0`, value);
       if (binding.portId) {
         setLiveValue(`${binding.nodeId}:${binding.portId}`, value);
       }
-      setLiveValue(binding.nodeId, value);
     }
     try {
       const apiBase = (() => {
