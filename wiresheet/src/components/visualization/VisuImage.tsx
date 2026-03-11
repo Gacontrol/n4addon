@@ -1,6 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { Image as ImageIcon, Upload, X } from 'lucide-react';
+import { Image as ImageIcon, Upload, X, FolderOpen } from 'lucide-react';
 import { ImageConfig } from '../../types/visualization';
+import { FileManager } from './FileManager';
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
 
 interface VisuImageProps {
   config: ImageConfig;
@@ -14,6 +21,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFilePicker, setShowFilePicker] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,29 +65,52 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   if (!config.imageUrl) {
     if (!isEditMode) return null;
     return (
-      <div
-        className="w-full h-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-slate-400 transition-colors"
-        style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
-        onClick={() => fileRef.current?.click()}
-      >
-        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff,image/ico,image/x-icon,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico" className="hidden" onChange={handleFileChange} />
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs text-slate-400">Hochladen...</span>
-          </div>
-        ) : (
-          <>
-            <ImageIcon className="w-8 h-8 text-slate-500" />
-            <span className="text-xs text-slate-400 text-center px-2">Bild hochladen</span>
-            <div className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 border border-blue-500/30 rounded text-xs text-blue-400">
-              <Upload className="w-3 h-3" />
-              Datei waehlen
+      <>
+        <div
+          className="w-full h-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-600 rounded-lg"
+          style={{ backgroundColor: 'rgba(15,23,42,0.5)' }}
+        >
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff,image/ico,image/x-icon,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico" className="hidden" onChange={handleFileChange} />
+          {uploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-slate-400">Hochladen...</span>
             </div>
-          </>
+          ) : (
+            <>
+              <ImageIcon className="w-8 h-8 text-slate-500" />
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 rounded text-xs text-blue-400 transition-colors"
+                >
+                  <Upload className="w-3 h-3" />
+                  Bild hochladen
+                </button>
+                <button
+                  onClick={() => setShowFilePicker(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded text-xs text-slate-300 transition-colors"
+                >
+                  <FolderOpen className="w-3 h-3" />
+                  Aus Dateimanager
+                </button>
+              </div>
+            </>
+          )}
+          {error && <span className="text-xs text-red-400">{error}</span>}
+        </div>
+        {showFilePicker && (
+          <FileManager
+            apiBase={getApiBase()}
+            pickerMode
+            onSelectImage={(url) => {
+              onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+              setShowFilePicker(false);
+            }}
+            onClose={() => setShowFilePicker(false)}
+          />
         )}
-        {error && <span className="text-xs text-red-400">{error}</span>}
-      </div>
+      </>
     );
   }
 
@@ -98,13 +129,20 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
         }}
       />
       {isEditMode && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-lg">
+        <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded-lg p-2">
           <button
             className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition-colors"
             onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
           >
             <Upload className="w-3 h-3" />
-            Ersetzen
+            Hochladen
+          </button>
+          <button
+            className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded transition-colors"
+            onClick={(e) => { e.stopPropagation(); setShowFilePicker(true); }}
+          >
+            <FolderOpen className="w-3 h-3" />
+            Dateimanager
           </button>
           <button
             className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded transition-colors"
@@ -115,6 +153,17 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
           </button>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml,image/bmp,image/tiff,image/ico,image/x-icon,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.tif,.tiff,.ico" className="hidden" onChange={handleFileChange} />
         </div>
+      )}
+      {showFilePicker && (
+        <FileManager
+          apiBase={getApiBase()}
+          pickerMode
+          onSelectImage={(url) => {
+            onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+            setShowFilePicker(false);
+          }}
+          onClose={() => setShowFilePicker(false)}
+        />
       )}
       {uploading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">

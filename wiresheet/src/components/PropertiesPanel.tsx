@@ -320,14 +320,28 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-violet-500 transition-colors placeholder-slate-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-slate-700/50 border border-slate-600 rounded p-2">
-                <span className="text-slate-400">True</span>
-                <p className="text-white font-mono mt-0.5">true / 1 / on</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="block text-xs text-slate-400">Text bei True</label>
+                <input
+                  type="text"
+                  value={String(config.trueText || '')}
+                  onChange={e => updateConfig('trueText', e.target.value)}
+                  placeholder="z.B. Ein, Normal, An"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-green-500 transition-colors placeholder-slate-500"
+                />
+                <p className="text-[10px] text-slate-600">true / 1 / on</p>
               </div>
-              <div className="bg-slate-700/50 border border-slate-600 rounded p-2">
-                <span className="text-slate-400">False</span>
-                <p className="text-white font-mono mt-0.5">false / 0 / off</p>
+              <div className="space-y-1">
+                <label className="block text-xs text-slate-400">Text bei False</label>
+                <input
+                  type="text"
+                  value={String(config.falseText || '')}
+                  onChange={e => updateConfig('falseText', e.target.value)}
+                  placeholder="z.B. Aus, Stoerung, Off"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-red-500 transition-colors placeholder-slate-500"
+                />
+                <p className="text-[10px] text-slate-600">false / 0 / off</p>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban } from 'lucide-react';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen } from 'lucide-react';
 
 interface ColorPickerProps {
   value: string | undefined;
@@ -42,6 +42,13 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
 };
 import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
+import { FileManager } from './FileManager';
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
 
 interface WidgetPropertiesPanelProps {
   widget: VisuWidget;
@@ -151,6 +158,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   onClose
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
   const isShapeWidget = SHAPE_TYPES.has(widget.type);
@@ -1249,6 +1257,39 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         return (
           <>
             <div>
+              <label className="block text-xs text-slate-400 mb-1">Bild</label>
+              {imgCfg.imageUrl ? (
+                <div className="space-y-2">
+                  <div className="relative rounded-lg overflow-hidden bg-slate-800" style={{ aspectRatio: '16/9' }}>
+                    <img src={imgCfg.imageUrl} alt="Vorschau" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowImagePicker(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition-colors"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      Anderes Bild
+                    </button>
+                    <button
+                      onClick={() => onUpdate({ config: { ...imgCfg, imageUrl: undefined, storagePath: undefined } })}
+                      className="px-2 py-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-700/40 text-red-400 text-xs rounded transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowImagePicker(true)}
+                  className="w-full flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-slate-600 hover:border-blue-500 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
+                >
+                  <FolderOpen className="w-6 h-6" />
+                  <span className="text-xs">Bild aus Dateimanager auswaehlen</span>
+                </button>
+              )}
+            </div>
+            <div>
               <label className="block text-xs text-slate-400 mb-1">Darstellung</label>
               <select value={imgCfg.objectFit || 'contain'} onChange={(e) => onUpdate({ config: { ...imgCfg, objectFit: e.target.value as ImageConfig['objectFit'] } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
                 <option value="contain">Einpassen (contain)</option>
@@ -1265,8 +1306,16 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-1">Eckenradius (px)</label>
               <input type="number" min="0" max="200" value={imgCfg.borderRadius ?? 0} onChange={(e) => onUpdate({ config: { ...imgCfg, borderRadius: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
             </div>
-            {imgCfg.imageUrl && (
-              <div className="text-xs text-slate-500 truncate">Bild hochgeladen</div>
+            {showImagePicker && (
+              <FileManager
+                apiBase={getApiBase()}
+                pickerMode
+                onSelectImage={(url) => {
+                  onUpdate({ config: { ...imgCfg, imageUrl: url, storagePath: url } });
+                  setShowImagePicker(false);
+                }}
+                onClose={() => setShowImagePicker(false)}
+              />
             )}
           </>
         );

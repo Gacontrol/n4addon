@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Upload, Trash2, RefreshCw, FolderOpen, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { X, Upload, Trash2, RefreshCw, FolderOpen, Image as ImageIcon, AlertCircle, Check } from 'lucide-react';
 
 interface ImageFile {
   filename: string;
@@ -11,6 +11,8 @@ interface ImageFile {
 interface FileManagerProps {
   onClose: () => void;
   apiBase: string;
+  onSelectImage?: (url: string) => void;
+  pickerMode?: boolean;
 }
 
 function formatBytes(bytes: number): string {
@@ -19,7 +21,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase }) => {
+export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSelectImage, pickerMode = false }) => {
   const [images, setImages] = useState<ImageFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -113,7 +115,9 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase }) =>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-slate-400" />
-            <h2 className="text-sm font-semibold text-slate-200">Datei-Manager</h2>
+            <h2 className="text-sm font-semibold text-slate-200">
+              {pickerMode ? 'Bild auswaehlen' : 'Datei-Manager'}
+            </h2>
             <span className="text-xs text-slate-500 tabular-nums">({images.length} Dateien)</span>
           </div>
           <div className="flex items-center gap-2">
@@ -199,6 +203,12 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase }) =>
                       }`}
                       style={{ aspectRatio: '4/3', backgroundColor: '#1e293b' }}
                       onClick={() => setSelectedFile(selectedFile === img.filename ? null : img.filename)}
+                      onDoubleClick={() => {
+                        if (pickerMode && onSelectImage) {
+                          onSelectImage(imageUrl(img));
+                          onClose();
+                        }
+                      }}
                     >
                       <img
                         src={imageUrl(img)}
@@ -210,17 +220,33 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase }) =>
                         <p className="text-[10px] text-slate-300 truncate">{img.filename}</p>
                         <p className="text-[9px] text-slate-500">{formatBytes(img.size)}</p>
                       </div>
-                      <button
-                        className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(img.filename); }}
-                        disabled={deletingFile === img.filename}
-                        title="Loeschen"
-                      >
-                        {deletingFile === img.filename
-                          ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                          : <Trash2 className="w-3 h-3 text-white" />
-                        }
-                      </button>
+                      {pickerMode ? (
+                        <button
+                          className="absolute top-1 right-1 p-1 bg-blue-600/90 hover:bg-blue-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onSelectImage) {
+                              onSelectImage(imageUrl(img));
+                              onClose();
+                            }
+                          }}
+                          title="Auswaehlen"
+                        >
+                          <Check className="w-3 h-3 text-white" />
+                        </button>
+                      ) : (
+                        <button
+                          className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(img.filename); }}
+                          disabled={deletingFile === img.filename}
+                          title="Loeschen"
+                        >
+                          {deletingFile === img.filename
+                            ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                            : <Trash2 className="w-3 h-3 text-white" />
+                          }
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -256,14 +282,29 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase }) =>
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDelete(img.filename)}
-                    disabled={deletingFile === img.filename}
-                    className="flex items-center gap-2 px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-700/40 text-red-400 text-xs rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Datei loeschen
-                  </button>
+                  {pickerMode ? (
+                    <button
+                      onClick={() => {
+                        if (onSelectImage) {
+                          onSelectImage(imageUrl(img));
+                          onClose();
+                        }
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-lg transition-colors"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Bild auswaehlen
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleDelete(img.filename)}
+                      disabled={deletingFile === img.filename}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-700/40 text-red-400 text-xs rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Datei loeschen
+                    </button>
+                  )}
                 </div>
               </div>
             );

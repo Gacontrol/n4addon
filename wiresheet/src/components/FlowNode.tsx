@@ -241,7 +241,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     return String(val);
   };
 
-  const displayValue = node.type === 'dp-enum' ? getEnumLabel(liveValue) : String(liveValue);
+  const getBooleanLabel = (val: unknown): string => {
+    const isTruthy = val === true || val === 1 || val === 'true' || val === '1' || val === 'on';
+    if (node.type === 'dp-boolean') {
+      const trueText = data.config?.trueText as string | undefined;
+      const falseText = data.config?.falseText as string | undefined;
+      if (isTruthy && trueText) return trueText;
+      if (!isTruthy && falseText) return falseText;
+    }
+    return String(val);
+  };
+
+  const displayValue = node.type === 'dp-enum'
+    ? getEnumLabel(liveValue)
+    : node.type === 'dp-boolean'
+      ? getBooleanLabel(liveValue)
+      : String(liveValue);
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
@@ -779,14 +794,14 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     onClick={e => { e.stopPropagation(); setOverrideInput('true'); onOverrideChange?.(node.id, { manual: true, value: true }); setShowOverrideInput(false); }}
                     className="flex-1 py-1 bg-emerald-700/60 hover:bg-emerald-700 text-emerald-200 text-xs rounded transition-colors"
                   >
-                    true
+                    {(data.config?.trueText as string | undefined) || 'true'}
                   </button>
                   <button
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => { e.stopPropagation(); setOverrideInput('false'); onOverrideChange?.(node.id, { manual: true, value: false }); setShowOverrideInput(false); }}
                     className="flex-1 py-1 bg-slate-700/60 hover:bg-slate-600 text-slate-300 text-xs rounded transition-colors"
                   >
-                    false
+                    {(data.config?.falseText as string | undefined) || 'false'}
                   </button>
                 </div>
               ) : node.type === 'dp-enum' && data.config?.dpEnumStages ? (
