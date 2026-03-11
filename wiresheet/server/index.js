@@ -22,6 +22,7 @@ let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
+const lastNodeValues = new Map();
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -1094,7 +1095,8 @@ async function runPageCycle(pageId) {
           manualOverrides[node.id] = node.data.override.value;
         }
       }
-      await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
+      lastNodeValues.set(pageId, nodeValues);
     }
 
     pageInfo.lastRun = Date.now();
@@ -1138,6 +1140,7 @@ function stopPage(pageId) {
     }
     runningPages.delete(pageId);
     pageNodeStates.delete(pageId);
+    lastNodeValues.delete(pageId);
     console.log(`Seite ${pageId} gestoppt`);
   }
 }
@@ -1309,6 +1312,14 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     console.error('Fehler beim Schreiben des Visu-Werts:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get(['/live-values', '/api/live-values'], (req, res) => {
+  const merged = {};
+  for (const [, values] of lastNodeValues) {
+    Object.assign(merged, values);
+  }
+  res.json(merged);
 });
 
 const net = require('net');
