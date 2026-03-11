@@ -822,7 +822,6 @@ export const useWiresheetPages = () => {
       savePages(safePages);
     },
     setLiveValue: (key: string, value: unknown) => {
-      visuOverridesRef.current = { ...visuOverridesRef.current, [key]: value };
       setLiveValues(prev => ({ ...prev, [key]: value }));
     },
     executeAllPages: async () => {

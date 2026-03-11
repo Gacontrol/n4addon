@@ -1180,7 +1180,8 @@ async function runPageCycle(pageId) {
         }
       }
 
-      const allOverrides = clientVisuOverrides.get('global') || {};
+      const allOverrides = { ...(clientVisuOverrides.get('global') || {}) };
+      clientVisuOverrides.set('global', {});
       console.log(`[CYCLE DEBUG] Page ${pageId} - clientVisuOverrides.get('global'):`, JSON.stringify(allOverrides));
       console.log(`[CYCLE DEBUG] Page ${pageId} - visuControlledDps:`, JSON.stringify([...visuControlledDps.entries()]));
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
