@@ -168,7 +168,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const selectedNodePorts = selectedNode ? getNodePorts(selectedNode) : [];
   const selectedNodeConfigParams = selectedNode ? getNodeConfigParams(selectedNode) : [];
 
-  const isWriteWidget = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate'].includes(widget.type);
+  const isWriteWidget = [
+    'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
+    'modern-switch', 'modern-button', 'modern-incrementer',
+    'dash-toggle'
+  ].includes(widget.type);
 
   const handleNodeChange = (nodeId: string) => {
     if (!nodeId) {
@@ -1418,7 +1422,9 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 </div>
                 {widget.binding && (selectedNodePorts.length > 0 || selectedNodeConfigParams.length > 0) && (
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Port / Parameter</label>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      {isWriteWidget ? 'Eingang (schreiben)' : 'Port / Parameter'}
+                    </label>
                     <select
                       value={widget.binding.paramKey ? `param:${widget.binding.paramKey}` : (widget.binding.portId || '')}
                       onChange={(e) => {
@@ -1432,26 +1438,47 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                     >
                       <option value="">-- Hauptwert --</option>
-                      {selectedNodePorts.filter(p => p.isOutput).length > 0 && (
-                        <optgroup label="Ausgaenge (lesen)">
-                          {selectedNodePorts.filter(p => p.isOutput).map(p => (
-                            <option key={p.id} value={p.id}>{p.label}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {selectedNodePorts.filter(p => !p.isOutput).length > 0 && isWriteWidget && (
-                        <optgroup label="Eingaenge (schreiben)">
-                          {selectedNodePorts.filter(p => !p.isOutput).map(p => (
-                            <option key={p.id} value={p.id}>{p.label}</option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {selectedNodeConfigParams.length > 0 && (
-                        <optgroup label="Parameter (lesen/schreiben)">
-                          {selectedNodeConfigParams.map(p => (
-                            <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
-                          ))}
-                        </optgroup>
+                      {isWriteWidget ? (
+                        <>
+                          {selectedNodePorts.filter(p => !p.isOutput).length > 0 && (
+                            <optgroup label="Eingaenge (schreiben)">
+                              {selectedNodePorts.filter(p => !p.isOutput).map(p => (
+                                <option key={p.id} value={p.id}>{p.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {selectedNodeConfigParams.length > 0 && (
+                            <optgroup label="Parameter (lesen/schreiben)">
+                              {selectedNodeConfigParams.map(p => (
+                                <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {selectedNodePorts.filter(p => p.isOutput).length > 0 && (
+                            <optgroup label="Ausgaenge (lesen)">
+                              {selectedNodePorts.filter(p => p.isOutput).map(p => (
+                                <option key={p.id} value={p.id}>{p.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {selectedNodePorts.filter(p => !p.isOutput).length > 0 && (
+                            <optgroup label="Eingaenge (lesen)">
+                              {selectedNodePorts.filter(p => !p.isOutput).map(p => (
+                                <option key={p.id} value={p.id}>{p.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {selectedNodeConfigParams.length > 0 && (
+                            <optgroup label="Parameter">
+                              {selectedNodeConfigParams.map(p => (
+                                <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
                       )}
                     </select>
                   </div>
@@ -1479,15 +1506,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
 
-                {['visu-switch', 'visu-button', 'visu-multistate'].includes(widget.type) && (
+                {isWriteWidget && (
                   <>
                     <hr className="border-slate-700" />
                     <div className="flex items-center gap-2 mb-1">
                       <Monitor className="w-3.5 h-3.5 text-sky-400" />
-                      <label className="text-xs text-sky-400 font-medium">Status-Rueckmeldung (optional)</label>
+                      <label className="text-xs text-sky-400 font-medium">Rueckmeldung / Anzeige (optional)</label>
                     </div>
+                    <p className="text-[10px] text-slate-500 leading-relaxed -mt-1">
+                      Verknuepfe einen Ausgang oder Eingang als Anzeigewert. Separate Rueckmeldung z.B. vom Datenpunkt-Ausgang.
+                    </p>
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">Status-Baustein</label>
+                      <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Baustein</label>
                       <select
                         value={widget.statusBinding?.nodeId || ''}
                         onChange={(e) => {
@@ -1497,12 +1527,12 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                           }
                           const node = availableNodes.find(n => n.id === e.target.value);
                           const ports = node ? getNodePorts(node) : [];
-                          const outPort = ports.find(p => p.isOutput);
+                          const outPort = ports.find(p => p.isOutput) || ports[0];
                           onUpdate({ statusBinding: { nodeId: e.target.value, portId: outPort?.id, direction: 'read' } });
                         }}
                         className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                       >
-                        <option value="">-- Kein Status --</option>
+                        <option value="">-- Keine Rueckmeldung --</option>
                         {Object.entries(nodesByCategory).map(([cat, nodes]) => (
                           <optgroup key={cat} label={cat}>
                             {nodes.map((node) => (
@@ -1515,18 +1545,29 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     {widget.statusBinding && (() => {
                       const statusNode = availableNodes.find(n => n.id === widget.statusBinding?.nodeId);
                       const statusPorts = statusNode ? getNodePorts(statusNode) : [];
-                      return statusPorts.filter(p => p.isOutput).length > 0 ? (
+                      return statusPorts.length > 0 ? (
                         <div>
-                          <label className="block text-xs text-slate-400 mb-1">Status-Port</label>
+                          <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Port</label>
                           <select
                             value={widget.statusBinding.portId || ''}
                             onChange={(e) => onUpdate({ statusBinding: { ...widget.statusBinding!, portId: e.target.value || undefined } })}
                             className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                           >
                             <option value="">-- Hauptwert --</option>
-                            {statusPorts.filter(p => p.isOutput).map(p => (
-                              <option key={p.id} value={p.id}>{p.label}</option>
-                            ))}
+                            {statusPorts.filter(p => p.isOutput).length > 0 && (
+                              <optgroup label="Ausgaenge">
+                                {statusPorts.filter(p => p.isOutput).map(p => (
+                                  <option key={p.id} value={p.id}>{p.label}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {statusPorts.filter(p => !p.isOutput).length > 0 && (
+                              <optgroup label="Eingaenge">
+                                {statusPorts.filter(p => !p.isOutput).map(p => (
+                                  <option key={p.id} value={p.id}>{p.label}</option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
                         </div>
                       ) : null;
@@ -1535,7 +1576,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       <div className="flex items-center gap-2 p-2 bg-sky-900/20 border border-sky-700 rounded">
                         <Monitor className="w-4 h-4 text-sky-400" />
                         <div className="text-xs text-sky-400">
-                          <p className="font-medium">Status verknuepft</p>
+                          <p className="font-medium">Rueckmeldung verknuepft</p>
                           <p className="text-sky-500/70">{getNodeLabel(availableNodes.find(n => n.id === widget.statusBinding?.nodeId)!)}</p>
                         </div>
                         <button

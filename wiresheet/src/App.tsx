@@ -570,12 +570,18 @@ function App() {
         });
       }
     } else {
-      const key = binding.portId ? `${binding.nodeId}:${binding.portId}` : binding.nodeId;
-      setLiveValue(key, value);
+      if (binding.portId) {
+        setLiveValue(`${binding.nodeId}:${binding.portId}`, value);
+      }
       setLiveValue(binding.nodeId, value);
     }
     try {
-      await fetch('/api/visu/write-value', {
+      const apiBase = (() => {
+        const path = window.location.pathname;
+        const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+        return m ? `${m[1]}/api` : '/api';
+      })();
+      await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value })

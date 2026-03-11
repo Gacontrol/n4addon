@@ -265,10 +265,11 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           />
         );
 
-      case 'visu-multistate':
+      case 'visu-multistate': {
+        const msDisplayVal = widget.statusBinding && statusValue !== undefined ? statusValue : value;
         return (
           <VisuMultistate
-            value={value as number | string | null}
+            value={msDisplayVal as number | string | null}
             onChange={onValueChange}
             config={widget.config as MultistateConfig}
             style={widget.style}
@@ -276,11 +277,13 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             disabled={isEditMode}
           />
         );
+      }
 
-      case 'visu-slider':
+      case 'visu-slider': {
+        const sliderDisplayVal = widget.statusBinding && statusValue !== undefined ? statusValue : value;
         return (
           <VisuSlider
-            value={typeof value === 'number' ? value : 0}
+            value={typeof sliderDisplayVal === 'number' ? sliderDisplayVal : 0}
             onChange={(v) => onValueChange(v)}
             config={widget.config as SliderConfig}
             style={widget.style}
@@ -289,11 +292,13 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             width={widget.size.width - 20}
           />
         );
+      }
 
-      case 'visu-incrementer':
+      case 'visu-incrementer': {
+        const incDisplayVal = widget.statusBinding && statusValue !== undefined ? statusValue : value;
         return (
           <VisuIncrementer
-            value={typeof value === 'number' ? value : 0}
+            value={typeof incDisplayVal === 'number' ? incDisplayVal : 0}
             onChange={(v) => onValueChange(v)}
             config={widget.config as IncrementerConfig}
             style={widget.style}
@@ -301,11 +306,13 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             disabled={isEditMode}
           />
         );
+      }
 
-      case 'visu-input':
+      case 'visu-input': {
+        const inputDisplayVal = widget.statusBinding && statusValue !== undefined ? statusValue : value;
         return (
           <VisuInput
-            value={value as number | string}
+            value={inputDisplayVal as number | string}
             onChange={(v) => onValueChange(v)}
             config={widget.config as InputConfig}
             style={widget.style}
@@ -313,6 +320,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             disabled={isEditMode}
           />
         );
+      }
 
       case 'visu-gauge':
         return (
@@ -832,10 +840,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'modern-switch': {
         const mswCfg = widget.config as ModernSwitchConfig;
-        const mswIsWriteOnly = !!widget.binding && widget.binding.direction === 'write';
-        const mswVal = mswIsWriteOnly
-          ? Boolean(statusValue ?? mswCfg.defaultValue ?? false)
-          : Boolean(value ?? mswCfg.defaultValue ?? false);
+        const mswFeedback = widget.statusBinding && statusValue !== undefined ? statusValue : value;
+        const mswVal = Boolean(mswFeedback ?? mswCfg.defaultValue ?? false);
         return (
           <ModernSwitch
             value={mswVal}
@@ -913,10 +919,11 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           />
         );
 
-      case 'modern-multistate':
+      case 'modern-multistate': {
+        const mmsDisplayVal = widget.statusBinding && statusValue !== undefined ? statusValue : value;
         return (
           <ModernMultistate
-            value={value as number | string | null}
+            value={mmsDisplayVal as number | string | null}
             onChange={onValueChange}
             config={widget.config as ModernMultistateConfig}
             style={widget.style}
@@ -924,6 +931,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             disabled={isEditMode}
           />
         );
+      }
 
       case 'dash-stat':
         return (
