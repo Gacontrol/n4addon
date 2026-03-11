@@ -470,6 +470,11 @@ function getDefaultOutputsForNodeType(node) {
     case 'falling-edge':
       defaults['output-0'] = false;
       break;
+    case 'compare':
+      defaults['output-0'] = false;
+      defaults['output-1'] = false;
+      defaults['output-2'] = false;
+      break;
     case 'python-script': {
       const pythonOutputs = (node.data && node.data.config && node.data.config.pythonOutputs) || [];
       pythonOutputs.forEach((_, idx) => {
@@ -700,8 +705,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const incomingConns = connections.filter(c => c.target === nodeId);
 
     const getInputValue = (conn) => {
-      const sourceNode = nodes.find(n => n.id === conn.source);
-      if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
+      if (conn.sourcePort) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
@@ -727,14 +731,18 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
     if (manualOverrides[nodeId] !== undefined) {
       nodeValues[nodeId] = manualOverrides[nodeId];
+      nodeValues[`${nodeId}:output-0`] = manualOverrides[nodeId];
     } else if (node.type === 'ha-input') {
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
       const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
       const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
       if (visuVal !== undefined) {
         nodeValues[nodeId] = visuVal;
+        nodeValues[`${nodeId}:output-0`] = visuVal;
       } else {
-        nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
+        const val = inputVals[0] !== undefined ? inputVals[0] : null;
+        nodeValues[nodeId] = val;
+        nodeValues[`${nodeId}:output-0`] = val;
       }
     } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = visuOverrides[nodeId];
@@ -783,14 +791,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'compare') {
       const a = parseFloat(inputVals[0]) || 0;
       const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
-      const op = cfg.compareOperator || '>';
-      if (op === '>') nodeValues[nodeId] = a > b;
-      else if (op === '>=') nodeValues[nodeId] = a >= b;
-      else if (op === '==') nodeValues[nodeId] = a == b;
-      else if (op === '<=') nodeValues[nodeId] = a <= b;
-      else if (op === '<') nodeValues[nodeId] = a < b;
-      else if (op === '!=') nodeValues[nodeId] = a != b;
-      else nodeValues[nodeId] = false;
+      const gtResult = a > b;
+      const eqResult = a == b;
+      const ltResult = a < b;
+      nodeValues[`${nodeId}:output-0`] = gtResult;
+      nodeValues[`${nodeId}:output-1`] = eqResult;
+      nodeValues[`${nodeId}:output-2`] = ltResult;
+      nodeValues[nodeId] = gtResult;
     } else if (node.type === 'threshold') {
       const val = parseFloat(inputVals[0]) || 0;
       const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
