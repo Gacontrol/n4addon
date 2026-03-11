@@ -240,15 +240,17 @@ export const useWiresheetPages = () => {
       }
     }
 
+    const visuOverrides = { ...visuOverridesRef.current };
+
     try {
       const res = await fetch(`${API_BASE}/pages/${pageId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides })
+        body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides, visuOverrides })
       });
       if (res.ok) {
         const { nodeValues } = await res.json();
-        setLiveValues(prev => ({ ...prev, ...nodeValues }));
+        setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
       }
     } catch {
     }

@@ -20,16 +20,17 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
   disabled,
   width
 }) => {
-  const [localValue, setLocalValue] = useState(value);
+  const effectiveDefault = config.defaultValue !== undefined ? config.defaultValue : config.min;
+  const [localValue, setLocalValue] = useState(value !== null && value !== undefined ? value : effectiveDefault);
   const [isDragging, setIsDragging] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
   const accentColor = style.accentColor || '#3b82f6';
 
   useEffect(() => {
     if (!isDragging) {
-      setLocalValue(value);
+      setLocalValue(value !== null && value !== undefined ? value : effectiveDefault);
     }
-  }, [value, isDragging]);
+  }, [value, isDragging, effectiveDefault]);
 
   const calculateValue = useCallback((clientX: number) => {
     if (!sliderRef.current) return localValue;

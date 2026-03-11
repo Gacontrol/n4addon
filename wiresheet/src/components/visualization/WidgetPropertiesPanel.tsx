@@ -128,7 +128,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const selectedNodePorts = selectedNode ? getNodePorts(selectedNode) : [];
   const selectedNodeConfigParams = selectedNode ? getNodeConfigParams(selectedNode) : [];
 
-  const isWriteWidget = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'].includes(widget.type);
+  const isWriteWidget = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate'].includes(widget.type);
 
   const handleNodeChange = (nodeId: string) => {
     if (!nodeId) {
@@ -315,6 +315,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               </div>
             </div>
             <div>
+              <label className="block text-xs text-slate-400 mb-1">Standartwert</label>
+              <input
+                type="number"
+                value={(sliderCfg as SliderConfig).defaultValue ?? sliderCfg.min}
+                onChange={(e) => onUpdate({ config: { ...config, defaultValue: parseFloat(e.target.value) } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+            <div>
               <label className="block text-xs text-slate-400 mb-1">Einheit</label>
               <input
                 type="text"
@@ -363,6 +372,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 </div>
               </div>
             )}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Standartwert</label>
+              <input
+                type={inputCfg.inputType === 'number' ? 'number' : 'text'}
+                value={inputCfg.defaultValue ?? ''}
+                onChange={(e) => onUpdate({ config: { ...config, defaultValue: inputCfg.inputType === 'number' ? (e.target.value ? parseFloat(e.target.value) : undefined) : e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Einheit</label>
               <input

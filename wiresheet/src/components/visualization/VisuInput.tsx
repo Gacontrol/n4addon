@@ -19,14 +19,16 @@ export const VisuInput: React.FC<VisuInputProps> = ({
   label,
   disabled
 }) => {
-  const [localValue, setLocalValue] = useState<string>(String(value ?? ''));
+  const effectiveDefault = config.defaultValue !== undefined ? String(config.defaultValue) : '';
+  const [localValue, setLocalValue] = useState<string>(value !== null && value !== undefined && value !== '' ? String(value) : effectiveDefault);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (!hasChanges) {
-      setLocalValue(String(value ?? ''));
+      const incoming = value !== null && value !== undefined && value !== '' ? String(value) : effectiveDefault;
+      setLocalValue(incoming);
     }
-  }, [value, hasChanges]);
+  }, [value, hasChanges, effectiveDefault]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);

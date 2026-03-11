@@ -75,6 +75,7 @@ export interface SliderConfig {
   min: number;
   max: number;
   step: number;
+  defaultValue?: number;
   showValue?: boolean;
   unit?: string;
   orientation?: 'horizontal' | 'vertical';
@@ -91,6 +92,7 @@ export interface InputConfig {
   inputType: 'number' | 'text';
   min?: number;
   max?: number;
+  defaultValue?: number | string;
   placeholder?: string;
   unit?: string;
 }
