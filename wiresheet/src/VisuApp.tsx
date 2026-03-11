@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
-import { Monitor, ChevronLeft, Home, Maximize2, Lock } from 'lucide-react';
+import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -13,7 +13,6 @@ function getApiBase(): string {
 
 const POLL_INTERVAL = 100;
 const WRITE_LOCK_MS = 1500;
-const MODE_POLL_INTERVAL = 2000;
 
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
@@ -22,13 +21,9 @@ export function VisuApp() {
   const [logicNodes, setLogicNodes] = useState<FlowNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isActive, setIsActive] = useState(true);
-  const [inactiveReason, setInactiveReason] = useState('');
-  const [visuMode, setVisuMode] = useState<'addon' | 'port8098'>('addon');
 
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const modePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const writeLockRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
@@ -100,35 +95,9 @@ export function VisuApp() {
     } catch {}
   }, [apiBase]);
 
-  const checkMode = useCallback(async () => {
-    try {
-      const res = await fetch(`${apiBase}/visu-mode`);
-      if (!res.ok) return;
-      const d = await res.json();
-      setVisuMode(d.mode);
-      const active = d.isActive === true;
-      setIsActive(active);
-      if (!active) {
-        if (d.mode === 'port8098') {
-          setInactiveReason('Diese Visu ist gesperrt – der aktive Modus ist "Port 8098". Wechsle im Editor den Modus auf "Addon (Ingress)" um diese Visu zu aktivieren.');
-        } else {
-          setInactiveReason('Diese Visu ist gesperrt – der aktive Modus ist "Addon (Ingress)". Wechsle im Editor den Modus auf "Port 8098" um diese Visu zu aktivieren.');
-        }
-      }
-    } catch {}
-  }, [apiBase]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    checkMode();
-    modePollRef.current = setInterval(checkMode, MODE_POLL_INTERVAL);
-    return () => {
-      if (modePollRef.current) clearInterval(modePollRef.current);
-    };
-  }, [checkMode]);
 
   useEffect(() => {
     pollLiveValues();
@@ -139,8 +108,6 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
-    if (!isActive) return;
-
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
     for (const page of pages) {
@@ -176,22 +143,17 @@ export function VisuApp() {
     });
 
     try {
-      const res = await fetch(`${apiBase}/visu/write-value`, {
+      await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (res.status === 403) {
-        writeLockRef.current.delete(liveKey);
-        if (portLiveKey) writeLockRef.current.delete(portLiveKey);
-        setIsActive(false);
-      }
     } catch (err) {
       console.error('write value error:', err);
       writeLockRef.current.delete(liveKey);
       if (portLiveKey) writeLockRef.current.delete(portLiveKey);
     }
-  }, [apiBase, isActive]);
+  }, [apiBase]);
 
   const handleNavigateTo = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
@@ -240,28 +202,6 @@ export function VisuApp() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-slate-400">Lade Visualisierung...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isActive) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-5 text-center px-8 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-            <Lock className="w-8 h-8 text-slate-400" />
-          </div>
-          <div>
-            <h2 className="text-white font-semibold text-lg mb-2">Visualisierung gesperrt</h2>
-            <p className="text-slate-400 text-sm leading-relaxed">{inactiveReason}</p>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-lg border border-slate-700">
-            <Monitor className="w-4 h-4 text-slate-500 flex-shrink-0" />
-            <span className="text-xs text-slate-500">
-              Aktiver Modus: <span className="text-slate-300 font-medium">{visuMode === 'port8098' ? 'Port 8098' : 'Addon (Ingress)'}</span>
-            </span>
-          </div>
         </div>
       </div>
     );

@@ -14,7 +14,7 @@ import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup, ExternalLink
+  Monitor, Cpu, DatabaseBackup
 } from 'lucide-react';
 
 function App() {
@@ -94,7 +94,6 @@ function App() {
   } = useVisualization();
 
   const [mainView, setMainView] = useState<'logic' | 'visu'>('logic');
-  const [visuActiveMode, setVisuActiveMode] = useState<'addon' | 'port8098'>('addon');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -148,23 +147,6 @@ function App() {
     return m ? `${m[1]}/api` : '/api';
   };
 
-  useEffect(() => {
-    fetch(`${getApiBase()}/visu-mode`)
-      .then(r => r.json())
-      .then(d => { if (d.mode) setVisuActiveMode(d.mode); })
-      .catch(() => {});
-  }, []);
-
-  const handleToggleVisuMode = async (mode: 'addon' | 'port8098') => {
-    setVisuActiveMode(mode);
-    try {
-      await fetch(`${getApiBase()}/visu-mode`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
-      });
-    } catch {}
-  };
 
   useEffect(() => {
     if (mainView !== 'visu') return;
@@ -789,38 +771,10 @@ function App() {
 
           {mainView === 'visu' && (
             <div className="flex-1 flex items-center justify-center gap-2">
-              <span className="text-xs text-slate-400 mr-1">Aktive Visu:</span>
-              <div className="flex items-center gap-1 bg-slate-700 rounded-lg p-0.5">
-                <button
-                  onClick={() => handleToggleVisuMode('addon')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    visuActiveMode === 'addon'
-                      ? 'bg-green-600 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Visu läuft im Addon (Ingress). Port 8098 zeigt Platzhalter."
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                  Addon (Ingress)
-                </button>
-                <button
-                  onClick={() => handleToggleVisuMode('port8098')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    visuActiveMode === 'port8098'
-                      ? 'bg-amber-600 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Visu läuft auf Port 8098. Addon-Visu zeigt Platzhalter."
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Port 8098
-                </button>
-              </div>
-              {visuActiveMode === 'port8098' && (
-                <span className="text-xs text-amber-400 bg-amber-950/50 border border-amber-800/50 px-2 py-1 rounded">
-                  Visu ist auf Port 8098 aktiv
-                </span>
-              )}
+              <span className="text-xs text-green-400 bg-green-950/50 border border-green-800/50 px-2 py-1 rounded flex items-center gap-1.5">
+                <Monitor className="w-3.5 h-3.5" />
+                Addon + Port 8098 aktiv
+              </span>
             </div>
           )}
 

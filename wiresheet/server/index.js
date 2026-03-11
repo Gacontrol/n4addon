@@ -19,9 +19,6 @@ let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
 let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
-let visuModeFile = path.join(dataDir, 'visu-mode.json');
-
-let visuMode = 'addon';
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -198,33 +195,12 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-function getRequestSource(req) {
-  const visuPort = req.headers['x-visu-port'];
-  if (visuPort === '8098') return 'port8098';
-  if (visuPort === '8099') return 'addon';
-  const origin = req.headers['origin'] || req.headers['referer'] || '';
-  if (origin.includes(':8098')) return 'port8098';
-  return 'addon';
-}
-
 app.get(['/visu-mode', '/api/visu-mode'], (req, res) => {
-  const requestSource = getRequestSource(req);
-  const isActive = requestSource === visuMode;
-  res.json({ mode: visuMode, isActive, requestSource });
+  res.json({ mode: 'all', isActive: true, requestSource: 'any' });
 });
 
 app.post(['/visu-mode', '/api/visu-mode'], async (req, res) => {
-  const { mode } = req.body;
-  if (mode !== 'addon' && mode !== 'port8098') {
-    return res.status(400).json({ error: 'Ungültiger Modus' });
-  }
-  visuMode = mode;
-  try {
-    await fs.writeFile(visuModeFile, JSON.stringify({ mode }), 'utf-8');
-  } catch (err) {
-    console.error('Fehler beim Speichern des Visu-Modus:', err.message);
-  }
-  res.json({ mode: visuMode });
+  res.json({ mode: 'all' });
 });
 
 app.get(['/pages', '/api/pages'], async (req, res) => {
@@ -1372,11 +1348,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
-  const requestSource = getRequestSource(req);
-  if (requestSource !== visuMode) {
-    console.log(`[write-value] Gesperrt: Anfrage von ${requestSource}, Modus ist ${visuMode}`);
-    return res.status(403).json({ error: 'Gesperrt: Diese Visu ist im aktuellen Modus nicht aktiv.' });
-  }
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');
     const pages = JSON.parse(data);
@@ -2092,11 +2063,6 @@ async function start() {
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
-    visuModeFile = path.join(dataDir, 'visu-mode.json');
-    try {
-      const modeData = await fs.readFile(visuModeFile, 'utf-8');
-      visuMode = JSON.parse(modeData).mode || 'addon';
-    } catch {}
 
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
