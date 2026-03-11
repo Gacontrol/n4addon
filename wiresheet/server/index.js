@@ -28,6 +28,7 @@ const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
+const visuControlledDps = new Map();
 let dpValuesSaveTimeout = null;
 
 async function loadPersistentDpValues() {
@@ -730,9 +731,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
       const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
       const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
-      const persistentVal = persistentDpValues.get(nodeId);
+      const visuControlledVal = visuControlledDps.get(nodeId);
 
       if (visuVal !== undefined) {
+        visuControlledDps.set(nodeId, visuVal);
         nodeValues[nodeId] = visuVal;
         setPersistentDpValue(nodeId, visuVal);
         delete visuOverrides[visuKey];
@@ -742,13 +744,19 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
             delete visuOverrides[key];
           }
         }
+      } else if (visuControlledVal !== undefined) {
+        nodeValues[nodeId] = visuControlledVal;
       } else if (inputVals[0] !== undefined) {
         nodeValues[nodeId] = inputVals[0];
         setPersistentDpValue(nodeId, inputVals[0]);
-      } else if (persistentVal !== undefined) {
-        nodeValues[nodeId] = persistentVal;
       } else {
-        nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
+        const persistentVal = persistentDpValues.get(nodeId);
+        if (persistentVal !== undefined) {
+          visuControlledDps.set(nodeId, persistentVal);
+          nodeValues[nodeId] = persistentVal;
+        } else {
+          nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
+        }
       }
     } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = visuOverrides[nodeId];
@@ -1383,9 +1391,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     overrides[overrideKey] = value;
     overrides[nodeId] = value;
 
+    visuControlledDps.set(nodeId, value);
     setPersistentDpValue(nodeId, value);
 
-    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value} (wird im naechsten Zyklus verarbeitet)`);
+    console.log(`Visu-Wert geschrieben: ${nodeId} = ${value} (Visu hat jetzt Kontrolle)`);
     res.json({ success: true });
   }
 });
