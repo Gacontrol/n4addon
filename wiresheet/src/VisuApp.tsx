@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
-import { Monitor, ChevronLeft, Home, Maximize2, AlertTriangle } from 'lucide-react';
+import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -14,6 +14,8 @@ function getApiBase(): string {
 const POLL_INTERVAL = 300;
 const WRITE_LOCK_MS = 1500;
 
+const IS_PORT_8098 = window.location.port === '8098';
+
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
   const [activePageId, setActivePageId] = useState<string>('');
@@ -21,15 +23,14 @@ export function VisuApp() {
   const [logicNodes, setLogicNodes] = useState<FlowNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [visuMode, setVisuMode] = useState<'addon' | 'port8098' | null>(null);
+  const [addonVisuDisabled, setAddonVisuDisabled] = useState(false);
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const writeLockRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
 
-  const hideToolbar = window.location.port === '8098' || new URLSearchParams(window.location.search).get('kiosk') === '1';
-  const isPort8098 = window.location.port === '8098';
+  const hideToolbar = IS_PORT_8098 || new URLSearchParams(window.location.search).get('kiosk') === '1';
 
   visuPagesRef.current = visuPages;
 
@@ -100,15 +101,11 @@ export function VisuApp() {
   }, [loadData]);
 
   useEffect(() => {
-    const fetchMode = () => {
-      fetch(`${apiBase}/visu-mode`)
-        .then(r => r.json())
-        .then(d => { if (d.mode) setVisuMode(d.mode); })
-        .catch(() => setVisuMode('addon'));
-    };
-    fetchMode();
-    const interval = setInterval(fetchMode, 5000);
-    return () => clearInterval(interval);
+    if (IS_PORT_8098) return;
+    fetch(`${apiBase}/visu-mode`)
+      .then(r => r.json())
+      .then(d => { setAddonVisuDisabled(d.mode === 'port8098'); })
+      .catch(() => { setAddonVisuDisabled(false); });
   }, [apiBase]);
 
   useEffect(() => {
@@ -196,7 +193,7 @@ export function VisuApp() {
   const activePage = visuPages.find(p => p.id === activePageId) || visuPages[0];
   const canGoBack = pageHistoryRef.current.length > 1;
 
-  if (loading || visuMode === null) {
+  if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-3">
@@ -207,7 +204,7 @@ export function VisuApp() {
     );
   }
 
-  if (!isPort8098 && visuMode === 'port8098') {
+  if (!IS_PORT_8098 && addonVisuDisabled) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-4 text-center px-8 max-w-md">
@@ -217,31 +214,10 @@ export function VisuApp() {
           <div>
             <h2 className="text-white font-semibold text-lg mb-2">Visu laeuft auf Port 8098</h2>
             <p className="text-slate-400 text-sm leading-relaxed">
-              Die Visualisierung ist derzeit auf Port 8098 aktiv. Die Addon-Visu (Ingress) ist deaktiviert.
+              Die Visualisierung ist auf Port 8098 aktiv. Die Addon-Visu (Ingress) ist deaktiviert.
             </p>
             <p className="text-slate-500 text-xs mt-3">
               Um die Addon-Visu zu aktivieren, wechsle im Editor unter "Visu" den Modus auf "Addon (Ingress)".
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isPort8098 && visuMode === 'addon') {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4 text-center px-8 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-amber-950/50 border border-amber-800/50 flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-amber-500" />
-          </div>
-          <div>
-            <h2 className="text-white font-semibold text-lg mb-2">Visu ist im Addon aktiv</h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Die Visualisierung laeuft derzeit im Addon (Ingress). Port 8098 ist deaktiviert.
-            </p>
-            <p className="text-slate-500 text-xs mt-3">
-              Um die Visu auf Port 8098 zu aktivieren, wechsle im Addon unter "Visu" den Modus auf "Port 8098".
             </p>
           </div>
         </div>
