@@ -12,6 +12,7 @@ function getApiBase(): string {
 }
 
 const POLL_INTERVAL = 1000;
+const WRITE_HOLD_MS = 2000;
 
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
@@ -23,6 +24,7 @@ export function VisuApp() {
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
+  const pendingWritesRef = useRef<Map<string, { value: unknown; timestamp: number }>>(new Map());
   const apiBase = getApiBase();
 
   visuPagesRef.current = visuPages;
@@ -64,6 +66,15 @@ export function VisuApp() {
       const res = await fetch(`${apiBase}/live-values`);
       if (res.ok) {
         const data = await res.json();
+        const now = Date.now();
+        const pending = pendingWritesRef.current;
+        for (const [key, entry] of pending.entries()) {
+          if (now - entry.timestamp > WRITE_HOLD_MS) {
+            pending.delete(key);
+          } else {
+            data[key] = entry.value;
+          }
+        }
         setLiveValues(data);
       }
     } catch {}
@@ -95,6 +106,13 @@ export function VisuApp() {
     if (!binding) {
       console.log('[VisuApp] No binding found for widget:', widgetId);
       return;
+    }
+
+    const now = Date.now();
+    const pending = pendingWritesRef.current;
+    pending.set(binding.nodeId, { value, timestamp: now });
+    if (binding.portId) {
+      pending.set(`${binding.nodeId}:${binding.portId}`, { value, timestamp: now });
     }
 
     setLiveValues(prev => {
