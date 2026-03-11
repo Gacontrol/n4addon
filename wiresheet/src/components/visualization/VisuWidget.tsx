@@ -123,21 +123,19 @@ function makeCrossPoints(w: number, h: number, armRatio: number): string {
 }
 
 function resolveShapeColor(cfg: RectConfig | CircleConfig | PolygonConfig | StarConfig | DiamondConfig | CrossConfig, value: unknown): string {
-  const base = cfg.fillColor || '#1e293b';
   if (cfg.activeColor && cfg.inactiveColor) {
     return value ? cfg.activeColor : cfg.inactiveColor;
   }
   if (cfg.activeColor && value) return cfg.activeColor;
-  return base;
+  return cfg.fillColor || 'transparent';
 }
 
 function resolveLineColor(cfg: LineConfig | ArrowConfig, value: unknown): string {
-  const base = cfg.strokeColor || '#64748b';
   if (cfg.activeColor && cfg.inactiveColor) {
     return value ? cfg.activeColor : cfg.inactiveColor;
   }
   if (cfg.activeColor && value) return cfg.activeColor;
-  return base;
+  return cfg.strokeColor || 'transparent';
 }
 
 export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
@@ -380,7 +378,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
               x="0" y="0"
               width="100%" height="100%"
               fill={fillColor}
-              stroke={rCfg.strokeColor || '#475569'}
+              stroke={rCfg.strokeColor || 'none'}
               strokeWidth={rCfg.strokeWidth ?? 2}
               rx={widget.style.borderRadius ?? 4}
             />
@@ -407,7 +405,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             <ellipse
               cx={cx} cy={cy} rx={rx} ry={ry}
               fill={fillColor}
-              stroke={cCfg.strokeColor || '#475569'}
+              stroke={cCfg.strokeColor || 'none'}
               strokeWidth={cCfg.strokeWidth ?? 2}
             />
           </svg>
@@ -963,9 +961,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
         border: showSelectionBorder
           ? '2px solid #3b82f6'
-          : (isEditMode && !isTransparentWidget && !isNavWidget)
-            ? '1px dashed rgba(255,255,255,0.08)'
-            : 'none',
+          : 'none',
         boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
@@ -985,12 +981,19 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       }}
     >
       {renderWidget()}
+      {isEditMode && !isVertexWidget && (
+        <div
+          className="absolute inset-0"
+          style={{ zIndex: 10, cursor: 'move' }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
+        />
+      )}
       {showResizeHandles && (
         <>
-          <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nw-resize" />
-          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-ne-resize" />
-          <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-sw-resize" />
-          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-se-resize" />
+          <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nw-resize" style={{ zIndex: 11 }} />
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-ne-resize" style={{ zIndex: 11 }} />
+          <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-sw-resize" style={{ zIndex: 11 }} />
+          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-se-resize" style={{ zIndex: 11 }} />
         </>
       )}
     </div>

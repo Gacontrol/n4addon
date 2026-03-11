@@ -1,5 +1,45 @@
 import React, { useState } from 'react';
-import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor } from 'lucide-react';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban } from 'lucide-react';
+
+interface ColorPickerProps {
+  value: string | undefined;
+  defaultColor: string;
+  onChange: (color: string | undefined) => void;
+}
+
+const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange }) => {
+  const isNone = !value;
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative flex-1">
+        {isNone ? (
+          <div className="w-full h-8 rounded border border-slate-600 bg-slate-800 flex items-center justify-center gap-1 text-xs text-slate-400">
+            <Ban className="w-3 h-3" />
+            Keine Farbe
+          </div>
+        ) : (
+          <input
+            type="color"
+            value={value || defaultColor}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full h-8 rounded cursor-pointer"
+          />
+        )}
+      </div>
+      <button
+        onClick={() => onChange(isNone ? defaultColor : undefined)}
+        title={isNone ? 'Farbe aktivieren' : 'Keine Farbe'}
+        className={`flex-shrink-0 w-8 h-8 rounded border flex items-center justify-center transition-colors ${
+          isNone
+            ? 'border-blue-500 bg-blue-900/30 text-blue-400 hover:bg-blue-900/50'
+            : 'border-slate-600 bg-slate-800 text-slate-400 hover:text-red-400 hover:border-red-600'
+        }`}
+      >
+        {isNone ? <span className="text-[10px] font-bold">+</span> : <Ban className="w-3 h-3" />}
+      </button>
+    </div>
+  );
+};
 import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
@@ -561,11 +601,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           <>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={shapeCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={shapeCfg.fillColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, fillColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
-              <input type="color" value={shapeCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={shapeCfg.strokeColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
@@ -587,11 +627,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung (Tab Verknuepfung):</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe (Wert = true/1)</label>
-              <input type="color" value={shapeCfg.activeColor || shapeCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={shapeCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe (Wert = false/0)</label>
-              <input type="color" value={shapeCfg.inactiveColor || shapeCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={shapeCfg.inactiveColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -606,7 +646,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           <>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
-              <input type="color" value={lineCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={lineCfg.strokeColor} defaultColor="#64748b" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Linienstaerke</label>
@@ -644,11 +684,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe (Wert = true/1)</label>
-              <input type="color" value={lineCfg.activeColor || lineCfg.strokeColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={lineCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe (Wert = false/0)</label>
-              <input type="color" value={lineCfg.inactiveColor || lineCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={lineCfg.inactiveColor} defaultColor="#64748b" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -664,11 +704,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={pCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={pCfg.fillColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, fillColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
-              <input type="color" value={pCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={pCfg.strokeColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
@@ -690,11 +730,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
-              <input type="color" value={pCfg.activeColor || pCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={pCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
-              <input type="color" value={pCfg.inactiveColor || pCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={pCfg.inactiveColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -714,11 +754,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={sCfg.fillColor || '#eab308'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={sCfg.fillColor} defaultColor="#eab308" onChange={(c) => onUpdate({ config: { ...config, fillColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
-              <input type="color" value={sCfg.strokeColor || '#ca8a04'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={sCfg.strokeColor} defaultColor="#ca8a04" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
@@ -735,11 +775,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
-              <input type="color" value={sCfg.activeColor || sCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={sCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
-              <input type="color" value={sCfg.inactiveColor || sCfg.fillColor || '#eab308'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={sCfg.inactiveColor} defaultColor="#eab308" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -751,11 +791,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           <>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={dCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={dCfg.fillColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, fillColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
-              <input type="color" value={dCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={dCfg.strokeColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
@@ -776,11 +816,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
-              <input type="color" value={dCfg.activeColor || dCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={dCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
-              <input type="color" value={dCfg.inactiveColor || dCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={dCfg.inactiveColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -796,7 +836,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={xCfg.fillColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={xCfg.fillColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, fillColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
@@ -813,11 +853,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
-              <input type="color" value={xCfg.activeColor || xCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={xCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
-              <input type="color" value={xCfg.inactiveColor || xCfg.fillColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={xCfg.inactiveColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -829,7 +869,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           <>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Linienfarbe</label>
-              <input type="color" value={plCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={plCfg.strokeColor} defaultColor="#64748b" onChange={(c) => onUpdate({ config: { ...config, strokeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Linienstaerke</label>
@@ -837,7 +877,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
-              <input type="color" value={plCfg.fillColor && plCfg.fillColor !== 'transparent' ? plCfg.fillColor : '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={plCfg.fillColor === 'transparent' ? undefined : plCfg.fillColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ config: { ...config, fillColor: c || 'transparent' } })} />
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" checked={plCfg.closed ?? false} onChange={(e) => onUpdate({ config: { ...config, closed: e.target.checked } })} className="rounded" />
@@ -880,11 +920,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
-              <input type="color" value={plCfg.activeColor || plCfg.strokeColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={plCfg.activeColor} defaultColor="#22c55e" onChange={(c) => onUpdate({ config: { ...config, activeColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
-              <input type="color" value={plCfg.inactiveColor || plCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={plCfg.inactiveColor} defaultColor="#475569" onChange={(c) => onUpdate({ config: { ...config, inactiveColor: c } })} />
             </div>
           </>
         );
@@ -909,7 +949,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
-              <input type="color" value={navCfg.color || '#3b82f6'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={navCfg.color} defaultColor="#3b82f6" onChange={(c) => onUpdate({ config: { ...config, color: c } })} />
             </div>
           </>
         );
@@ -938,7 +978,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
-              <input type="color" value={homeCfg.color || '#10b981'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={homeCfg.color} defaultColor="#10b981" onChange={(c) => onUpdate({ config: { ...config, color: c } })} />
             </div>
           </>
         );
@@ -954,7 +994,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Farbe</label>
-              <input type="color" value={backCfg.color || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, color: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              <ColorPicker value={backCfg.color} defaultColor="#64748b" onChange={(c) => onUpdate({ config: { ...config, color: c } })} />
             </div>
           </>
         );
@@ -1058,17 +1098,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Akzentfarbe</label>
-                <input type="color" value={frCfg.accentColor || '#3b82f6'} onChange={(e) => onUpdate({ config: { ...frCfg, accentColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+                <ColorPicker value={frCfg.accentColor} defaultColor="#3b82f6" onChange={(c) => onUpdate({ config: { ...frCfg, accentColor: c } })} />
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Hintergrund</label>
-                <input type="color" value={frCfg.backgroundColor || '#0f172a'} onChange={(e) => onUpdate({ config: { ...frCfg, backgroundColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+                <ColorPicker value={frCfg.backgroundColor} defaultColor="#0f172a" onChange={(c) => onUpdate({ config: { ...frCfg, backgroundColor: c } })} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Textfarbe</label>
-                <input type="color" value={frCfg.textColor || '#e2e8f0'} onChange={(e) => onUpdate({ config: { ...frCfg, textColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+                <ColorPicker value={frCfg.textColor} defaultColor="#e2e8f0" onChange={(c) => onUpdate({ config: { ...frCfg, textColor: c } })} />
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Position</label>
@@ -1548,30 +1588,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <hr className="border-slate-700" />
             <div>
               <label className="block text-xs text-slate-400 mb-1">Hintergrundfarbe</label>
-              <input
-                type="color"
-                value={widget.style.backgroundColor || '#1e293b'}
-                onChange={(e) => onUpdate({ style: { ...widget.style, backgroundColor: e.target.value } })}
-                className="w-full h-8 rounded cursor-pointer"
-              />
+              <ColorPicker value={widget.style.backgroundColor} defaultColor="#1e293b" onChange={(c) => onUpdate({ style: { ...widget.style, backgroundColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Textfarbe</label>
-              <input
-                type="color"
-                value={widget.style.textColor || '#e2e8f0'}
-                onChange={(e) => onUpdate({ style: { ...widget.style, textColor: e.target.value } })}
-                className="w-full h-8 rounded cursor-pointer"
-              />
+              <ColorPicker value={widget.style.textColor} defaultColor="#e2e8f0" onChange={(c) => onUpdate({ style: { ...widget.style, textColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Akzentfarbe</label>
-              <input
-                type="color"
-                value={widget.style.accentColor || '#3b82f6'}
-                onChange={(e) => onUpdate({ style: { ...widget.style, accentColor: e.target.value } })}
-                className="w-full h-8 rounded cursor-pointer"
-              />
+              <ColorPicker value={widget.style.accentColor} defaultColor="#3b82f6" onChange={(c) => onUpdate({ style: { ...widget.style, accentColor: c } })} />
             </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Eckenradius</label>
