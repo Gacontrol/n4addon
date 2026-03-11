@@ -34,7 +34,8 @@ export type WidgetType =
   | 'visu-nav-button'
   | 'visu-home-button'
   | 'visu-back-button'
-  | 'visu-frame';
+  | 'visu-frame'
+  | 'visu-image';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -42,6 +43,18 @@ export interface WidgetBinding {
   paramKey?: string;
   direction: 'read' | 'write' | 'readwrite';
 }
+
+export type WidgetTheme =
+  | 'default'
+  | 'dark-glass'
+  | 'neon-glow'
+  | 'minimal-flat'
+  | 'industrial'
+  | 'soft-light'
+  | 'midnight-blue'
+  | 'carbon-fiber'
+  | 'warm-amber'
+  | 'arctic-white';
 
 export interface WidgetStyle {
   backgroundColor?: string;
@@ -52,6 +65,7 @@ export interface WidgetStyle {
   borderRadius?: number;
   showLabel?: boolean;
   labelPosition?: 'top' | 'bottom' | 'left' | 'right';
+  theme?: WidgetTheme;
 }
 
 export interface SwitchConfig {
@@ -290,6 +304,14 @@ export interface FrameConfig {
   showIcons?: boolean;
 }
 
+export interface ImageConfig {
+  imageUrl?: string;
+  storagePath?: string;
+  objectFit?: 'contain' | 'cover' | 'fill' | 'none';
+  opacity?: number;
+  borderRadius?: number;
+}
+
 export type WidgetConfig =
   | SwitchConfig
   | SliderConfig
@@ -316,7 +338,8 @@ export type WidgetConfig =
   | NavButtonConfig
   | HomeButtonConfig
   | BackButtonConfig
-  | FrameConfig;
+  | FrameConfig
+  | ImageConfig;
 
 export interface VisuWidget {
   id: string;

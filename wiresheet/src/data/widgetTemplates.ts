@@ -535,6 +535,24 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Ein- und ausklappbare Seitennavigation',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-image',
+    label: 'Hintergrundbild',
+    icon: 'ImageIcon',
+    category: 'decoration',
+    defaultSize: { width: 300, height: 200 },
+    defaultConfig: {
+      imageUrl: undefined,
+      storagePath: undefined,
+      objectFit: 'contain',
+      opacity: 1,
+      borderRadius: 0
+    },
+    defaultStyle: {},
+    description: 'Bild / Logo / Grundriss von PC hochladen',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

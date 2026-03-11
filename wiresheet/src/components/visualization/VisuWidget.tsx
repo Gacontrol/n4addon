@@ -27,9 +27,12 @@ import {
   NavButtonConfig,
   HomeButtonConfig,
   BackButtonConfig,
-  FrameConfig
+  FrameConfig,
+  ImageConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
+import { VisuImage } from './VisuImage';
+import { getThemeVars } from '../../utils/widgetThemes';
 import {
   VisuSwitch,
   VisuButton,
@@ -766,16 +769,34 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-image': {
+        const imgCfg = widget.config as ImageConfig;
+        return (
+          <VisuImage
+            config={imgCfg}
+            isEditMode={isEditMode}
+            onUpdateConfig={(cfg) => onUpdateConfig?.(cfg as Record<string, unknown>)}
+            width={widget.size.width}
+            height={widget.size.height}
+          />
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
   };
 
   const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
-  const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button', 'visu-frame'].includes(widget.type);
+  const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button', 'visu-frame', 'visu-image'].includes(widget.type);
   const isVertexWidget = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
   const showResizeHandles = isEditMode && isSelected && !isVertexWidget;
   const showSelectionBorder = isSelected && !isVertexWidget && !['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
+
+  const themeVars = getThemeVars(widget.style.theme);
+  const resolvedBg = widget.style.backgroundColor || themeVars.bg;
+  const resolvedBorderRadius = widget.style.borderRadius ?? themeVars.borderRadius;
+  const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 
   return (
     <div
@@ -786,11 +807,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         width: widget.size.width,
         height: widget.size.height,
         zIndex: widget.zIndex || 1,
-        backgroundColor: isDrawingWidget ? 'transparent' : widget.style.backgroundColor,
-        borderRadius: isDrawingWidget ? 0 : (widget.style.borderRadius ?? 8),
-        border: showSelectionBorder ? '2px solid #3b82f6' : (!isDrawingWidget && widget.style.borderColor) ? `1px solid ${widget.style.borderColor}` : 'none',
+        backgroundColor: isDrawingWidget ? 'transparent' : resolvedBg,
+        borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
+        border: showSelectionBorder ? '2px solid #3b82f6' : (!isDrawingWidget ? `1px solid ${resolvedBorderColor}` : 'none'),
+        boxShadow: (!isDrawingWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
+        backdropFilter: (!isDrawingWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
+        WebkitBackdropFilter: (!isDrawingWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         padding: isDrawingWidget || isNavWidget ? 0 : 8
-      }}
+      } as React.CSSProperties}
       onClick={(e) => {
         if (isEditMode) {
           e.stopPropagation();

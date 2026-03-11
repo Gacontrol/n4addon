@@ -35,6 +35,10 @@ interface VisuCanvasProps {
   onNavigateToPage?: (pageId: string) => void;
   onNavigateBack?: () => void;
   onNavigateHome?: () => void;
+  onBringToFront: (widgetId: string) => void;
+  onSendToBack: (widgetId: string) => void;
+  onBringForward: (widgetId: string) => void;
+  onSendBackward: (widgetId: string) => void;
 }
 
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
@@ -54,7 +58,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onEditWidgetProperties,
   onNavigateToPage,
   onNavigateBack,
-  onNavigateHome
+  onNavigateHome,
+  onBringToFront,
+  onSendToBack,
+  onBringForward,
+  onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<{
@@ -513,11 +521,28 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
       {contextMenu && (
         <div
-          className="fixed bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 py-1 min-w-44"
+          className="fixed bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 py-1 min-w-48"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
+          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+            onClick={() => { onBringToFront(contextMenu.widgetId); setContextMenu(null); }}>
+            Ganz nach vorne
+          </button>
+          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+            onClick={() => { onBringForward(contextMenu.widgetId); setContextMenu(null); }}>
+            Eine Ebene nach vorne
+          </button>
+          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+            onClick={() => { onSendBackward(contextMenu.widgetId); setContextMenu(null); }}>
+            Eine Ebene nach hinten
+          </button>
+          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+            onClick={() => { onSendToBack(contextMenu.widgetId); setContextMenu(null); }}>
+            Ganz nach hinten
+          </button>
+          <div className="border-t border-slate-700 my-1" />
           <button
             className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
             onClick={() => { onDuplicateWidget(contextMenu.widgetId); setContextMenu(null); }}

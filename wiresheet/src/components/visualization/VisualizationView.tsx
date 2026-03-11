@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings } from 'lucide-react';
+import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { VisuCanvas } from './VisuCanvas';
@@ -38,6 +38,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
+  const [showLayerPanel, setShowLayerPanel] = useState(false);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
 
   const handleNavigateToPage = useCallback((pageId: string) => {
@@ -160,6 +161,55 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     }
   }, [activePage.widgets, onWidgetValueChange]);
 
+  const reindexZOrder = (widgets: VisuWidget[]) =>
+    widgets.map((w, i) => ({ ...w, zIndex: i + 1 }));
+
+  const handleBringToFront = useCallback((widgetId: string) => {
+    const widgets = [...activePage.widgets];
+    const idx = widgets.findIndex(w => w.id === widgetId);
+    if (idx < 0) return;
+    const [item] = widgets.splice(idx, 1);
+    widgets.push(item);
+    onUpdateVisuPage(activePage.id, { widgets: reindexZOrder(widgets) });
+  }, [activePage, onUpdateVisuPage]);
+
+  const handleSendToBack = useCallback((widgetId: string) => {
+    const widgets = [...activePage.widgets];
+    const idx = widgets.findIndex(w => w.id === widgetId);
+    if (idx < 0) return;
+    const [item] = widgets.splice(idx, 1);
+    widgets.unshift(item);
+    onUpdateVisuPage(activePage.id, { widgets: reindexZOrder(widgets) });
+  }, [activePage, onUpdateVisuPage]);
+
+  const handleBringForward = useCallback((widgetId: string) => {
+    const widgets = [...activePage.widgets];
+    const idx = widgets.findIndex(w => w.id === widgetId);
+    if (idx < 0 || idx === widgets.length - 1) return;
+    [widgets[idx], widgets[idx + 1]] = [widgets[idx + 1], widgets[idx]];
+    onUpdateVisuPage(activePage.id, { widgets: reindexZOrder(widgets) });
+  }, [activePage, onUpdateVisuPage]);
+
+  const handleSendBackward = useCallback((widgetId: string) => {
+    const widgets = [...activePage.widgets];
+    const idx = widgets.findIndex(w => w.id === widgetId);
+    if (idx <= 0) return;
+    [widgets[idx], widgets[idx - 1]] = [widgets[idx - 1], widgets[idx]];
+    onUpdateVisuPage(activePage.id, { widgets: reindexZOrder(widgets) });
+  }, [activePage, onUpdateVisuPage]);
+
+  const handleLayerDragStart = useRef<number | null>(null);
+
+  const handleLayerDrop = useCallback((fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    const widgets = [...activePage.widgets];
+    const [item] = widgets.splice(fromIdx, 1);
+    widgets.splice(toIdx, 0, item);
+    onUpdateVisuPage(activePage.id, { widgets: reindexZOrder(widgets) });
+  }, [activePage, onUpdateVisuPage]);
+
+  const sortedWidgets = [...activePage.widgets].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+
   const selectedWidget = selectedWidgetId
     ? activePage.widgets.find(w => w.id === selectedWidgetId)
     : null;
@@ -223,6 +273,15 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {isEditMode && (
+            <button
+              onClick={() => setShowLayerPanel(!showLayerPanel)}
+              className={`p-2 rounded transition-colors ${showLayerPanel ? 'bg-slate-700 text-slate-200' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+              title="Ebenen"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={() => setShowPageSettings(!showPageSettings)}
             className={`p-2 rounded transition-colors ${showPageSettings ? 'bg-slate-700 text-slate-200' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
@@ -328,6 +387,10 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onNavigateToPage={handleNavigateToPage}
             onNavigateBack={handleNavigateBack}
             onNavigateHome={handleNavigateHome}
+            onBringToFront={handleBringToFront}
+            onSendToBack={handleSendToBack}
+            onBringForward={handleBringForward}
+            onSendBackward={handleSendBackward}
           />
         </div>
 
@@ -340,6 +403,83 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}
           />
+        )}
+
+        {isEditMode && showLayerPanel && (
+          <div className="w-56 bg-slate-900 border-l border-slate-700 flex flex-col overflow-hidden">
+            <div className="p-3 border-b border-slate-700 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-300 flex-1">Ebenen</h2>
+              <span className="text-xs text-slate-500">{activePage.widgets.length}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {sortedWidgets.map((widget, visIdx) => {
+                const realIdx = activePage.widgets.findIndex(w => w.id === widget.id);
+                const isSelected = widget.id === selectedWidgetId;
+                return (
+                  <div
+                    key={widget.id}
+                    draggable
+                    onDragStart={() => { handleLayerDragStart.current = realIdx; }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => {
+                      if (handleLayerDragStart.current !== null) {
+                        handleLayerDrop(handleLayerDragStart.current, realIdx);
+                        handleLayerDragStart.current = null;
+                      }
+                    }}
+                    onClick={() => {
+                      setSelectedWidgetId(widget.id);
+                      setShowProperties(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 mx-1 rounded cursor-pointer transition-colors group ${
+                      isSelected
+                        ? 'bg-blue-600/30 border border-blue-500/50'
+                        : 'hover:bg-slate-800 border border-transparent'
+                    }`}
+                  >
+                    <span className="text-[10px] text-slate-600 w-4 text-right flex-shrink-0">{widget.zIndex ?? visIdx + 1}</span>
+                    <span className={`text-xs truncate flex-1 ${isSelected ? 'text-blue-300' : 'text-slate-400'}`}>
+                      {widget.label || widget.type.replace('visu-', '')}
+                    </span>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button
+                        title="Ganz nach vorne"
+                        onClick={(e) => { e.stopPropagation(); handleBringToFront(widget.id); }}
+                        className="p-0.5 rounded hover:bg-slate-600 text-slate-400 hover:text-white"
+                      >
+                        <ChevronsUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        title="Eine Ebene nach vorne"
+                        onClick={(e) => { e.stopPropagation(); handleBringForward(widget.id); }}
+                        className="p-0.5 rounded hover:bg-slate-600 text-slate-400 hover:text-white"
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        title="Eine Ebene nach hinten"
+                        onClick={(e) => { e.stopPropagation(); handleSendBackward(widget.id); }}
+                        className="p-0.5 rounded hover:bg-slate-600 text-slate-400 hover:text-white"
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                      <button
+                        title="Ganz nach hinten"
+                        onClick={(e) => { e.stopPropagation(); handleSendToBack(widget.id); }}
+                        className="p-0.5 rounded hover:bg-slate-600 text-slate-400 hover:text-white"
+                      >
+                        <ChevronsDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {activePage.widgets.length === 0 && (
+                <div className="px-3 py-4 text-xs text-slate-600 text-center">Keine Widgets</div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

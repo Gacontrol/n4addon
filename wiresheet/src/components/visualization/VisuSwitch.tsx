@@ -24,8 +24,16 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
 }) => {
   const onColor = config.onColor || '#22c55e';
   const offColor = config.offColor || '#64748b';
+
+  const hasFeedback = statusValue !== null && statusValue !== undefined;
   const displayValue = writeOnly ? (statusValue ?? (config.defaultValue ?? false)) : value;
-  const currentColor = displayValue ? onColor : offColor;
+
+  const knobValue = displayValue;
+  const colorValue = hasFeedback ? Boolean(statusValue) : displayValue;
+
+  const currentColor = colorValue ? onColor : offColor;
+
+  const isPending = hasFeedback && !writeOnly && value !== Boolean(statusValue);
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -42,27 +50,34 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
           }}
           disabled={disabled}
           className={`relative w-16 h-8 rounded-full transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          style={{ backgroundColor: currentColor }}
+          style={{
+            backgroundColor: currentColor,
+            opacity: isPending ? 0.7 : 1,
+            boxShadow: isPending ? `0 0 0 2px ${currentColor}44` : undefined
+          }}
         >
+          {isPending && (
+            <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: currentColor, opacity: 0.3 }} />
+          )}
           <div
             className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-200"
-            style={{ transform: displayValue ? 'translateX(34px)' : 'translateX(2px)' }}
+            style={{ transform: knobValue ? 'translateX(34px)' : 'translateX(2px)' }}
           />
           <span
             className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white"
-            style={{ paddingLeft: displayValue ? '0' : '20px', paddingRight: displayValue ? '20px' : '0' }}
+            style={{ paddingLeft: knobValue ? '0' : '20px', paddingRight: knobValue ? '20px' : '0' }}
           >
-            {displayValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
+            {knobValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
           </span>
         </button>
-        {statusValue !== null && statusValue !== undefined && writeOnly && (
+        {hasFeedback && (
           <div className="flex items-center gap-1">
             <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: statusValue ? onColor : offColor }}
+              className="w-2 h-2 rounded-full transition-colors duration-300"
+              style={{ backgroundColor: Boolean(statusValue) ? onColor : offColor }}
             />
             <span className="text-[9px] text-slate-500">
-              {statusValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
+              {Boolean(statusValue) ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
             </span>
           </div>
         )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor } from 'lucide-react';
-import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
 interface WidgetPropertiesPanelProps {
@@ -1200,6 +1200,34 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-image': {
+        const imgCfg = config as ImageConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Darstellung</label>
+              <select value={imgCfg.objectFit || 'contain'} onChange={(e) => onUpdate({ config: { ...imgCfg, objectFit: e.target.value as ImageConfig['objectFit'] } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="contain">Einpassen (contain)</option>
+                <option value="cover">Ausfuellen (cover)</option>
+                <option value="fill">Strecken (fill)</option>
+                <option value="none">Original (none)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.05" value={imgCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...imgCfg, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Eckenradius (px)</label>
+              <input type="number" min="0" max="200" value={imgCfg.borderRadius ?? 0} onChange={(e) => onUpdate({ config: { ...imgCfg, borderRadius: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            {imgCfg.imageUrl && (
+              <div className="text-xs text-slate-500 truncate">Bild hochgeladen</div>
+            )}
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }
@@ -1487,6 +1515,37 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
         {activeTab === 'style' && (
           <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Design-Vorlage</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  { value: 'default', label: 'Standard', preview: 'bg-slate-800 border-slate-600' },
+                  { value: 'dark-glass', label: 'Dark Glass', preview: 'bg-slate-900/80 border-blue-500/30' },
+                  { value: 'neon-glow', label: 'Neon Glow', preview: 'bg-slate-950 border-cyan-400' },
+                  { value: 'minimal-flat', label: 'Minimal Flat', preview: 'bg-slate-700 border-transparent' },
+                  { value: 'industrial', label: 'Industrial', preview: 'bg-zinc-800 border-orange-600' },
+                  { value: 'soft-light', label: 'Soft Light', preview: 'bg-slate-200 border-slate-300' },
+                  { value: 'midnight-blue', label: 'Midnight Blue', preview: 'bg-blue-950 border-blue-700' },
+                  { value: 'carbon-fiber', label: 'Carbon Fiber', preview: 'bg-neutral-900 border-neutral-600' },
+                  { value: 'warm-amber', label: 'Warm Amber', preview: 'bg-amber-950 border-amber-600' },
+                  { value: 'arctic-white', label: 'Arctic White', preview: 'bg-white border-slate-200' },
+                ] as { value: WidgetTheme; label: string; preview: string }[]).map(({ value, label, preview }) => (
+                  <button
+                    key={value}
+                    onClick={() => onUpdate({ style: { ...widget.style, theme: value } })}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs transition-colors ${
+                      (widget.style.theme ?? 'default') === value
+                        ? 'border-blue-500 bg-blue-900/30 text-blue-300'
+                        : 'border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-300'
+                    }`}
+                  >
+                    <span className={`w-3 h-3 rounded-sm border flex-shrink-0 ${preview}`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <hr className="border-slate-700" />
             <div>
               <label className="block text-xs text-slate-400 mb-1">Hintergrundfarbe</label>
               <input
