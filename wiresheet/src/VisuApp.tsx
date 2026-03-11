@@ -145,6 +145,12 @@ export function VisuApp() {
       });
       const result = await response.json();
       console.log('[VisuApp] API response:', response.status, result);
+      if (response.ok) {
+        pendingWritesRef.current.delete(binding.nodeId);
+        if (binding.portId) {
+          pendingWritesRef.current.delete(`${binding.nodeId}:${binding.portId}`);
+        }
+      }
     } catch (err) {
       console.error('[VisuApp] write value error:', err);
     }
