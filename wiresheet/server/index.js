@@ -198,8 +198,22 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+function getRequestSource(req) {
+  const visuPort = req.headers['x-visu-port'];
+  if (visuPort === '8098') return 'port8098';
+  if (visuPort === '8099') return 'port8099';
+  const path = req.path || '';
+  if (path.includes('/hassio_ingress/')) return 'addon';
+  const forwarded = req.headers['x-forwarded-for'] || '';
+  const origin = req.headers['origin'] || req.headers['referer'] || '';
+  if (origin.includes(':8098')) return 'port8098';
+  return 'addon';
+}
+
 app.get(['/visu-mode', '/api/visu-mode'], (req, res) => {
-  res.json({ mode: visuMode });
+  const requestSource = getRequestSource(req);
+  const isActive = requestSource === visuMode;
+  res.json({ mode: visuMode, isActive, requestSource });
 });
 
 app.post(['/visu-mode', '/api/visu-mode'], async (req, res) => {
@@ -1361,9 +1375,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
-  const visuSource = req.headers['x-visu-source'];
-  if (visuSource && visuSource !== visuMode) {
-    return res.status(403).json({ error: 'Visu-Modus stimmt nicht ueberein. Eingaben sind gesperrt.' });
+  const requestSource = getRequestSource(req);
+  if (requestSource !== visuMode) {
+    console.log(`[write-value] Gesperrt: Anfrage von ${requestSource}, Modus ist ${visuMode}`);
+    return res.status(403).json({ error: 'Gesperrt: Diese Visu ist im aktuellen Modus nicht aktiv.' });
   }
   try {
     const data = await fs.readFile(pagesFile, 'utf-8');

@@ -12,9 +12,8 @@ function getApiBase(): string {
 }
 
 const POLL_INTERVAL = 300;
-const WRITE_LOCK_MS = 8000;
-
-const IS_PORT_8098 = window.location.port === '8098';
+const WRITE_LOCK_MS = 5000;
+const MODE_POLL_INTERVAL = 2000;
 
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
@@ -23,15 +22,19 @@ export function VisuApp() {
   const [logicNodes, setLogicNodes] = useState<FlowNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [addonVisuDisabled, setAddonVisuDisabled] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [inactiveReason, setInactiveReason] = useState('');
   const [visuMode, setVisuMode] = useState<'addon' | 'port8098'>('addon');
+
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const modePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const writeLockRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
 
-  const hideToolbar = IS_PORT_8098 || new URLSearchParams(window.location.search).get('kiosk') === '1';
+  const isKiosk = new URLSearchParams(window.location.search).get('kiosk') === '1';
+  const hideToolbar = isKiosk;
 
   visuPagesRef.current = visuPages;
 
@@ -97,29 +100,35 @@ export function VisuApp() {
     } catch {}
   }, [apiBase]);
 
+  const checkMode = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase}/visu-mode`);
+      if (!res.ok) return;
+      const d = await res.json();
+      setVisuMode(d.mode);
+      const active = d.isActive === true;
+      setIsActive(active);
+      if (!active) {
+        if (d.mode === 'port8098') {
+          setInactiveReason('Diese Visu ist gesperrt – der aktive Modus ist "Port 8098". Wechsle im Editor den Modus auf "Addon (Ingress)" um diese Visu zu aktivieren.');
+        } else {
+          setInactiveReason('Diese Visu ist gesperrt – der aktive Modus ist "Addon (Ingress)". Wechsle im Editor den Modus auf "Port 8098" um diese Visu zu aktivieren.');
+        }
+      }
+    } catch {}
+  }, [apiBase]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    const checkMode = () => {
-      fetch(`${apiBase}/visu-mode`)
-        .then(r => r.json())
-        .then(d => {
-          const mode = d.mode as 'addon' | 'port8098';
-          setVisuMode(mode);
-          if (!IS_PORT_8098) {
-            setAddonVisuDisabled(mode === 'port8098');
-          }
-        })
-        .catch(() => {
-          if (!IS_PORT_8098) setAddonVisuDisabled(false);
-        });
-    };
     checkMode();
-    const interval = setInterval(checkMode, 3000);
-    return () => clearInterval(interval);
-  }, [apiBase]);
+    modePollRef.current = setInterval(checkMode, MODE_POLL_INTERVAL);
+    return () => {
+      if (modePollRef.current) clearInterval(modePollRef.current);
+    };
+  }, [checkMode]);
 
   useEffect(() => {
     pollLiveValues();
@@ -130,8 +139,7 @@ export function VisuApp() {
   }, [pollLiveValues]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
-    if (IS_PORT_8098 && visuMode !== 'port8098') return;
-    if (!IS_PORT_8098 && visuMode !== 'addon') return;
+    if (!isActive) return;
 
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
@@ -168,20 +176,22 @@ export function VisuApp() {
     });
 
     try {
-      await fetch(`${apiBase}/visu/write-value`, {
+      const res = await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Visu-Source': IS_PORT_8098 ? 'port8098' : 'addon'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      if (res.status === 403) {
+        writeLockRef.current.delete(liveKey);
+        if (portLiveKey) writeLockRef.current.delete(portLiveKey);
+        setIsActive(false);
+      }
     } catch (err) {
       console.error('write value error:', err);
       writeLockRef.current.delete(liveKey);
       if (portLiveKey) writeLockRef.current.delete(portLiveKey);
     }
-  }, [apiBase, visuMode]);
+  }, [apiBase, isActive]);
 
   const handleNavigateTo = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
@@ -235,28 +245,27 @@ export function VisuApp() {
     );
   }
 
-  if (!IS_PORT_8098 && addonVisuDisabled) {
+  if (!isActive) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4 text-center px-8 max-w-md">
-          <div className="w-16 h-16 rounded-full bg-blue-950/50 border border-blue-800/50 flex items-center justify-center">
-            <Monitor className="w-8 h-8 text-blue-400" />
+        <div className="flex flex-col items-center gap-5 text-center px-8 max-w-md">
+          <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+            <Lock className="w-8 h-8 text-slate-400" />
           </div>
           <div>
-            <h2 className="text-white font-semibold text-lg mb-2">Visu laeuft auf Port 8098</h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Die Visualisierung ist auf Port 8098 aktiv. Die Addon-Visu (Ingress) ist deaktiviert.
-            </p>
-            <p className="text-slate-500 text-xs mt-3">
-              Um die Addon-Visu zu aktivieren, wechsle im Editor unter "Visu" den Modus auf "Addon (Ingress)".
-            </p>
+            <h2 className="text-white font-semibold text-lg mb-2">Visualisierung gesperrt</h2>
+            <p className="text-slate-400 text-sm leading-relaxed">{inactiveReason}</p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 rounded-lg border border-slate-700">
+            <Monitor className="w-4 h-4 text-slate-500 flex-shrink-0" />
+            <span className="text-xs text-slate-500">
+              Aktiver Modus: <span className="text-slate-300 font-medium">{visuMode === 'port8098' ? 'Port 8098' : 'Addon (Ingress)'}</span>
+            </span>
           </div>
         </div>
       </div>
     );
   }
-
-  const isReadOnly = (IS_PORT_8098 && visuMode !== 'port8098') || (!IS_PORT_8098 && visuMode !== 'addon');
 
   if (!activePage) {
     return (
@@ -322,17 +331,6 @@ export function VisuApp() {
         </div>
       )}
 
-      {isReadOnly && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-950/80 border-b border-amber-800/60" style={{ flexShrink: 0 }}>
-          <Lock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-          <span className="text-xs text-amber-300">
-            {IS_PORT_8098
-              ? 'Visu gesperrt – Addon-Modus aktiv. Wechsle im Editor auf "Port 8098" um Eingaben zu erlauben.'
-              : 'Visu gesperrt – Port 8098 Modus aktiv. Eingaben sind deaktiviert.'}
-          </span>
-        </div>
-      )}
-
       <div className="flex-1 overflow-hidden">
         <VisuCanvas
           page={activePage}
@@ -347,7 +345,7 @@ export function VisuApp() {
           onDuplicateWidget={() => {}}
           onCopyWidget={() => {}}
           onPasteWidget={() => {}}
-          onWidgetValueChange={isReadOnly ? () => {} : handleWidgetValueChange}
+          onWidgetValueChange={handleWidgetValueChange}
           onEditWidgetProperties={() => {}}
           onNavigateToPage={handleNavigateTo}
           onNavigateBack={handleNavigateBack}
