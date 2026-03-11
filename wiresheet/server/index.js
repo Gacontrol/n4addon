@@ -692,8 +692,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
       const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
       const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
+      console.log(`DP Node ${nodeId}: visuKey=${visuKey}, visuVal=${visuVal}, visuOverrides=`, JSON.stringify(visuOverrides));
       if (visuVal !== undefined) {
         nodeValues[nodeId] = visuVal;
+        console.log(`DP Node ${nodeId} auf Visu-Wert gesetzt: ${visuVal}`);
       } else {
         nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
       }
