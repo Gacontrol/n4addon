@@ -3,15 +3,25 @@ import { VisuWidget, VisuPage } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { VisuWidgetRenderer } from './VisuWidget';
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  widgetId: string;
+}
+
 interface VisuCanvasProps {
   page: VisuPage;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
   isEditMode: boolean;
   selectedWidgetId: string | null;
+  clipboard: VisuWidget | null;
   onSelectWidget: (widgetId: string | null) => void;
   onUpdateWidget: (widgetId: string, updates: Partial<VisuWidget>) => void;
   onDeleteWidget: (widgetId: string) => void;
+  onDuplicateWidget: (widgetId: string) => void;
+  onCopyWidget: (widgetId: string) => void;
+  onPasteWidget: () => void;
   onWidgetValueChange: (widgetId: string, value: unknown) => void;
   onEditWidgetProperties: (widgetId: string) => void;
   onNavigateToPage?: (pageId: string) => void;
@@ -25,8 +35,13 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   logicNodes,
   isEditMode,
   selectedWidgetId,
+  clipboard,
   onSelectWidget,
   onUpdateWidget,
+  onDeleteWidget,
+  onDuplicateWidget,
+  onCopyWidget,
+  onPasteWidget,
   onWidgetValueChange,
   onEditWidgetProperties,
   onNavigateToPage,
@@ -52,6 +67,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     widgetStartX: number;
     widgetStartY: number;
   } | null>(null);
+
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
@@ -80,13 +97,29 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [liveValues]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
+    }
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
     }
-  }, [onSelectWidget]);
+  }, [onSelectWidget, contextMenu]);
+
+  const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
+    if (!isEditMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onSelectWidget(widgetId);
+    setContextMenu({ x: e.clientX, y: e.clientY, widgetId });
+  }, [isEditMode, onSelectWidget]);
 
   const handleWidgetMouseDown = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
+    }
 
     const widget = page.widgets.find(w => w.id === widgetId);
     if (!widget || widget.locked) return;
@@ -126,7 +159,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     onSelectWidget(widgetId);
     e.preventDefault();
-  }, [isEditMode, page.widgets, onSelectWidget]);
+  }, [isEditMode, page.widgets, onSelectWidget, contextMenu]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (dragState) {
@@ -214,6 +247,31 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [dragState, resizeState, handleMouseMove, handleMouseUp]);
 
+  useEffect(() => {
+    if (!isEditMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!selectedWidgetId) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onDeleteWidget(selectedWidgetId);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        onCopyWidget(selectedWidgetId);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        onDuplicateWidget(selectedWidgetId);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        onPasteWidget();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditMode, selectedWidgetId, onDeleteWidget, onCopyWidget, onDuplicateWidget, onPasteWidget]);
+
   const gridPattern = page.showGrid && page.gridSize ? (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.1 }}>
       <defs>
@@ -231,18 +289,23 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       className="relative w-full h-full overflow-auto"
       style={{ backgroundColor: page.backgroundColor || '#0f172a' }}
       onClick={handleCanvasClick}
+      onContextMenu={(e) => {
+        if (e.target === canvasRef.current) e.preventDefault();
+      }}
     >
       {gridPattern}
       {page.widgets.map((widget) => (
         <div
           key={widget.id}
           onMouseDown={(e) => handleWidgetMouseDown(e, widget.id)}
+          onContextMenu={(e) => handleWidgetContextMenu(e, widget.id)}
         >
           <VisuWidgetRenderer
             widget={widget}
             value={getWidgetValue(widget)}
             statusValue={getWidgetStatusValue(widget)}
             onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+            onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
             isEditMode={isEditMode}
             isSelected={selectedWidgetId === widget.id}
             onSelect={() => onSelectWidget(widget.id)}
@@ -253,6 +316,47 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           />
         </div>
       ))}
+
+      {contextMenu && (
+        <div
+          className="fixed bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 py-1 min-w-44"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+            onClick={() => { onDuplicateWidget(contextMenu.widgetId); setContextMenu(null); }}
+          >
+            <span>Duplizieren</span>
+            <span className="text-slate-500 text-xs">Strg+D</span>
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+            onClick={() => { onCopyWidget(contextMenu.widgetId); setContextMenu(null); }}
+          >
+            <span>Kopieren</span>
+            <span className="text-slate-500 text-xs">Strg+C</span>
+          </button>
+          {clipboard && (
+            <button
+              className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+              onClick={() => { onPasteWidget(); setContextMenu(null); }}
+            >
+              <span>Einfuegen</span>
+              <span className="text-slate-500 text-xs">Strg+V</span>
+            </button>
+          )}
+          <div className="border-t border-slate-700 my-1" />
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/30 flex items-center justify-between"
+            onClick={() => { onDeleteWidget(contextMenu.widgetId); setContextMenu(null); }}
+          >
+            <span>Loeschen</span>
+            <span className="text-slate-500 text-xs">Entf</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

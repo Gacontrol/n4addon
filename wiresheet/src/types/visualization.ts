@@ -30,6 +30,7 @@ export type WidgetType =
   | 'visu-star'
   | 'visu-diamond'
   | 'visu-cross'
+  | 'visu-polyline'
   | 'visu-nav-button'
   | 'visu-home-button'
   | 'visu-back-button';
@@ -235,6 +236,15 @@ export interface CrossConfig extends ShapeBindingConfig {
   armWidth?: number;
 }
 
+export interface PolylineConfig extends ShapeBindingConfig {
+  points: { x: number; y: number }[];
+  strokeColor?: string;
+  strokeWidth?: number;
+  fillColor?: string;
+  closed?: boolean;
+  opacity?: number;
+}
+
 export interface NavButtonConfig {
   label: string;
   targetPageId?: string;
@@ -274,6 +284,7 @@ export type WidgetConfig =
   | StarConfig
   | DiamondConfig
   | CrossConfig
+  | PolylineConfig
   | NavButtonConfig
   | HomeButtonConfig
   | BackButtonConfig;

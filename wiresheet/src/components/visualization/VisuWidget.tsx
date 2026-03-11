@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Home, ChevronLeft, Navigation } from 'lucide-react';
 import {
   VisuWidget as VisuWidgetType,
@@ -23,6 +23,7 @@ import {
   StarConfig,
   DiamondConfig,
   CrossConfig,
+  PolylineConfig,
   NavButtonConfig,
   HomeButtonConfig,
   BackButtonConfig
@@ -48,6 +49,7 @@ interface VisuWidgetProps {
   value: unknown;
   statusValue?: unknown;
   onValueChange: (value: unknown) => void;
+  onUpdateConfig?: (config: Record<string, unknown>) => void;
   isEditMode: boolean;
   isSelected: boolean;
   onSelect: () => void;
@@ -112,6 +114,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   value,
   statusValue,
   onValueChange,
+  onUpdateConfig,
   isEditMode,
   isSelected,
   onSelect,
@@ -121,6 +124,34 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateHome,
   visuPages = []
 }) => {
+  const [draggingVertex, setDraggingVertex] = useState<{ index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const handleVertexMouseDown = useCallback((e: React.MouseEvent, index: number, pt: { x: number; y: number }) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDraggingVertex({ index, startX: e.clientX, startY: e.clientY, origX: pt.x, origY: pt.y });
+  }, []);
+
+  useEffect(() => {
+    if (!draggingVertex) return;
+    const plCfg = widget.config as PolylineConfig;
+    const handleMove = (e: MouseEvent) => {
+      const dx = e.clientX - draggingVertex.startX;
+      const dy = e.clientY - draggingVertex.startY;
+      const newPoints = plCfg.points.map((p, i) =>
+        i === draggingVertex.index ? { x: draggingVertex.origX + dx, y: draggingVertex.origY + dy } : p
+      );
+      onUpdateConfig?.({ ...plCfg, points: newPoints });
+    };
+    const handleUp = () => setDraggingVertex(null);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [draggingVertex, widget.config, onUpdateConfig]);
+
   const handleShapeClick = (cfg: { navigateToPageId?: string }) => {
     if (isEditMode) return;
     if (cfg.navigateToPageId) {
@@ -521,6 +552,49 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-polyline': {
+        const plCfg = widget.config as PolylineConfig;
+        const isHidden = plCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const pts = plCfg.points || [];
+        const pathData = pts.length > 0
+          ? pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + (plCfg.closed ? ' Z' : '')
+          : '';
+        const strokeColor = plCfg.activeColor && plCfg.inactiveColor
+          ? (value ? plCfg.activeColor : plCfg.inactiveColor)
+          : (plCfg.activeColor && value ? plCfg.activeColor : (plCfg.strokeColor || '#64748b'));
+        const hasNav = !!plCfg.navigateToPageId && !isEditMode;
+        return (
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: plCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(plCfg)}
+          >
+            {pathData && (
+              <path
+                d={pathData}
+                fill={plCfg.fillColor && plCfg.fillColor !== 'transparent' ? plCfg.fillColor : 'none'}
+                stroke={strokeColor}
+                strokeWidth={plCfg.strokeWidth ?? 2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+            {isEditMode && isSelected && pts.map((pt, i) => (
+              <circle
+                key={i}
+                cx={pt.x} cy={pt.y} r={6}
+                fill="#3b82f6"
+                stroke="white"
+                strokeWidth={2}
+                style={{ cursor: 'grab' }}
+                onMouseDown={(e) => handleVertexMouseDown(e, i, pt)}
+              />
+            ))}
+          </svg>
+        );
+      }
+
       case 'visu-nav-button': {
         const navCfg = widget.config as NavButtonConfig;
         if (isEditMode) {
@@ -616,7 +690,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     }
   };
 
-  const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross'].includes(widget.type);
+  const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
   const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button'].includes(widget.type);
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor } from 'lucide-react';
-import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
 interface WidgetPropertiesPanelProps {
@@ -19,7 +19,7 @@ const NON_BINDABLE_TYPES = new Set([
 
 const SHAPE_TYPES = new Set([
   'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
-  'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross'
+  'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'
 ]);
 
 const getNodeLabel = (node: FlowNode) => {
@@ -818,6 +818,73 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <div>
               <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
               <input type="color" value={xCfg.inactiveColor || xCfg.fillColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-polyline': {
+        const plCfg = config as PolylineConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Linienfarbe</label>
+              <input type="color" value={plCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Linienstaerke</label>
+              <input type="number" min="1" max="20" value={plCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={plCfg.fillColor && plCfg.fillColor !== 'transparent' ? plCfg.fillColor : '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={plCfg.closed ?? false} onChange={(e) => onUpdate({ config: { ...config, closed: e.target.checked } })} className="rounded" />
+              <label className="text-xs text-slate-400">Geschlossen (Polygon)</label>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={plCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Punkte ({plCfg.points?.length ?? 0})</label>
+              <p className="text-xs text-slate-500">Im Bearbeitungsmodus die blauen Punkte ziehen.</p>
+              <button
+                className="mt-1 w-full px-2 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-xs text-slate-300"
+                onClick={() => {
+                  const pts = plCfg.points || [];
+                  const newPt = pts.length > 0 ? { x: pts[pts.length - 1].x + 40, y: pts[pts.length - 1].y } : { x: 20, y: 20 };
+                  onUpdate({ config: { ...config, points: [...pts, newPt] } });
+                }}
+              >
+                + Punkt hinzufuegen
+              </button>
+              {plCfg.points?.length > 2 && (
+                <button
+                  className="mt-1 w-full px-2 py-1.5 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-xs text-red-400"
+                  onClick={() => onUpdate({ config: { ...config, points: plCfg.points.slice(0, -1) } })}
+                >
+                  - Letzten Punkt loeschen
+                </button>
+              )}
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={plCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
+              <input type="color" value={plCfg.activeColor || plCfg.strokeColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
+              <input type="color" value={plCfg.inactiveColor || plCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
             </div>
           </>
         );

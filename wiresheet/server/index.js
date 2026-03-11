@@ -659,6 +659,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
     const nodeInputs = node.data.inputs || [];
     const inputVals = nodeInputs.map((inputPort, idx) => {
+      const portKey = `${nodeId}:${inputPort.id}`;
+      if (visuOverrides[portKey] !== undefined) {
+        return visuOverrides[portKey];
+      }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
       if (conn) {
         return getInputValue(conn);
@@ -679,6 +683,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       } else {
         nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
       }
+    } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
+      nodeValues[nodeId] = visuOverrides[nodeId];
     } else if (node.type === 'and-gate') {
       if (inputVals.length === 0) {
         nodeValues[nodeId] = false;

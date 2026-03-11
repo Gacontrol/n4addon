@@ -433,6 +433,30 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'read'
   },
   {
+    type: 'visu-polyline',
+    label: 'Polylinie',
+    icon: 'Spline',
+    category: 'decoration',
+    defaultSize: { width: 200, height: 120 },
+    defaultConfig: {
+      points: [
+        { x: 20, y: 100 },
+        { x: 80, y: 20 },
+        { x: 140, y: 80 },
+        { x: 180, y: 30 }
+      ],
+      strokeColor: '#64748b',
+      strokeWidth: 2,
+      fillColor: 'transparent',
+      closed: false,
+      opacity: 1
+    },
+    defaultStyle: {},
+    description: 'Freihand Polylinie - Ecken verschiebbar',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
     type: 'visu-nav-button',
     label: 'Seiten-Taster',
     icon: 'Navigation',

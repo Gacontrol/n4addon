@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings } from 'lucide-react';
-import { VisuPage, VisuWidget, WidgetTemplate } from '../../types/visualization';
+import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { VisuCanvas } from './VisuCanvas';
 import { WidgetPalette } from './WidgetPalette';
@@ -37,6 +37,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [showProperties, setShowProperties] = useState(false);
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
+  const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
 
   const handleNavigateToPage = useCallback((pageId: string) => {
@@ -113,6 +114,44 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     setSelectedWidgetId(null);
     setShowProperties(false);
   }, [activePage, onUpdateVisuPage]);
+
+  const handleCopyWidget = useCallback((widgetId: string) => {
+    const widget = activePage.widgets.find(w => w.id === widgetId);
+    if (widget) setClipboard(widget);
+  }, [activePage.widgets]);
+
+  const handleDuplicateWidget = useCallback((widgetId: string) => {
+    const widget = activePage.widgets.find(w => w.id === widgetId);
+    if (!widget) return;
+    const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newWidget: VisuWidget = {
+      ...widget,
+      id: newId,
+      position: { x: widget.position.x + 20, y: widget.position.y + 20 },
+      config: widget.type === 'visu-polyline'
+        ? { ...(widget.config as PolylineConfig), points: (widget.config as PolylineConfig).points.map(p => ({ ...p })) }
+        : { ...widget.config },
+      zIndex: activePage.widgets.length + 1
+    };
+    onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
+    setSelectedWidgetId(newId);
+  }, [activePage, onUpdateVisuPage]);
+
+  const handlePasteWidget = useCallback(() => {
+    if (!clipboard) return;
+    const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newWidget: VisuWidget = {
+      ...clipboard,
+      id: newId,
+      position: { x: clipboard.position.x + 20, y: clipboard.position.y + 20 },
+      config: clipboard.type === 'visu-polyline'
+        ? { ...(clipboard.config as PolylineConfig), points: (clipboard.config as PolylineConfig).points.map(p => ({ ...p })) }
+        : { ...clipboard.config },
+      zIndex: activePage.widgets.length + 1
+    };
+    onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
+    setSelectedWidgetId(newId);
+  }, [clipboard, activePage, onUpdateVisuPage]);
 
   const handleWidgetValueChange = useCallback((widgetId: string, value: unknown) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
@@ -271,12 +310,16 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             logicNodes={logicNodes}
             isEditMode={isEditMode}
             selectedWidgetId={selectedWidgetId}
+            clipboard={clipboard}
             onSelectWidget={(id) => {
               setSelectedWidgetId(id);
               if (id) setShowProperties(true);
             }}
             onUpdateWidget={handleUpdateWidget}
             onDeleteWidget={handleDeleteWidget}
+            onDuplicateWidget={handleDuplicateWidget}
+            onCopyWidget={handleCopyWidget}
+            onPasteWidget={handlePasteWidget}
             onWidgetValueChange={handleWidgetValueChange}
             onEditWidgetProperties={(id) => {
               setSelectedWidgetId(id);
