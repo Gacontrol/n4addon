@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { SwitchConfig, WidgetStyle } from '../../types/visualization';
 
 interface VisuSwitchProps {
@@ -26,57 +26,15 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
   const offColor = config.offColor || '#64748b';
 
   const hasFeedback = statusValue !== null && statusValue !== undefined;
+  const displayValue = writeOnly
+    ? (hasFeedback ? Boolean(statusValue) : (config.defaultValue ?? false))
+    : (hasFeedback ? Boolean(statusValue) : value);
 
-  const [localValue, setLocalValue] = useState<boolean | null>(null);
-  const pendingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const serverValue = hasFeedback ? Boolean(statusValue) : value;
-
-  useEffect(() => {
-    if (localValue !== null && serverValue === localValue) {
-      setLocalValue(null);
-      if (pendingTimeoutRef.current) {
-        clearTimeout(pendingTimeoutRef.current);
-        pendingTimeoutRef.current = null;
-      }
-    }
-  }, [serverValue, localValue]);
-
-  useEffect(() => {
-    return () => {
-      if (pendingTimeoutRef.current) {
-        clearTimeout(pendingTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const displayValue = localValue !== null ? localValue : (writeOnly ? (statusValue ?? (config.defaultValue ?? false)) : serverValue);
-
-  const knobValue = displayValue;
-  const colorValue = hasFeedback && localValue === null ? Boolean(statusValue) : displayValue;
-
-  const currentColor = colorValue ? onColor : offColor;
-
-  const isPending = localValue !== null && localValue !== serverValue;
+  const currentColor = displayValue ? onColor : offColor;
 
   const handleClick = () => {
-    console.log('[VisuSwitch] Click - disabled:', disabled, 'displayValue:', displayValue, 'hasFeedback:', hasFeedback);
-    if (disabled) {
-      console.log('[VisuSwitch] Click blocked - disabled');
-      return;
-    }
-    const newVal = !displayValue;
-    console.log('[VisuSwitch] Sending newVal:', newVal);
-    onChange(newVal);
-
-    setLocalValue(newVal);
-    if (pendingTimeoutRef.current) {
-      clearTimeout(pendingTimeoutRef.current);
-    }
-    pendingTimeoutRef.current = setTimeout(() => {
-      setLocalValue(null);
-      pendingTimeoutRef.current = null;
-    }, 5000);
+    if (disabled) return;
+    onChange(!displayValue);
   };
 
   return (
@@ -89,24 +47,17 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
           onClick={handleClick}
           disabled={disabled}
           className={`relative w-16 h-8 rounded-full transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          style={{
-            backgroundColor: currentColor,
-            opacity: isPending ? 0.7 : 1,
-            boxShadow: isPending ? `0 0 0 2px ${currentColor}44` : undefined
-          }}
+          style={{ backgroundColor: currentColor }}
         >
-          {isPending && (
-            <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: currentColor, opacity: 0.3 }} />
-          )}
           <div
             className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-200"
-            style={{ transform: knobValue ? 'translateX(34px)' : 'translateX(2px)' }}
+            style={{ transform: displayValue ? 'translateX(34px)' : 'translateX(2px)' }}
           />
           <span
             className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white"
-            style={{ paddingLeft: knobValue ? '0' : '20px', paddingRight: knobValue ? '20px' : '0' }}
+            style={{ paddingLeft: displayValue ? '0' : '20px', paddingRight: displayValue ? '20px' : '0' }}
           >
-            {knobValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
+            {displayValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
           </span>
         </button>
         {hasFeedback && (
