@@ -27,7 +27,7 @@ const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const visuWriteLocks = new Map();
-const VISU_WRITE_LOCK_MS = 2000;
+const VISU_WRITE_LOCK_MS = 8000;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -1347,6 +1347,22 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           lastNodeValues.get(page.id)[nodeId] = value;
           if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
           visuWriteLocks.get(page.id)[nodeId] = Date.now() + VISU_WRITE_LOCK_MS;
+          const capturedPageId = page.id;
+          const capturedNodeId = nodeId;
+          setTimeout(async () => {
+            try {
+              const rawData = await fs.readFile(pagesFile, 'utf-8');
+              const allPages = JSON.parse(rawData);
+              const targetPage = allPages.find(p => p.id === capturedPageId);
+              if (!targetPage) return;
+              const targetNode = targetPage.nodes.find(n => n.id === capturedNodeId);
+              if (targetNode && targetNode.data.override?.manual) {
+                targetNode.data.override.manual = false;
+                await fs.writeFile(pagesFile, JSON.stringify(allPages, null, 2));
+                console.log(`Visu-Override zurueckgesetzt: ${capturedNodeId}`);
+              }
+            } catch {}
+          }, VISU_WRITE_LOCK_MS);
         }
         updated = true;
         foundPageId = page.id;

@@ -12,7 +12,7 @@ function getApiBase(): string {
 }
 
 const POLL_INTERVAL = 300;
-const WRITE_LOCK_MS = 1500;
+const WRITE_LOCK_MS = 8000;
 
 const IS_PORT_8098 = window.location.port === '8098';
 
@@ -137,8 +137,19 @@ export function VisuApp() {
       ? `${binding.nodeId}:param:${binding.paramKey}`
       : binding.nodeId;
 
+    const portLiveKey = binding.portId && !binding.paramKey
+      ? `${binding.nodeId}:${binding.portId}`
+      : null;
+
     writeLockRef.current.set(liveKey, Date.now() + WRITE_LOCK_MS);
-    setLiveValues(prev => ({ ...prev, [liveKey]: value }));
+    if (portLiveKey) {
+      writeLockRef.current.set(portLiveKey, Date.now() + WRITE_LOCK_MS);
+    }
+    setLiveValues(prev => {
+      const next = { ...prev, [liveKey]: value };
+      if (portLiveKey) next[portLiveKey] = value;
+      return next;
+    });
 
     try {
       await fetch(`${apiBase}/visu/write-value`, {
@@ -149,6 +160,7 @@ export function VisuApp() {
     } catch (err) {
       console.error('write value error:', err);
       writeLockRef.current.delete(liveKey);
+      if (portLiveKey) writeLockRef.current.delete(portLiveKey);
     }
   }, [apiBase]);
 
