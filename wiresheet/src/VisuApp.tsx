@@ -12,7 +12,6 @@ function getApiBase(): string {
 }
 
 const POLL_INTERVAL = 1000;
-const WRITE_HOLD_MS = 2000;
 const WRITE_DEBOUNCE_MS = 300;
 
 export function VisuApp() {
@@ -25,7 +24,6 @@ export function VisuApp() {
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
-  const pendingWritesRef = useRef<Map<string, { value: unknown; timestamp: number }>>(new Map());
   const lastWriteRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
 
@@ -69,18 +67,6 @@ export function VisuApp() {
       if (res.ok) {
         const response = await res.json();
         const data = response.values || response;
-        const serverTimestamps = response.timestamps || {};
-        const pending = pendingWritesRef.current;
-        const now = Date.now();
-
-        for (const [key, entry] of pending.entries()) {
-          const serverTs = serverTimestamps[key] || 0;
-          if (entry.timestamp > serverTs && now - entry.timestamp < WRITE_HOLD_MS) {
-            data[key] = entry.value;
-          } else {
-            pending.delete(key);
-          }
-        }
         setLiveValues(data);
       }
     } catch {}
@@ -102,12 +88,10 @@ export function VisuApp() {
     const now = Date.now();
     const lastWrite = lastWriteRef.current.get(widgetId) || 0;
     if (now - lastWrite < WRITE_DEBOUNCE_MS) {
-      console.log('[VisuApp] handleWidgetValueChange DEBOUNCED:', widgetId, value);
       return;
     }
     lastWriteRef.current.set(widgetId, now);
 
-    console.log('[VisuApp] handleWidgetValueChange called:', widgetId, value);
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
     for (const page of pages) {
@@ -118,14 +102,7 @@ export function VisuApp() {
       }
     }
     if (!binding) {
-      console.log('[VisuApp] No binding found for widget:', widgetId);
       return;
-    }
-
-    const pending = pendingWritesRef.current;
-    pending.set(binding.nodeId, { value, timestamp: now });
-    if (binding.portId) {
-      pending.set(`${binding.nodeId}:${binding.portId}`, { value, timestamp: now });
     }
 
     setLiveValues(prev => {
@@ -136,9 +113,8 @@ export function VisuApp() {
       return { ...prev, ...updates };
     });
 
-    console.log('[VisuApp] Sending to API:', apiBase, binding, value);
     try {
-      const response = await fetch(`${apiBase}/visu/write-value`, {
+      await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,14 +123,6 @@ export function VisuApp() {
           value
         })
       });
-      const result = await response.json();
-      console.log('[VisuApp] API response:', response.status, result);
-      if (response.ok) {
-        pendingWritesRef.current.delete(binding.nodeId);
-        if (binding.portId) {
-          pendingWritesRef.current.delete(`${binding.nodeId}:${binding.portId}`);
-        }
-      }
     } catch (err) {
       console.error('[VisuApp] write value error:', err);
     }
