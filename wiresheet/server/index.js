@@ -1370,6 +1370,9 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
 app.get(['/live-values', '/api/live-values'], (req, res) => {
   const merged = {};
+  for (const [nodeId, value] of persistentDpValues) {
+    merged[nodeId] = value;
+  }
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }
