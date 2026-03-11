@@ -11,7 +11,7 @@ function getApiBase(): string {
   return '/api';
 }
 
-const POLL_INTERVAL = 1000;
+const POLL_INTERVAL = 200;
 const WRITE_DEBOUNCE_MS = 300;
 
 export function VisuApp() {
