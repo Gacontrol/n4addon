@@ -38,6 +38,7 @@ export const useWiresheetPages = () => {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInProgress = useRef(false);
   const pagesRef = useRef<WiresheetPage[]>(pages);
+  const visuOverridesRef = useRef<Record<string, unknown>>({});
 
   const [selectedNodes, setSelectedNodes] = useState<Set<string>>(new Set());
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
@@ -72,15 +73,16 @@ export const useWiresheetPages = () => {
                   }
                 }
 
+                const visuOverrides = { ...visuOverridesRef.current };
                 fetch(`${API_BASE}/pages/${page.id}/execute`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nodes: currentPage.nodes, connections: currentPage.connections, manualOverrides })
+                  body: JSON.stringify({ nodes: currentPage.nodes, connections: currentPage.connections, manualOverrides, visuOverrides })
                 })
                   .then(r => r.ok ? r.json() : null)
                   .then(result => {
                     if (result?.nodeValues) {
-                      setLiveValues(prev => ({ ...prev, ...result.nodeValues }));
+                      setLiveValues(prev => ({ ...prev, ...result.nodeValues, ...visuOverridesRef.current }));
                     }
                   })
                   .catch(() => {});
@@ -809,6 +811,9 @@ export const useWiresheetPages = () => {
     updateCaseSize,
     moveNodeToContainer,
     releaseContainerNodes,
-    setLiveValue: (key: string, value: unknown) => setLiveValues(prev => ({ ...prev, [key]: value }))
+    setLiveValue: (key: string, value: unknown) => {
+      visuOverridesRef.current = { ...visuOverridesRef.current, [key]: value };
+      setLiveValues(prev => ({ ...prev, [key]: value }));
+    }
   };
 };

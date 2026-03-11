@@ -498,7 +498,7 @@ print(json.dumps(_outputs))
   });
 }
 
-async function executePageLogic(nodes, connections, manualOverrides = {}) {
+async function executePageLogic(nodes, connections, manualOverrides = {}, visuOverrides = {}) {
   const nodeValues = {};
 
   const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
@@ -672,7 +672,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
       nodeValues[nodeId] = manualOverrides[nodeId];
     } else if (node.type === 'ha-input') {
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
-      nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
+      const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
+      const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
+      if (visuVal !== undefined) {
+        nodeValues[nodeId] = visuVal;
+      } else {
+        nodeValues[nodeId] = inputVals[0] !== undefined ? inputVals[0] : null;
+      }
     } else if (node.type === 'and-gate') {
       if (inputVals.length === 0) {
         nodeValues[nodeId] = false;
@@ -935,9 +941,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}) {
 }
 
 app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
-  const { nodes, connections, manualOverrides = {} } = req.body;
+  const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
   try {
-    const nodeValues = await executePageLogic(nodes, connections, manualOverrides);
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides);
     res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
