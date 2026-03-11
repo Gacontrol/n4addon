@@ -193,6 +193,10 @@ export interface LineConfig extends ShapeBindingConfig {
   strokeWidth?: number;
   opacity?: number;
   angle?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
 }
 
 export interface ArrowConfig extends ShapeBindingConfig {
@@ -210,6 +214,7 @@ export interface PolygonConfig extends ShapeBindingConfig {
   strokeWidth?: number;
   opacity?: number;
   sides?: number;
+  points?: { x: number; y: number }[];
 }
 
 export interface StarConfig extends ShapeBindingConfig {

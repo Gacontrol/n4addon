@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Home, ChevronLeft, Navigation } from 'lucide-react';
 import {
   VisuWidget as VisuWidgetType,
@@ -124,24 +124,43 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateHome,
   visuPages = []
 }) => {
-  const [draggingVertex, setDraggingVertex] = useState<{ index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
-  const handleVertexMouseDown = useCallback((e: React.MouseEvent, index: number, pt: { x: number; y: number }) => {
+  const handleVertexMouseDown = useCallback((e: React.MouseEvent, type: 'polyline' | 'polygon' | 'line', index: number, pt: { x: number; y: number }) => {
     e.stopPropagation();
     e.preventDefault();
-    setDraggingVertex({ index, startX: e.clientX, startY: e.clientY, origX: pt.x, origY: pt.y });
+    setDraggingVertex({ type, index, startX: e.clientX, startY: e.clientY, origX: pt.x, origY: pt.y });
   }, []);
 
   useEffect(() => {
     if (!draggingVertex) return;
-    const plCfg = widget.config as PolylineConfig;
     const handleMove = (e: MouseEvent) => {
       const dx = e.clientX - draggingVertex.startX;
       const dy = e.clientY - draggingVertex.startY;
-      const newPoints = plCfg.points.map((p, i) =>
-        i === draggingVertex.index ? { x: draggingVertex.origX + dx, y: draggingVertex.origY + dy } : p
-      );
-      onUpdateConfig?.({ ...plCfg, points: newPoints });
+      const nx = draggingVertex.origX + dx;
+      const ny = draggingVertex.origY + dy;
+      if (draggingVertex.type === 'polyline') {
+        const plCfg = widget.config as PolylineConfig;
+        const newPoints = plCfg.points.map((p, i) =>
+          i === draggingVertex.index ? { x: nx, y: ny } : p
+        );
+        onUpdateConfig?.({ ...plCfg, points: newPoints });
+      } else if (draggingVertex.type === 'polygon') {
+        const pgCfg = widget.config as PolygonConfig;
+        const pts = pgCfg.points || [];
+        const newPoints = pts.map((p, i) =>
+          i === draggingVertex.index ? { x: nx, y: ny } : p
+        );
+        onUpdateConfig?.({ ...pgCfg, points: newPoints });
+      } else if (draggingVertex.type === 'line') {
+        const lCfg = widget.config as LineConfig;
+        if (draggingVertex.index === 0) {
+          onUpdateConfig?.({ ...lCfg, x1: nx, y1: ny });
+        } else {
+          onUpdateConfig?.({ ...lCfg, x2: nx, y2: ny });
+        }
+      }
     };
     const handleUp = () => setDraggingVertex(null);
     window.addEventListener('mousemove', handleMove);
@@ -368,22 +387,31 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const lCfg = widget.config as LineConfig;
         const isHidden = lCfg.visibilityBinding && value === false;
         if (isHidden) return null;
-        const angle = lCfg.angle ?? 0;
-        const w = widget.size.width;
-        const h = widget.size.height;
-        const cx = w / 2, cy = h / 2;
-        const len = Math.sqrt(w * w + h * h) / 2;
-        const rad = (angle * Math.PI) / 180;
-        const x1 = cx - len * Math.cos(rad);
-        const y1 = cy - len * Math.sin(rad);
-        const x2 = cx + len * Math.cos(rad);
-        const y2 = cy + len * Math.sin(rad);
+        let x1: number, y1: number, x2: number, y2: number;
+        if (lCfg.x1 !== undefined && lCfg.y1 !== undefined && lCfg.x2 !== undefined && lCfg.y2 !== undefined) {
+          x1 = lCfg.x1; y1 = lCfg.y1; x2 = lCfg.x2; y2 = lCfg.y2;
+        } else {
+          const angle = lCfg.angle ?? 0;
+          const w = widget.size.width;
+          const h = widget.size.height;
+          const cx = w / 2, cy = h / 2;
+          const len = Math.sqrt(w * w + h * h) / 2;
+          const rad = (angle * Math.PI) / 180;
+          x1 = cx - len * Math.cos(rad); y1 = cy - len * Math.sin(rad);
+          x2 = cx + len * Math.cos(rad); y2 = cy + len * Math.sin(rad);
+        }
         const strokeColor = resolveLineColor(lCfg, value);
         const hasNav = !!lCfg.navigateToPageId && !isEditMode;
+        const minX = Math.min(x1, x2) - 20;
+        const minY = Math.min(y1, y2) - 20;
+        const svgW = Math.abs(x2 - x1) + 40;
+        const svgH = Math.abs(y2 - y1) + 40;
         return (
           <svg
-            width="100%" height="100%"
-            style={{ overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            ref={svgRef}
+            style={{ position: 'absolute', left: minX, top: minY, overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            width={svgW} height={svgH}
+            viewBox={`${minX} ${minY} ${svgW} ${svgH}`}
             onClick={() => handleShapeClick(lCfg)}
           >
             <line
@@ -392,6 +420,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
               strokeWidth={lCfg.strokeWidth ?? 2}
               strokeLinecap="round"
             />
+            {isEditMode && isSelected && (
+              <>
+                <circle cx={x1} cy={y1} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 0, { x: x1, y: y1 })} />
+                <circle cx={x2} cy={y2} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 1, { x: x2, y: y2 })} />
+              </>
+            )}
           </svg>
         );
       }
@@ -450,14 +486,45 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const pCfg = widget.config as PolygonConfig;
         const isHidden = pCfg.visibilityBinding && value === false;
         if (isHidden) return null;
+        const fillColor = resolveShapeColor(pCfg, value);
+        const hasNav = !!pCfg.navigateToPageId && !isEditMode;
+        const freehandPts = pCfg.points;
+        if (freehandPts && freehandPts.length >= 2) {
+          const xs = freehandPts.map(p => p.x);
+          const ys = freehandPts.map(p => p.y);
+          const minPx = Math.min(...xs) - 20;
+          const minPy = Math.min(...ys) - 20;
+          const svgW = Math.max(...xs) - minPx + 20;
+          const svgH = Math.max(...ys) - minPy + 20;
+          const ptStr = freehandPts.map(p => `${p.x},${p.y}`).join(' ');
+          return (
+            <svg
+              style={{ position: 'absolute', left: minPx, top: minPy, overflow: 'visible', opacity: pCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+              width={svgW} height={svgH}
+              viewBox={`${minPx} ${minPy} ${svgW} ${svgH}`}
+              onClick={() => handleShapeClick(pCfg)}
+            >
+              <polygon
+                points={ptStr}
+                fill={fillColor}
+                stroke={pCfg.strokeColor || '#475569'}
+                strokeWidth={pCfg.strokeWidth ?? 2}
+                strokeLinejoin="round"
+              />
+              {isEditMode && isSelected && freehandPts.map((pt, i) => (
+                <circle key={i} cx={pt.x} cy={pt.y} r={6} fill="#3b82f6" stroke="white" strokeWidth={2}
+                  style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleVertexMouseDown(e, 'polygon', i, pt)} />
+              ))}
+            </svg>
+          );
+        }
         const sides = pCfg.sides ?? 6;
         const w = widget.size.width, h = widget.size.height;
         const cx = w / 2, cy = h / 2;
         const rx = Math.max(1, cx - (pCfg.strokeWidth ?? 2) / 2);
         const ry = Math.max(1, cy - (pCfg.strokeWidth ?? 2) / 2);
         const pts = makePolygonPoints(cx, cy, rx, ry, sides);
-        const fillColor = resolveShapeColor(pCfg, value);
-        const hasNav = !!pCfg.navigateToPageId && !isEditMode;
         return (
           <svg
             width="100%" height="100%"
@@ -588,7 +655,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
                 stroke="white"
                 strokeWidth={2}
                 style={{ cursor: 'grab' }}
-                onMouseDown={(e) => handleVertexMouseDown(e, i, pt)}
+                onMouseDown={(e) => handleVertexMouseDown(e, 'polyline', i, pt)}
               />
             ))}
           </svg>
@@ -692,6 +759,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
   const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
   const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button'].includes(widget.type);
+  const isVertexWidget = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
+  const showResizeHandles = isEditMode && isSelected && !isVertexWidget;
+  const showSelectionBorder = isSelected && !isVertexWidget && !['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
 
   return (
     <div
@@ -704,7 +774,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         zIndex: widget.zIndex || 1,
         backgroundColor: isDrawingWidget ? 'transparent' : widget.style.backgroundColor,
         borderRadius: isDrawingWidget ? 0 : (widget.style.borderRadius ?? 8),
-        border: isSelected ? '2px solid #3b82f6' : (!isDrawingWidget && widget.style.borderColor) ? `1px solid ${widget.style.borderColor}` : 'none',
+        border: showSelectionBorder ? '2px solid #3b82f6' : (!isDrawingWidget && widget.style.borderColor) ? `1px solid ${widget.style.borderColor}` : 'none',
         padding: isDrawingWidget || isNavWidget ? 0 : 8
       }}
       onClick={(e) => {
@@ -721,7 +791,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       }}
     >
       {renderWidget()}
-      {isEditMode && isSelected && (
+      {showResizeHandles && (
         <>
           <div className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 rounded-full cursor-nw-resize" />
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full cursor-ne-resize" />
