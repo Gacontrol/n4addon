@@ -74,6 +74,7 @@ export const useWiresheetPages = () => {
                 }
 
                 const visuOverrides = { ...visuOverridesRef.current };
+                visuOverridesRef.current = {};
                 fetch(`${API_BASE}/pages/${page.id}/execute`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -82,7 +83,7 @@ export const useWiresheetPages = () => {
                   .then(r => r.ok ? r.json() : null)
                   .then(result => {
                     if (result?.nodeValues) {
-                      setLiveValues(prev => ({ ...prev, ...result.nodeValues, ...visuOverridesRef.current }));
+                      setLiveValues(prev => ({ ...prev, ...result.nodeValues }));
                     }
                   })
                   .catch(() => {});
@@ -250,7 +251,7 @@ export const useWiresheetPages = () => {
       });
       if (res.ok) {
         const { nodeValues } = await res.json();
-        setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
+        setLiveValues(prev => ({ ...prev, ...nodeValues }));
       }
     } catch {
     }
@@ -834,6 +835,7 @@ export const useWiresheetPages = () => {
           }
         }
         const visuOverrides = { ...visuOverridesRef.current };
+        visuOverridesRef.current = {};
         try {
           const res = await fetch(`${API_BASE}/pages/${page.id}/execute`, {
             method: 'POST',
@@ -842,7 +844,7 @@ export const useWiresheetPages = () => {
           });
           if (res.ok) {
             const { nodeValues } = await res.json();
-            setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
+            setLiveValues(prev => ({ ...prev, ...nodeValues }));
           }
         } catch { }
       }
