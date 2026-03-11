@@ -102,10 +102,15 @@ export function VisuApp() {
 
   useEffect(() => {
     if (IS_PORT_8098) return;
-    fetch(`${apiBase}/visu-mode`)
-      .then(r => r.json())
-      .then(d => { setAddonVisuDisabled(d.mode === 'port8098'); })
-      .catch(() => { setAddonVisuDisabled(false); });
+    const checkMode = () => {
+      fetch(`${apiBase}/visu-mode`)
+        .then(r => r.json())
+        .then(d => { setAddonVisuDisabled(d.mode === 'port8098'); })
+        .catch(() => { setAddonVisuDisabled(false); });
+    };
+    checkMode();
+    const interval = setInterval(checkMode, 3000);
+    return () => clearInterval(interval);
   }, [apiBase]);
 
   useEffect(() => {

@@ -1347,22 +1347,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           lastNodeValues.get(page.id)[nodeId] = value;
           if (!visuWriteLocks.has(page.id)) visuWriteLocks.set(page.id, {});
           visuWriteLocks.get(page.id)[nodeId] = Date.now() + VISU_WRITE_LOCK_MS;
-          const capturedPageId = page.id;
-          const capturedNodeId = nodeId;
-          setTimeout(async () => {
-            try {
-              const rawData = await fs.readFile(pagesFile, 'utf-8');
-              const allPages = JSON.parse(rawData);
-              const targetPage = allPages.find(p => p.id === capturedPageId);
-              if (!targetPage) return;
-              const targetNode = targetPage.nodes.find(n => n.id === capturedNodeId);
-              if (targetNode && targetNode.data.override?.manual) {
-                targetNode.data.override.manual = false;
-                await fs.writeFile(pagesFile, JSON.stringify(allPages, null, 2));
-                console.log(`Visu-Override zurueckgesetzt: ${capturedNodeId}`);
-              }
-            } catch {}
-          }, VISU_WRITE_LOCK_MS);
         }
         updated = true;
         foundPageId = page.id;
