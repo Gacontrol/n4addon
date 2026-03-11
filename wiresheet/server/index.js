@@ -1068,7 +1068,16 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
   const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
   try {
     const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides, pageId);
-    res.json({ success: true, nodeValues });
+    const now = Date.now();
+    const pageLocks = visuWriteLocks.get(pageId) || {};
+    const merged = { ...nodeValues };
+    for (const [key, expiry] of Object.entries(pageLocks)) {
+      if (now < expiry && lastNodeValues.has(pageId) && key in lastNodeValues.get(pageId)) {
+        merged[key] = lastNodeValues.get(pageId)[key];
+      }
+    }
+    lastNodeValues.set(pageId, merged);
+    res.json({ success: true, nodeValues: merged });
   } catch (err) {
     console.error('Execute error:', err.message);
     res.status(500).json({ error: err.message });
