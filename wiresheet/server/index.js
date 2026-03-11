@@ -6,7 +6,9 @@ const axios = require('axios');
 const { spawn } = require('child_process');
 
 const app = express();
+const visuApp = express();
 const PORT = 8100;
+const VISU_PORT = 8098;
 
 const DATA_PATHS = [
   '/data/wiresheet',
@@ -23,6 +25,7 @@ let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
+const clientVisuOverrides = new Map();
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -1095,7 +1098,8 @@ async function runPageCycle(pageId) {
           manualOverrides[node.id] = node.data.override.value;
         }
       }
-      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, {}, pageId);
+      const visuOverrides = clientVisuOverrides.get('global') || {};
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, visuOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
     }
 
@@ -1274,43 +1278,51 @@ app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
 });
 
 app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, paramKey, value } = req.body;
+  const { nodeId, portId, paramKey, value, clientId } = req.body;
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
-  try {
-    const data = await fs.readFile(pagesFile, 'utf-8');
-    const pages = JSON.parse(data);
-    let updated = false;
-    for (const page of pages) {
-      const node = page.nodes.find(n => n.id === nodeId);
-      if (node) {
-        if (paramKey) {
+
+  if (paramKey) {
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId);
+        if (node) {
           if (!node.data.config) node.data.config = {};
           node.data.config[paramKey] = value;
           console.log(`Visu-Parameter geschrieben: ${nodeId}.${paramKey} = ${value}`);
-        } else {
-          if (!node.data.override) {
-            node.data.override = { manual: true, value };
-          } else {
-            node.data.override.manual = true;
-            node.data.override.value = value;
-          }
-          console.log(`Visu-Wert geschrieben: ${nodeId} = ${value}`);
+          updated = true;
+          break;
         }
-        updated = true;
-        break;
       }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des Visu-Parameters:', err);
+      res.status(500).json({ error: err.message });
     }
-    if (updated) {
-      await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Node nicht gefunden' });
+  } else {
+    const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
+
+    if (!clientVisuOverrides.has('global')) {
+      clientVisuOverrides.set('global', {});
     }
-  } catch (err) {
-    console.error('Fehler beim Schreiben des Visu-Werts:', err);
-    res.status(500).json({ error: err.message });
+    const overrides = clientVisuOverrides.get('global');
+    overrides[overrideKey] = value;
+    overrides[nodeId] = value;
+    if (portId) {
+      overrides[`${nodeId}:${portId}`] = value;
+    }
+
+    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value}`);
+    res.json({ success: true });
   }
 });
 
@@ -1968,6 +1980,63 @@ app.delete('/api/images/:filename', async (req, res) => {
   }
 });
 
+visuApp.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+visuApp.use(express.json({ limit: '10mb' }));
+
+const distDir = path.join(__dirname, '../dist');
+
+visuApp.use('/api', async (req, res) => {
+  try {
+    const apiUrl = `http://localhost:${PORT}${req.originalUrl}`;
+    const response = await axios({
+      method: req.method,
+      url: apiUrl,
+      data: req.body,
+      headers: {
+        'Content-Type': req.headers['content-type'] || 'application/json'
+      },
+      timeout: 30000
+    });
+    res.status(response.status).json(response.data);
+  } catch (err) {
+    if (err.response) {
+      res.status(err.response.status).json(err.response.data);
+    } else {
+      res.status(503).json({ error: err.message });
+    }
+  }
+});
+
+visuApp.use('/assets', express.static(path.join(distDir, 'assets'), {
+  maxAge: '1y',
+  immutable: true
+}));
+
+visuApp.get('/', (req, res) => {
+  const visuHtmlPath = path.join(distDir, 'visu.html');
+  if (fsSync.existsSync(visuHtmlPath)) {
+    res.sendFile(visuHtmlPath);
+  } else {
+    res.status(404).send('Visu nicht gefunden. Bitte erst bauen mit npm run build');
+  }
+});
+
+visuApp.get('*', (req, res) => {
+  const visuHtmlPath = path.join(distDir, 'visu.html');
+  if (fsSync.existsSync(visuHtmlPath)) {
+    res.sendFile(visuHtmlPath);
+  } else {
+    res.status(404).send('Visu nicht gefunden');
+  }
+});
+
 async function start() {
   try {
     dataDir = await findWritableDataDir();
@@ -2008,8 +2077,11 @@ async function start() {
 
     app.listen(PORT, async () => {
       console.log(`=== Wiresheet API Server laeuft auf Port ${PORT} ===`);
-
       await restoreRunningPages();
+    });
+
+    visuApp.listen(VISU_PORT, () => {
+      console.log(`=== Wiresheet Visu Server laeuft auf Port ${VISU_PORT} ===`);
     });
   } catch (err) {
     console.error('Start fehlgeschlagen:', err);

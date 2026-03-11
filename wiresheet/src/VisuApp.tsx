@@ -97,9 +97,12 @@ export function VisuApp() {
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: binding.nodeId, value })
+        body: JSON.stringify({
+          nodeId: binding.nodeId,
+          portId: binding.portId,
+          value
+        })
       });
-      setLiveValues(prev => ({ ...prev, [binding!.nodeId]: value }));
     } catch (err) {
       console.error('write value error:', err);
     }
