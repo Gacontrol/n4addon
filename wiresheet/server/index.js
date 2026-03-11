@@ -195,13 +195,6 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-app.get(['/visu-mode', '/api/visu-mode'], (req, res) => {
-  res.json({ mode: 'all', isActive: true, requestSource: 'any' });
-});
-
-app.post(['/visu-mode', '/api/visu-mode'], async (req, res) => {
-  res.json({ mode: 'all' });
-});
 
 app.get(['/pages', '/api/pages'], async (req, res) => {
   try {

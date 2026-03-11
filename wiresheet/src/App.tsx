@@ -770,12 +770,7 @@ function App() {
           )}
 
           {mainView === 'visu' && (
-            <div className="flex-1 flex items-center justify-center gap-2">
-              <span className="text-xs text-green-400 bg-green-950/50 border border-green-800/50 px-2 py-1 rounded flex items-center gap-1.5">
-                <Monitor className="w-3.5 h-3.5" />
-                Addon + Port 8098 aktiv
-              </span>
-            </div>
+            <div className="flex-1" />
           )}
 
           <button
