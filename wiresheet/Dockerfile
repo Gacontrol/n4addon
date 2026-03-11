@@ -9,6 +9,7 @@ RUN npm ci --production=false
 
 COPY src ./src
 COPY index.html ./
+COPY visu.html ./
 COPY vite.config.ts ./
 COPY tsconfig.json ./
 COPY tsconfig.app.json ./

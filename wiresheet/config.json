@@ -1,6 +1,6 @@
 {
   "name": "Wiresheet Flow Editor",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "slug": "wiresheet",
   "description": "Visual Flow Editor for Home Assistant",
   "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
