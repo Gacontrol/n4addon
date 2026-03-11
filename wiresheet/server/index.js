@@ -1152,18 +1152,7 @@ async function runPageCycle(pageId) {
 
       const now = Date.now();
       const allOverrides = clientVisuOverrides.get('global') || {};
-      const activeVisuOverrides = {};
-      for (const [key, value] of Object.entries(allOverrides)) {
-        const ts = visuOverrideTimestamps.get(key);
-        if (ts && (now - ts) < VISU_OVERRIDE_HOLD_MS) {
-          activeVisuOverrides[key] = value;
-        } else if (ts) {
-          delete allOverrides[key];
-          visuOverrideTimestamps.delete(key);
-        }
-      }
-
-      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, activeVisuOverrides, pageId);
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
     }
 
@@ -1414,6 +1403,10 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
   }
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
+  }
+  const globalOverrides = clientVisuOverrides.get('global') || {};
+  for (const [key, value] of Object.entries(globalOverrides)) {
+    merged[key] = value;
   }
   res.json(merged);
 });

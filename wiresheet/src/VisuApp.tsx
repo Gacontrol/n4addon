@@ -97,6 +97,14 @@ export function VisuApp() {
       return;
     }
 
+    setLiveValues(prev => {
+      const updates: Record<string, unknown> = { [binding!.nodeId]: value };
+      if (binding!.portId) {
+        updates[`${binding!.nodeId}:${binding!.portId}`] = value;
+      }
+      return { ...prev, ...updates };
+    });
+
     console.log('[VisuApp] Sending to API:', apiBase, binding, value);
     try {
       const response = await fetch(`${apiBase}/visu/write-value`, {
