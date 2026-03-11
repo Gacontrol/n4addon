@@ -1110,6 +1110,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
   const isTransparentWidget = isDrawingWidget || isModernWidget || isDashWidget;
 
+  const isFrameWidget = widget.type === 'visu-frame';
+
   return (
     <div
       className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
@@ -1127,7 +1129,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? 0 : 8
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? 0 : 8,
+        overflow: isFrameWidget ? 'hidden' : undefined
       } as React.CSSProperties}
       onClick={(e) => {
         if (isEditMode) {

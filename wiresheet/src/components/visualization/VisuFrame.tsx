@@ -146,10 +146,13 @@ export const VisuFrame: React.FC<VisuFrameProps> = ({
   if (isVertical) {
     return (
       <div
-        className="h-full flex flex-col transition-all duration-200 overflow-hidden"
+        className="h-full flex flex-col transition-all duration-200"
         style={{
           backgroundColor: bg,
           width: collapsed ? 48 : '100%',
+          minWidth: collapsed ? 48 : undefined,
+          maxWidth: '100%',
+          overflow: 'hidden',
           borderRight: pos === 'left' ? `1px solid ${accent}22` : undefined,
           borderLeft: pos === 'right' ? `1px solid ${accent}22` : undefined,
         }}
