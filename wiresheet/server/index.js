@@ -1004,6 +1004,46 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       }
       nodeValues[nodeId] = scaled;
       nodeValues[`${nodeId}:output-0`] = scaled;
+    } else if (node.type === 'pid-controller') {
+      const actual = parseFloat(inputVals[0]);
+      const setpoint = parseFloat(inputVals[1]);
+      const kp = cfg.kp !== undefined ? parseFloat(cfg.kp) : 1.0;
+      const ki = cfg.ki !== undefined ? parseFloat(cfg.ki) : 0.1;
+      const kd = cfg.kd !== undefined ? parseFloat(cfg.kd) : 0.05;
+      const outMin = cfg.outputMin !== undefined ? parseFloat(cfg.outputMin) : 0;
+      const outMax = cfg.outputMax !== undefined ? parseFloat(cfg.outputMax) : 100;
+      const antiWindup = cfg.antiWindup !== false;
+      const sampleTimeMs = cfg.sampleTimeMs !== undefined ? cfg.sampleTimeMs : 100;
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__pidState || (node.__pidState = {});
+      if (st.integral === undefined) st.integral = 0;
+      if (st.prevError === undefined) st.prevError = 0;
+      if (st.lastTs === undefined) st.lastTs = now;
+      let output = null;
+      let error = null;
+      if (!isNaN(actual) && !isNaN(setpoint)) {
+        error = setpoint - actual;
+        const dtMs = now - st.lastTs;
+        const dt = Math.max(dtMs, sampleTimeMs) / 1000.0;
+        st.integral += error * dt;
+        const derivative = (error - st.prevError) / dt;
+        let rawOutput = kp * error + ki * st.integral + kd * derivative;
+        if (antiWindup) {
+          if (rawOutput > outMax) {
+            rawOutput = outMax;
+            if (error > 0) st.integral -= error * dt;
+          } else if (rawOutput < outMin) {
+            rawOutput = outMin;
+            if (error < 0) st.integral -= error * dt;
+          }
+        }
+        output = Math.max(outMin, Math.min(outMax, rawOutput));
+        st.prevError = error;
+        st.lastTs = now;
+      }
+      nodeValues[nodeId] = output;
+      nodeValues[`${nodeId}:output-0`] = output;
+      nodeValues[`${nodeId}:output-1`] = error;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
