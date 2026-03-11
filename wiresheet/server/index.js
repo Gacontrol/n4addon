@@ -21,6 +21,7 @@ let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
 let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
+let dpValuesFile = path.join(dataDir, 'dp-values.json');
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -29,6 +30,44 @@ const clientVisuOverrides = new Map();
 const visuOverrideTimestamps = new Map();
 const persistentDpValues = new Map();
 const VISU_OVERRIDE_HOLD_MS = 60000;
+let dpValuesSaveTimeout = null;
+
+async function loadPersistentDpValues() {
+  try {
+    const data = await fs.readFile(dpValuesFile, 'utf-8');
+    const obj = JSON.parse(data);
+    persistentDpValues.clear();
+    for (const [key, value] of Object.entries(obj)) {
+      persistentDpValues.set(key, value);
+    }
+    console.log(`Persistente DP-Werte geladen: ${persistentDpValues.size} Eintraege`);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('Fehler beim Laden der DP-Werte:', err.message);
+    }
+  }
+}
+
+function savePersistentDpValues() {
+  if (dpValuesSaveTimeout) {
+    clearTimeout(dpValuesSaveTimeout);
+  }
+  dpValuesSaveTimeout = setTimeout(async () => {
+    try {
+      const obj = Object.fromEntries(persistentDpValues);
+      await fs.writeFile(dpValuesFile, JSON.stringify(obj, null, 2));
+      console.log(`Persistente DP-Werte gespeichert: ${persistentDpValues.size} Eintraege`);
+    } catch (err) {
+      console.error('Fehler beim Speichern der DP-Werte:', err.message);
+    }
+    dpValuesSaveTimeout = null;
+  }, 500);
+}
+
+function setPersistentDpValue(nodeId, value) {
+  persistentDpValues.set(nodeId, value);
+  savePersistentDpValues();
+}
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -697,11 +736,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
       if (visuVal !== undefined) {
         nodeValues[nodeId] = visuVal;
-        persistentDpValues.set(nodeId, visuVal);
+        setPersistentDpValue(nodeId, visuVal);
         console.log(`DP Node ${nodeId} auf Visu-Wert gesetzt: ${visuVal}`);
       } else if (inputVals[0] !== undefined) {
         nodeValues[nodeId] = inputVals[0];
-        persistentDpValues.set(nodeId, inputVals[0]);
+        setPersistentDpValue(nodeId, inputVals[0]);
       } else if (persistentVal !== undefined) {
         nodeValues[nodeId] = persistentVal;
       } else {
@@ -1350,7 +1389,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       visuOverrideTimestamps.set(`${nodeId}:${portId}`, now);
     }
 
-    persistentDpValues.set(nodeId, value);
+    setPersistentDpValue(nodeId, value);
 
     for (const [pageId, values] of lastNodeValues) {
       if (values[nodeId] !== undefined || Object.keys(values).some(k => k.startsWith(nodeId + ':'))) {
@@ -2088,10 +2127,13 @@ async function start() {
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
+    dpValuesFile = path.join(dataDir, 'dp-values.json');
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
+
+    await loadPersistentDpValues();
 
     console.log(`--- Umgebungsvariablen ---`);
     console.log(`SUPERVISOR_TOKEN: ${process.env.SUPERVISOR_TOKEN ? 'ja (' + process.env.SUPERVISOR_TOKEN.substring(0,10) + '...)' : 'NEIN'}`);
