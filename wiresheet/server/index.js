@@ -1824,12 +1824,69 @@ async function restoreRunningPages() {
   }
 }
 
+let imagesDir = '/data/wiresheet/images';
+
+app.post('/api/images/upload', async (req, res) => {
+  try {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      try {
+        await fs.mkdir(imagesDir, { recursive: true });
+        const contentType = req.headers['content-type'] || 'image/png';
+        const ext = contentType.split('/')[1]?.split(';')[0] || 'png';
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const filePath = path.join(imagesDir, filename);
+        await fs.writeFile(filePath, Buffer.concat(chunks));
+        res.json({ url: `/api/images/${filename}` });
+      } catch (err) {
+        console.error('Bild Upload Fehler:', err);
+        res.status(500).json({ error: 'Upload fehlgeschlagen' });
+      }
+    });
+    req.on('error', (err) => {
+      console.error('Request Fehler:', err);
+      res.status(500).json({ error: 'Upload fehlgeschlagen' });
+    });
+  } catch (err) {
+    console.error('Bild Upload Fehler:', err);
+    res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+app.get('/api/images/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(imagesDir, filename);
+    const data = await fs.readFile(filePath);
+    const ext = path.extname(filename).slice(1).toLowerCase();
+    const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+    res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(data);
+  } catch (err) {
+    res.status(404).json({ error: 'Bild nicht gefunden' });
+  }
+});
+
+app.delete('/api/images/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(imagesDir, filename);
+    await fs.unlink(filePath);
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: true });
+  }
+});
+
 async function start() {
   try {
     dataDir = await findWritableDataDir();
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
+    imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);

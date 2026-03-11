@@ -1,14 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Image as ImageIcon, Upload, X } from 'lucide-react';
 import { ImageConfig } from '../../types/visualization';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-const SUPABASE_AVAILABLE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-const supabase = SUPABASE_AVAILABLE ? createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!) : null;
-
-const BUCKET = 'visu-images';
 
 interface VisuImageProps {
   config: ImageConfig;
@@ -26,25 +18,20 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!supabase) {
-      setError('Supabase nicht konfiguriert');
-      return;
-    }
     setUploading(true);
     setError(null);
 
     try {
-      const ext = file.name.split('.').pop();
-      const path = `uploads/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { upsert: true });
+      if (!response.ok) throw new Error('Upload fehlgeschlagen');
 
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      onUpdateConfig({ ...config, imageUrl: data.publicUrl, storagePath: path });
+      const data = await response.json();
+      onUpdateConfig({ ...config, imageUrl: data.url, storagePath: data.url });
     } catch (err) {
       setError('Upload fehlgeschlagen');
       console.error(err);
@@ -53,7 +40,15 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
     }
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
+    if (config.storagePath) {
+      const filename = config.storagePath.split('/').pop();
+      if (filename) {
+        try {
+          await fetch(`/api/images/${filename}`, { method: 'DELETE' });
+        } catch {}
+      }
+    }
     onUpdateConfig({ ...config, imageUrl: undefined, storagePath: undefined });
   };
 
