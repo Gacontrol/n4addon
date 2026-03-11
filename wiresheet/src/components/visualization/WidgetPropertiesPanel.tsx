@@ -1045,6 +1045,161 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-frame': {
+        const frCfg = config as import('../../types/visualization').FrameConfig;
+        const items = frCfg.items || [];
+        const iconOptions = ['Home', 'LayoutDashboard', 'Settings', 'Activity', 'Zap', 'Thermometer', 'BarChart2', 'Cpu', 'Globe', 'Bell', 'FileText', 'Layers', 'Monitor', 'Wind', 'Droplets', 'Sun', 'Power', 'Map'];
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Titel</label>
+              <input type="text" value={frCfg.title || ''} onChange={(e) => onUpdate({ config: { ...frCfg, title: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Akzentfarbe</label>
+                <input type="color" value={frCfg.accentColor || '#3b82f6'} onChange={(e) => onUpdate({ config: { ...frCfg, accentColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Hintergrund</label>
+                <input type="color" value={frCfg.backgroundColor || '#0f172a'} onChange={(e) => onUpdate({ config: { ...frCfg, backgroundColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Textfarbe</label>
+                <input type="color" value={frCfg.textColor || '#e2e8f0'} onChange={(e) => onUpdate({ config: { ...frCfg, textColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Position</label>
+                <select value={frCfg.position || 'left'} onChange={(e) => onUpdate({ config: { ...frCfg, position: e.target.value as 'left' | 'right' | 'top' | 'bottom' } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                  <option value="left">Links</option>
+                  <option value="right">Rechts</option>
+                  <option value="top">Oben</option>
+                  <option value="bottom">Unten</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={frCfg.collapsible !== false} onChange={(e) => onUpdate({ config: { ...frCfg, collapsible: e.target.checked } })} className="rounded" />
+              <label className="text-xs text-slate-400">Einklappbar</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" checked={frCfg.defaultCollapsed ?? false} onChange={(e) => onUpdate({ config: { ...frCfg, defaultCollapsed: e.target.checked } })} className="rounded" />
+              <label className="text-xs text-slate-400">Standardmaessig eingeklappt</label>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-slate-400">Eintraege</label>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => {
+                      const newItem: import('../../types/visualization').FrameItem = { id: `section-${Date.now()}`, type: 'section', label: 'Abschnitt' };
+                      onUpdate({ config: { ...frCfg, items: [...items, newItem] } });
+                    }}
+                    className="px-2 py-0.5 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 rounded transition-colors"
+                    title="Abschnitt hinzufuegen"
+                  >
+                    + Abschnitt
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newItem: import('../../types/visualization').FrameItem = { id: `btn-${Date.now()}`, type: 'nav-button', label: 'Neue Seite', icon: 'Home', targetPageId: '' };
+                      onUpdate({ config: { ...frCfg, items: [...items, newItem] } });
+                    }}
+                    className="px-2 py-0.5 text-xs text-blue-400 hover:text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 rounded transition-colors"
+                    title="Button hinzufuegen"
+                  >
+                    + Button
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {items.map((item, idx) => (
+                  <div key={item.id} className={`p-2 rounded border ${item.type === 'section' ? 'bg-slate-800/50 border-slate-600' : 'bg-slate-800 border-slate-700'}`}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[10px] text-slate-500 uppercase">{item.type === 'section' ? 'Abschnitt' : 'Button'}</span>
+                      <div className="flex-1" />
+                      <button
+                        onClick={() => onUpdate({ config: { ...frCfg, items: items.filter((_, i) => i !== idx) } })}
+                        className="text-red-400 hover:text-red-300 text-xs px-1"
+                        title="Entfernen"
+                      >
+                        ×
+                      </button>
+                      {idx > 0 && (
+                        <button
+                          onClick={() => {
+                            const arr = [...items];
+                            [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+                            onUpdate({ config: { ...frCfg, items: arr } });
+                          }}
+                          className="text-slate-400 hover:text-slate-200 text-xs px-1"
+                          title="Nach oben"
+                        >
+                          ↑
+                        </button>
+                      )}
+                      {idx < items.length - 1 && (
+                        <button
+                          onClick={() => {
+                            const arr = [...items];
+                            [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+                            onUpdate({ config: { ...frCfg, items: arr } });
+                          }}
+                          className="text-slate-400 hover:text-slate-200 text-xs px-1"
+                          title="Nach unten"
+                        >
+                          ↓
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={item.label}
+                      placeholder="Label"
+                      onChange={(e) => {
+                        const updated = items.map((it, i) => i === idx ? { ...it, label: e.target.value } : it);
+                        onUpdate({ config: { ...frCfg, items: updated } });
+                      }}
+                      className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 mb-1"
+                    />
+                    {item.type === 'nav-button' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-1">
+                          <select
+                            value={item.icon || ''}
+                            onChange={(e) => {
+                              const updated = items.map((it, i) => i === idx ? { ...it, icon: e.target.value } : it);
+                              onUpdate({ config: { ...frCfg, items: updated } });
+                            }}
+                            className="px-1 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+                          >
+                            <option value="">Kein Icon</option>
+                            {iconOptions.map(ic => <option key={ic} value={ic}>{ic}</option>)}
+                          </select>
+                          <select
+                            value={item.targetPageId || ''}
+                            onChange={(e) => {
+                              const updated = items.map((it, i) => i === idx ? { ...it, targetPageId: e.target.value } : it);
+                              onUpdate({ config: { ...frCfg, items: updated } });
+                            }}
+                            className="px-1 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+                          >
+                            <option value="">-- Seite --</option>
+                            {(visuPages || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }

@@ -507,6 +507,34 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Springt zur vorherigen Seite',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-frame',
+    label: 'Navigation Frame',
+    icon: 'PanelLeft',
+    category: 'decoration',
+    defaultSize: { width: 220, height: 500 },
+    defaultConfig: {
+      title: 'Navigation',
+      items: [
+        { id: 'section-1', type: 'section', label: 'Hauptmenu' },
+        { id: 'btn-1', type: 'nav-button', label: 'Startseite', icon: 'Home', targetPageId: '' },
+        { id: 'btn-2', type: 'nav-button', label: 'Uebersicht', icon: 'LayoutDashboard', targetPageId: '' },
+        { id: 'section-2', type: 'section', label: 'Einstellungen' },
+        { id: 'btn-3', type: 'nav-button', label: 'Einstellungen', icon: 'Settings', targetPageId: '' }
+      ],
+      accentColor: '#3b82f6',
+      backgroundColor: '#0f172a',
+      textColor: '#e2e8f0',
+      collapsible: true,
+      defaultCollapsed: false,
+      position: 'left',
+      showIcons: true
+    },
+    defaultStyle: {},
+    description: 'Ein- und ausklappbare Seitennavigation',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

@@ -26,8 +26,10 @@ import {
   PolylineConfig,
   NavButtonConfig,
   HomeButtonConfig,
-  BackButtonConfig
+  BackButtonConfig,
+  FrameConfig
 } from '../../types/visualization';
+import { VisuFrame } from './VisuFrame';
 import {
   VisuSwitch,
   VisuButton,
@@ -752,13 +754,25 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-frame': {
+        const frCfg = widget.config as FrameConfig;
+        return (
+          <VisuFrame
+            config={frCfg}
+            isEditMode={isEditMode}
+            onNavigateToPage={onNavigateToPage}
+            visuPages={visuPages}
+          />
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
   };
 
   const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
-  const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button'].includes(widget.type);
+  const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button', 'visu-frame'].includes(widget.type);
   const isVertexWidget = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
   const showResizeHandles = isEditMode && isSelected && !isVertexWidget;
   const showSelectionBorder = isSelected && !isVertexWidget && !['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);

@@ -3,7 +3,7 @@ import {
   ToggleLeft, Square, SlidersHorizontal, PlusCircle, TextCursorInput,
   Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer,
   RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft,
-  Hexagon, Star, Diamond, Plus, Spline, List
+  Hexagon, Star, Diamond, Plus, Spline, List, PanelLeft
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -37,7 +37,8 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   Diamond,
   Plus,
   Spline,
-  List
+  List,
+  PanelLeft
 };
 
 const categoryLabels: Record<string, string> = {

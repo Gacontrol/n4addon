@@ -33,7 +33,8 @@ export type WidgetType =
   | 'visu-polyline'
   | 'visu-nav-button'
   | 'visu-home-button'
-  | 'visu-back-button';
+  | 'visu-back-button'
+  | 'visu-frame';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -267,6 +268,28 @@ export interface BackButtonConfig {
   color?: string;
 }
 
+export type FrameItemType = 'nav-button' | 'section';
+
+export interface FrameItem {
+  id: string;
+  type: FrameItemType;
+  label: string;
+  targetPageId?: string;
+  icon?: string;
+}
+
+export interface FrameConfig {
+  title?: string;
+  items: FrameItem[];
+  accentColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  position?: 'left' | 'right' | 'top' | 'bottom';
+  showIcons?: boolean;
+}
+
 export type WidgetConfig =
   | SwitchConfig
   | SliderConfig
@@ -292,7 +315,8 @@ export type WidgetConfig =
   | PolylineConfig
   | NavButtonConfig
   | HomeButtonConfig
-  | BackButtonConfig;
+  | BackButtonConfig
+  | FrameConfig;
 
 export interface VisuWidget {
   id: string;
