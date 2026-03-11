@@ -57,10 +57,7 @@ export const useWiresheetPages = () => {
           setActivePageId(data[0].id);
 
           for (const page of data) {
-            if (page.running) {
-              if (localCycleTimers.current[page.id]) {
-                clearInterval(localCycleTimers.current[page.id]);
-              }
+            if (page.running && !localCycleTimers.current[page.id]) {
               const interval = Math.max(200, page.cycleMs || 1000);
               localCycleTimers.current[page.id] = setInterval(() => {
                 const currentPage = pagesRef.current.find(p => p.id === page.id);

@@ -1581,6 +1581,14 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
     setPersistentDpValue(nodeId, value);
 
+    for (const [pageId, nodeValues] of lastNodeValues) {
+      if (nodeId in nodeValues) {
+        const updated = { ...nodeValues, [nodeId]: value };
+        if (overrideKey !== nodeId) updated[overrideKey] = value;
+        lastNodeValues.set(pageId, updated);
+      }
+    }
+
     console.log(`[WRITE-VALUE DEBUG] FERTIG - Visu-Wert geschrieben: ${nodeId} = ${value}`);
     res.json({ success: true });
   }
