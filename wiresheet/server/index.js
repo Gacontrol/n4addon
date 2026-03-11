@@ -19,6 +19,9 @@ let dataDir = DATA_PATHS[0];
 let pagesFile = path.join(dataDir, 'pages.json');
 let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
+let visuModeFile = path.join(dataDir, 'visu-mode.json');
+
+let visuMode = 'addon';
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -193,6 +196,24 @@ app.get('/api/status', (req, res) => {
     hassioTokenPresent: !!process.env.HASSIO_TOKEN,
     runningPages: runningStatus
   });
+});
+
+app.get(['/visu-mode', '/api/visu-mode'], (req, res) => {
+  res.json({ mode: visuMode });
+});
+
+app.post(['/visu-mode', '/api/visu-mode'], async (req, res) => {
+  const { mode } = req.body;
+  if (mode !== 'addon' && mode !== 'port8098') {
+    return res.status(400).json({ error: 'Ungültiger Modus' });
+  }
+  visuMode = mode;
+  try {
+    await fs.writeFile(visuModeFile, JSON.stringify({ mode }), 'utf-8');
+  } catch (err) {
+    console.error('Fehler beim Speichern des Visu-Modus:', err.message);
+  }
+  res.json({ mode: visuMode });
 });
 
 app.get(['/pages', '/api/pages'], async (req, res) => {
@@ -2012,6 +2033,12 @@ async function start() {
     pagesFile = path.join(dataDir, 'pages.json');
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
+    visuModeFile = path.join(dataDir, 'visu-mode.json');
+    try {
+      const modeData = await fs.readFile(visuModeFile, 'utf-8');
+      visuMode = JSON.parse(modeData).mode || 'addon';
+    } catch {}
+
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
