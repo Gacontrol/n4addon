@@ -63,11 +63,21 @@ export function VisuApp() {
 
   const pollLiveValues = useCallback(async () => {
     try {
-      const res = await fetch(`${apiBase}/live-values`);
-      if (res.ok) {
-        const response = await res.json();
+      const [liveRes, pagesRes] = await Promise.all([
+        fetch(`${apiBase}/live-values`),
+        fetch(`${apiBase}/pages`)
+      ]);
+      if (liveRes.ok) {
+        const response = await liveRes.json();
         const data = response.values || response;
         setLiveValues(data);
+      }
+      if (pagesRes.ok) {
+        const data = await pagesRes.json();
+        if (Array.isArray(data)) {
+          const allNodes = data.flatMap((p: { nodes: FlowNode[] }) => p.nodes || []);
+          setLogicNodes(allNodes);
+        }
       }
     } catch {}
   }, [apiBase]);

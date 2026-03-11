@@ -204,18 +204,53 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
   const onColor = config.onColor ?? '#22c55e';
   const offColor = config.offColor ?? '#64748b';
   const showLabel = style.showLabel !== false;
-  const color = value ? onColor : offColor;
+
+  const [localValue, setLocalValue] = useState<boolean | null>(null);
+  const pendingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (localValue !== null && value === localValue) {
+      setLocalValue(null);
+      if (pendingTimeoutRef.current) {
+        clearTimeout(pendingTimeoutRef.current);
+        pendingTimeoutRef.current = null;
+      }
+    }
+  }, [value, localValue]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingTimeoutRef.current) clearTimeout(pendingTimeoutRef.current);
+    };
+  }, []);
+
+  const displayValue = localValue !== null ? localValue : value;
+  const color = displayValue ? onColor : offColor;
+  const isPending = localValue !== null && localValue !== value;
+
+  const handleClick = () => {
+    if (disabled) return;
+    const newVal = !displayValue;
+    setLocalValue(newVal);
+    if (pendingTimeoutRef.current) clearTimeout(pendingTimeoutRef.current);
+    pendingTimeoutRef.current = setTimeout(() => {
+      setLocalValue(null);
+      pendingTimeoutRef.current = null;
+    }, 5000);
+    onChange(newVal);
+  };
 
   return (
     <div
       className="w-full h-full rounded-xl overflow-hidden flex flex-col p-3 cursor-pointer transition-all duration-200"
       style={{
-        background: value
+        background: displayValue
           ? `linear-gradient(135deg, ${onColor}18 0%, ${onColor}08 100%)`
           : 'rgba(255,255,255,0.03)',
-        border: `1px solid ${color}30`
+        border: `1px solid ${color}30`,
+        opacity: isPending ? 0.85 : 1
       }}
-      onClick={() => !disabled && onChange(!value)}
+      onClick={handleClick}
     >
       <div className="flex items-start justify-between">
         <div className="rounded-lg p-2" style={{ backgroundColor: `${color}20` }}>
@@ -223,11 +258,11 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
         </div>
         <div
           className="relative rounded-full transition-all duration-300 flex-shrink-0"
-          style={{ width: 42, height: 24, backgroundColor: value ? onColor : 'rgba(255,255,255,0.1)' }}
+          style={{ width: 42, height: 24, backgroundColor: displayValue ? onColor : 'rgba(255,255,255,0.1)' }}
         >
           <div
             className="absolute top-1 rounded-full bg-white shadow transition-all duration-300"
-            style={{ width: 16, height: 16, left: value ? 22 : 4 }}
+            style={{ width: 16, height: 16, left: displayValue ? 22 : 4 }}
           />
         </div>
       </div>
@@ -236,7 +271,7 @@ export const DashToggleCard: React.FC<DashToggleCardProps> = ({ value, onChange,
           <div className="text-xs text-slate-400 truncate mb-0.5">{label}</div>
         )}
         <div className="text-sm font-bold" style={{ color }}>
-          {value ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
+          {displayValue ? (config.onLabel ?? 'Aktiv') : (config.offLabel ?? 'Inaktiv')}
         </div>
       </div>
     </div>

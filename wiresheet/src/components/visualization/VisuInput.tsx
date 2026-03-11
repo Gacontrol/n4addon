@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { InputConfig, WidgetStyle } from '../../types/visualization';
 
@@ -22,9 +22,17 @@ export const VisuInput: React.FC<VisuInputProps> = ({
   const effectiveDefault = config.defaultValue !== undefined ? String(config.defaultValue) : '';
   const [localValue, setLocalValue] = useState<string>(value !== null && value !== undefined && value !== '' ? String(value) : effectiveDefault);
   const [hasChanges, setHasChanges] = useState(false);
+  const suppressServerUpdateRef = useRef(false);
+  const suppressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!hasChanges) {
+    return () => {
+      if (suppressTimeoutRef.current) clearTimeout(suppressTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasChanges && !suppressServerUpdateRef.current) {
       const incoming = value !== null && value !== undefined && value !== '' ? String(value) : effectiveDefault;
       setLocalValue(incoming);
     }
@@ -36,6 +44,12 @@ export const VisuInput: React.FC<VisuInputProps> = ({
   }, []);
 
   const handleSubmit = useCallback(() => {
+    suppressServerUpdateRef.current = true;
+    if (suppressTimeoutRef.current) clearTimeout(suppressTimeoutRef.current);
+    suppressTimeoutRef.current = setTimeout(() => {
+      suppressServerUpdateRef.current = false;
+    }, 2000);
+
     if (config.inputType === 'number') {
       let numValue = parseFloat(localValue);
       if (isNaN(numValue)) numValue = 0;
