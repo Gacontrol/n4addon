@@ -25,6 +25,8 @@ export function VisuApp() {
   const visuPagesRef = useRef<VisuPage[]>([]);
   const apiBase = getApiBase();
 
+  const hideToolbar = window.location.port === '8098' || new URLSearchParams(window.location.search).get('kiosk') === '1';
+
   visuPagesRef.current = visuPages;
 
   const loadData = useCallback(async () => {
@@ -50,6 +52,15 @@ export function VisuApp() {
         if (Array.isArray(data)) {
           const allNodes = data.flatMap((p: { nodes: FlowNode[] }) => p.nodes || []);
           setLogicNodes(allNodes);
+          const paramValues: Record<string, unknown> = {};
+          for (const node of allNodes) {
+            if (node.data?.config) {
+              for (const [key, val] of Object.entries(node.data.config)) {
+                paramValues[`${node.id}:param:${key}`] = val;
+              }
+            }
+          }
+          setLiveValues(prev => ({ ...paramValues, ...prev }));
         }
       }
     } catch (err) {
@@ -93,13 +104,23 @@ export function VisuApp() {
     }
     if (!binding) return;
 
+    const body: Record<string, unknown> = { nodeId: binding.nodeId, value };
+    if (binding.paramKey) {
+      body.paramKey = binding.paramKey;
+    }
+
     try {
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: binding.nodeId, value })
+        body: JSON.stringify(body)
       });
-      setLiveValues(prev => ({ ...prev, [binding!.nodeId]: value }));
+      if (binding.paramKey) {
+        const liveKey = `${binding.nodeId}:param:${binding.paramKey}`;
+        setLiveValues(prev => ({ ...prev, [liveKey]: value }));
+      } else {
+        setLiveValues(prev => ({ ...prev, [binding!.nodeId]: value }));
+      }
     } catch (err) {
       console.error('write value error:', err);
     }
@@ -171,53 +192,55 @@ export function VisuApp() {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden">
-      <div
-        className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800 bg-slate-900"
-        style={{ minHeight: 40, flexShrink: 0 }}
-      >
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleNavigateHome}
-            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Startseite"
-          >
-            <Home className="w-3.5 h-3.5" />
-          </button>
-          {canGoBack && (
-            <button
-              onClick={handleNavigateBack}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Zurueck"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {visuPages.map(page => (
-            <button
-              key={page.id}
-              onClick={() => handleNavigateTo(page.id)}
-              className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
-                activePageId === page.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              {page.name}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={toggleFullscreen}
-          className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          title={isFullscreen ? 'Vollbild beenden' : 'Vollbild'}
+      {!hideToolbar && (
+        <div
+          className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800 bg-slate-900"
+          style={{ minHeight: 40, flexShrink: 0 }}
         >
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleNavigateHome}
+              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Startseite"
+            >
+              <Home className="w-3.5 h-3.5" />
+            </button>
+            {canGoBack && (
+              <button
+                onClick={handleNavigateBack}
+                className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Zurueck"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {visuPages.map(page => (
+              <button
+                key={page.id}
+                onClick={() => handleNavigateTo(page.id)}
+                className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+                  activePageId === page.id
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {page.name}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={toggleFullscreen}
+            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title={isFullscreen ? 'Vollbild beenden' : 'Vollbild'}
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden">
         <VisuCanvas

@@ -140,13 +140,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const WRITE_WIDGET_TYPES = new Set([
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
-    'modern-switch', 'modern-button', 'modern-incrementer', 'dash-toggle'
+    'modern-switch', 'modern-button', 'modern-incrementer', 'dash-toggle', 'dash-toggle-card', 'dash-multistate'
   ]);
 
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
     const { nodeId, portId, paramKey } = widget.binding;
     if (paramKey) {
+      const liveKey = `${nodeId}:param:${paramKey}`;
+      if (liveKey in liveValues) return liveValues[liveKey];
       const node = logicNodes.find(n => n.id === nodeId);
       if (node?.data.config) {
         const val = node.data.config[paramKey];

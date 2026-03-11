@@ -130,7 +130,9 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
       params.push({ key: 'delayMs', label: 'Verzoegerung (ms)', type: 'number' });
       break;
     case 'timer':
-      params.push({ key: 'timerMs', label: 'Zeitdauer (ms)', type: 'number' });
+      params.push({ key: 'timerOnMs', label: 'Einschaltverzögerung (ms)', type: 'number' });
+      params.push({ key: 'timerOffMs', label: 'Ausschaltverzögerung (ms)', type: 'number' });
+      params.push({ key: 'timerMs', label: 'Zeitdauer allgemein (ms)', type: 'number' });
       break;
     case 'counter':
       params.push({ key: 'counterMin', label: 'Zähler Min', type: 'number' });
@@ -179,7 +181,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isWriteWidget = [
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
     'modern-switch', 'modern-button', 'modern-incrementer',
-    'dash-toggle'
+    'dash-toggle', 'dash-toggle-card', 'dash-multistate'
   ].includes(widget.type);
 
   const handleNodeChange = (nodeId: string) => {
@@ -1317,6 +1319,37 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 onClose={() => setShowImagePicker(false)}
               />
             )}
+          </>
+        );
+      }
+
+      case 'dash-toggle-card': {
+        const dtCfg = config as import('../../types/visualization').DashToggleCardConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ein-Label</label>
+              <input type="text" value={dtCfg.onLabel || 'Aktiv'} onChange={(e) => onUpdate({ config: { ...config, onLabel: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aus-Label</label>
+              <input type="text" value={dtCfg.offLabel || 'Inaktiv'} onChange={(e) => onUpdate({ config: { ...config, offLabel: e.target.value } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ein-Farbe</label>
+              <input type="color" value={dtCfg.onColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, onColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aus-Farbe</label>
+              <input type="color" value={dtCfg.offColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, offColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Standardwert</label>
+              <select value={dtCfg.defaultValue ? 'true' : 'false'} onChange={(e) => onUpdate({ config: { ...config, defaultValue: e.target.value === 'true' } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="false">Aus</option>
+                <option value="true">Ein</option>
+              </select>
+            </div>
           </>
         );
       }
