@@ -12,6 +12,7 @@ function getApiBase(): string {
 }
 
 const POLL_INTERVAL = 300;
+const WRITE_LOCK_MS = 1500;
 
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
@@ -23,6 +24,7 @@ export function VisuApp() {
   const pageHistoryRef = useRef<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
+  const writeLockRef = useRef<Map<string, number>>(new Map());
   const apiBase = getApiBase();
 
   const hideToolbar = window.location.port === '8098' || new URLSearchParams(window.location.search).get('kiosk') === '1';
@@ -75,9 +77,14 @@ export function VisuApp() {
       const res = await fetch(`${apiBase}/live-values`);
       if (res.ok) {
         const data = await res.json();
+        const now = Date.now();
+        for (const [k, ts] of writeLockRef.current.entries()) {
+          if (now >= ts) writeLockRef.current.delete(k);
+        }
         setLiveValues(prev => {
           const merged: Record<string, unknown> = { ...prev };
           for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+            if (writeLockRef.current.has(k)) continue;
             merged[k] = v;
           }
           return merged;
@@ -115,20 +122,22 @@ export function VisuApp() {
       body.paramKey = binding.paramKey;
     }
 
+    const liveKey = binding.paramKey
+      ? `${binding.nodeId}:param:${binding.paramKey}`
+      : binding.nodeId;
+
+    writeLockRef.current.set(liveKey, Date.now() + WRITE_LOCK_MS);
+    setLiveValues(prev => ({ ...prev, [liveKey]: value }));
+
     try {
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      if (binding.paramKey) {
-        const liveKey = `${binding.nodeId}:param:${binding.paramKey}`;
-        setLiveValues(prev => ({ ...prev, [liveKey]: value }));
-      } else {
-        setLiveValues(prev => ({ ...prev, [binding!.nodeId]: value }));
-      }
     } catch (err) {
       console.error('write value error:', err);
+      writeLockRef.current.delete(liveKey);
     }
   }, [apiBase]);
 
