@@ -27,7 +27,7 @@ const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const visuWriteLocks = new Map();
-const VISU_WRITE_LOCK_MS = 8000;
+const VISU_WRITE_LOCK_MS = 1500;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
