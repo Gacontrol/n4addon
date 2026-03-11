@@ -1085,6 +1085,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         return (
           <DashMultistate
             value={value as number | string | null}
+            statusValue={widget.statusBinding ? statusValue as number | string | null : undefined}
             onChange={onValueChange}
             config={widget.config as DashMultistateConfig}
             style={widget.style}

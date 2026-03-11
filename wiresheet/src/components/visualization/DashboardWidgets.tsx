@@ -676,16 +676,18 @@ export const DashWind: React.FC<DashWindProps> = ({ value, config, label, style 
 /* ─── Dash Multistate ─── */
 interface DashMultistateProps extends BaseProps {
   value: number | string | null;
+  statusValue?: number | string | null;
   onChange: (v: number | string) => void;
   config: DashMultistateConfig;
   disabled?: boolean;
 }
 
-export const DashMultistate: React.FC<DashMultistateProps> = ({ value, onChange, config, label, style, disabled }) => {
+export const DashMultistate: React.FC<DashMultistateProps> = ({ value, statusValue, onChange, config, label, style, disabled }) => {
   const options = config.options ?? [];
   const showLabel = style.showLabel !== false;
   const activeColor = config.activeColor ?? '#3b82f6';
-  const currentOption = options.find(o => String(o.value) === String(value));
+  const displayValue = (statusValue !== null && statusValue !== undefined) ? statusValue : value;
+  const currentOption = options.find(o => String(o.value) === String(displayValue));
 
   return (
     <div
@@ -705,7 +707,7 @@ export const DashMultistate: React.FC<DashMultistateProps> = ({ value, onChange,
       </div>
       <div className="flex flex-wrap gap-1 flex-1 content-center">
         {options.map((opt) => {
-          const isActive = String(opt.value) === String(value);
+          const isActive = String(opt.value) === String(displayValue);
           const btnColor = opt.color ?? activeColor;
           return (
             <button
