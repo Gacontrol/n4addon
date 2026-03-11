@@ -1394,11 +1394,17 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
 app.get(['/live-values', '/api/live-values'], (req, res) => {
   const merged = {};
+  for (const [, values] of lastNodeValues) {
+    Object.assign(merged, values);
+  }
   for (const [nodeId, value] of persistentDpValues) {
     merged[nodeId] = value;
   }
-  for (const [, values] of lastNodeValues) {
-    Object.assign(merged, values);
+  const globalOverrides = clientVisuOverrides.get('global') || {};
+  for (const [key, value] of Object.entries(globalOverrides)) {
+    if (!key.includes(':')) {
+      merged[key] = value;
+    }
   }
   res.json(merged);
 });
