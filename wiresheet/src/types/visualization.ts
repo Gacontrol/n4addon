@@ -46,7 +46,17 @@ export type WidgetType =
   | 'dash-stat'
   | 'dash-progress'
   | 'dash-value-card'
-  | 'dash-toggle-card';
+  | 'dash-toggle-card'
+  | 'dash-battery'
+  | 'dash-signal'
+  | 'dash-sparkline'
+  | 'dash-multivalue'
+  | 'dash-heatbar'
+  | 'dash-compass'
+  | 'dash-clock'
+  | 'dash-rating'
+  | 'dash-level'
+  | 'dash-wind';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -361,7 +371,17 @@ export type WidgetConfig =
   | DashStatConfig
   | DashProgressConfig
   | DashValueCardConfig
-  | DashToggleCardConfig;
+  | DashToggleCardConfig
+  | DashBatteryConfig
+  | DashSignalConfig
+  | DashSparklineConfig
+  | DashMultivalueConfig
+  | DashHeatbarConfig
+  | DashCompassConfig
+  | DashClockConfig
+  | DashRatingConfig
+  | DashLevelConfig
+  | DashWindConfig;
 
 export interface VisuWidget {
   id: string;
@@ -477,6 +497,93 @@ export interface DashToggleCardConfig {
   onColor?: string;
   offColor?: string;
   icon?: string;
+}
+
+export interface DashBatteryConfig {
+  color?: string;
+  showPercent?: boolean;
+  lowThreshold?: number;
+  criticalThreshold?: number;
+}
+
+export interface DashSignalConfig {
+  color?: string;
+  maxBars?: number;
+  showValue?: boolean;
+  unit?: string;
+}
+
+export interface DashSparklineConfig {
+  color?: string;
+  historyLength?: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+  showValue?: boolean;
+  decimals?: number;
+  fillArea?: boolean;
+}
+
+export interface DashMultivalueItem {
+  label: string;
+  unit?: string;
+  color?: string;
+  decimals?: number;
+}
+
+export interface DashMultivalueConfig {
+  items?: DashMultivalueItem[];
+  color?: string;
+}
+
+export interface DashHeatbarConfig {
+  min: number;
+  max: number;
+  unit?: string;
+  showValue?: boolean;
+  decimals?: number;
+  lowColor?: string;
+  midColor?: string;
+  highColor?: string;
+}
+
+export interface DashCompassConfig {
+  color?: string;
+  showDegrees?: boolean;
+  showCardinal?: boolean;
+}
+
+export interface DashClockConfig {
+  showSeconds?: boolean;
+  showDate?: boolean;
+  format24h?: boolean;
+  color?: string;
+}
+
+export interface DashRatingConfig {
+  max?: number;
+  color?: string;
+  icon?: string;
+  showValue?: boolean;
+}
+
+export interface DashLevelConfig {
+  min: number;
+  max: number;
+  unit?: string;
+  orientation?: 'horizontal' | 'vertical';
+  color?: string;
+  showValue?: boolean;
+  decimals?: number;
+  dangerZone?: number;
+  warningZone?: number;
+}
+
+export interface DashWindConfig {
+  color?: string;
+  showSpeed?: boolean;
+  showDirection?: boolean;
+  speedUnit?: string;
 }
 
 export interface WidgetTemplate {

@@ -65,7 +65,8 @@ function App() {
     moveNodeToContainer,
     duplicateSelected,
     addTextAnnotation,
-    setLiveValue
+    setLiveValue,
+    executeAllPages
   } = useWiresheetPages();
 
   const {
@@ -134,6 +135,16 @@ function App() {
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
   }, [activePageId, activePage.cycleMs]);
+
+  useEffect(() => {
+    if (mainView !== 'visu') return;
+    executeAllPages();
+    const pollTimer = setInterval(() => {
+      const anyRunning = pages.some(p => p.running);
+      if (!anyRunning) executeAllPages();
+    }, 2000);
+    return () => clearInterval(pollTimer);
+  }, [mainView]);
 
   useEffect(() => {
     if (selectedNodes.size === 1) {
@@ -596,7 +607,7 @@ function App() {
               Logik
             </button>
             <button
-              onClick={() => setMainView('visu')}
+              onClick={() => { setMainView('visu'); executeAllPages(); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'visu'
                   ? 'bg-green-600 text-white'

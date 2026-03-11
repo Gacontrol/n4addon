@@ -685,6 +685,126 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Dashboard-Karte mit grossem Toggle-Schalter',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'dash-battery',
+    label: 'Batterie',
+    icon: 'Battery',
+    category: 'dashboard',
+    defaultSize: { width: 180, height: 100 },
+    defaultConfig: { showPercent: true, lowThreshold: 20, criticalThreshold: 10, color: '#22c55e' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Batterie-Ladestandsanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-signal',
+    label: 'Signalstaerke',
+    icon: 'Wifi',
+    category: 'dashboard',
+    defaultSize: { width: 160, height: 100 },
+    defaultConfig: { maxBars: 5, showValue: true, color: '#3b82f6', unit: 'dBm' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Signalstaerke-Balkenanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-sparkline',
+    label: 'Kurve',
+    icon: 'TrendingUp',
+    category: 'dashboard',
+    defaultSize: { width: 220, height: 110 },
+    defaultConfig: { color: '#3b82f6', historyLength: 20, showValue: true, decimals: 1, fillArea: true },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Mini-Verlaufskurve mit aktuellem Wert',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-multivalue',
+    label: 'Multi-Wert',
+    icon: 'LayoutGrid',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 120 },
+    defaultConfig: { items: [{ label: 'Wert 1', unit: '', color: '#3b82f6', decimals: 1 }, { label: 'Wert 2', unit: '', color: '#22c55e', decimals: 1 }, { label: 'Wert 3', unit: '', color: '#f59e0b', decimals: 1 }], color: '#3b82f6' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Mehrere Messwerte in einer Karte',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-heatbar',
+    label: 'Heatbar',
+    icon: 'Thermometer',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 90 },
+    defaultConfig: { min: 0, max: 100, unit: '%', showValue: true, decimals: 0, lowColor: '#3b82f6', midColor: '#f59e0b', highColor: '#ef4444' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Farbgradient-Balken mit Schwellwerten',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-compass',
+    label: 'Kompass',
+    icon: 'Navigation',
+    category: 'dashboard',
+    defaultSize: { width: 160, height: 160 },
+    defaultConfig: { color: '#3b82f6', showDegrees: true, showCardinal: true },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Kompass-Richtungsanzeige (0-360°)',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-clock',
+    label: 'Uhr',
+    icon: 'Clock',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 100 },
+    defaultConfig: { showSeconds: true, showDate: true, format24h: true, color: '#3b82f6' },
+    defaultStyle: { showLabel: false, labelPosition: 'top' },
+    description: 'Digitale Uhr ohne Verknuepfung',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-rating',
+    label: 'Bewertung',
+    icon: 'Star',
+    category: 'dashboard',
+    defaultSize: { width: 180, height: 90 },
+    defaultConfig: { max: 5, color: '#f59e0b', showValue: true },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Stern-/Punkte-Bewertungsanzeige',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-level',
+    label: 'Pegelanzeige',
+    icon: 'AlignLeft',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 110 },
+    defaultConfig: { min: 0, max: 100, unit: '%', orientation: 'horizontal', color: '#3b82f6', showValue: true, decimals: 0, dangerZone: 90, warningZone: 70 },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Pegelmesser mit Warn- und Gefahrenzonen',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'dash-wind',
+    label: 'Wind',
+    icon: 'Wind',
+    category: 'dashboard',
+    defaultSize: { width: 180, height: 130 },
+    defaultConfig: { showSpeed: true, showDirection: true, speedUnit: 'km/h', color: '#06b6d4' },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Windgeschwindigkeit und -richtung',
+    supportsBinding: true,
+    bindingDirection: 'read'
   }
 ];
 

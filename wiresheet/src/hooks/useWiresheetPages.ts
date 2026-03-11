@@ -816,6 +816,29 @@ export const useWiresheetPages = () => {
     setLiveValue: (key: string, value: unknown) => {
       visuOverridesRef.current = { ...visuOverridesRef.current, [key]: value };
       setLiveValues(prev => ({ ...prev, [key]: value }));
+    },
+    executeAllPages: async () => {
+      const currentPages = pagesRef.current;
+      for (const page of currentPages) {
+        const manualOverrides: Record<string, unknown> = {};
+        for (const node of page.nodes) {
+          if (node.data.override?.manual) {
+            manualOverrides[node.id] = node.data.override.value;
+          }
+        }
+        const visuOverrides = { ...visuOverridesRef.current };
+        try {
+          const res = await fetch(`${API_BASE}/pages/${page.id}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides, visuOverrides })
+          });
+          if (res.ok) {
+            const { nodeValues } = await res.json();
+            setLiveValues(prev => ({ ...prev, ...nodeValues, ...visuOverridesRef.current }));
+          }
+        } catch { }
+      }
     }
   };
 };

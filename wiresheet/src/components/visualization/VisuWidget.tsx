@@ -39,7 +39,17 @@ import {
   DashStatConfig,
   DashProgressConfig,
   DashValueCardConfig,
-  DashToggleCardConfig
+  DashToggleCardConfig,
+  DashBatteryConfig,
+  DashSignalConfig,
+  DashSparklineConfig,
+  DashMultivalueConfig,
+  DashHeatbarConfig,
+  DashCompassConfig,
+  DashClockConfig,
+  DashRatingConfig,
+  DashLevelConfig,
+  DashWindConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuImage } from './VisuImage';
@@ -72,7 +82,17 @@ import {
   DashStat,
   DashProgress,
   DashValueCard,
-  DashToggleCard
+  DashToggleCard,
+  DashBattery,
+  DashSignal,
+  DashSparkline,
+  DashMultivalue,
+  DashHeatbar,
+  DashCompass,
+  DashClock,
+  DashRating,
+  DashLevel,
+  DashWind
 } from './DashboardWidgets';
 
 interface VisuWidgetProps {
@@ -925,6 +945,105 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             style={widget.style}
             label={widget.label}
             disabled={isEditMode}
+          />
+        );
+
+      case 'dash-battery':
+        return (
+          <DashBattery
+            value={Number(value) || 0}
+            config={widget.config as DashBatteryConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-signal':
+        return (
+          <DashSignal
+            value={Number(value) || 0}
+            config={widget.config as DashSignalConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-sparkline':
+        return (
+          <DashSparkline
+            value={Number(value) || 0}
+            config={widget.config as DashSparklineConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-multivalue':
+        return (
+          <DashMultivalue
+            value={Number(value) || 0}
+            config={widget.config as DashMultivalueConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-heatbar':
+        return (
+          <DashHeatbar
+            value={Number(value) || 0}
+            config={widget.config as DashHeatbarConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-compass':
+        return (
+          <DashCompass
+            value={Number(value) || 0}
+            config={widget.config as DashCompassConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-clock':
+        return (
+          <DashClock
+            config={widget.config as DashClockConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-rating':
+        return (
+          <DashRating
+            value={Number(value) || 0}
+            config={widget.config as DashRatingConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-level':
+        return (
+          <DashLevel
+            value={Number(value) || 0}
+            config={widget.config as DashLevelConfig}
+            style={widget.style}
+            label={widget.label}
+          />
+        );
+
+      case 'dash-wind':
+        return (
+          <DashWind
+            value={Number(value) || 0}
+            config={widget.config as DashWindConfig}
+            style={widget.style}
+            label={widget.label}
           />
         );
 
