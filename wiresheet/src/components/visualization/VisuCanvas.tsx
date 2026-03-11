@@ -140,12 +140,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [selectedWidgetId, page.widgets, isEditMode, isInDrawingMode]);
 
-  const WRITE_WIDGET_TYPES = new Set([
-    'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
-    'modern-switch', 'modern-button', 'modern-incrementer', 'modern-multistate', 'modern-slider',
-    'dash-toggle', 'dash-toggle-card', 'dash-multistate'
-  ]);
-
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
     const { nodeId, portId, paramKey } = widget.binding;
@@ -159,19 +153,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       }
       return null;
     }
-    const isWrite = WRITE_WIDGET_TYPES.has(widget.type);
-    if (isWrite) {
-      if (widget.statusBinding) return null;
-      if (portId) {
-        const portKey = `${nodeId}:${portId}`;
-        if (portKey in liveValues) return liveValues[portKey];
-      }
-      return liveValues[nodeId] ?? null;
-    }
     if (portId) {
-      return liveValues[`${nodeId}:${portId}`] ?? liveValues[nodeId];
+      const portKey = `${nodeId}:${portId}`;
+      if (portKey in liveValues) return liveValues[portKey];
     }
-    return liveValues[nodeId];
+    return liveValues[nodeId] ?? null;
   }, [liveValues, logicNodes]);
 
   const getWidgetStatusValue = useCallback((widget: VisuWidget): unknown => {
