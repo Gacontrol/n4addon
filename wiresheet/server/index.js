@@ -27,9 +27,7 @@ const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
-const visuOverrideTimestamps = new Map();
 const persistentDpValues = new Map();
-const VISU_OVERRIDE_HOLD_MS = 60000;
 let dpValuesSaveTimeout = null;
 
 async function loadPersistentDpValues() {
@@ -1366,7 +1364,6 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
   } else {
     const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
-    const now = Date.now();
 
     if (!clientVisuOverrides.has('global')) {
       clientVisuOverrides.set('global', {});
@@ -1374,27 +1371,13 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     const overrides = clientVisuOverrides.get('global');
     overrides[overrideKey] = value;
     overrides[nodeId] = value;
-    visuOverrideTimestamps.set(overrideKey, now);
-    visuOverrideTimestamps.set(nodeId, now);
     if (portId) {
       overrides[`${nodeId}:${portId}`] = value;
-      visuOverrideTimestamps.set(`${nodeId}:${portId}`, now);
     }
 
     setPersistentDpValue(nodeId, value);
 
-    for (const [pageId, values] of lastNodeValues) {
-      if (values[nodeId] !== undefined || Object.keys(values).some(k => k.startsWith(nodeId + ':'))) {
-        values[nodeId] = value;
-        if (portId) {
-          values[`${nodeId}:${portId}`] = value;
-        }
-        console.log(`Visu-Wert direkt in lastNodeValues gesetzt: ${nodeId} = ${value}`);
-        break;
-      }
-    }
-
-    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value} (persistent)`);
+    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value} (wird im naechsten Zyklus verarbeitet)`);
     res.json({ success: true });
   }
 });
@@ -1406,10 +1389,6 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
   }
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
-  }
-  const globalOverrides = clientVisuOverrides.get('global') || {};
-  for (const [key, value] of Object.entries(globalOverrides)) {
-    merged[key] = value;
   }
   res.json(merged);
 });
