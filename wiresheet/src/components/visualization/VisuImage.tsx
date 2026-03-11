@@ -3,10 +3,10 @@ import { Image as ImageIcon, Upload, X } from 'lucide-react';
 import { ImageConfig } from '../../types/visualization';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_ANON_KEY as string
-);
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const SUPABASE_AVAILABLE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const supabase = SUPABASE_AVAILABLE ? createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!) : null;
 
 const BUCKET = 'visu-images';
 
@@ -26,6 +26,10 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!supabase) {
+      setError('Supabase nicht konfiguriert');
+      return;
+    }
     setUploading(true);
     setError(null);
 
