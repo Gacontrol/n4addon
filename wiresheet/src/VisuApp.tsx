@@ -121,6 +121,12 @@ export function VisuApp() {
     }
     console.log('[VISUAPP 8098 DEBUG] Binding gefunden:', JSON.stringify(binding));
 
+    if (binding.portId) {
+      setLiveValues(prev => ({ ...prev, [`${binding!.nodeId}:${binding!.portId}`]: value, [binding!.nodeId]: value }));
+    } else {
+      setLiveValues(prev => ({ ...prev, [binding!.nodeId]: value }));
+    }
+
     try {
       const payload = { nodeId: binding.nodeId, portId: binding.portId, value };
       console.log('[VISUAPP 8098 DEBUG] Sende an Server:', apiBase + '/visu/write-value');
