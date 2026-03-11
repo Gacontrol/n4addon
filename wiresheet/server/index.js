@@ -26,6 +26,8 @@ const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
+const visuOverrideTimestamps = new Map();
+const VISU_OVERRIDE_HOLD_MS = 500;
 
 function getNodeState(pageId, nodeId) {
   if (!pageNodeStates.has(pageId)) pageNodeStates.set(pageId, {});
@@ -1098,8 +1100,21 @@ async function runPageCycle(pageId) {
           manualOverrides[node.id] = node.data.override.value;
         }
       }
-      const visuOverrides = clientVisuOverrides.get('global') || {};
-      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, visuOverrides, pageId);
+
+      const now = Date.now();
+      const allOverrides = clientVisuOverrides.get('global') || {};
+      const activeVisuOverrides = {};
+      for (const [key, value] of Object.entries(allOverrides)) {
+        const ts = visuOverrideTimestamps.get(key);
+        if (ts && (now - ts) < VISU_OVERRIDE_HOLD_MS) {
+          activeVisuOverrides[key] = value;
+        } else if (ts) {
+          delete allOverrides[key];
+          visuOverrideTimestamps.delete(key);
+        }
+      }
+
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, activeVisuOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
     }
 
@@ -1310,6 +1325,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
   } else {
     const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
+    const now = Date.now();
 
     if (!clientVisuOverrides.has('global')) {
       clientVisuOverrides.set('global', {});
@@ -1317,11 +1333,14 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     const overrides = clientVisuOverrides.get('global');
     overrides[overrideKey] = value;
     overrides[nodeId] = value;
+    visuOverrideTimestamps.set(overrideKey, now);
+    visuOverrideTimestamps.set(nodeId, now);
     if (portId) {
       overrides[`${nodeId}:${portId}`] = value;
+      visuOverrideTimestamps.set(`${nodeId}:${portId}`, now);
     }
 
-    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value}`);
+    console.log(`Visu-Wert geschrieben: ${overrideKey} = ${value} (Hold: ${VISU_OVERRIDE_HOLD_MS}ms)`);
     res.json({ success: true });
   }
 });
