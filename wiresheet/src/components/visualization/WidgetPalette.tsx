@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  ToggleLeft, Square, SlidersHorizontal, PlusCircle, TextCursorInput,
-  Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer,
-  RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft,
-  Hexagon, Star, Diamond, Plus, Spline, List, PanelLeft, ImageIcon
-} from 'lucide-react';
+import { ToggleLeft, Square, SlidersHorizontal, PlusCircle, TextCursorInput, Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer, RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft, Hexagon, Star, Diamond, Plus, Spline, List, PanelLeft, Image as ImageIcon } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
 

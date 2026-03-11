@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ImageIcon, Upload, X } from 'lucide-react';
+import { Image as ImageIcon, Upload, X } from 'lucide-react';
 import { ImageConfig } from '../../types/visualization';
 import { createClient } from '@supabase/supabase-js';
 
