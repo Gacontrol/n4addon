@@ -69,10 +69,6 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
     console.log('[VisuSwitch] Sending newVal:', newVal);
     onChange(newVal);
 
-    if (hasFeedback) {
-      return;
-    }
-
     setLocalValue(newVal);
     if (pendingTimeoutRef.current) {
       clearTimeout(pendingTimeoutRef.current);
