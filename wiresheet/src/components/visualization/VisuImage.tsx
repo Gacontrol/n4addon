@@ -117,7 +117,9 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   const apiBase = getApiBase();
   const resolvedUrl = config.imageUrl
     ? config.imageUrl.startsWith('/api/')
-      ? `${apiBase}${config.imageUrl.slice(4)}`
+      ? apiBase
+        ? `${apiBase}${config.imageUrl.slice(4)}`
+        : config.imageUrl
       : config.imageUrl
     : undefined;
 
