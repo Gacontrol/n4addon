@@ -69,7 +69,8 @@ const SHAPE_TYPES = new Set([
   'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'
 ]);
 
-const getNodeLabel = (node: FlowNode) => {
+const getNodeLabel = (node: FlowNode | undefined) => {
+  if (!node) return '(Geloeschter Node)';
   const customLabel = node.data.config?.customLabel as string | undefined;
   return customLabel || node.data.label || node.type;
 };
@@ -1468,7 +1469,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -1570,7 +1571,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
                       {(widget.binding.portId || widget.binding.paramKey) && (
                         <div className="flex items-center gap-1 mt-0.5">
                           {widget.binding.paramKey && <Settings className="w-3 h-3 text-amber-400" />}

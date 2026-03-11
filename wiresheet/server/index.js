@@ -789,10 +789,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'const-value') {
       nodeValues[nodeId] = cfg.constValue !== undefined ? cfg.constValue : 0;
     } else if (node.type === 'compare') {
-      const a = parseFloat(inputVals[0]) || 0;
-      const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
+      const rawA = inputVals[0];
+      const rawB = inputVals[1];
+      const a = rawA !== undefined && rawA !== null ? (isNaN(Number(rawA)) ? 0 : Number(rawA)) : 0;
+      const b = cfg.compareValue !== undefined ? Number(cfg.compareValue) : (rawB !== undefined && rawB !== null ? (isNaN(Number(rawB)) ? 0 : Number(rawB)) : 0);
       const gtResult = a > b;
-      const eqResult = a == b;
+      const eqResult = a === b;
       const ltResult = a < b;
       nodeValues[`${nodeId}:output-0`] = gtResult;
       nodeValues[`${nodeId}:output-1`] = eqResult;
