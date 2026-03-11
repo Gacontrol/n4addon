@@ -943,6 +943,67 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-0`] = smoothed;
       nodeValues[`${nodeId}:output-1`] = minVal;
       nodeValues[`${nodeId}:output-2`] = maxVal;
+    } else if (node.type === 'counter') {
+      const pulseInput = toBool(inputVals[0]);
+      const resetInput = toBool(inputVals[1]);
+      const counterMin = cfg.counterMin !== undefined ? cfg.counterMin : 0;
+      const counterMax = cfg.counterMax !== undefined ? cfg.counterMax : 100;
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__counterState || (node.__counterState = {});
+      if (st.count === undefined) st.count = counterMin;
+      if (st.prevPulse === undefined) st.prevPulse = false;
+      if (st.prevReset === undefined) st.prevReset = false;
+      const risingPulse = pulseInput && !st.prevPulse;
+      const risingReset = resetInput && !st.prevReset;
+      if (risingReset) {
+        st.count = counterMin;
+      } else if (risingPulse) {
+        st.count = st.count + 1;
+        if (st.count > counterMax) st.count = counterMin;
+      }
+      st.prevPulse = pulseInput;
+      st.prevReset = resetInput;
+      nodeValues[nodeId] = st.count;
+      nodeValues[`${nodeId}:output-0`] = st.count;
+    } else if (node.type === 'sr-flipflop') {
+      const setInput = toBool(inputVals[0]);
+      const resetInput = toBool(inputVals[1]);
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__srState || (node.__srState = {});
+      if (st.output === undefined) st.output = false;
+      if (setInput) st.output = true;
+      if (resetInput) st.output = false;
+      nodeValues[nodeId] = st.output;
+      nodeValues[`${nodeId}:output-0`] = st.output;
+    } else if (node.type === 'rising-edge') {
+      const inputVal = toBool(inputVals[0]);
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__risingState || (node.__risingState = {});
+      if (st.prevInput === undefined) st.prevInput = inputVal;
+      const risingEdge = inputVal && !st.prevInput;
+      st.prevInput = inputVal;
+      nodeValues[nodeId] = risingEdge;
+      nodeValues[`${nodeId}:output-0`] = risingEdge;
+    } else if (node.type === 'falling-edge') {
+      const inputVal = toBool(inputVals[0]);
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__fallingState || (node.__fallingState = {});
+      if (st.prevInput === undefined) st.prevInput = inputVal;
+      const fallingEdge = !inputVal && st.prevInput;
+      st.prevInput = inputVal;
+      nodeValues[nodeId] = fallingEdge;
+      nodeValues[`${nodeId}:output-0`] = fallingEdge;
+    } else if (node.type === 'scaling') {
+      const inputVal = parseFloat(inputVals[0]);
+      const inMin = cfg.scalingInMin !== undefined ? parseFloat(cfg.scalingInMin) : 0;
+      const inMax = cfg.scalingInMax !== undefined ? parseFloat(cfg.scalingInMax) : 100;
+      const outMin = cfg.scalingOutMin !== undefined ? parseFloat(cfg.scalingOutMin) : 0;
+      const outMax = cfg.scalingOutMax !== undefined ? parseFloat(cfg.scalingOutMax) : 100;
+      let scaled = null;
+      if (!isNaN(inputVal) && inMax !== inMin) {
+        scaled = outMin + ((inputVal - inMin) / (inMax - inMin)) * (outMax - outMin);
+        if (cfg.scalingClamp) {
+          scaled = Math.max(Math.min(outMin, outMax), Math.min(Math.max(outMin, outMax), scaled));
+        }
+      }
+      nodeValues[nodeId] = scaled;
+      nodeValues[`${nodeId}:output-0`] = scaled;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
