@@ -249,6 +249,27 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
     if (!Array.isArray(pages)) {
       return res.status(400).json({ error: 'Ungueltige Daten - Array erwartet' });
     }
+    let existingOverrides = {};
+    try {
+      const existingData = await fs.readFile(pagesFile, 'utf-8');
+      const existingPages = JSON.parse(existingData);
+      for (const ep of existingPages) {
+        for (const en of (ep.nodes || [])) {
+          if (en.data?.override?.manual) {
+            existingOverrides[`${ep.id}:${en.id}`] = en.data.override;
+          }
+        }
+      }
+    } catch {}
+    for (const page of pages) {
+      for (const node of (page.nodes || [])) {
+        const key = `${page.id}:${node.id}`;
+        if (existingOverrides[key] && !node.data.override?.manual) {
+          if (!node.data) node.data = {};
+          node.data.override = existingOverrides[key];
+        }
+      }
+    }
     await fs.mkdir(dataDir, { recursive: true });
     await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
     console.log(`Gespeichert: ${pages.length} Seiten nach ${pagesFile}`);
@@ -1088,7 +1109,20 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
   const { pageId } = req.params;
   const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
   try {
-    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides, pageId);
+    const finalOverrides = { ...manualOverrides };
+    try {
+      const fileData = await fs.readFile(pagesFile, 'utf-8');
+      const filePages = JSON.parse(fileData);
+      const filePage = filePages.find(p => p.id === pageId);
+      if (filePage) {
+        for (const node of filePage.nodes) {
+          if (node.data.override?.manual && finalOverrides[node.id] === undefined) {
+            finalOverrides[node.id] = node.data.override.value;
+          }
+        }
+      }
+    } catch {}
+    const nodeValues = await executePageLogic(nodes, connections, finalOverrides, visuOverrides, pageId);
     const now = Date.now();
     const pageLocks = visuWriteLocks.get(pageId) || {};
     const merged = { ...nodeValues };
