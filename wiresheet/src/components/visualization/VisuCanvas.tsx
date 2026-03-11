@@ -71,6 +71,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     startY: number;
     widgetStartX: number;
     widgetStartY: number;
+    isVertex?: boolean;
+    initialConfig?: Record<string, unknown>;
   } | null>(null);
 
   const [resizeState, setResizeState] = useState<{
@@ -267,12 +269,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         widgetStartY: widget.position.y
       });
     } else {
+      const isVertex = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
       setDragState({
         widgetId,
         startX: e.clientX,
         startY: e.clientY,
         widgetStartX: widget.position.x,
-        widgetStartY: widget.position.y
+        widgetStartY: widget.position.y,
+        isVertex,
+        initialConfig: isVertex ? JSON.parse(JSON.stringify(widget.config)) : undefined
       });
     }
 
@@ -282,24 +287,59 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (dragState) {
-      const deltaX = e.clientX - dragState.startX;
-      const deltaY = e.clientY - dragState.startY;
+      const rawDeltaX = e.clientX - dragState.startX;
+      const rawDeltaY = e.clientY - dragState.startY;
       const gridSize = page.gridSize || 10;
 
-      let newX = dragState.widgetStartX + deltaX;
-      let newY = dragState.widgetStartY + deltaY;
+      if (dragState.isVertex && dragState.initialConfig) {
+        let dx = rawDeltaX;
+        let dy = rawDeltaY;
+        if (page.showGrid) {
+          dx = Math.round(dx / gridSize) * gridSize;
+          dy = Math.round(dy / gridSize) * gridSize;
+        }
+        const cfg = dragState.initialConfig as Record<string, unknown>;
+        const widget = page.widgets.find(w => w.id === dragState.widgetId);
+        if (!widget) return;
 
-      if (page.showGrid) {
-        newX = Math.round(newX / gridSize) * gridSize;
-        newY = Math.round(newY / gridSize) * gridSize;
+        if (widget.type === 'visu-line') {
+          const lCfg = cfg as { x1?: number; y1?: number; x2?: number; y2?: number };
+          if (lCfg.x1 !== undefined) {
+            onUpdateWidget(dragState.widgetId, {
+              config: {
+                ...cfg,
+                x1: (lCfg.x1 ?? 0) + dx,
+                y1: (lCfg.y1 ?? 0) + dy,
+                x2: (lCfg.x2 ?? 0) + dx,
+                y2: (lCfg.y2 ?? 0) + dy,
+              }
+            });
+          }
+        } else if (widget.type === 'visu-polyline' || widget.type === 'visu-polygon') {
+          const pts = (cfg.points as { x: number; y: number }[]) || [];
+          onUpdateWidget(dragState.widgetId, {
+            config: {
+              ...cfg,
+              points: pts.map(p => ({ x: p.x + dx, y: p.y + dy }))
+            }
+          });
+        }
+      } else {
+        let newX = dragState.widgetStartX + rawDeltaX;
+        let newY = dragState.widgetStartY + rawDeltaY;
+
+        if (page.showGrid) {
+          newX = Math.round(newX / gridSize) * gridSize;
+          newY = Math.round(newY / gridSize) * gridSize;
+        }
+
+        newX = Math.max(0, newX);
+        newY = Math.max(0, newY);
+
+        onUpdateWidget(dragState.widgetId, {
+          position: { x: newX, y: newY }
+        });
       }
-
-      newX = Math.max(0, newX);
-      newY = Math.max(0, newY);
-
-      onUpdateWidget(dragState.widgetId, {
-        position: { x: newX, y: newY }
-      });
     }
 
     if (resizeState) {
