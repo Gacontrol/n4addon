@@ -1415,7 +1415,11 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
   for (const [nodeId, value] of persistentDpValues) {
     merged[nodeId] = value;
   }
-  res.json(merged);
+  const timestamps = {};
+  for (const [nodeId, ts] of dpValueTimestamps) {
+    timestamps[nodeId] = ts;
+  }
+  res.json({ values: merged, timestamps });
 });
 
 const net = require('net');

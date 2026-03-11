@@ -67,14 +67,18 @@ export function VisuApp() {
     try {
       const res = await fetch(`${apiBase}/live-values`);
       if (res.ok) {
-        const data = await res.json();
-        const now = Date.now();
+        const response = await res.json();
+        const data = response.values || response;
+        const serverTimestamps = response.timestamps || {};
         const pending = pendingWritesRef.current;
+        const now = Date.now();
+
         for (const [key, entry] of pending.entries()) {
-          if (now - entry.timestamp > WRITE_HOLD_MS) {
-            pending.delete(key);
-          } else {
+          const serverTs = serverTimestamps[key] || 0;
+          if (entry.timestamp > serverTs && now - entry.timestamp < WRITE_HOLD_MS) {
             data[key] = entry.value;
+          } else {
+            pending.delete(key);
           }
         }
         setLiveValues(data);
