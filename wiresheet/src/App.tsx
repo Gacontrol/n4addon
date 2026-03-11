@@ -965,6 +965,7 @@ function App() {
           wiresheets={pages}
           visuPages={visuPages}
           customBlocks={customBlocks}
+          apiBase={(() => { const p = window.location.pathname; const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/); return m ? `${m[1]}/api` : '/api'; })()}
           onImport={(newWiresheets, newVisuPages, newBlocks) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);

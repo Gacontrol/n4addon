@@ -88,6 +88,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
+  const [lassoState, setLassoState] = useState<{ startX: number; startY: number; curX: number; curY: number } | null>(null);
+  const [lassoSelected, setLassoSelected] = useState<Set<string>>(new Set());
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -186,7 +188,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       const pos = snapPos(getCanvasPos(e));
       setDrawingState(prev => prev ? { ...prev, cursorPos: pos } : null);
     }
-  }, [drawingState, getCanvasPos, snapPos]);
+    if (lassoState) {
+      const pos = getCanvasPos(e);
+      setLassoState(prev => prev ? { ...prev, curX: pos.x, curY: pos.y } : null);
+    }
+  }, [drawingState, lassoState, getCanvasPos, snapPos]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (contextMenu) {
@@ -194,12 +200,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) return;
+    if (lassoState) return;
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
+      setLassoSelected(new Set());
     }
-  }, [onSelectWidget, contextMenu, drawingState]);
+  }, [onSelectWidget, contextMenu, drawingState, lassoState]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.target === canvasRef.current && isEditMode && !drawingState && e.button === 0) {
+      const pos = getCanvasPos(e);
+      setLassoState({ startX: pos.x, startY: pos.y, curX: pos.x, curY: pos.y });
+      onSelectWidget(null);
+      setLassoSelected(new Set());
+      return;
+    }
     if (!drawingState) return;
     if (e.target !== canvasRef.current) return;
     e.stopPropagation();
@@ -407,10 +422,41 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [dragState, resizeState, page.gridSize, page.showGrid, onUpdateWidget]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e?: MouseEvent) => {
     setDragState(null);
     setResizeState(null);
-  }, []);
+    setLassoState(prev => {
+      if (!prev) return null;
+      const x1 = Math.min(prev.startX, prev.curX);
+      const y1 = Math.min(prev.startY, prev.curY);
+      const x2 = Math.max(prev.startX, prev.curX);
+      const y2 = Math.max(prev.startY, prev.curY);
+      if (x2 - x1 > 4 || y2 - y1 > 4) {
+        const hit = new Set<string>();
+        for (const w of page.widgets) {
+          const wx1 = w.position.x, wy1 = w.position.y;
+          const wx2 = wx1 + w.size.width, wy2 = wy1 + w.size.height;
+          if (wx1 < x2 && wx2 > x1 && wy1 < y2 && wy2 > y1) {
+            hit.add(w.id);
+          }
+        }
+        setLassoSelected(hit);
+        if (hit.size === 1) {
+          onSelectWidget([...hit][0]);
+        }
+      }
+      return null;
+    });
+  }, [page.widgets, onSelectWidget]);
+
+  const handleWindowMouseMoveLasso = useCallback((e: MouseEvent) => {
+    if (!lassoState) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setLassoState(prev => prev ? { ...prev, curX: x, curY: y } : null);
+  }, [lassoState]);
 
   useEffect(() => {
     if (dragState || resizeState) {
@@ -422,6 +468,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
   }, [dragState, resizeState, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    if (lassoState) {
+      window.addEventListener('mousemove', handleWindowMouseMoveLasso);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleWindowMouseMoveLasso);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [lassoState, handleWindowMouseMoveLasso, handleMouseUp]);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -526,7 +583,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return null;
   })() : null;
 
-  const drawingCursor = drawingState ? 'crosshair' : undefined;
+  const drawingCursor = drawingState ? 'crosshair' : lassoState ? 'crosshair' : undefined;
 
   const hasFixedSize = page.canvasWidth && page.canvasHeight;
 
@@ -573,8 +630,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
             onValueChange={(value) => onWidgetValueChange(widget.id, value)}
             onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
             isEditMode={isEditMode}
-            isSelected={selectedWidgetId === widget.id}
-            onSelect={() => onSelectWidget(widget.id)}
+            isSelected={selectedWidgetId === widget.id || lassoSelected.has(widget.id)}
+            onSelect={() => { onSelectWidget(widget.id); setLassoSelected(new Set()); }}
             onDoubleClick={() => onEditWidgetProperties(widget.id)}
             onNavigateToPage={onNavigateToPage}
             onNavigateBack={onNavigateBack}
@@ -582,6 +639,24 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           />
         </div>
       ))}
+
+      {lassoState && (() => {
+        const x = Math.min(lassoState.startX, lassoState.curX);
+        const y = Math.min(lassoState.startY, lassoState.curY);
+        const w = Math.abs(lassoState.curX - lassoState.startX);
+        const h = Math.abs(lassoState.curY - lassoState.startY);
+        return (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: x, top: y, width: w, height: h,
+              border: '1.5px dashed #3b82f6',
+              backgroundColor: 'rgba(59,130,246,0.08)',
+              zIndex: 9998
+            }}
+          />
+        );
+      })()}
 
       {drawingOverlay}
 

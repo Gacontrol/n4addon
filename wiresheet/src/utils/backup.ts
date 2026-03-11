@@ -2,7 +2,13 @@ import { WiresheetPage } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
+
+export interface BackupImage {
+  filename: string;
+  mimeType: string;
+  data: string;
+}
 
 export interface WiresheetBackup {
   version: number;
@@ -11,6 +17,7 @@ export interface WiresheetBackup {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
+  images?: BackupImage[];
 }
 
 export interface BackupImportSelection {
@@ -22,7 +29,8 @@ export interface BackupImportSelection {
 export function createBackup(
   wiresheets: WiresheetPage[],
   visuPages: VisuPage[],
-  customBlocks: CustomBlockDefinition[]
+  customBlocks: CustomBlockDefinition[],
+  images?: BackupImage[]
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -30,8 +38,49 @@ export function createBackup(
     appVersion: '1.0.0',
     wiresheets,
     visuPages,
-    customBlocks
+    customBlocks,
+    images: images ?? []
   };
+}
+
+export async function fetchImagesForBackup(apiBase: string): Promise<BackupImage[]> {
+  try {
+    const res = await fetch(`${apiBase}/images`);
+    if (!res.ok) return [];
+    const list = await res.json() as { filename: string; url: string }[];
+    const results: BackupImage[] = [];
+    for (const img of list) {
+      try {
+        const imgRes = await fetch(`${apiBase}/images/${img.filename}`);
+        if (!imgRes.ok) continue;
+        const blob = await imgRes.blob();
+        const reader = new FileReader();
+        const data = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        results.push({ filename: img.filename, mimeType: blob.type, data });
+      } catch {}
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+export async function restoreImagesFromBackup(apiBase: string, images: BackupImage[]): Promise<void> {
+  for (const img of images) {
+    try {
+      const binary = atob(img.data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: img.mimeType });
+      const formData = new FormData();
+      formData.append('image', blob, img.filename);
+      await fetch(`${apiBase}/images/upload`, { method: 'POST', body: formData });
+    } catch {}
+  }
 }
 
 export function downloadBackup(backup: WiresheetBackup, filename?: string): void {
