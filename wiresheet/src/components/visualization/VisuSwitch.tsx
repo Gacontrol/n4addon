@@ -30,50 +30,68 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
     ? (hasFeedback ? Boolean(statusValue) : (config.defaultValue ?? false))
     : (hasFeedback ? Boolean(statusValue) : value);
 
-  const currentColor = displayValue ? onColor : offColor;
-
   const handleClick = () => {
     if (disabled) return;
     onChange(!displayValue);
   };
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1.5">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs font-medium text-slate-400 truncate max-w-full tracking-wide uppercase">{label}</span>
       )}
-      <div className="flex flex-col items-center gap-1">
+
+      <div className="flex flex-col items-center gap-2">
         <button
           onClick={handleClick}
           disabled={disabled}
-          className={`relative w-16 h-8 rounded-full transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          style={{ backgroundColor: currentColor }}
+          aria-pressed={displayValue}
+          className={`relative flex-shrink-0 transition-all duration-300 ease-in-out focus:outline-none ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+          style={{ width: 56, height: 28 }}
         >
           <div
-            className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-200"
-            style={{ transform: displayValue ? 'translateX(34px)' : 'translateX(2px)' }}
+            className="absolute inset-0 rounded-full transition-all duration-300"
+            style={{
+              backgroundColor: displayValue ? onColor : offColor,
+              boxShadow: displayValue
+                ? `0 0 0 1px ${onColor}44, inset 0 1px 3px rgba(0,0,0,0.2)`
+                : 'inset 0 1px 3px rgba(0,0,0,0.3)',
+            }}
           />
-          <span
-            className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-white"
-            style={{ paddingLeft: displayValue ? '0' : '20px', paddingRight: displayValue ? '20px' : '0' }}
-          >
-            {displayValue ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
-          </span>
-        </button>
-        {hasFeedback && (
-          <div className="flex items-center gap-1">
+          <div
+            className="absolute top-[3px] w-[22px] h-[22px] rounded-full transition-all duration-300 ease-in-out"
+            style={{
+              left: displayValue ? 'calc(100% - 25px)' : '3px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #e8e8e8 100%)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.35), 0 0 0 0.5px rgba(0,0,0,0.1)',
+            }}
+          />
+          {!disabled && (
             <div
-              className="w-2 h-2 rounded-full transition-colors duration-300"
-              style={{ backgroundColor: Boolean(statusValue) ? onColor : offColor }}
+              className="absolute inset-0 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-200"
+              style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
             />
-            <span className="text-[9px] text-slate-500">
+          )}
+        </button>
+
+        {hasFeedback && (
+          <div className="flex items-center gap-1.5">
+            <div
+              className="w-1.5 h-1.5 rounded-full transition-colors duration-300"
+              style={{
+                backgroundColor: Boolean(statusValue) ? onColor : '#475569',
+                boxShadow: Boolean(statusValue) ? `0 0 4px ${onColor}` : 'none',
+              }}
+            />
+            <span className="text-[9px] font-medium text-slate-500 tracking-wider uppercase">
               {Boolean(statusValue) ? config.onLabel || 'Ein' : config.offLabel || 'Aus'}
             </span>
           </div>
         )}
       </div>
+
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs font-medium text-slate-400 truncate max-w-full tracking-wide uppercase">{label}</span>
       )}
     </div>
   );
