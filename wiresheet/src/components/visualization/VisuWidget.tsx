@@ -49,7 +49,9 @@ import {
   DashClockConfig,
   DashRatingConfig,
   DashLevelConfig,
-  DashWindConfig
+  DashWindConfig,
+  DashMultistateConfig,
+  ModernMultistateConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuImage } from './VisuImage';
@@ -76,7 +78,8 @@ import {
   ModernDisplay,
   ModernBar,
   ModernLed,
-  ModernSlider
+  ModernSlider,
+  ModernMultistate
 } from './ModernWidgets';
 import {
   DashStat,
@@ -92,7 +95,8 @@ import {
   DashClock,
   DashRating,
   DashLevel,
-  DashWind
+  DashWind,
+  DashMultistate
 } from './DashboardWidgets';
 
 interface VisuWidgetProps {
@@ -828,7 +832,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'modern-switch': {
         const mswCfg = widget.config as ModernSwitchConfig;
-        const mswVal = Boolean(value ?? mswCfg.defaultValue ?? false);
+        const mswIsWriteOnly = !!widget.binding && widget.binding.direction === 'write';
+        const mswVal = mswIsWriteOnly
+          ? Boolean(statusValue ?? mswCfg.defaultValue ?? false)
+          : Boolean(value ?? mswCfg.defaultValue ?? false);
         return (
           <ModernSwitch
             value={mswVal}
@@ -900,6 +907,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             value={typeof value === 'number' ? value : 0}
             onChange={(v) => onValueChange(v)}
             config={widget.config as ModernSliderConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
+          />
+        );
+
+      case 'modern-multistate':
+        return (
+          <ModernMultistate
+            value={value as number | string | null}
+            onChange={onValueChange}
+            config={widget.config as ModernMultistateConfig}
             style={widget.style}
             label={widget.label}
             disabled={isEditMode}
@@ -1044,6 +1063,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             config={widget.config as DashWindConfig}
             style={widget.style}
             label={widget.label}
+          />
+        );
+
+      case 'dash-multistate':
+        return (
+          <DashMultistate
+            value={value as number | string | null}
+            onChange={onValueChange}
+            config={widget.config as DashMultistateConfig}
+            style={widget.style}
+            label={widget.label}
+            disabled={isEditMode}
           />
         );
 

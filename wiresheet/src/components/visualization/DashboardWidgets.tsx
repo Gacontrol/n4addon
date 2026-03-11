@@ -19,6 +19,7 @@ import {
   DashRatingConfig,
   DashLevelConfig,
   DashWindConfig,
+  DashMultistateConfig,
   WidgetStyle
 } from '../../types/visualization';
 
@@ -663,6 +664,64 @@ export const DashWind: React.FC<DashWindProps> = ({ value, config, label, style 
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-slate-500 truncate">{beaufortNames[beaufortScale]}</span>
         <span className="text-[10px] text-slate-500">Bft {beaufortScale}</span>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Dash Multistate ─── */
+interface DashMultistateProps extends BaseProps {
+  value: number | string | null;
+  onChange: (v: number | string) => void;
+  config: DashMultistateConfig;
+  disabled?: boolean;
+}
+
+export const DashMultistate: React.FC<DashMultistateProps> = ({ value, onChange, config, label, style, disabled }) => {
+  const options = config.options ?? [];
+  const showLabel = style.showLabel !== false;
+  const activeColor = config.activeColor ?? '#3b82f6';
+  const currentOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div
+      className="w-full h-full rounded-xl p-3 flex flex-col"
+      style={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)',
+        border: '1px solid rgba(255,255,255,0.08)'
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        {showLabel && <span className="text-xs font-medium text-slate-400 truncate">{label}</span>}
+        {currentOption && (
+          <span className="text-xs font-bold truncate ml-2" style={{ color: currentOption.color ?? activeColor }}>
+            {currentOption.label}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1 flex-1 content-center">
+        {options.map((opt) => {
+          const isActive = String(opt.value) === String(value);
+          const btnColor = opt.color ?? activeColor;
+          return (
+            <button
+              key={String(opt.value)}
+              disabled={disabled}
+              onClick={() => !disabled && onChange(opt.value as number | string)}
+              className="flex-1 min-w-0 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 focus:outline-none"
+              style={{
+                backgroundColor: isActive ? btnColor : 'rgba(255,255,255,0.05)',
+                color: isActive ? 'white' : 'rgba(255,255,255,0.45)',
+                border: isActive ? `1px solid ${btnColor}60` : '1px solid rgba(255,255,255,0.07)',
+                boxShadow: isActive ? `0 0 10px ${btnColor}40` : 'none',
+                opacity: disabled ? 0.5 : 1,
+                backdropFilter: 'blur(4px)'
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

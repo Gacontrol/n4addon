@@ -5,7 +5,8 @@ import {
   Thermometer, RectangleHorizontal, Circle, Minus, ArrowRight,
   Navigation, Home, ChevronLeft, Hexagon, Star, Diamond, Plus,
   Spline, List, PanelLeft, Image as ImageIcon,
-  TrendingUp, Activity, Zap
+  TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
+  AlignLeft, LayoutGrid
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -21,7 +22,8 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   Type, Container, Thermometer, RectangleHorizontal, Circle,
   Minus, ArrowRight, Navigation, Home, ChevronLeft, Hexagon,
   Star, Diamond, Plus, Spline, List, PanelLeft, ImageIcon,
-  TrendingUp, Activity, Zap
+  TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
+  AlignLeft, LayoutGrid
 };
 
 const groups: { key: string; label: string; categories: string[]; color: string; dot: string }[] = [
@@ -47,6 +49,13 @@ const groups: { key: string; label: string; categories: string[]; color: string;
     dot: '#64748b'
   },
   {
+    key: 'navigation',
+    label: 'Navigation',
+    categories: ['navigation'],
+    color: 'rgba(16,185,129,0.08)',
+    dot: '#10b981'
+  },
+  {
     key: 'modern',
     label: 'Modern',
     categories: ['modern'],
@@ -57,8 +66,8 @@ const groups: { key: string; label: string; categories: string[]; color: string;
     key: 'dashboard',
     label: 'Dashboard',
     categories: ['dashboard'],
-    color: 'rgba(168,85,247,0.06)',
-    dot: '#a855f7'
+    color: 'rgba(245,158,11,0.06)',
+    dot: '#f59e0b'
   }
 ];
 

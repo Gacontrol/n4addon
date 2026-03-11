@@ -56,7 +56,9 @@ export type WidgetType =
   | 'dash-clock'
   | 'dash-rating'
   | 'dash-level'
-  | 'dash-wind';
+  | 'dash-wind'
+  | 'modern-multistate'
+  | 'dash-multistate';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -381,7 +383,9 @@ export type WidgetConfig =
   | DashClockConfig
   | DashRatingConfig
   | DashLevelConfig
-  | DashWindConfig;
+  | DashWindConfig
+  | ModernMultistateConfig
+  | DashMultistateConfig;
 
 export interface VisuWidget {
   id: string;
@@ -586,11 +590,23 @@ export interface DashWindConfig {
   speedUnit?: string;
 }
 
+export interface ModernMultistateConfig {
+  options: MultistateOption[];
+  defaultValue?: number | string;
+  activeColor?: string;
+}
+
+export interface DashMultistateConfig {
+  options: MultistateOption[];
+  defaultValue?: number | string;
+  activeColor?: string;
+}
+
 export interface WidgetTemplate {
   type: WidgetType;
   label: string;
   icon: string;
-  category: 'control' | 'display' | 'indicator' | 'decoration' | 'modern' | 'dashboard';
+  category: 'control' | 'display' | 'indicator' | 'decoration' | 'modern' | 'dashboard' | 'navigation';
   defaultSize: Size;
   defaultConfig: WidgetConfig;
   defaultStyle: WidgetStyle;

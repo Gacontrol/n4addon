@@ -7,6 +7,7 @@ import {
   ModernBarConfig,
   ModernLedConfig,
   ModernSliderConfig,
+  ModernMultistateConfig,
   WidgetStyle
 } from '../../types/visualization';
 
@@ -368,6 +369,58 @@ export const ModernSlider: React.FC<ModernSliderProps> = ({ value, onChange, con
           style={{ left: `calc(${pct}% - 8px)`, borderColor: color, zIndex: 1 }}
         />
       </div>
+    </div>
+  );
+};
+
+/* ─── Modern Multistate ─── */
+interface ModernMultistateProps extends BaseProps {
+  value: number | string | null;
+  onChange: (v: number | string) => void;
+  config: ModernMultistateConfig;
+  disabled?: boolean;
+}
+
+export const ModernMultistate: React.FC<ModernMultistateProps> = ({ value, onChange, config, label, style, disabled }) => {
+  const options = config.options ?? [];
+  const showLabel = style.showLabel !== false;
+  const activeColor = config.activeColor ?? '#3b82f6';
+
+  const currentOption = options.find(o => String(o.value) === String(value));
+
+  return (
+    <div className="w-full h-full flex flex-col justify-center gap-1.5 px-3">
+      {showLabel && (
+        <span className="text-xs font-medium text-slate-400 truncate">{label}</span>
+      )}
+      <div className="flex gap-1 flex-wrap">
+        {options.map((opt) => {
+          const isActive = String(opt.value) === String(value);
+          const btnColor = opt.color ?? activeColor;
+          return (
+            <button
+              key={String(opt.value)}
+              disabled={disabled}
+              onClick={() => !disabled && onChange(opt.value as number | string)}
+              className="flex-1 min-w-0 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 focus:outline-none"
+              style={{
+                backgroundColor: isActive ? btnColor : 'rgba(255,255,255,0.06)',
+                color: isActive ? 'white' : 'rgba(255,255,255,0.5)',
+                border: isActive ? `1px solid ${btnColor}` : '1px solid rgba(255,255,255,0.1)',
+                boxShadow: isActive ? `0 0 8px ${btnColor}50` : 'none',
+                opacity: disabled ? 0.5 : 1
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {currentOption && (
+        <div className="text-[10px] text-slate-500 truncate">
+          Aktiv: <span style={{ color: currentOption.color ?? activeColor }}>{currentOption.label}</span>
+        </div>
+      )}
     </div>
   );
 };

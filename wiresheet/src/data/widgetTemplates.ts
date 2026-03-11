@@ -460,7 +460,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-nav-button',
     label: 'Seiten-Taster',
     icon: 'Navigation',
-    category: 'decoration',
+    category: 'navigation',
     defaultSize: { width: 120, height: 50 },
     defaultConfig: {
       label: 'Seite 2',
@@ -478,7 +478,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-home-button',
     label: 'Home-Taster',
     icon: 'Home',
-    category: 'decoration',
+    category: 'navigation',
     defaultSize: { width: 80, height: 50 },
     defaultConfig: {
       label: 'Home',
@@ -495,7 +495,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-back-button',
     label: 'Zurueck-Taster',
     icon: 'ChevronLeft',
-    category: 'decoration',
+    category: 'navigation',
     defaultSize: { width: 80, height: 50 },
     defaultConfig: {
       label: 'Zurueck',
@@ -512,7 +512,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-frame',
     label: 'Navigation Frame',
     icon: 'PanelLeft',
-    category: 'decoration',
+    category: 'navigation',
     defaultSize: { width: 220, height: 500 },
     defaultConfig: {
       title: 'Navigation',
@@ -635,6 +635,26 @@ export const widgetTemplates: WidgetTemplate[] = [
     defaultConfig: { min: 0, max: 100, step: 1, unit: '', showValue: true, color: '#3b82f6' },
     defaultStyle: { showLabel: true, labelPosition: 'top' },
     description: 'Moderner Schieberegler mit Wertanzeige',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
+    type: 'modern-multistate',
+    label: 'Mehrfachschalter Modern',
+    icon: 'List',
+    category: 'modern',
+    defaultSize: { width: 200, height: 80 },
+    defaultConfig: {
+      options: [
+        { value: 0, label: 'Aus', color: '#64748b' },
+        { value: 1, label: 'Ein', color: '#22c55e' },
+        { value: 2, label: 'Auto', color: '#3b82f6' }
+      ],
+      defaultValue: 0,
+      activeColor: '#3b82f6'
+    },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Moderner Mehrfachschalter mit Schaltflaechen',
     supportsBinding: true,
     bindingDirection: 'readwrite'
   },
@@ -805,6 +825,26 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Windgeschwindigkeit und -richtung',
     supportsBinding: true,
     bindingDirection: 'read'
+  },
+  {
+    type: 'dash-multistate',
+    label: 'Mehrfachschalter Dash',
+    icon: 'List',
+    category: 'dashboard',
+    defaultSize: { width: 200, height: 120 },
+    defaultConfig: {
+      options: [
+        { value: 0, label: 'Aus', color: '#64748b' },
+        { value: 1, label: 'Ein', color: '#22c55e' },
+        { value: 2, label: 'Auto', color: '#3b82f6' }
+      ],
+      defaultValue: 0,
+      activeColor: '#3b82f6'
+    },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Dashboard Mehrfachschalter mit Karten-Design',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 
