@@ -26,6 +26,10 @@ export type WidgetType =
   | 'visu-circle'
   | 'visu-line'
   | 'visu-arrow'
+  | 'visu-polygon'
+  | 'visu-star'
+  | 'visu-diamond'
+  | 'visu-cross'
   | 'visu-nav-button'
   | 'visu-home-button'
   | 'visu-back-button';
@@ -159,32 +163,74 @@ export interface ButtonConfig {
   defaultReleaseValue?: unknown;
 }
 
-export interface RectConfig {
+export interface ShapeBindingConfig {
+  navigateToPageId?: string;
+  colorBinding?: WidgetBinding;
+  visibilityBinding?: WidgetBinding;
+  activeColor?: string;
+  inactiveColor?: string;
+}
+
+export interface RectConfig extends ShapeBindingConfig {
   fillColor?: string;
   strokeColor?: string;
   strokeWidth?: number;
   opacity?: number;
 }
 
-export interface CircleConfig {
+export interface CircleConfig extends ShapeBindingConfig {
   fillColor?: string;
   strokeColor?: string;
   strokeWidth?: number;
   opacity?: number;
 }
 
-export interface LineConfig {
+export interface LineConfig extends ShapeBindingConfig {
   strokeColor?: string;
   strokeWidth?: number;
   opacity?: number;
+  angle?: number;
 }
 
-export interface ArrowConfig {
+export interface ArrowConfig extends ShapeBindingConfig {
   strokeColor?: string;
   strokeWidth?: number;
   arrowEnd?: boolean;
   arrowStart?: boolean;
   opacity?: number;
+  angle?: number;
+}
+
+export interface PolygonConfig extends ShapeBindingConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  sides?: number;
+}
+
+export interface StarConfig extends ShapeBindingConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  points?: number;
+  innerRadiusRatio?: number;
+}
+
+export interface DiamondConfig extends ShapeBindingConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+}
+
+export interface CrossConfig extends ShapeBindingConfig {
+  fillColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  armWidth?: number;
 }
 
 export interface NavButtonConfig {
@@ -222,6 +268,10 @@ export type WidgetConfig =
   | CircleConfig
   | LineConfig
   | ArrowConfig
+  | PolygonConfig
+  | StarConfig
+  | DiamondConfig
+  | CrossConfig
   | NavButtonConfig
   | HomeButtonConfig
   | BackButtonConfig;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor } from 'lucide-react';
-import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 
 interface WidgetPropertiesPanelProps {
@@ -13,9 +13,13 @@ interface WidgetPropertiesPanelProps {
 }
 
 const NON_BINDABLE_TYPES = new Set([
-  'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
   'visu-nav-button', 'visu-home-button', 'visu-back-button',
   'ha-output', 'modbus-driver', 'modbus-device-output', 'text-annotation'
+]);
+
+const SHAPE_TYPES = new Set([
+  'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
+  'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross'
 ]);
 
 const getNodeLabel = (node: FlowNode) => {
@@ -109,6 +113,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
 
   const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
+  const isShapeWidget = SHAPE_TYPES.has(widget.type);
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
 
@@ -552,6 +557,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
               <input type="number" min="0" max="1" step="0.1" value={shapeCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
             </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={shapeCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <hr className="border-slate-700" />
+            <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung (Tab Verknuepfung):</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe (Wert = true/1)</label>
+              <input type="color" value={shapeCfg.activeColor || shapeCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe (Wert = false/0)</label>
+              <input type="color" value={shapeCfg.inactiveColor || shapeCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
           </>
         );
       }
@@ -571,6 +594,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-1">Linienstaerke</label>
               <input type="number" min="1" max="20" value={lineCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Winkel (Grad, 0 = waagerecht)</label>
+              <input type="number" min="-180" max="180" value={lineCfg.angle ?? 0} onChange={(e) => onUpdate({ config: { ...config, angle: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
             {isArrow && (
               <>
                 <div className="flex items-center gap-2">
@@ -586,6 +613,193 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             <div>
               <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
               <input type="number" min="0" max="1" step="0.1" value={lineCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={lineCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <hr className="border-slate-700" />
+            <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe (Wert = true/1)</label>
+              <input type="color" value={lineCfg.activeColor || lineCfg.strokeColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe (Wert = false/0)</label>
+              <input type="color" value={lineCfg.inactiveColor || lineCfg.strokeColor || '#64748b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-polygon': {
+        const pCfg = config as PolygonConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ecken (3-12)</label>
+              <input type="number" min="3" max="12" value={pCfg.sides ?? 6} onChange={(e) => onUpdate({ config: { ...config, sides: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={pCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
+              <input type="color" value={pCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
+              <input type="number" min="0" max="20" value={pCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={pCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={pCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <hr className="border-slate-700" />
+            <p className="text-xs text-slate-500">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
+              <input type="color" value={pCfg.activeColor || pCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
+              <input type="color" value={pCfg.inactiveColor || pCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-star': {
+        const sCfg = config as StarConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Spitzen (3-12)</label>
+              <input type="number" min="3" max="12" value={sCfg.points ?? 5} onChange={(e) => onUpdate({ config: { ...config, points: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Innenradius (0.1-0.9)</label>
+              <input type="number" min="0.1" max="0.9" step="0.05" value={sCfg.innerRadiusRatio ?? 0.4} onChange={(e) => onUpdate({ config: { ...config, innerRadiusRatio: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={sCfg.fillColor || '#eab308'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
+              <input type="color" value={sCfg.strokeColor || '#ca8a04'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={sCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={sCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
+              <input type="color" value={sCfg.activeColor || sCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
+              <input type="color" value={sCfg.inactiveColor || sCfg.fillColor || '#eab308'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-diamond': {
+        const dCfg = config as DiamondConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={dCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
+              <input type="color" value={dCfg.strokeColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, strokeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Rahmenstaerke</label>
+              <input type="number" min="0" max="20" value={dCfg.strokeWidth ?? 2} onChange={(e) => onUpdate({ config: { ...config, strokeWidth: parseInt(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={dCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={dCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
+              <input type="color" value={dCfg.activeColor || dCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
+              <input type="color" value={dCfg.inactiveColor || dCfg.fillColor || '#1e293b'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-cross': {
+        const xCfg = config as CrossConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Armbreite (0.1-0.8)</label>
+              <input type="number" min="0.1" max="0.8" step="0.05" value={xCfg.armWidth ?? 0.3} onChange={(e) => onUpdate({ config: { ...config, armWidth: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Fuellfarbe</label>
+              <input type="color" value={xCfg.fillColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, fillColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Transparenz (0-1)</label>
+              <input type="number" min="0" max="1" step="0.1" value={xCfg.opacity ?? 1} onChange={(e) => onUpdate({ config: { ...config, opacity: parseFloat(e.target.value) } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200" />
+            </div>
+            <hr className="border-slate-700" />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Seitenwechsel (leer = kein)</label>
+              <select value={xCfg.navigateToPageId || ''} onChange={(e) => onUpdate({ config: { ...config, navigateToPageId: e.target.value || undefined } })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200">
+                <option value="">-- Kein Seitenwechsel --</option>
+                {visuPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Farbsteuerung via Verknuepfung:</p>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Aktiv-Farbe</label>
+              <input type="color" value={xCfg.activeColor || xCfg.fillColor || '#22c55e'} onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Inaktiv-Farbe</label>
+              <input type="color" value={xCfg.inactiveColor || xCfg.fillColor || '#475569'} onChange={(e) => onUpdate({ config: { ...config, inactiveColor: e.target.value } })} className="w-full h-8 rounded cursor-pointer" />
             </div>
           </>
         );
@@ -818,6 +1032,61 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <Unlink className="w-4 h-4 text-slate-500" />
                 <span className="text-xs text-slate-400">Dieses Widget unterstuetzt keine Verknuepfungen</span>
               </div>
+            ) : isShapeWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe diese Form mit einem Datenpunkt um Farbe oder Sichtbarkeit zu steuern. Aktiv/Inaktiv-Farben werden im Allgemein-Tab eingestellt.
+                </p>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt (Farbsteuerung)</label>
+                  <select
+                    value={widget.binding?.nodeId || ''}
+                    onChange={(e) => handleNodeChange(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  >
+                    <option value="">-- Keine Verknuepfung --</option>
+                    {Object.entries(nodesByCategory).map(([cat, nodes]) => (
+                      <optgroup key={cat} label={cat}>
+                        {nodes.map((node) => (
+                          <option key={node.id} value={node.id}>{getNodeLabel(node)}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {widget.binding && selectedNodePorts.length > 0 && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Port</label>
+                    <select
+                      value={widget.binding.portId || ''}
+                      onChange={(e) => handlePortChange(e.target.value)}
+                      className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                    >
+                      <option value="">-- Hauptwert --</option>
+                      {selectedNodePorts.filter(p => p.isOutput).map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {widget.binding ? (
+                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <Link2 className="w-4 h-4 text-green-500" />
+                    <div className="text-xs text-green-400">
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
+                    </div>
+                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
+                    <Unlink className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <div>

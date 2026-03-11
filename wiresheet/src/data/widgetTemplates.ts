@@ -303,8 +303,8 @@ export const widgetTemplates: WidgetTemplate[] = [
       opacity: 1
     },
     defaultStyle: {},
-    description: 'Rechteck zum Gruppieren',
-    supportsBinding: false,
+    description: 'Rechteck - mit Verknuepfung fuer Farbwechsel',
+    supportsBinding: true,
     bindingDirection: 'read'
   },
   {
@@ -320,8 +320,8 @@ export const widgetTemplates: WidgetTemplate[] = [
       opacity: 1
     },
     defaultStyle: {},
-    description: 'Kreis / Ellipse',
-    supportsBinding: false,
+    description: 'Kreis / Ellipse - mit Verknuepfung fuer Farbwechsel',
+    supportsBinding: true,
     bindingDirection: 'read'
   },
   {
@@ -329,15 +329,16 @@ export const widgetTemplates: WidgetTemplate[] = [
     label: 'Linie',
     icon: 'Minus',
     category: 'decoration',
-    defaultSize: { width: 150, height: 4 },
+    defaultSize: { width: 150, height: 40 },
     defaultConfig: {
       strokeColor: '#64748b',
       strokeWidth: 2,
-      opacity: 1
+      opacity: 1,
+      angle: 0
     },
     defaultStyle: {},
-    description: 'Linie zur Trennung',
-    supportsBinding: false,
+    description: 'Linie - frei drehbar, mit Verknuepfung',
+    supportsBinding: true,
     bindingDirection: 'read'
   },
   {
@@ -345,17 +346,90 @@ export const widgetTemplates: WidgetTemplate[] = [
     label: 'Pfeil',
     icon: 'ArrowRight',
     category: 'decoration',
-    defaultSize: { width: 150, height: 30 },
+    defaultSize: { width: 150, height: 40 },
     defaultConfig: {
       strokeColor: '#64748b',
       strokeWidth: 2,
       arrowEnd: true,
       arrowStart: false,
+      opacity: 1,
+      angle: 0
+    },
+    defaultStyle: {},
+    description: 'Pfeil - frei drehbar, mit Verknuepfung',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-polygon',
+    label: 'Polygon',
+    icon: 'Hexagon',
+    category: 'decoration',
+    defaultSize: { width: 100, height: 100 },
+    defaultConfig: {
+      fillColor: '#1e293b',
+      strokeColor: '#475569',
+      strokeWidth: 2,
+      opacity: 1,
+      sides: 6
+    },
+    defaultStyle: {},
+    description: 'Vieleck (3-12 Ecken) - mit Verknuepfung',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-star',
+    label: 'Stern',
+    icon: 'Star',
+    category: 'decoration',
+    defaultSize: { width: 100, height: 100 },
+    defaultConfig: {
+      fillColor: '#eab308',
+      strokeColor: '#ca8a04',
+      strokeWidth: 1,
+      opacity: 1,
+      points: 5,
+      innerRadiusRatio: 0.4
+    },
+    defaultStyle: {},
+    description: 'Stern - mit Verknuepfung fuer Farbwechsel',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-diamond',
+    label: 'Raute',
+    icon: 'Diamond',
+    category: 'decoration',
+    defaultSize: { width: 100, height: 100 },
+    defaultConfig: {
+      fillColor: '#1e293b',
+      strokeColor: '#475569',
+      strokeWidth: 2,
       opacity: 1
     },
     defaultStyle: {},
-    description: 'Pfeil zur Richtungsanzeige',
-    supportsBinding: false,
+    description: 'Raute - mit Verknuepfung fuer Farbwechsel',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
+    type: 'visu-cross',
+    label: 'Kreuz / Plus',
+    icon: 'Plus',
+    category: 'decoration',
+    defaultSize: { width: 80, height: 80 },
+    defaultConfig: {
+      fillColor: '#475569',
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      opacity: 1,
+      armWidth: 0.3
+    },
+    defaultStyle: {},
+    description: 'Kreuz / Plus-Symbol - mit Verknuepfung',
+    supportsBinding: true,
     bindingDirection: 'read'
   },
   {

@@ -19,6 +19,10 @@ import {
   CircleConfig,
   LineConfig,
   ArrowConfig,
+  PolygonConfig,
+  StarConfig,
+  DiamondConfig,
+  CrossConfig,
   NavButtonConfig,
   HomeButtonConfig,
   BackButtonConfig
@@ -54,6 +58,55 @@ interface VisuWidgetProps {
   visuPages?: { id: string; name: string }[];
 }
 
+function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
+  const pts: string[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
+    pts.push(`${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`);
+  }
+  return pts.join(' ');
+}
+
+function makeStarPoints(cx: number, cy: number, rx: number, ry: number, points: number, innerRatio: number): string {
+  const pts: string[] = [];
+  const total = points * 2;
+  for (let i = 0; i < total; i++) {
+    const angle = (Math.PI * 2 * i) / total - Math.PI / 2;
+    const r = i % 2 === 0 ? 1 : innerRatio;
+    pts.push(`${cx + rx * r * Math.cos(angle)},${cy + ry * r * Math.sin(angle)}`);
+  }
+  return pts.join(' ');
+}
+
+function makeDiamondPoints(w: number, h: number): string {
+  return `${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`;
+}
+
+function makeCrossPoints(w: number, h: number, armRatio: number): string {
+  const a = armRatio;
+  const x1 = w * (0.5 - a / 2), x2 = w * (0.5 + a / 2);
+  const y1 = h * (0.5 - a / 2), y2 = h * (0.5 + a / 2);
+  return `${x1},0 ${x2},0 ${x2},${y1} ${w},${y1} ${w},${y2} ${x2},${y2} ${x2},${h} ${x1},${h} ${x1},${y2} 0,${y2} 0,${y1} ${x1},${y1}`;
+}
+
+function resolveShapeColor(cfg: RectConfig | CircleConfig | PolygonConfig | StarConfig | DiamondConfig | CrossConfig, value: unknown): string {
+  const base = cfg.fillColor || '#1e293b';
+  if (cfg.activeColor && cfg.inactiveColor) {
+    return value ? cfg.activeColor : cfg.inactiveColor;
+  }
+  if (cfg.activeColor && value) return cfg.activeColor;
+  return base;
+}
+
+function resolveLineColor(cfg: LineConfig | ArrowConfig, value: unknown): string {
+  const base = cfg.strokeColor || '#64748b';
+  if (cfg.activeColor && cfg.inactiveColor) {
+    return value ? cfg.activeColor : cfg.inactiveColor;
+  }
+  if (cfg.activeColor && value) return cfg.activeColor;
+  return base;
+}
+
 export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   widget,
   value,
@@ -68,6 +121,13 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateHome,
   visuPages = []
 }) => {
+  const handleShapeClick = (cfg: { navigateToPageId?: string }) => {
+    if (isEditMode) return;
+    if (cfg.navigateToPageId) {
+      onNavigateToPage?.(cfg.navigateToPageId);
+    }
+  };
+
   const renderWidget = () => {
     switch (widget.type) {
       case 'visu-switch': {
@@ -225,12 +285,20 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-rect': {
         const rCfg = widget.config as RectConfig;
+        const isHidden = rCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const fillColor = resolveShapeColor(rCfg, value);
+        const hasNav = !!rCfg.navigateToPageId && !isEditMode;
         return (
-          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: rCfg.opacity ?? 1 }}>
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: rCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(rCfg)}
+          >
             <rect
               x="0" y="0"
               width="100%" height="100%"
-              fill={rCfg.fillColor || '#1e293b'}
+              fill={fillColor}
               stroke={rCfg.strokeColor || '#475569'}
               strokeWidth={rCfg.strokeWidth ?? 2}
               rx={widget.style.borderRadius ?? 4}
@@ -241,15 +309,23 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-circle': {
         const cCfg = widget.config as CircleConfig;
+        const isHidden = cCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
         const cx = widget.size.width / 2;
         const cy = widget.size.height / 2;
         const rx = Math.max(1, cx - (cCfg.strokeWidth ?? 2) / 2);
         const ry = Math.max(1, cy - (cCfg.strokeWidth ?? 2) / 2);
+        const fillColor = resolveShapeColor(cCfg, value);
+        const hasNav = !!cCfg.navigateToPageId && !isEditMode;
         return (
-          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: cCfg.opacity ?? 1 }}>
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: cCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(cCfg)}
+          >
             <ellipse
               cx={cx} cy={cy} rx={rx} ry={ry}
-              fill={cCfg.fillColor || '#1e293b'}
+              fill={fillColor}
               stroke={cCfg.strokeColor || '#475569'}
               strokeWidth={cCfg.strokeWidth ?? 2}
             />
@@ -259,13 +335,31 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-line': {
         const lCfg = widget.config as LineConfig;
-        const cy = widget.size.height / 2;
+        const isHidden = lCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const angle = lCfg.angle ?? 0;
+        const w = widget.size.width;
+        const h = widget.size.height;
+        const cx = w / 2, cy = h / 2;
+        const len = Math.sqrt(w * w + h * h) / 2;
+        const rad = (angle * Math.PI) / 180;
+        const x1 = cx - len * Math.cos(rad);
+        const y1 = cy - len * Math.sin(rad);
+        const x2 = cx + len * Math.cos(rad);
+        const y2 = cy + len * Math.sin(rad);
+        const strokeColor = resolveLineColor(lCfg, value);
+        const hasNav = !!lCfg.navigateToPageId && !isEditMode;
         return (
-          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: lCfg.opacity ?? 1 }}>
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(lCfg)}
+          >
             <line
-              x1="0" y1={cy} x2={widget.size.width} y2={cy}
-              stroke={lCfg.strokeColor || '#64748b'}
+              x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={strokeColor}
               strokeWidth={lCfg.strokeWidth ?? 2}
+              strokeLinecap="round"
             />
           </svg>
         );
@@ -273,28 +367,155 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
       case 'visu-arrow': {
         const aCfg = widget.config as ArrowConfig;
-        const cy = widget.size.height / 2;
+        const isHidden = aCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const angle = aCfg.angle ?? 0;
+        const w = widget.size.width;
+        const h = widget.size.height;
+        const cx = w / 2, cy = h / 2;
         const sw = aCfg.strokeWidth ?? 2;
         const arrowSize = Math.max(8, sw * 3);
+        const len = Math.sqrt(w * w + h * h) / 2;
+        const rad = (angle * Math.PI) / 180;
+        const strokeColor = resolveLineColor(aCfg, value);
         const markerId = `arrowhead-${widget.id}`;
         const markerStartId = `arrowhead-start-${widget.id}`;
+        const x1raw = cx - len * Math.cos(rad);
+        const y1raw = cy - len * Math.sin(rad);
+        const x2raw = cx + len * Math.cos(rad);
+        const y2raw = cy + len * Math.sin(rad);
+        const x1 = aCfg.arrowStart ? x1raw + arrowSize * Math.cos(rad) : x1raw;
+        const y1 = aCfg.arrowStart ? y1raw + arrowSize * Math.sin(rad) : y1raw;
+        const x2 = aCfg.arrowEnd ? x2raw - arrowSize * Math.cos(rad) : x2raw;
+        const y2 = aCfg.arrowEnd ? y2raw - arrowSize * Math.sin(rad) : y2raw;
+        const hasNav = !!aCfg.navigateToPageId && !isEditMode;
         return (
-          <svg width="100%" height="100%" style={{ overflow: 'visible', opacity: aCfg.opacity ?? 1 }}>
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: aCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(aCfg)}
+          >
             <defs>
               <marker id={markerId} markerWidth={arrowSize} markerHeight={arrowSize} refX={arrowSize - 1} refY={arrowSize / 2} orient="auto">
-                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={aCfg.strokeColor || '#64748b'} />
+                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={strokeColor} />
               </marker>
               <marker id={markerStartId} markerWidth={arrowSize} markerHeight={arrowSize} refX="1" refY={arrowSize / 2} orient="auto-start-reverse">
-                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={aCfg.strokeColor || '#64748b'} />
+                <polygon points={`0 0, ${arrowSize} ${arrowSize / 2}, 0 ${arrowSize}`} fill={strokeColor} />
               </marker>
             </defs>
             <line
-              x1={aCfg.arrowStart ? arrowSize : 0} y1={cy}
-              x2={aCfg.arrowEnd ? widget.size.width - arrowSize : widget.size.width} y2={cy}
-              stroke={aCfg.strokeColor || '#64748b'}
+              x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={strokeColor}
               strokeWidth={sw}
+              strokeLinecap="round"
               markerEnd={aCfg.arrowEnd ? `url(#${markerId})` : undefined}
               markerStart={aCfg.arrowStart ? `url(#${markerStartId})` : undefined}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-polygon': {
+        const pCfg = widget.config as PolygonConfig;
+        const isHidden = pCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const sides = pCfg.sides ?? 6;
+        const w = widget.size.width, h = widget.size.height;
+        const cx = w / 2, cy = h / 2;
+        const rx = Math.max(1, cx - (pCfg.strokeWidth ?? 2) / 2);
+        const ry = Math.max(1, cy - (pCfg.strokeWidth ?? 2) / 2);
+        const pts = makePolygonPoints(cx, cy, rx, ry, sides);
+        const fillColor = resolveShapeColor(pCfg, value);
+        const hasNav = !!pCfg.navigateToPageId && !isEditMode;
+        return (
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: pCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(pCfg)}
+          >
+            <polygon
+              points={pts}
+              fill={fillColor}
+              stroke={pCfg.strokeColor || '#475569'}
+              strokeWidth={pCfg.strokeWidth ?? 2}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-star': {
+        const sCfg = widget.config as StarConfig;
+        const isHidden = sCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const numPoints = sCfg.points ?? 5;
+        const innerRatio = sCfg.innerRadiusRatio ?? 0.4;
+        const w = widget.size.width, h = widget.size.height;
+        const cx = w / 2, cy = h / 2;
+        const rx = Math.max(1, cx - (sCfg.strokeWidth ?? 1));
+        const ry = Math.max(1, cy - (sCfg.strokeWidth ?? 1));
+        const pts = makeStarPoints(cx, cy, rx, ry, numPoints, innerRatio);
+        const fillColor = resolveShapeColor(sCfg, value);
+        const hasNav = !!sCfg.navigateToPageId && !isEditMode;
+        return (
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: sCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(sCfg)}
+          >
+            <polygon
+              points={pts}
+              fill={fillColor}
+              stroke={sCfg.strokeColor || '#ca8a04'}
+              strokeWidth={sCfg.strokeWidth ?? 1}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-diamond': {
+        const dCfg = widget.config as DiamondConfig;
+        const isHidden = dCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const w = widget.size.width, h = widget.size.height;
+        const pts = makeDiamondPoints(w, h);
+        const fillColor = resolveShapeColor(dCfg, value);
+        const hasNav = !!dCfg.navigateToPageId && !isEditMode;
+        return (
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: dCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(dCfg)}
+          >
+            <polygon
+              points={pts}
+              fill={fillColor}
+              stroke={dCfg.strokeColor || '#475569'}
+              strokeWidth={dCfg.strokeWidth ?? 2}
+            />
+          </svg>
+        );
+      }
+
+      case 'visu-cross': {
+        const xCfg = widget.config as CrossConfig;
+        const isHidden = xCfg.visibilityBinding && value === false;
+        if (isHidden) return null;
+        const w = widget.size.width, h = widget.size.height;
+        const armRatio = xCfg.armWidth ?? 0.3;
+        const pts = makeCrossPoints(w, h, armRatio);
+        const fillColor = resolveShapeColor(xCfg, value);
+        const hasNav = !!xCfg.navigateToPageId && !isEditMode;
+        return (
+          <svg
+            width="100%" height="100%"
+            style={{ overflow: 'visible', opacity: xCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            onClick={() => handleShapeClick(xCfg)}
+          >
+            <polygon
+              points={pts}
+              fill={fillColor}
+              stroke={xCfg.strokeColor || 'transparent'}
+              strokeWidth={xCfg.strokeWidth ?? 0}
             />
           </svg>
         );
@@ -395,7 +616,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     }
   };
 
-  const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow'].includes(widget.type);
+  const isDrawingWidget = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross'].includes(widget.type);
   const isNavWidget = ['visu-nav-button', 'visu-home-button', 'visu-back-button'].includes(widget.type);
 
   return (

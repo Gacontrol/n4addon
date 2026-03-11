@@ -2,7 +2,8 @@ import React from 'react';
 import {
   ToggleLeft, Square, SlidersHorizontal, PlusCircle, TextCursorInput,
   Gauge, MonitorDot, Lightbulb, BarChart3, Type, Container, Thermometer,
-  RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft
+  RectangleHorizontal, Circle, Minus, ArrowRight, Navigation, Home, ChevronLeft,
+  Hexagon, Star, Diamond, Plus
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -30,7 +31,11 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   ArrowRight,
   Navigation,
   Home,
-  ChevronLeft
+  ChevronLeft,
+  Hexagon,
+  Star,
+  Diamond,
+  Plus
 };
 
 const categoryLabels: Record<string, string> = {
