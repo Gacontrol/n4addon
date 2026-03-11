@@ -738,6 +738,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         nodeValues[nodeId] = visuVal;
         setPersistentDpValue(nodeId, visuVal);
         console.log(`DP Node ${nodeId} auf Visu-Wert gesetzt: ${visuVal}`);
+        delete visuOverrides[visuKey];
+        delete visuOverrides[nodeId];
       } else if (inputVals[0] !== undefined) {
         nodeValues[nodeId] = inputVals[0];
         setPersistentDpValue(nodeId, inputVals[0]);
@@ -748,6 +750,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       }
     } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = visuOverrides[nodeId];
+      delete visuOverrides[nodeId];
     } else if (node.type === 'and-gate') {
       if (inputVals.length === 0) {
         nodeValues[nodeId] = false;
