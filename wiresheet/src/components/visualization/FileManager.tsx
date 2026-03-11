@@ -11,7 +11,7 @@ interface ImageFile {
 interface FileManagerProps {
   onClose: () => void;
   apiBase: string;
-  onSelectImage?: (url: string) => void;
+  onSelectImage?: (url: string, rawUrl?: string) => void;
   pickerMode?: boolean;
 }
 
@@ -205,7 +205,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
                       onClick={() => setSelectedFile(selectedFile === img.filename ? null : img.filename)}
                       onDoubleClick={() => {
                         if (pickerMode && onSelectImage) {
-                          onSelectImage(imageUrl(img));
+                          onSelectImage(imageUrl(img), img.url);
                           onClose();
                         }
                       }}
@@ -226,7 +226,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onSelectImage) {
-                              onSelectImage(imageUrl(img));
+                              onSelectImage(imageUrl(img), img.url);
                               onClose();
                             }
                           }}
@@ -286,7 +286,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
                     <button
                       onClick={() => {
                         if (onSelectImage) {
-                          onSelectImage(imageUrl(img));
+                          onSelectImage(imageUrl(img), img.url);
                           onClose();
                         }
                       }}

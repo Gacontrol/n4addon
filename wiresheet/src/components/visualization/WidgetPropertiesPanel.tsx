@@ -1312,8 +1312,9 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <FileManager
                 apiBase={getApiBase()}
                 pickerMode
-                onSelectImage={(url) => {
-                  onUpdate({ config: { ...imgCfg, imageUrl: url, storagePath: url } });
+                onSelectImage={(url, rawUrl) => {
+                  const storeUrl = rawUrl ?? url;
+                  onUpdate({ config: { ...imgCfg, imageUrl: storeUrl, storagePath: storeUrl } });
                   setShowImagePicker(false);
                 }}
                 onClose={() => setShowImagePicker(false)}

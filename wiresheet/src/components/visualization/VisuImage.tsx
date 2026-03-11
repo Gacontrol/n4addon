@@ -103,8 +103,9 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
           <FileManager
             apiBase={getApiBase()}
             pickerMode
-            onSelectImage={(url) => {
-              onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+            onSelectImage={(url, rawUrl) => {
+              const storeUrl = rawUrl ?? url;
+              onUpdateConfig({ ...config, imageUrl: storeUrl, storagePath: storeUrl });
               setShowFilePicker(false);
             }}
             onClose={() => setShowFilePicker(false)}
@@ -167,8 +168,9 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
         <FileManager
           apiBase={getApiBase()}
           pickerMode
-          onSelectImage={(url) => {
-            onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+          onSelectImage={(url, rawUrl) => {
+            const storeUrl = rawUrl ?? url;
+            onUpdateConfig({ ...config, imageUrl: storeUrl, storagePath: storeUrl });
             setShowFilePicker(false);
           }}
           onClose={() => setShowFilePicker(false)}
