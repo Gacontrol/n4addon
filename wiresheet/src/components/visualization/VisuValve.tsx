@@ -349,47 +349,49 @@ export const VisuValve: React.FC<VisuValveProps> = ({
                 </div>
               )}
 
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <Sliders size={16} /> {isHandMode ? 'Stellwert einstellen (Hand)' : 'Sollwert einstellen'}
-                </h3>
-                <div className="space-y-3">
-                  <input
-                    type="range"
-                    min={minOutput}
-                    max={maxOutput}
-                    value={localSetpoint}
-                    onChange={(e) => handleSetpointChange(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <div className="flex items-center gap-2">
+              {isHandMode && (
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                    <Sliders size={16} /> Stellwert einstellen (Hand)
+                  </h3>
+                  <div className="space-y-3">
                     <input
-                      type="number"
+                      type="range"
                       min={minOutput}
                       max={maxOutput}
                       value={localSetpoint}
                       onChange={(e) => handleSetpointChange(Number(e.target.value))}
-                      className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center"
+                      className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
-                    <span className="text-slate-400">%</span>
-                  </div>
-                  <div className="flex gap-2">
-                    {[0, 25, 50, 75, 100].map(preset => (
-                      <button
-                        key={preset}
-                        onClick={() => handleSetpointChange(preset)}
-                        className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          localSetpoint === preset
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        {preset}%
-                      </button>
-                    ))}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={minOutput}
+                        max={maxOutput}
+                        value={localSetpoint}
+                        onChange={(e) => handleSetpointChange(Number(e.target.value))}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-center"
+                      />
+                      <span className="text-slate-400">%</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {[0, 25, 50, 75, 100].map(preset => (
+                        <button
+                          key={preset}
+                          onClick={() => handleSetpointChange(preset)}
+                          className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            localSetpoint === preset
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          {preset}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {alarm && (
                 <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">

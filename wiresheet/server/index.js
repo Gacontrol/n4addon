@@ -1304,6 +1304,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (resetInput && st.alarmLatch) {
         st.alarmLatch = false;
         st.alarmTimerStart = null;
+        if (visuReset === true) {
+          cfg.valveVisuReset = false;
+        }
       }
 
       if (monitoringEnable && deviation > tolerance) {
