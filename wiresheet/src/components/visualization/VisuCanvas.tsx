@@ -594,11 +594,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       }
     };
 
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 0) {
+        finishLasso();
+      }
+    };
+
     window.addEventListener('pointermove', handleGlobalPointerMove);
     window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointercancel', finishLasso);
     return () => {
       window.removeEventListener('pointermove', handleGlobalPointerMove);
       window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointercancel', finishLasso);
     };
   }, [lasso]);
 
