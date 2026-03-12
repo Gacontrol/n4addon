@@ -251,8 +251,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const scrollLeft = canvasRef.current.scrollLeft;
+      const scrollTop = canvasRef.current.scrollTop;
+      const x = e.clientX - rect.left + scrollLeft;
+      const y = e.clientY - rect.top + scrollTop;
       lassoRef.current = { startX: x, startY: y, currentX: x, currentY: y };
       setLassoTick(t => t + 1);
 
@@ -263,10 +265,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const handleCanvasPointerMove = (e: React.PointerEvent) => {
     if (lassoRef.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
+      const scrollLeft = canvasRef.current.scrollLeft;
+      const scrollTop = canvasRef.current.scrollTop;
       lassoRef.current = {
         ...lassoRef.current,
-        currentX: e.clientX - rect.left,
-        currentY: e.clientY - rect.top
+        currentX: e.clientX - rect.left + scrollLeft,
+        currentY: e.clientY - rect.top + scrollTop
       };
       setLassoTick(t => t + 1);
     }
@@ -318,13 +322,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       lassoRef.current = null;
       setLassoTick(t => t + 1);
 
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-
-      const minX = (Math.min(currentLasso.startX, currentLasso.currentX) + scrollLeft) / zoom;
-      const maxX = (Math.max(currentLasso.startX, currentLasso.currentX) + scrollLeft) / zoom;
-      const minY = (Math.min(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
-      const maxY = (Math.max(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
+      const minX = Math.min(currentLasso.startX, currentLasso.currentX) / zoom;
+      const maxX = Math.max(currentLasso.startX, currentLasso.currentX) / zoom;
+      const minY = Math.min(currentLasso.startY, currentLasso.currentY) / zoom;
+      const maxY = Math.max(currentLasso.startY, currentLasso.currentY) / zoom;
 
       const lassoWidth = Math.abs(currentLasso.currentX - currentLasso.startX);
       const lassoHeight = Math.abs(currentLasso.currentY - currentLasso.startY);
@@ -424,11 +425,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   void lassoTick;
   const lasso = lassoRef.current;
-  const scrollLeft = canvasRef.current?.scrollLeft || 0;
-  const scrollTop = canvasRef.current?.scrollTop || 0;
   const lassoRect = lasso ? {
-    x: (Math.min(lasso.startX, lasso.currentX) + scrollLeft) / zoom,
-    y: (Math.min(lasso.startY, lasso.currentY) + scrollTop) / zoom,
+    x: Math.min(lasso.startX, lasso.currentX) / zoom,
+    y: Math.min(lasso.startY, lasso.currentY) / zoom,
     width: Math.abs(lasso.currentX - lasso.startX) / zoom,
     height: Math.abs(lasso.currentY - lasso.startY) / zoom
   } : null;
