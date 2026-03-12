@@ -1,8 +1,10 @@
-# Wiresheet Flow Editor - Dokumentation
+# GA-Control - Dokumentation
+
+**keep it simple - by Dr. Muff**
 
 ## Übersicht
 
-Wiresheet ist ein visueller Flow-Editor für Home Assistant, der es dir ermöglicht, Smart Home Automatisierungen mit grafischen Bausteinen zu erstellen - ähnlich wie Niagara Wiresheet oder Node-RED.
+GA-Control ist ein visueller Flow-Editor für Home Assistant, der es dir ermöglicht, Smart Home Automatisierungen mit grafischen Bausteinen zu erstellen - ähnlich wie Niagara Wiresheet oder Node-RED.
 
 ## Erste Schritte
 
@@ -12,14 +14,14 @@ Wiresheet ist ein visueller Flow-Editor für Home Assistant, der es dir ermögli
 2. Navigiere zu **Einstellungen** > **Add-ons**
 3. Klicke auf **ADD-ON STORE** (unten rechts)
 4. Füge das Repository hinzu (falls noch nicht geschehen)
-5. Suche nach "Wiresheet Flow Editor"
+5. Suche nach "GA-Control"
 6. Klicke auf **INSTALLIEREN**
 7. Nach der Installation klicke auf **STARTEN**
 8. Aktiviere **Im Seitenleisten anzeigen** für schnellen Zugriff
 
 ### Erstes Flow erstellen
 
-1. Öffne Wiresheet über die Sidebar
+1. Öffne GA-Control über die Sidebar
 2. Ziehe einen **Bewegungsmelder** aus der Palette auf das Canvas
 3. Ziehe einen **Licht Schalter** auf das Canvas
 4. Klicke auf den Ausgang des Bewegungsmelders

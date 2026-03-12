@@ -1,4 +1,6 @@
-# Wiresheet Flow Editor - Home Assistant Addon
+# GA-Control - Home Assistant Addon
+
+**keep it simple - by Dr. Muff**
 
 Ein visueller Flow-Editor für Home Assistant, inspiriert von Niagara Wiresheet. Programmiere deine Smart Home Automatisierungen mit Drag & Drop Bausteinen.
 
@@ -14,7 +16,7 @@ Ein visueller Flow-Editor für Home Assistant, inspiriert von Niagara Wiresheet.
 ## Installation
 
 1. Füge das Repository zu deinen Home Assistant Addon-Repositories hinzu
-2. Suche nach "Wiresheet Flow Editor"
+2. Suche nach "GA-Control"
 3. Klicke auf "Installieren"
 4. Starte das Addon
 5. Öffne das Web UI
