@@ -524,6 +524,18 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
     }
   };
 
+  const writeAllConfigValues = (deviceId: string) => {
+    const device = devices.find(d => d.id === deviceId);
+    if (device && device.configDatapoints && onWriteConfigValue) {
+      device.configDatapoints.forEach(dp => {
+        const valueToWrite = dp.pendingValue ?? dp.currentValue;
+        if (valueToWrite !== undefined) {
+          onWriteConfigValue(deviceId, dp.id, valueToWrite);
+        }
+      });
+    }
+  };
+
   const removeDatapoint = (deviceId: string, dpId: string) => {
     onDevicesChange(devices.map(d => {
       if (d.id !== deviceId) return d;
@@ -908,13 +920,22 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
                 <Sliders className="w-4 h-4 text-purple-400" />
                 <span className="text-xs font-medium text-slate-300">Konfiguration ({currentDevice.configDatapoints.length})</span>
               </div>
-              <button
-                onClick={() => readAllConfigValues(currentDevice.id)}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
-                title="Alle Konfigurationswerte vom Geraet lesen"
-              >
-                <Download className="w-3 h-3" /> Alle lesen
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => readAllConfigValues(currentDevice.id)}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                  title="Alle Konfigurationswerte vom Geraet lesen"
+                >
+                  <Download className="w-3 h-3" /> Alle lesen
+                </button>
+                <button
+                  onClick={() => writeAllConfigValues(currentDevice.id)}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+                  title="Alle Konfigurationswerte zum Geraet schreiben"
+                >
+                  <Upload className="w-3 h-3" /> Alle schreiben
+                </button>
+              </div>
             </div>
             <div className="space-y-1">
               {currentDevice.configDatapoints.map(dp => (

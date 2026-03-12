@@ -89,12 +89,12 @@ function createUIConfigDatapoints(count: number) {
   const configs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 1; i <= count; i++) {
     configs.push(
-      { name: `UI${i} Sensortyp`, address: 150 + i - 1, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i}` },
-      { name: `UI${i} Filterzeit`, address: 158 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: `Filterzeit fuer UI${i}` },
-      { name: `UI${i} Offset`, address: 169 + i, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: `Offset-Korrektur fuer UI${i}` }
+      { name: `UI${i} Sensortyp`, address: 150 + i - 1, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i}`, currentValue: 7 },
+      { name: `UI${i} Filterzeit`, address: 158 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: `Filterzeit fuer UI${i}`, currentValue: 20 },
+      { name: `UI${i} Offset`, address: 169 + i, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: `Offset-Korrektur fuer UI${i}`, currentValue: 0 }
     );
   }
-  configs.push({ name: 'UI Aufloesung', address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung aller Universaleingaenge' });
+  configs.push({ name: 'UI Aufloesung', address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung aller Universaleingaenge', currentValue: 1 });
   return configs;
 }
 
