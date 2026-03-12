@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Fan, AlertTriangle, Wrench, Power, RotateCcw, X, Clock, Hash, Gauge, Settings, Play, Pause } from 'lucide-react';
+import { Fan, AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
 import { PumpWidgetConfig } from '../../types/visualization';
 
 interface PumpValues {
@@ -11,26 +11,22 @@ interface PumpValues {
   alarm: boolean;
   opHours: number;
   starts: number;
-  startCmd?: boolean;
-  feedback?: boolean;
-  faultInput?: boolean;
-  revision?: boolean;
-  hoaMode?: number;
-  handStart?: boolean;
-  speedSetpoint?: number;
+  hoaMode: number;
+  revision: boolean;
+  handStart: boolean;
 }
 
 interface PumpParams {
-  startDelayMs: number;
-  stopDelayMs: number;
-  feedbackTimeoutMs: number;
-  enableFeedback: boolean;
-  speedMin: number;
-  speedMax: number;
-  antiSeizeIntervalMs: number;
-  antiSeizeRunMs: number;
-  antiSeizeSpeed: number;
-  pumpName: string;
+  pumpStartDelayMs?: number;
+  pumpStopDelayMs?: number;
+  pumpFeedbackTimeoutMs?: number;
+  pumpEnableFeedback?: boolean;
+  pumpSpeedMin?: number;
+  pumpSpeedMax?: number;
+  pumpAntiSeizeIntervalMs?: number;
+  pumpAntiSeizeRunMs?: number;
+  pumpAntiSeizeSpeed?: number;
+  pumpName?: string;
 }
 
 interface VisuPumpProps {
@@ -38,7 +34,6 @@ interface VisuPumpProps {
   value: PumpValues | null;
   isEditMode: boolean;
   onValueChange?: (updates: Record<string, unknown>) => void;
-  onParamChange?: (updates: Record<string, unknown>) => void;
   params?: PumpParams;
 }
 
@@ -47,11 +42,12 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   value,
   isEditMode,
   onValueChange,
-  onParamChange,
   params
 }) => {
   const [showPopup, setShowPopup] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const [localParams, setLocalParams] = useState<PumpParams>({});
 
   const running = value?.running ?? false;
   const fault = value?.fault ?? false;
@@ -63,6 +59,13 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   const starts = value?.starts ?? 0;
   const hoaMode = value?.hoaMode ?? 2;
   const revision = value?.revision ?? false;
+  const handStart = value?.handStart ?? false;
+
+  useEffect(() => {
+    if (params) {
+      setLocalParams(params);
+    }
+  }, [params]);
 
   useEffect(() => {
     if (running) {
@@ -100,6 +103,11 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
     onValueChange?.({ handStart: active });
   }, [onValueChange]);
 
+  const handleParamChange = useCallback((key: string, val: number | boolean) => {
+    setLocalParams(prev => ({ ...prev, [key]: val }));
+    onValueChange?.({ [`param_${key}`]: val });
+  }, [onValueChange]);
+
   const statusColor = getStatusColor();
 
   const formatHours = (hours: number) => {
@@ -117,6 +125,8 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
     if (ms < 86400000) return `${(ms / 3600000).toFixed(1)} h`;
     return `${(ms / 86400000).toFixed(1)} d`;
   };
+
+  const pumpName = params?.pumpName || config.pumpName || 'Pumpe';
 
   return (
     <>
@@ -151,19 +161,19 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
               transition: running ? 'none' : 'transform 0.3s ease'
             }}
           />
-          {fault && (
+          {(fault || alarm) && (
             <div className="absolute -top-1 -right-1">
               <AlertTriangle size={16} className="text-red-500" />
             </div>
           )}
-          {revision && !fault && (
+          {revision && !fault && !alarm && (
             <div className="absolute -top-1 -right-1">
               <Wrench size={14} className="text-amber-500" />
             </div>
           )}
         </div>
         <div className="mt-1 text-xs text-center text-slate-300 truncate w-full px-1">
-          {config.pumpName || 'Pumpe'}
+          {pumpName}
         </div>
         {config.showSpeed && running && (
           <div className="text-xs text-slate-400">
@@ -176,11 +186,14 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowPopup(false);
+            if (e.target === e.currentTarget) {
+              setShowPopup(false);
+              setShowSettings(false);
+            }
           }}
         >
           <div
-            className="bg-slate-800 rounded-xl shadow-2xl border border-slate-600 w-[480px] max-h-[90vh] overflow-hidden"
+            className="bg-slate-800 rounded-xl shadow-2xl border border-slate-600 w-[500px] max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -201,9 +214,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                   />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    {params?.pumpName || config.pumpName || 'Pumpe'}
-                  </h2>
+                  <h2 className="text-lg font-semibold text-white">{pumpName}</h2>
                   <div className="flex items-center gap-2 text-sm">
                     {running ? (
                       <span className="text-green-400 flex items-center gap-1">
@@ -214,17 +225,29 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         <Pause size={12} /> Gestoppt
                       </span>
                     )}
-                    {fault && <span className="text-red-400">| Stoerung</span>}
+                    {(fault || alarm) && <span className="text-red-400">| Stoerung</span>}
                     {revision && <span className="text-amber-400">| Revision</span>}
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setShowPopup(false)}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                <X size={20} className="text-slate-400" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className={`p-2 rounded-lg transition-colors ${showSettings ? 'bg-blue-600 text-white' : 'hover:bg-slate-700 text-slate-400'}`}
+                  title="Parameter anzeigen"
+                >
+                  <Settings size={20} />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPopup(false);
+                    setShowSettings(false);
+                  }}
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
@@ -292,18 +315,20 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                     onMouseDown={() => handleHandStart(true)}
                     onMouseUp={() => handleHandStart(false)}
                     onMouseLeave={() => handleHandStart(false)}
+                    onTouchStart={() => handleHandStart(true)}
+                    onTouchEnd={() => handleHandStart(false)}
                     className={`w-full py-3 rounded-lg font-medium transition-all ${
-                      value?.handStart
+                      handStart
                         ? 'bg-green-600 text-white'
                         : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
                     }`}
                   >
-                    {value?.handStart ? 'Pumpe laeuft...' : 'Pumpe starten (halten)'}
+                    {handStart ? 'Pumpe laeuft...' : 'Pumpe starten (halten)'}
                   </button>
                 </div>
               )}
 
-              {fault && (
+              {(fault || alarm) && (
                 <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-red-400">
@@ -323,47 +348,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
 
               <div className="bg-slate-700/30 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <Settings size={16} /> Parameter
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Einschaltverz.:</span>
-                    <span className="text-slate-200">{formatMs(params?.startDelayMs ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Ausschaltverz.:</span>
-                    <span className="text-slate-200">{formatMs(params?.stopDelayMs ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">RM-Timeout:</span>
-                    <span className="text-slate-200">{formatMs(params?.feedbackTimeoutMs ?? 10000)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">RM aktiv:</span>
-                    <span className="text-slate-200">{params?.enableFeedback !== false ? 'Ja' : 'Nein'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Drehzahl Min:</span>
-                    <span className="text-slate-200">{params?.speedMin ?? 0}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Drehzahl Max:</span>
-                    <span className="text-slate-200">{params?.speedMax ?? 100}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Anti-Seize Int.:</span>
-                    <span className="text-slate-200">{formatMs(params?.antiSeizeIntervalMs ?? 604800000)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Anti-Seize Lauf:</span>
-                    <span className="text-slate-200">{formatMs(params?.antiSeizeRunMs ?? 60000)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <Gauge size={16} /> Signale
+                  <ChevronRight size={16} /> Signale
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
                   {[
@@ -387,6 +372,126 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                   ))}
                 </div>
               </div>
+
+              {showSettings && (
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-medium text-blue-300 flex items-center gap-2">
+                    <Settings size={16} /> Parameter einstellen
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Einschaltverzoegerung (ms)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpStartDelayMs ?? 0}
+                        onChange={(e) => handleParamChange('pumpStartDelayMs', parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Ausschaltverzoegerung (ms)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpStopDelayMs ?? 0}
+                        onChange={(e) => handleParamChange('pumpStopDelayMs', parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">RM-Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpFeedbackTimeoutMs ?? 10000}
+                        onChange={(e) => handleParamChange('pumpFeedbackTimeoutMs', parseInt(e.target.value) || 10000)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-5">
+                      <input
+                        type="checkbox"
+                        id="enableFeedback"
+                        checked={localParams.pumpEnableFeedback !== false}
+                        onChange={(e) => handleParamChange('pumpEnableFeedback', e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600"
+                      />
+                      <label htmlFor="enableFeedback" className="text-sm text-slate-300">RM aktiv</label>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Drehzahl Min (%)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpSpeedMin ?? 0}
+                        onChange={(e) => handleParamChange('pumpSpeedMin', parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Drehzahl Max (%)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpSpeedMax ?? 100}
+                        onChange={(e) => handleParamChange('pumpSpeedMax', parseInt(e.target.value) || 100)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Anti-Seize Intervall</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={Math.round((localParams.pumpAntiSeizeIntervalMs ?? 604800000) / 86400000)}
+                          onChange={(e) => handleParamChange('pumpAntiSeizeIntervalMs', (parseInt(e.target.value) || 7) * 86400000)}
+                          className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                        />
+                        <span className="text-xs text-slate-400">Tage</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Anti-Seize Laufzeit</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={Math.round((localParams.pumpAntiSeizeRunMs ?? 60000) / 1000)}
+                          onChange={(e) => handleParamChange('pumpAntiSeizeRunMs', (parseInt(e.target.value) || 60) * 1000)}
+                          className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                        />
+                        <span className="text-xs text-slate-400">Sek</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Anti-Seize Drehzahl (%)</label>
+                      <input
+                        type="number"
+                        value={localParams.pumpAntiSeizeSpeed ?? 30}
+                        onChange={(e) => handleParamChange('pumpAntiSeizeSpeed', parseInt(e.target.value) || 30)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-700">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="flex justify-between text-slate-400">
+                        <span>Einschaltverz.:</span>
+                        <span className="text-slate-300">{formatMs(localParams.pumpStartDelayMs ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Ausschaltverz.:</span>
+                        <span className="text-slate-300">{formatMs(localParams.pumpStopDelayMs ?? 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>RM-Timeout:</span>
+                        <span className="text-slate-300">{formatMs(localParams.pumpFeedbackTimeoutMs ?? 10000)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-400">
+                        <span>Anti-Seize Int.:</span>
+                        <span className="text-slate-300">{formatMs(localParams.pumpAntiSeizeIntervalMs ?? 604800000)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

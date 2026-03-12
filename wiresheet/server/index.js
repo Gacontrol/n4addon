@@ -1122,10 +1122,18 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const pumpFeedback = toBool(inputVals[1]);
       const faultInput = toBool(inputVals[2]);
       const revisionSwitch = toBool(inputVals[3]);
-      const hoaMode = toNumber(inputVals[4]);
-      const handStart = toBool(inputVals[5]);
+      const hoaModeInput = inputVals[4];
+      const handStartInput = inputVals[5];
       const speedSetpoint = toNumber(inputVals[6]);
-      const resetInput = toBool(inputVals[7]);
+      const resetInputWire = toBool(inputVals[7]);
+
+      const visuHOA = cfg.pumpVisuHOA;
+      const visuHandStart = cfg.pumpVisuHandStart;
+      const visuReset = cfg.pumpVisuReset;
+
+      const hoaMode = visuHOA !== undefined ? toNumber(visuHOA) : (hoaModeInput !== null && hoaModeInput !== undefined ? toNumber(hoaModeInput) : 2);
+      const handStart = visuHandStart !== undefined ? toBool(visuHandStart) : toBool(handStartInput);
+      const resetInput = visuReset === true ? true : resetInputWire;
 
       const startDelayMs = cfg.pumpStartDelayMs || 0;
       const stopDelayMs = cfg.pumpStopDelayMs || 0;
@@ -1156,12 +1164,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (st.lastTickTs === undefined) st.lastTickTs = now;
 
       if (resetInput && (st.faultLatch || st.feedbackFault)) {
-        if (!faultInput && !st.feedbackFault) {
+        if (!faultInput) {
           st.faultLatch = false;
         }
-        if (pumpFeedback || !st.pumpCmd) {
-          st.feedbackFault = false;
-        }
+        st.feedbackFault = false;
       }
 
       if (faultInput && !st.faultLatch) {
@@ -1686,6 +1692,58 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
   const { nodeId, portId, paramKey, value, clientId } = req.body;
   if (!nodeId) {
     return res.status(400).json({ error: 'nodeId fehlt' });
+  }
+
+  if (value && typeof value === 'object' && value.pumpControl) {
+    const pumpCtrl = value.pumpControl;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId && n.type === 'pump-control');
+        if (node) {
+          if (!node.data.config) node.data.config = {};
+          if (pumpCtrl.hoaMode !== undefined) {
+            node.data.config.pumpVisuHOA = pumpCtrl.hoaMode;
+          }
+          if (pumpCtrl.handStart !== undefined) {
+            node.data.config.pumpVisuHandStart = pumpCtrl.handStart;
+          }
+          if (pumpCtrl.reset !== undefined && pumpCtrl.reset === true) {
+            node.data.config.pumpVisuReset = true;
+          } else if (pumpCtrl.reset === false) {
+            node.data.config.pumpVisuReset = false;
+          }
+          for (const key of Object.keys(pumpCtrl)) {
+            if (key.startsWith('param_')) {
+              const paramName = key.slice(6);
+              node.data.config[paramName] = pumpCtrl[key];
+            }
+          }
+          console.log(`Pump Control geschrieben: ${nodeId}`, JSON.stringify(pumpCtrl));
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Pump-Control Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des Pump-Control Parameters:', err);
+      res.status(500).json({ error: err.message });
+    }
+    return;
   }
 
   if (paramKey) {

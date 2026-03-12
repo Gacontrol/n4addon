@@ -245,7 +245,12 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const handleWidgetValueChange = useCallback((widgetId: string, value: unknown) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
     if (widget?.binding) {
-      onWidgetValueChange(widgetId, widget.binding, value);
+      if (widget.type === 'visu-pump') {
+        const pumpValue = value as Record<string, unknown>;
+        onWidgetValueChange(widgetId, widget.binding, { pumpControl: pumpValue });
+      } else {
+        onWidgetValueChange(widgetId, widget.binding, value);
+      }
     }
   }, [activePage.widgets, onWidgetValueChange]);
 

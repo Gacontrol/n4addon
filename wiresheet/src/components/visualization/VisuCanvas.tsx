@@ -176,6 +176,25 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
     const { nodeId, portId, paramKey } = widget.binding;
+
+    if (widget.type === 'visu-pump') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'pump-control') return null;
+      return {
+        pumpCmd: liveValues[`${nodeId}:output-0`] ?? false,
+        speedOut: liveValues[`${nodeId}:output-1`] ?? 0,
+        running: liveValues[`${nodeId}:output-2`] ?? false,
+        fault: liveValues[`${nodeId}:output-3`] ?? false,
+        ready: liveValues[`${nodeId}:output-4`] ?? true,
+        alarm: liveValues[`${nodeId}:output-5`] ?? false,
+        opHours: liveValues[`${nodeId}:output-6`] ?? 0,
+        starts: liveValues[`${nodeId}:output-7`] ?? 0,
+        hoaMode: node.data.config?.pumpVisuHOA ?? 2,
+        revision: liveValues[`${nodeId}:input-3`] ?? false,
+        handStart: node.data.config?.pumpVisuHandStart ?? false
+      };
+    }
+
     if (paramKey) {
       const node = logicNodes.find(n => n.id === nodeId);
       if (node?.data.config) {
