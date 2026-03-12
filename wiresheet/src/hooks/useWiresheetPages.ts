@@ -482,8 +482,10 @@ export const useWiresheetPages = () => {
   }, []);
 
   const selectNodes = useCallback((nodeIds: string[]) => {
+    console.log('[HOOK] selectNodes called with:', nodeIds);
     setSelectedConnection(null);
     setSelectedNodes(new Set(nodeIds));
+    console.log('[HOOK] setSelectedNodes called with Set of size:', nodeIds.length);
   }, []);
 
   const clearSelection = useCallback(() => {

@@ -259,6 +259,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const y = e.clientY - rect.top;
       lassoRef.current = { startX: x, startY: y, currentX: x, currentY: y };
       setLassoTick(t => t + 1);
+      console.log('[LASSO] Started at screen:', { x, y });
 
       canvasRef.current.setPointerCapture(e.pointerId);
     }
@@ -318,6 +319,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     const currentLasso = lassoRef.current;
+    console.log('[LASSO] PointerUp - currentLasso:', currentLasso, 'canvasRef:', !!canvasRef.current);
     if (currentLasso && canvasRef.current) {
       lassoRef.current = null;
       setLassoTick(t => t + 1);
@@ -330,18 +332,28 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const minY = (Math.min(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
       const maxY = (Math.max(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
 
+      console.log('[LASSO] Bounds:', { minX, maxX, minY, maxY, scrollLeft, scrollTop, zoom });
+      console.log('[LASSO] Nodes count:', nodes.length);
+
       if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
         const selectedIds = nodes.filter(node => {
           const nx = node.position.x;
           const ny = node.position.y;
           const nw = 180;
           const nh = 60;
-          return nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
+          const isInside = nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
+          console.log('[LASSO] Node check:', node.id, { nx, ny, nw, nh, isInside });
+          return isInside;
         }).map(n => n.id);
 
+        console.log('[LASSO] Selected IDs:', selectedIds);
+
         if (selectedIds.length > 0) {
+          console.log('[LASSO] Calling onNodesSelect with:', selectedIds);
           onNodesSelect(selectedIds);
         }
+      } else {
+        console.log('[LASSO] Too small, skipped. Size:', Math.abs(maxX - minX), Math.abs(maxY - minY));
       }
     }
 

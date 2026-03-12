@@ -152,6 +152,10 @@ function App() {
   }, [mainView]);
 
   useEffect(() => {
+    console.log('[APP] selectedNodes changed:', selectedNodes.size, Array.from(selectedNodes));
+  }, [selectedNodes]);
+
+  useEffect(() => {
     if (selectedNodes.size === 1) {
       const selectedId = Array.from(selectedNodes)[0];
       const selectedNode = nodes.find(n => n.id === selectedId);
