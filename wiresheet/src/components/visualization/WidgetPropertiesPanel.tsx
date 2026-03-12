@@ -82,10 +82,18 @@ const SYMBOL_OPTIONS = [
 const VALVE_SYMBOL_OPTIONS = [
   { value: 'valve-2way', label: '2-Wege Ventil' },
   { value: 'valve-3way', label: '3-Wege Ventil' },
-  { value: 'valve-motor', label: 'Motorventil' },
+  { value: 'valve-motor', label: 'Motorventil 2-Wege' },
+  { value: 'valve-3way-motor', label: 'Motorventil 3-Wege' },
   { value: 'valve-butterfly', label: 'Klappenventil' },
   { value: 'valve-ball', label: 'Kugelventil' },
   { value: 'valve-gate', label: 'Schieberventil' }
+];
+
+const ROTATION_OPTIONS = [
+  { value: 0, label: '0 Grad' },
+  { value: 90, label: '90 Grad' },
+  { value: 180, label: '180 Grad' },
+  { value: 270, label: '270 Grad' }
 ];
 
 const SHAPE_TYPES = new Set([
@@ -1476,7 +1484,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-valve': {
-        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; orientation?: 'horizontal' | 'vertical'; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showDeviation?: boolean };
+        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showOutput?: boolean };
         return (
           <>
             <div>
@@ -1502,14 +1510,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Ausrichtung</label>
+              <label className="block text-xs text-slate-400 mb-1">Drehung</label>
               <select
-                value={valveCfg.orientation || 'horizontal'}
-                onChange={(e) => onUpdate({ config: { ...config, orientation: e.target.value as 'horizontal' | 'vertical' } })}
+                value={valveCfg.rotation ?? 0}
+                onChange={(e) => onUpdate({ config: { ...config, rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 } })}
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
-                <option value="horizontal">Horizontal</option>
-                <option value="vertical">Vertikal</option>
+                {ROTATION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1537,7 +1546,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={valveCfg.showSetpoint ?? true}
+                  checked={valveCfg.showSetpoint !== false}
                   onChange={(e) => onUpdate({ config: { ...config, showSetpoint: e.target.checked } })}
                   className="rounded"
                 />
@@ -1546,7 +1555,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={valveCfg.showFeedback ?? true}
+                  checked={valveCfg.showFeedback !== false}
                   onChange={(e) => onUpdate({ config: { ...config, showFeedback: e.target.checked } })}
                   className="rounded"
                 />
@@ -1555,11 +1564,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={valveCfg.showDeviation ?? true}
-                  onChange={(e) => onUpdate({ config: { ...config, showDeviation: e.target.checked } })}
+                  checked={valveCfg.showOutput !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showOutput: e.target.checked } })}
                   className="rounded"
                 />
-                <label className="text-xs text-slate-400">Abweichung anzeigen</label>
+                <label className="text-xs text-slate-400">Stellwert anzeigen</label>
               </div>
             </div>
           </>

@@ -623,17 +623,17 @@ export interface PumpWidgetConfig {
   symbolType?: AggregateSymbolType;
 }
 
-export type ValveSymbolType = 'valve-2way' | 'valve-3way' | 'valve-motor' | 'valve-butterfly' | 'valve-ball' | 'valve-gate';
+export type ValveSymbolType = 'valve-2way' | 'valve-3way' | 'valve-motor' | 'valve-3way-motor' | 'valve-butterfly' | 'valve-ball' | 'valve-gate';
 
 export interface ValveWidgetConfig {
   valveName?: string;
   normalColor?: string;
   alarmColor?: string;
-  orientation?: 'horizontal' | 'vertical';
+  rotation?: 0 | 90 | 180 | 270;
   symbolType?: ValveSymbolType;
   showSetpoint?: boolean;
   showFeedback?: boolean;
-  showDeviation?: boolean;
+  showOutput?: boolean;
 }
 
 export interface WidgetTemplate {

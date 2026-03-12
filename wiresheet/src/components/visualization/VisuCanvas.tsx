@@ -205,7 +205,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         setpoint: setpointFromVisu ?? setpointFromWire ?? 0,
         feedback: liveValues[`${nodeId}:input-1`] ?? 0,
         alarm: liveValues[`${nodeId}:output-1`] ?? false,
-        deviation: liveValues[`${nodeId}:deviation`] ?? 0
+        hoaMode: node.data.config?.valveVisuHOA ?? 2
       };
     }
 

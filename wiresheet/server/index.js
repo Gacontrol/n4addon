@@ -1275,7 +1275,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
       const visuSetpoint = cfg.valveVisuSetpoint;
       const visuReset = cfg.valveVisuReset;
+      const visuHOA = cfg.valveVisuHOA ?? 2;
 
+      const isHandMode = visuHOA === 1;
       const actualSetpoint = visuSetpoint !== undefined ? toNumber(visuSetpoint) : setpoint;
       const resetInput = visuReset === true ? true : resetInputWire;
 
@@ -1291,7 +1293,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
       if (st.alarmLatch === undefined) st.alarmLatch = false;
 
-      const valveOutput = Math.max(minOutput, Math.min(maxOutput, actualSetpoint || 0));
+      let valveOutput;
+      if (isHandMode) {
+        valveOutput = Math.max(minOutput, Math.min(maxOutput, actualSetpoint || 0));
+      } else {
+        valveOutput = Math.max(minOutput, Math.min(maxOutput, setpoint || 0));
+      }
       const deviation = Math.abs(valveOutput - feedback);
 
       if (resetInput && st.alarmLatch) {
@@ -1312,7 +1319,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = valveOutput;
       nodeValues[`${nodeId}:output-0`] = valveOutput;
       nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
-      nodeValues[`${nodeId}:deviation`] = deviation;
+      nodeValues[`${nodeId}:hoaMode`] = visuHOA;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
@@ -1810,6 +1817,9 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
             node.data.config.valveVisuReset = true;
           } else if (valveCtrl.reset === false) {
             node.data.config.valveVisuReset = false;
+          }
+          if (valveCtrl.hoa !== undefined) {
+            node.data.config.valveVisuHOA = valveCtrl.hoa;
           }
           for (const key of Object.keys(valveCtrl)) {
             if (key.startsWith('param_')) {

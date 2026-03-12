@@ -7,7 +7,7 @@ interface ValveValues {
   setpoint: number;
   feedback: number;
   alarm: boolean;
-  deviation: number;
+  hoaMode: number;
 }
 
 interface ValveParams {
@@ -56,6 +56,17 @@ const ValveMotorSymbol: React.FC<{ color: string; openPercent: number; size: num
   </svg>
 );
 
+const Valve3WayMotorSymbol: React.FC<{ color: string; openPercent: number; size: number }> = ({ color, openPercent, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <polygon points="10,45 45,60 10,75" fill={openPercent > 0 ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" fillOpacity={openPercent / 100} />
+    <polygon points="90,45 55,60 90,75" fill={openPercent > 0 ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" fillOpacity={openPercent / 100} />
+    <polygon points="35,95 50,60 65,95" fill={openPercent > 0 ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" fillOpacity={(100 - openPercent) / 100} />
+    <line x1="50" y1="60" x2="50" y2="35" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <circle cx="50" cy="22" r="15" stroke={color} strokeWidth="2" fill="transparent" />
+    <text x="50" y="27" textAnchor="middle" fontSize="14" fontWeight="bold" fill={color}>M</text>
+  </svg>
+);
+
 const ValveButterflySymbol: React.FC<{ color: string; openPercent: number; size: number }> = ({ color, openPercent, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
     <circle cx="50" cy="50" r="35" stroke={color} strokeWidth="3" fill="transparent" />
@@ -95,6 +106,7 @@ const ValveSymbol: React.FC<{ symbolType: ValveSymbolType; color: string; openPe
   switch (symbolType) {
     case 'valve-3way': return <Valve3WaySymbol color={color} openPercent={openPercent} size={size} />;
     case 'valve-motor': return <ValveMotorSymbol color={color} openPercent={openPercent} size={size} />;
+    case 'valve-3way-motor': return <Valve3WayMotorSymbol color={color} openPercent={openPercent} size={size} />;
     case 'valve-butterfly': return <ValveButterflySymbol color={color} openPercent={openPercent} size={size} />;
     case 'valve-ball': return <ValveBallSymbol color={color} openPercent={openPercent} size={size} />;
     case 'valve-gate': return <ValveGateSymbol color={color} openPercent={openPercent} size={size} />;
@@ -114,12 +126,13 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [localParams, setLocalParams] = useState<ValveParams>({});
   const [localSetpoint, setLocalSetpoint] = useState<number>(0);
+  const [localHOA, setLocalHOA] = useState<number>(2);
 
   const valveOutput = value?.valveOutput ?? 0;
   const setpoint = value?.setpoint ?? 0;
   const feedback = value?.feedback ?? 0;
   const alarm = value?.alarm ?? false;
-  const deviation = value?.deviation ?? 0;
+  const hoaMode = value?.hoaMode ?? 2;
 
   const minOutput = params?.valveMinOutput ?? 0;
   const maxOutput = params?.valveMaxOutput ?? 100;
@@ -133,6 +146,10 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   useEffect(() => {
     setLocalSetpoint(setpoint);
   }, [setpoint]);
+
+  useEffect(() => {
+    setLocalHOA(hoaMode);
+  }, [hoaMode]);
 
   const getStatusColor = useCallback(() => {
     if (alarm) return config.alarmColor || '#ef4444';
@@ -155,6 +172,11 @@ export const VisuValve: React.FC<VisuValveProps> = ({
     onValueChange?.({ valveControl: { setpoint: newSetpoint } });
   }, [onValueChange]);
 
+  const handleHOAChange = useCallback((mode: number) => {
+    setLocalHOA(mode);
+    onValueChange?.({ valveControl: { hoa: mode } });
+  }, [onValueChange]);
+
   const handleParamChange = useCallback((key: string, val: number | boolean) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
     onValueChange?.({ valveControl: { [`param_${key}`]: val } });
@@ -163,7 +185,12 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   const statusColor = getStatusColor();
   const valveName = config.valveName || params?.valveName || 'Ventil';
   const symbolType = config.symbolType || 'valve-2way';
-  const orientation = config.orientation || 'horizontal';
+  const rotation = config.rotation ?? 0;
+  const isHandMode = localHOA === 1;
+
+  const showSetpoint = config.showSetpoint !== false;
+  const showFeedback = config.showFeedback !== false;
+  const showOutput = config.showOutput !== false;
 
   return (
     <>
@@ -177,6 +204,11 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             ALARM
           </div>
         )}
+        {isHandMode && (
+          <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10 bg-amber-600 text-white">
+            HAND
+          </div>
+        )}
         <div
           className="relative flex items-center justify-center"
           style={{
@@ -184,7 +216,7 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             height: '60%',
             maxWidth: 80,
             maxHeight: 80,
-            transform: orientation === 'vertical' ? 'rotate(90deg)' : 'none'
+            transform: `rotate(${rotation}deg)`
           }}
         >
           <ValveSymbol
@@ -194,7 +226,7 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             size={60}
           />
           {alarm && (
-            <div className="absolute -top-1 -right-1" style={{ transform: orientation === 'vertical' ? 'rotate(-90deg)' : 'none' }}>
+            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
               <AlertTriangle size={14} className="text-red-500" />
             </div>
           )}
@@ -236,6 +268,7 @@ export const VisuValve: React.FC<VisuValveProps> = ({
                   <h2 className="text-lg font-semibold text-white">{valveName}</h2>
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-slate-300">{valveOutput.toFixed(0)}% offen</span>
+                    {isHandMode && <span className="text-amber-400">| Hand</span>}
                     {alarm && <span className="text-red-400">| Alarm</span>}
                   </div>
                 </div>
@@ -261,30 +294,64 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {setpoint.toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">Sollwert</div>
-                </div>
-                <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {feedback.toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">Rueckmeldung</div>
-                </div>
-                <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold" style={{ color: statusColor }}>
-                    {valveOutput.toFixed(0)}%
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">Stellwert</div>
+              <div className="bg-slate-700/30 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-slate-300 mb-3">Betriebsart</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleHOAChange(1)}
+                    className={`flex-1 py-3 rounded-lg font-medium transition-all ${
+                      localHOA === 1
+                        ? 'bg-amber-600 text-white shadow-lg'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    Hand
+                  </button>
+                  <button
+                    onClick={() => handleHOAChange(2)}
+                    className={`flex-1 py-3 rounded-lg font-medium transition-all ${
+                      localHOA === 2
+                        ? 'bg-green-600 text-white shadow-lg'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    Auto
+                  </button>
                 </div>
               </div>
 
+              {(showSetpoint || showFeedback || showOutput) && (
+                <div className="grid grid-cols-3 gap-3">
+                  {showSetpoint && (
+                    <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {setpoint.toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">Sollwert</div>
+                    </div>
+                  )}
+                  {showFeedback && (
+                    <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-green-400">
+                        {feedback.toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">Istwert</div>
+                    </div>
+                  )}
+                  {showOutput && (
+                    <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold" style={{ color: statusColor }}>
+                        {valveOutput.toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1">Stellwert</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="bg-slate-700/30 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
-                  <Sliders size={16} /> Sollwert einstellen
+                  <Sliders size={16} /> {isHandMode ? 'Stellwert einstellen (Hand)' : 'Sollwert einstellen'}
                 </h3>
                 <div className="space-y-3">
                   <input
@@ -321,27 +388,6 @@ export const VisuValve: React.FC<VisuValveProps> = ({
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              <div className="bg-slate-700/30 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-slate-300 mb-3">Abweichung</h3>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-3 bg-slate-600 rounded-full overflow-hidden">
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${Math.min(deviation, 100)}%`,
-                        backgroundColor: deviation > (localParams.valveTolerance ?? 5) ? '#ef4444' : '#22c55e'
-                      }}
-                    />
-                  </div>
-                  <span className={`text-lg font-bold ${deviation > (localParams.valveTolerance ?? 5) ? 'text-red-400' : 'text-green-400'}`}>
-                    {deviation.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Toleranz: {localParams.valveTolerance ?? 5}%
                 </div>
               </div>
 
