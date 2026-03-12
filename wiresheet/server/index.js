@@ -1335,14 +1335,18 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const monitoringEnable = cfg.sensorMonitoringEnable !== false;
       const alarmDelayMs = cfg.sensorAlarmDelayMs ?? 5000;
 
+      const visuHOA = cfg.sensorVisuHOA || 'auto';
+      const manualValue = cfg.sensorManualValue ?? 0;
+      const isHandMode = visuHOA === 'hand';
+
       const now = Date.now();
       const st = pageId ? getNodeState(pageId, nodeId) : node.__sensorState || (node.__sensorState = {});
 
       if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
       if (st.alarmLatch === undefined) st.alarmLatch = false;
 
-      const sensorOut = sensorIn;
-      const outOfLimits = sensorIn < minLimit || sensorIn > maxLimit;
+      const sensorOut = isHandMode ? manualValue : sensorIn;
+      const outOfLimits = sensorOut < minLimit || sensorOut > maxLimit;
 
       if (resetInput && st.alarmLatch) {
         st.alarmLatch = false;
@@ -1366,6 +1370,67 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-0`] = sensorOut;
       nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
       nodeValues[`${nodeId}:input-0`] = sensorIn;
+      nodeValues[`${nodeId}:hoaMode`] = visuHOA;
+      nodeValues[`${nodeId}:manualValue`] = manualValue;
+    } else if (node.type === 'pid-controller') {
+      const setpoint = toNumber(inputVals[0]);
+      const actualValue = toNumber(inputVals[1]);
+      const enable = toBool(inputVals[2]);
+
+      const Kp = cfg.pidKp ?? 1.0;
+      const Ki = cfg.pidKi ?? 0.1;
+      const Kd = cfg.pidKd ?? 0.0;
+      const windupLimit = cfg.pidWindupLimit ?? 100;
+      const minOutput = cfg.pidMinOutput ?? 0;
+      const maxOutput = cfg.pidMaxOutput ?? 100;
+
+      const visuHOA = cfg.pidVisuHOA || 'auto';
+      const manualOutput = cfg.pidManualOutput ?? 0;
+      const isHandMode = visuHOA === 'hand';
+
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__pidState || (node.__pidState = {});
+
+      if (st.integral === undefined) st.integral = 0;
+      if (st.lastError === undefined) st.lastError = 0;
+      if (st.lastTime === undefined) st.lastTime = now;
+
+      let controlOutput = 0;
+
+      if (isHandMode) {
+        controlOutput = Math.max(minOutput, Math.min(maxOutput, manualOutput));
+        st.integral = 0;
+        st.lastError = 0;
+      } else if (!enable) {
+        controlOutput = 0;
+        st.integral = 0;
+        st.lastError = 0;
+      } else {
+        const dt = (now - st.lastTime) / 1000;
+        const error = setpoint - actualValue;
+
+        const P = Kp * error;
+
+        st.integral = st.integral + (Ki * error * dt);
+        st.integral = Math.max(-windupLimit, Math.min(windupLimit, st.integral));
+        const I = st.integral;
+
+        const D = dt > 0 ? Kd * (error - st.lastError) / dt : 0;
+
+        const output = P + I + D;
+        controlOutput = Math.max(minOutput, Math.min(maxOutput, output));
+
+        st.lastError = error;
+      }
+      st.lastTime = now;
+
+      nodeValues[nodeId] = controlOutput;
+      nodeValues[`${nodeId}:output-0`] = controlOutput;
+      nodeValues[`${nodeId}:input-0`] = setpoint;
+      nodeValues[`${nodeId}:input-1`] = actualValue;
+      nodeValues[`${nodeId}:input-2`] = enable;
+      nodeValues[`${nodeId}:hoaMode`] = visuHOA;
+      nodeValues[`${nodeId}:manualOutput`] = manualOutput;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
@@ -1913,6 +1978,12 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           } else if (sensorCtrl.reset === false) {
             node.data.config.sensorVisuReset = false;
           }
+          if (sensorCtrl.hoaMode !== undefined) {
+            node.data.config.sensorVisuHOA = sensorCtrl.hoaMode;
+          }
+          if (sensorCtrl.manualValue !== undefined) {
+            node.data.config.sensorManualValue = sensorCtrl.manualValue;
+          }
           for (const key of Object.keys(sensorCtrl)) {
             if (key.startsWith('param_')) {
               const paramName = key.slice(6);
@@ -1939,6 +2010,53 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
     } catch (err) {
       console.error('Fehler beim Schreiben des Sensor-Control Parameters:', err);
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
+  if (value && typeof value === 'object' && value.pidControl) {
+    const pidCtrl = value.pidControl;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId && n.type === 'pid-controller');
+        if (node) {
+          if (!node.data.config) node.data.config = {};
+          if (pidCtrl.hoaMode !== undefined) {
+            node.data.config.pidVisuHOA = pidCtrl.hoaMode;
+          }
+          if (pidCtrl.manualOutput !== undefined) {
+            node.data.config.pidManualOutput = pidCtrl.manualOutput;
+          }
+          for (const key of Object.keys(pidCtrl)) {
+            if (key.startsWith('param_')) {
+              const paramName = key.slice(6);
+              node.data.config[paramName] = pidCtrl[key];
+            }
+          }
+          console.log(`PID Control geschrieben: ${nodeId}`, JSON.stringify(pidCtrl));
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'PID-Controller Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des PID-Controller Parameters:', err);
       res.status(500).json({ error: err.message });
     }
     return;

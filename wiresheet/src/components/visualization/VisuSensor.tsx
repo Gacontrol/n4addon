@@ -17,6 +17,8 @@ interface SensorWidgetConfig {
 interface SensorValues {
   sensorValue: number;
   alarm: boolean;
+  hoaMode?: 'hand' | 'auto';
+  manualValue?: number;
 }
 
 interface SensorParams {
@@ -26,6 +28,8 @@ interface SensorParams {
   sensorMonitoringEnable?: boolean;
   sensorAlarmDelayMs?: number;
   sensorName?: string;
+  sensorRangeMin?: number;
+  sensorRangeMax?: number;
 }
 
 interface VisuSensorProps {
@@ -111,18 +115,29 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
 
   const sensorValue = value?.sensorValue ?? 0;
   const alarm = value?.alarm ?? false;
+  const hoaMode = value?.hoaMode ?? 'auto';
+  const manualValue = value?.manualValue ?? 0;
 
   const minLimit = params?.sensorMinLimit ?? 0;
   const maxLimit = params?.sensorMaxLimit ?? 100;
+  const rangeMin = params?.sensorRangeMin ?? -50;
+  const rangeMax = params?.sensorRangeMax ?? 150;
   const symbolType = config.symbolType || 'generic';
   const autoUnit = getDefaultUnitForSymbol(symbolType);
   const unit = params?.sensorUnit || autoUnit;
+
+  const isHandMode = hoaMode === 'hand';
+  const [localManualValue, setLocalManualValue] = useState(manualValue);
 
   useEffect(() => {
     if (params) {
       setLocalParams(params);
     }
   }, [params]);
+
+  useEffect(() => {
+    setLocalManualValue(manualValue);
+  }, [manualValue]);
 
   const getStatusColor = useCallback(() => {
     if (alarm) return config.alarmColor || '#ef4444';
@@ -143,6 +158,15 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
   const handleParamChange = useCallback((key: string, val: number | boolean | string) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
     onValueChange?.({ sensorControl: { [`param_${key}`]: val } });
+  }, [onValueChange]);
+
+  const handleHOAChange = useCallback((mode: 'hand' | 'auto') => {
+    onValueChange?.({ sensorControl: { hoaMode: mode } });
+  }, [onValueChange]);
+
+  const handleManualValueChange = useCallback((val: number) => {
+    setLocalManualValue(val);
+    onValueChange?.({ sensorControl: { manualValue: val } });
   }, [onValueChange]);
 
   const statusColor = getStatusColor();
@@ -264,11 +288,68 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
             </div>
 
             <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="bg-slate-700/30 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-slate-400">Betriebsart</span>
+                  <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                    <button
+                      onClick={() => handleHOAChange('hand')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        isHandMode
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                    >
+                      Hand
+                    </button>
+                    <button
+                      onClick={() => handleHOAChange('auto')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        !isHandMode
+                          ? 'bg-green-600 text-white'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                    >
+                      Auto
+                    </button>
+                  </div>
+                </div>
+                {isHandMode && (
+                  <div className="mt-3 pt-3 border-t border-slate-600">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-slate-400">Handwert</span>
+                      <span className="text-sm font-medium" style={{ color: statusColor }}>
+                        {localManualValue.toFixed(1)} {unit}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={rangeMin}
+                      max={rangeMax}
+                      step={0.1}
+                      value={localManualValue}
+                      onChange={(e) => handleManualValueChange(parseFloat(e.target.value))}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, ${statusColor} 0%, ${statusColor} ${((localManualValue - rangeMin) / (rangeMax - rangeMin)) * 100}%, #475569 ${((localManualValue - rangeMin) / (rangeMax - rangeMin)) * 100}%, #475569 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                      <span>{rangeMin}</span>
+                      <span>{rangeMax}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="bg-slate-700/50 rounded-lg p-4 text-center">
                 <div className="text-4xl font-bold" style={{ color: isOutOfLimits ? '#ef4444' : statusColor }}>
                   {sensorValue.toFixed(1)}
                 </div>
                 <div className="text-lg text-slate-400 mt-1">{unit || 'Einheit'}</div>
+                {isHandMode && (
+                  <div className="text-xs text-amber-400 mt-1">Handbetrieb aktiv</div>
+                )}
               </div>
 
               {showLimits && (

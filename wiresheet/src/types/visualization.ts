@@ -61,7 +61,8 @@ export type WidgetType =
   | 'dash-multistate'
   | 'visu-pump'
   | 'visu-valve'
-  | 'visu-sensor';
+  | 'visu-sensor'
+  | 'visu-pid';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -392,7 +393,9 @@ export type WidgetConfig =
   | ModernMultistateConfig
   | DashMultistateConfig
   | PumpWidgetConfig
-  | ValveWidgetConfig;
+  | ValveWidgetConfig
+  | SensorWidgetConfig
+  | PIDWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -648,6 +651,19 @@ export interface SensorWidgetConfig {
   showValue?: boolean;
   showUnit?: boolean;
   showLimits?: boolean;
+}
+
+export type PIDSymbolType = 'pid' | 'controller' | 'regulator';
+
+export interface PIDWidgetConfig {
+  pidName?: string;
+  normalColor?: string;
+  activeColor?: string;
+  rotation?: 0 | 90 | 180 | 270;
+  symbolType?: PIDSymbolType;
+  showSetpoint?: boolean;
+  showActualValue?: boolean;
+  showOutput?: boolean;
 }
 
 export interface WidgetTemplate {

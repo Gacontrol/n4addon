@@ -910,6 +910,27 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Sensor-Widget mit Grenzwertueberwachung',
     supportsBinding: true,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-pid',
+    label: 'PID Regler',
+    icon: 'Activity',
+    category: 'control',
+    defaultSize: { width: 120, height: 120 },
+    defaultConfig: {
+      pidName: '',
+      normalColor: '#64748b',
+      activeColor: '#22c55e',
+      rotation: 0,
+      symbolType: 'pid',
+      showSetpoint: true,
+      showActualValue: true,
+      showOutput: true
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'PID-Regler Widget mit Sollwert, Istwert und Stellgroesse',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 

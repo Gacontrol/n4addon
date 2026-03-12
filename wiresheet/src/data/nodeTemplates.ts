@@ -694,7 +694,34 @@ export const nodeTemplates: NodeTemplate[] = [
       sensorUnit: '',
       sensorMonitoringEnable: true,
       sensorAlarmDelayMs: 5000,
-      sensorName: ''
+      sensorName: '',
+      sensorRangeMin: -50,
+      sensorRangeMax: 150
+    }
+  },
+  {
+    type: 'pid-controller',
+    label: 'PID Regler',
+    icon: 'Activity',
+    category: 'special',
+    color: '#dc2626',
+    inputs: [
+      { label: 'Setpoint', type: 'input' },
+      { label: 'ActualValue', type: 'input' },
+      { label: 'Enable', type: 'input' }
+    ],
+    outputs: [
+      { label: 'ControlOutput', type: 'output' }
+    ],
+    description: 'PID Regler mit P, I, D Anteilen',
+    defaultConfig: {
+      pidKp: 1.0,
+      pidKi: 0.1,
+      pidKd: 0.0,
+      pidWindupLimit: 100,
+      pidMinOutput: 0,
+      pidMaxOutput: 100,
+      pidName: ''
     }
   }
 ];

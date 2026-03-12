@@ -214,7 +214,22 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       if (!node || node.type !== 'sensor-control') return null;
       return {
         sensorValue: liveValues[`${nodeId}:output-0`] ?? 0,
-        alarm: liveValues[`${nodeId}:output-1`] ?? false
+        alarm: liveValues[`${nodeId}:output-1`] ?? false,
+        hoaMode: node.data.config?.sensorVisuHOA ?? 'auto',
+        manualValue: node.data.config?.sensorManualValue ?? 0
+      };
+    }
+
+    if (widget.type === 'visu-pid') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'pid-controller') return null;
+      return {
+        controlOutput: liveValues[`${nodeId}:output-0`] ?? 0,
+        setpoint: liveValues[`${nodeId}:input-0`] ?? 0,
+        actualValue: liveValues[`${nodeId}:input-1`] ?? 0,
+        enable: liveValues[`${nodeId}:input-2`] ?? false,
+        hoaMode: node.data.config?.pidVisuHOA ?? 'auto',
+        manualOutput: node.data.config?.pidManualOutput ?? 0
       };
     }
 
@@ -305,7 +320,28 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       sensorMaxLimit: cfg.sensorMaxLimit,
       sensorUnit: cfg.sensorUnit,
       sensorMonitoringEnable: cfg.sensorMonitoringEnable,
-      sensorAlarmDelayMs: cfg.sensorAlarmDelayMs
+      sensorAlarmDelayMs: cfg.sensorAlarmDelayMs,
+      sensorRangeMin: cfg.sensorRangeMin,
+      sensorRangeMax: cfg.sensorRangeMax
+    };
+  }, [logicNodes]);
+
+  const getPIDWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-pid' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    if (!node || node.type !== 'pid-controller') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const configName = cfg.pidName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'PID Regler';
+    return {
+      pidName: nodeName,
+      pidKp: cfg.pidKp,
+      pidKi: cfg.pidKi,
+      pidKd: cfg.pidKd,
+      pidWindupLimit: cfg.pidWindupLimit,
+      pidMinOutput: cfg.pidMinOutput,
+      pidMaxOutput: cfg.pidMaxOutput
     };
   }, [logicNodes]);
 
@@ -885,6 +921,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           pumpParams={getPumpWidgetParams(widget)}
           valveParams={getValveWidgetParams(widget)}
           sensorParams={getSensorWidgetParams(widget)}
+          pidParams={getPIDWidgetParams(widget)}
         />
       ))}
 

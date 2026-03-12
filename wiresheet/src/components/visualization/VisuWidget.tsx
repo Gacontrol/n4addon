@@ -54,12 +54,14 @@ import {
   ModernMultistateConfig,
   PumpWidgetConfig,
   ValveWidgetConfig,
-  SensorWidgetConfig
+  SensorWidgetConfig,
+  PIDWidgetConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
 import { VisuSensor } from './VisuSensor';
+import { VisuPID } from './VisuPID';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -134,6 +136,18 @@ interface SensorParams {
   sensorUnit?: string;
   sensorMonitoringEnable?: boolean;
   sensorAlarmDelayMs?: number;
+  sensorRangeMin?: number;
+  sensorRangeMax?: number;
+}
+
+interface PIDParams {
+  pidName?: string;
+  pidKp?: number;
+  pidKi?: number;
+  pidKd?: number;
+  pidWindupLimit?: number;
+  pidMinOutput?: number;
+  pidMaxOutput?: number;
 }
 
 interface VisuWidgetProps {
@@ -156,6 +170,7 @@ interface VisuWidgetProps {
   pumpParams?: PumpParams;
   valveParams?: ValveParams;
   sensorParams?: SensorParams;
+  pidParams?: PIDParams;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -224,7 +239,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   visuPages = [],
   pumpParams,
   valveParams,
-  sensorParams
+  sensorParams,
+  pidParams
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1212,17 +1228,49 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const sensorValues = value as {
           sensorValue?: number;
           alarm?: boolean;
+          hoaMode?: 'hand' | 'auto';
+          manualValue?: number;
         } | null;
         return (
           <VisuSensor
             config={sensorCfg}
             value={sensorValues ? {
               sensorValue: sensorValues.sensorValue ?? 0,
-              alarm: sensorValues.alarm ?? false
+              alarm: sensorValues.alarm ?? false,
+              hoaMode: sensorValues.hoaMode ?? 'auto',
+              manualValue: sensorValues.manualValue ?? 0
             } : null}
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={sensorParams}
+          />
+        );
+      }
+
+      case 'visu-pid': {
+        const pidCfg = widget.config as PIDWidgetConfig;
+        const pidValues = value as {
+          controlOutput?: number;
+          setpoint?: number;
+          actualValue?: number;
+          enable?: boolean;
+          hoaMode?: 'hand' | 'auto';
+          manualOutput?: number;
+        } | null;
+        return (
+          <VisuPID
+            config={pidCfg}
+            value={pidValues ? {
+              controlOutput: pidValues.controlOutput ?? 0,
+              setpoint: pidValues.setpoint ?? 0,
+              actualValue: pidValues.actualValue ?? 0,
+              enable: pidValues.enable ?? false,
+              hoaMode: pidValues.hoaMode ?? 'auto',
+              manualOutput: pidValues.manualOutput ?? 0
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={pidParams}
           />
         );
       }
