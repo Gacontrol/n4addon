@@ -304,41 +304,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     onSelectWidgets?.([]);
   }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
 
-  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
-    if (lasso) {
-      const pos = getCanvasPos(e);
-      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-    }
-  }, [lasso, getCanvasPos]);
-
-  const handleCanvasPointerUp = useCallback(() => {
-    const currentLasso = lassoRef.current;
-    if (currentLasso) {
-      const minX = Math.min(currentLasso.startX, currentLasso.currentX);
-      const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
-      const minY = Math.min(currentLasso.startY, currentLasso.currentY);
-      const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
-      const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
-
-      if (isActualLasso) {
-        const widgets = pageWidgetsRef.current;
-        const selected = widgets
-          .filter(w => {
-            const wx1 = w.position.x;
-            const wy1 = w.position.y;
-            const wx2 = wx1 + w.size.width;
-            const wy2 = wy1 + w.size.height;
-            return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
-          })
-          .map(w => w.id);
-        if (selected.length > 0) {
-          onSelectWidgetsRef.current?.(selected);
-        }
-      }
-      setLasso(null);
-    }
-  }, []);
-
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
     e.preventDefault();
@@ -578,6 +543,56 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [dragState, resizeState, multiDragState, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
+    if (!lasso) return;
+
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      if (!canvasRef.current) return;
+      const el = canvasRef.current;
+      const rect = el.getBoundingClientRect();
+      const pos = {
+        x: e.clientX - rect.left + el.scrollLeft,
+        y: e.clientY - rect.top + el.scrollTop
+      };
+      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    };
+
+    const handleGlobalPointerUp = () => {
+      const currentLasso = lassoRef.current;
+      if (currentLasso) {
+        const minX = Math.min(currentLasso.startX, currentLasso.currentX);
+        const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
+        const minY = Math.min(currentLasso.startY, currentLasso.currentY);
+        const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
+        const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
+
+        if (isActualLasso) {
+          const widgets = pageWidgetsRef.current;
+          const selected = widgets
+            .filter(w => {
+              const wx1 = w.position.x;
+              const wy1 = w.position.y;
+              const wx2 = wx1 + w.size.width;
+              const wy2 = wy1 + w.size.height;
+              return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
+            })
+            .map(w => w.id);
+          if (selected.length > 0) {
+            onSelectWidgetsRef.current?.(selected);
+          }
+        }
+        setLasso(null);
+      }
+    };
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+    };
+  }, [lasso]);
+
+  useEffect(() => {
     if (!isEditMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -737,8 +752,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
       onPointerDown={handleCanvasPointerDown}
-      onPointerMove={handleCanvasPointerMove}
-      onPointerUp={handleCanvasPointerUp}
       onContextMenu={(e) => {
         if (e.target === canvasRef.current) {
           handleCanvasContextMenu(e);
