@@ -2397,12 +2397,19 @@ visuApp.use('/api', async (req, res) => {
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/json'
       },
-      timeout: 30000
+      timeout: 30000,
+      responseType: 'arraybuffer'
     });
-    res.status(response.status).json(response.data);
+    const contentType = response.headers['content-type'] || '';
+    res.status(response.status);
+    res.set('Content-Type', contentType);
+    res.send(Buffer.from(response.data));
   } catch (err) {
     if (err.response) {
-      res.status(err.response.status).json(err.response.data);
+      const ct = err.response.headers['content-type'] || '';
+      res.status(err.response.status);
+      res.set('Content-Type', ct);
+      res.send(Buffer.from(err.response.data));
     } else {
       res.status(503).json({ error: err.message });
     }
