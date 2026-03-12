@@ -209,14 +209,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const getCoords = (ev: PointerEvent) => {
-      const r = canvas.getBoundingClientRect();
-      return {
-        x: ev.clientX - r.left,
-        y: ev.clientY - r.top
-      };
-    };
-
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (!isEditModeRef.current) return;
@@ -231,7 +223,13 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         }
       }
 
-      const { x: startX, y: startY } = getCoords(e);
+      const initialRect = canvas.getBoundingClientRect();
+      const getCoordsFromRect = (ev: PointerEvent) => ({
+        x: ev.clientX - initialRect.left,
+        y: ev.clientY - initialRect.top
+      });
+
+      const { x: startX, y: startY } = getCoordsFromRect(e);
 
       setLassoState({ startX, startY, currentX: startX, currentY: startY });
       onSelectWidgetRef.current(null);
@@ -239,7 +237,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       e.preventDefault();
 
       const onMove = (ev: PointerEvent) => {
-        const { x: cx, y: cy } = getCoords(ev);
+        const { x: cx, y: cy } = getCoordsFromRect(ev);
         setLassoState({ startX, startY, currentX: cx, currentY: cy });
       };
 
@@ -247,7 +245,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
 
-        const { x: cx, y: cy } = getCoords(ev);
+        const { x: cx, y: cy } = getCoordsFromRect(ev);
 
         const lx1 = Math.min(startX, cx);
         const ly1 = Math.min(startY, cy);
