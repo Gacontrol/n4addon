@@ -545,18 +545,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   useEffect(() => {
     if (!lasso) return;
 
-    const handleGlobalPointerMove = (e: PointerEvent) => {
-      if (!canvasRef.current) return;
-      const el = canvasRef.current;
-      const rect = el.getBoundingClientRect();
-      const pos = {
-        x: e.clientX - rect.left + el.scrollLeft,
-        y: e.clientY - rect.top + el.scrollTop
-      };
-      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-    };
-
-    const handleGlobalPointerUp = () => {
+    const finishLasso = () => {
       const currentLasso = lassoRef.current;
       if (currentLasso) {
         const minX = Math.min(currentLasso.startX, currentLasso.currentX);
@@ -581,6 +570,27 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           }
         }
         setLasso(null);
+      }
+    };
+
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      if (!(e.buttons & 1)) {
+        finishLasso();
+        return;
+      }
+      if (!canvasRef.current) return;
+      const el = canvasRef.current;
+      const rect = el.getBoundingClientRect();
+      const pos = {
+        x: e.clientX - rect.left + el.scrollLeft,
+        y: e.clientY - rect.top + el.scrollTop
+      };
+      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    };
+
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (e.button === 0) {
+        finishLasso();
       }
     };
 
