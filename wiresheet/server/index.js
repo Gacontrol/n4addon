@@ -1347,6 +1347,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (resetInput && st.alarmLatch) {
         st.alarmLatch = false;
         st.alarmTimerStart = null;
+        if (visuReset === true) {
+          cfg.sensorVisuReset = false;
+        }
       }
 
       if (monitoringEnable && outOfLimits) {

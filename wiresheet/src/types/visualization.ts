@@ -637,7 +637,7 @@ export interface ValveWidgetConfig {
   showOutput?: boolean;
 }
 
-export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic';
+export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
 
 export interface SensorWidgetConfig {
   sensorName?: string;

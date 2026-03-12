@@ -99,12 +99,13 @@ const ROTATION_OPTIONS = [
 ];
 
 const SENSOR_SYMBOL_OPTIONS = [
-  { value: 'temperature', label: 'Temperatur' },
-  { value: 'pressure', label: 'Druck' },
-  { value: 'humidity', label: 'Feuchte' },
+  { value: 'none', label: 'Kein Symbol (nur Wert)' },
+  { value: 'temperature', label: 'Temperatur (T)' },
+  { value: 'pressure', label: 'Druck (P)' },
+  { value: 'humidity', label: 'Feuchte (H)' },
   { value: 'co2', label: 'CO2' },
-  { value: 'flow', label: 'Durchfluss' },
-  { value: 'level', label: 'Fuellstand' },
+  { value: 'flow', label: 'Durchfluss (Q)' },
+  { value: 'level', label: 'Fuellstand (L)' },
   { value: 'generic', label: 'Allgemein' }
 ];
 

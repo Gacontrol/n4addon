@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, RotateCcw, X, Settings } from 'lucide-react';
 
-export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic';
+export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
 
 interface SensorWidgetConfig {
   sensorName?: string;
@@ -36,83 +36,65 @@ interface VisuSensorProps {
   params?: SensorParams;
 }
 
-const TemperatureSymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
+const CircleLetterSymbol: React.FC<{ color: string; size: number; letter: string }> = ({ color, size, letter }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <rect x="35" y="10" width="30" height="60" rx="15" stroke={color} strokeWidth="3" fill="transparent" />
-    <circle cx="50" cy="75" r="20" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.3" />
-    <line x1="50" y1="70" x2="50" y2="30" stroke={color} strokeWidth="8" strokeLinecap="round" />
-    <line x1="70" y1="30" x2="78" y2="30" stroke={color} strokeWidth="2" />
-    <line x1="70" y1="40" x2="75" y2="40" stroke={color} strokeWidth="2" />
-    <line x1="70" y1="50" x2="78" y2="50" stroke={color} strokeWidth="2" />
-  </svg>
-);
-
-const PressureSymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <circle cx="50" cy="50" r="40" stroke={color} strokeWidth="3" fill="transparent" />
-    <path d="M 50 90 L 50 100" stroke={color} strokeWidth="3" />
-    <path d="M 25 25 A 35 35 0 0 1 75 25" stroke={color} strokeWidth="2" fill="none" />
-    <line x1="50" y1="50" x2="65" y2="35" stroke={color} strokeWidth="3" strokeLinecap="round" />
-    <circle cx="50" cy="50" r="5" fill={color} />
-    <text x="25" y="70" fontSize="12" fill={color}>0</text>
-    <text x="68" y="70" fontSize="12" fill={color}>100</text>
-  </svg>
-);
-
-const HumiditySymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <path d="M 50 10 Q 20 50 20 65 A 30 30 0 0 0 80 65 Q 80 50 50 10" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.2" />
-    <path d="M 50 30 Q 35 50 35 60 A 15 15 0 0 0 65 60 Q 65 50 50 30" fill={color} fillOpacity="0.4" />
+    <circle cx="50" cy="50" r="42" stroke={color} strokeWidth="4" fill="transparent" />
+    <text x="50" y="58" textAnchor="middle" fontSize="42" fontWeight="bold" fill={color} fontFamily="Arial, sans-serif">{letter}</text>
   </svg>
 );
 
 const CO2Symbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <circle cx="50" cy="50" r="40" stroke={color} strokeWidth="3" fill="transparent" />
-    <text x="50" y="45" textAnchor="middle" fontSize="20" fontWeight="bold" fill={color}>CO</text>
-    <text x="65" y="60" textAnchor="middle" fontSize="14" fill={color}>2</text>
+    <circle cx="50" cy="50" r="42" stroke={color} strokeWidth="4" fill="transparent" />
+    <text x="42" y="56" textAnchor="middle" fontSize="28" fontWeight="bold" fill={color} fontFamily="Arial, sans-serif">CO</text>
+    <text x="72" y="64" textAnchor="middle" fontSize="18" fontWeight="bold" fill={color} fontFamily="Arial, sans-serif">2</text>
   </svg>
 );
 
 const FlowSymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <circle cx="50" cy="50" r="40" stroke={color} strokeWidth="3" fill="transparent" />
-    <path d="M 25 50 L 45 35 L 45 45 L 75 45 L 75 55 L 45 55 L 45 65 Z" fill={color} fillOpacity="0.5" stroke={color} strokeWidth="2" />
+    <circle cx="50" cy="50" r="42" stroke={color} strokeWidth="4" fill="transparent" />
+    <text x="50" y="58" textAnchor="middle" fontSize="36" fontWeight="bold" fill={color} fontFamily="Arial, sans-serif">Q</text>
   </svg>
 );
 
 const LevelSymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <rect x="25" y="15" width="50" height="70" rx="3" stroke={color} strokeWidth="3" fill="transparent" />
-    <rect x="28" y="45" width="44" height="37" fill={color} fillOpacity="0.4" />
-    <line x1="20" y1="30" x2="25" y2="30" stroke={color} strokeWidth="2" />
-    <line x1="20" y1="50" x2="25" y2="50" stroke={color} strokeWidth="2" />
-    <line x1="20" y1="70" x2="25" y2="70" stroke={color} strokeWidth="2" />
-    <path d="M 35 50 Q 42 45 50 50 Q 58 55 65 50" stroke={color} strokeWidth="2" fill="none" />
+    <circle cx="50" cy="50" r="42" stroke={color} strokeWidth="4" fill="transparent" />
+    <text x="50" y="58" textAnchor="middle" fontSize="36" fontWeight="bold" fill={color} fontFamily="Arial, sans-serif">L</text>
   </svg>
 );
 
 const GenericSymbol: React.FC<{ color: string; size: number }> = ({ color, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <circle cx="50" cy="50" r="40" stroke={color} strokeWidth="3" fill="transparent" />
+    <circle cx="50" cy="50" r="42" stroke={color} strokeWidth="4" fill="transparent" />
     <circle cx="50" cy="50" r="8" fill={color} />
-    <line x1="50" y1="15" x2="50" y2="35" stroke={color} strokeWidth="3" />
-    <line x1="50" y1="65" x2="50" y2="85" stroke={color} strokeWidth="3" />
-    <line x1="15" y1="50" x2="35" y2="50" stroke={color} strokeWidth="3" />
-    <line x1="65" y1="50" x2="85" y2="50" stroke={color} strokeWidth="3" />
   </svg>
 );
 
 const SensorSymbol: React.FC<{ symbolType: SensorSymbolType; color: string; size: number }> = ({ symbolType, color, size }) => {
   switch (symbolType) {
-    case 'temperature': return <TemperatureSymbol color={color} size={size} />;
-    case 'pressure': return <PressureSymbol color={color} size={size} />;
-    case 'humidity': return <HumiditySymbol color={color} size={size} />;
+    case 'temperature': return <CircleLetterSymbol color={color} size={size} letter="T" />;
+    case 'pressure': return <CircleLetterSymbol color={color} size={size} letter="P" />;
+    case 'humidity': return <CircleLetterSymbol color={color} size={size} letter="H" />;
     case 'co2': return <CO2Symbol color={color} size={size} />;
     case 'flow': return <FlowSymbol color={color} size={size} />;
     case 'level': return <LevelSymbol color={color} size={size} />;
-    case 'generic':
-    default: return <GenericSymbol color={color} size={size} />;
+    case 'generic': return <GenericSymbol color={color} size={size} />;
+    case 'none':
+    default: return null;
+  }
+};
+
+const getDefaultUnitForSymbol = (symbolType: SensorSymbolType): string => {
+  switch (symbolType) {
+    case 'temperature': return '\u00B0C';
+    case 'pressure': return 'bar';
+    case 'humidity': return '%rH';
+    case 'co2': return 'ppm';
+    case 'flow': return 'm\u00B3/h';
+    case 'level': return '%';
+    default: return '';
   }
 };
 
@@ -132,7 +114,9 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
 
   const minLimit = params?.sensorMinLimit ?? 0;
   const maxLimit = params?.sensorMaxLimit ?? 100;
-  const unit = params?.sensorUnit || '';
+  const symbolType = config.symbolType || 'generic';
+  const autoUnit = getDefaultUnitForSymbol(symbolType);
+  const unit = params?.sensorUnit || autoUnit;
 
   useEffect(() => {
     if (params) {
@@ -163,12 +147,12 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
 
   const statusColor = getStatusColor();
   const sensorName = config.sensorName || params?.sensorName || 'Sensor';
-  const symbolType = config.symbolType || 'generic';
   const rotation = config.rotation ?? 0;
 
   const showValue = config.showValue !== false;
   const showUnit = config.showUnit !== false;
   const showLimits = config.showLimits !== false;
+  const hasSymbol = symbolType !== 'none';
 
   const isOutOfLimits = sensorValue < minLimit || sensorValue > maxLimit;
   const valuePercent = Math.max(0, Math.min(100, ((sensorValue - minLimit) / (maxLimit - minLimit)) * 100));
@@ -185,32 +169,42 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
             ALARM
           </div>
         )}
-        <div
-          className="relative flex items-center justify-center"
-          style={{
-            width: '70%',
-            height: '50%',
-            maxWidth: 70,
-            maxHeight: 70,
-            transform: `rotate(${rotation}deg)`
-          }}
-        >
-          <SensorSymbol
-            symbolType={symbolType}
-            color={statusColor}
-            size={55}
-          />
-          {alarm && (
-            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
-              <AlertTriangle size={14} className="text-red-500" />
-            </div>
-          )}
-        </div>
+        {hasSymbol ? (
+          <div
+            className="relative flex items-center justify-center"
+            style={{
+              width: '70%',
+              height: '50%',
+              maxWidth: 70,
+              maxHeight: 70,
+              transform: `rotate(${rotation}deg)`
+            }}
+          >
+            <SensorSymbol
+              symbolType={symbolType}
+              color={statusColor}
+              size={55}
+            />
+            {alarm && (
+              <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
+                <AlertTriangle size={14} className="text-red-500" />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            {alarm && (
+              <div className="absolute top-0.5 right-0.5">
+                <AlertTriangle size={14} className="text-red-500" />
+              </div>
+            )}
+          </div>
+        )}
         <div className="text-xs text-center text-slate-300 truncate w-full px-1">
           {sensorName}
         </div>
         {showValue && (
-          <div className="text-sm font-semibold" style={{ color: isOutOfLimits ? '#ef4444' : statusColor }}>
+          <div className={`font-semibold ${hasSymbol ? 'text-sm' : 'text-lg'}`} style={{ color: isOutOfLimits ? '#ef4444' : statusColor }}>
             {sensorValue.toFixed(1)}{showUnit && unit ? ` ${unit}` : ''}
           </div>
         )}
