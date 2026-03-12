@@ -107,6 +107,14 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
   const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+  const lassoRef = useRef(lasso);
+  lassoRef.current = lasso;
+
+  const pageWidgetsRef = useRef(page.widgets);
+  pageWidgetsRef.current = page.widgets;
+
+  const onSelectWidgetsRef = useRef(onSelectWidgets);
+  onSelectWidgetsRef.current = onSelectWidgets;
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -304,15 +312,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [lasso, getCanvasPos]);
 
   const handleCanvasPointerUp = useCallback(() => {
-    if (lasso) {
-      const minX = Math.min(lasso.startX, lasso.currentX);
-      const maxX = Math.max(lasso.startX, lasso.currentX);
-      const minY = Math.min(lasso.startY, lasso.currentY);
-      const maxY = Math.max(lasso.startY, lasso.currentY);
-      const isActualLasso = Math.abs(lasso.currentX - lasso.startX) > 5 || Math.abs(lasso.currentY - lasso.startY) > 5;
+    const currentLasso = lassoRef.current;
+    if (currentLasso) {
+      const minX = Math.min(currentLasso.startX, currentLasso.currentX);
+      const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
+      const minY = Math.min(currentLasso.startY, currentLasso.currentY);
+      const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
+      const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
 
       if (isActualLasso) {
-        const selected = page.widgets
+        const widgets = pageWidgetsRef.current;
+        const selected = widgets
           .filter(w => {
             const wx1 = w.position.x;
             const wy1 = w.position.y;
@@ -322,12 +332,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           })
           .map(w => w.id);
         if (selected.length > 0) {
-          onSelectWidgets?.(selected);
+          onSelectWidgetsRef.current?.(selected);
         }
       }
       setLasso(null);
     }
-  }, [lasso, page.widgets, onSelectWidgets]);
+  }, []);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
