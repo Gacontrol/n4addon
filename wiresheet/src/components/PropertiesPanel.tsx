@@ -775,95 +775,106 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <span className="text-xs font-semibold uppercase tracking-wider">PID Regler</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Kp</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={config.kp ?? 1.0}
-                  onChange={e => updateConfig('kp', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-0.5">Proportional</p>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Ki</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={config.ki ?? 0.1}
-                  onChange={e => updateConfig('ki', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-0.5">Integral</p>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Kd</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={config.kd ?? 0.05}
-                  onChange={e => updateConfig('kd', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
-                <p className="text-[9px] text-slate-500 mt-0.5">Differential</p>
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.pidName ?? ''}
+                placeholder="Reglername"
+                onChange={e => updateConfig('pidName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">PID Parameter</label>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Kp (P-Anteil)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={config.pidKp ?? 1.0}
+                    onChange={e => updateConfig('pidKp', parseFloat(e.target.value) || 1.0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Ki (I-Anteil)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={config.pidKi ?? 0.1}
+                    onChange={e => updateConfig('pidKi', parseFloat(e.target.value) || 0.1)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Kd (D-Anteil)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={config.pidKd ?? 0.0}
+                    onChange={e => updateConfig('pidKd', parseFloat(e.target.value) || 0.0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Ausgang Min</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={config.outputMin ?? 0}
-                  onChange={e => updateConfig('outputMin', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Ausgang Max</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={config.outputMax ?? 100}
-                  onChange={e => updateConfig('outputMax', parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Windup Limit</label>
+              <input
+                type="number"
+                step="any"
+                value={config.pidWindupLimit ?? 100}
+                onChange={e => updateConfig('pidWindupLimit', parseFloat(e.target.value) || 100)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+              />
+              <p className="text-[9px] text-slate-500">Begrenzung des Integrators (Anti-Windup)</p>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbegrenzung</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Ausgang (%)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.pidMinOutput ?? 0}
+                    onChange={e => updateConfig('pidMinOutput', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Ausgang (%)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.pidMaxOutput ?? 100}
+                    onChange={e => updateConfig('pidMaxOutput', parseFloat(e.target.value) || 100)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Abtastzeit</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={10}
-                  step={10}
-                  value={config.sampleTimeMs ?? 100}
-                  onChange={e => updateConfig('sampleTimeMs', parseInt(e.target.value) || 100)}
-                  className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                />
-                <span className="text-xs text-slate-400">ms</span>
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">Setpoint (Sollwert)</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">ActualValue (Istwert)</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Enable (Freigabe)</span></div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
-              <span className="text-xs text-slate-300">Anti-Windup</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.antiWindup !== false}
-                  onChange={e => updateConfig('antiWindup', e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-red-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
-              </label>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">ControlOutput (Stellgroesse)</span></div>
+              </div>
             </div>
 
             <p className="text-[10px] text-slate-500">
-              Der PID-Regler berechnet die Stellgroesse basierend auf der Differenz zwischen Soll- und Istwert.
+              PID-Regler mit Proportional-, Integral- und Differentialanteil. Berechnet die Stellgroesse basierend auf der Regeldifferenz (Sollwert - Istwert).
             </p>
           </div>
         )}
@@ -1308,6 +1319,407 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
             <p className="text-[10px] text-slate-500">
               Kompletter Pumpenbaustein mit Verzoegerungen, Rueckmeldungsueberwachung, Drehzahlregelung und Blockierschutz.
+            </p>
+          </div>
+        )}
+
+        {node.type === 'aggregate-control' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-cyan-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Aggregatebaustein</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.aggregateName ?? ''}
+                placeholder="Aggregatname"
+                onChange={e => updateConfig('aggregateName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Verzoegerungen</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Einschaltverz. (ms)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={config.aggregateStartDelayMs ?? 0}
+                    onChange={e => updateConfig('aggregateStartDelayMs', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Ausschaltverz. (ms)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={config.aggregateStopDelayMs ?? 0}
+                    onChange={e => updateConfig('aggregateStopDelayMs', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Rueckmeldung</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">RM-Ueberwachung aktiv</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.aggregateEnableFeedback !== false}
+                    onChange={e => updateConfig('aggregateEnableFeedback', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-cyan-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">RM-Timeout (ms)</label>
+                <input
+                  type="number"
+                  min={1000}
+                  step={1000}
+                  value={config.aggregateFeedbackTimeoutMs ?? 10000}
+                  onChange={e => updateConfig('aggregateFeedbackTimeoutMs', parseInt(e.target.value) || 10000)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Drehzahlregelung</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Drehzahl (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.aggregateSpeedMin ?? 0}
+                    onChange={e => updateConfig('aggregateSpeedMin', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Drehzahl (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.aggregateSpeedMax ?? 100}
+                    onChange={e => updateConfig('aggregateSpeedMax', parseInt(e.target.value) || 100)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Blockierschutz (Anti-Seize)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Intervall (Tage)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.round((config.aggregateAntiSeizeIntervalMs ?? 604800000) / 86400000)}
+                    onChange={e => updateConfig('aggregateAntiSeizeIntervalMs', (parseInt(e.target.value) || 7) * 86400000)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Laufzeit (Sek)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.round((config.aggregateAntiSeizeRunMs ?? 60000) / 1000)}
+                    onChange={e => updateConfig('aggregateAntiSeizeRunMs', (parseInt(e.target.value) || 60) * 1000)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Drehzahl (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={config.aggregateAntiSeizeSpeed ?? 30}
+                  onChange={e => updateConfig('aggregateAntiSeizeSpeed', parseInt(e.target.value) || 30)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Betriebsdaten</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Betriebsstunden</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={config.aggregateOperatingHours ?? 0}
+                    onChange={e => updateConfig('aggregateOperatingHours', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Startanzahl</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={config.aggregateStartCount ?? 0}
+                    onChange={e => updateConfig('aggregateStartCount', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Aggregatebaustein fuer allgemeine Aggregate wie Ventilatoren, Motoren, Kompressoren etc.
+            </p>
+          </div>
+        )}
+
+        {node.type === 'valve-control' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-violet-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Ventilbaustein</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.valveName ?? ''}
+                placeholder="Ventilname"
+                onChange={e => updateConfig('valveName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsgrenzen</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Ausgang (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.valveMinOutput ?? 0}
+                    onChange={e => updateConfig('valveMinOutput', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Ausgang (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.valveMaxOutput ?? 100}
+                    onChange={e => updateConfig('valveMaxOutput', parseInt(e.target.value) || 100)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ueberwachung</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Ueberwachung aktiv</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.valveMonitoringEnable !== false}
+                    onChange={e => updateConfig('valveMonitoringEnable', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-violet-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Toleranz (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.valveTolerance ?? 5}
+                    onChange={e => updateConfig('valveTolerance', parseInt(e.target.value) || 5)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Alarmverz. (ms)</label>
+                  <input
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    value={config.valveAlarmDelayMs ?? 10000}
+                    onChange={e => updateConfig('valveAlarmDelayMs', parseInt(e.target.value) || 10000)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">Setpoint</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">Feedback</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">Reset</span></div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-violet-400" /><span className="text-slate-300">ValveOut</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Ventilbaustein mit Sollwertbegrenzung und Rueckmeldungsueberwachung.
+            </p>
+          </div>
+        )}
+
+        {node.type === 'sensor-control' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-cyan-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Sensorbaustein</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.sensorName ?? ''}
+                placeholder="Sensorname"
+                onChange={e => updateConfig('sensorName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Grenzwerte</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Grenzwert</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.sensorMinLimit ?? 0}
+                    onChange={e => updateConfig('sensorMinLimit', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Grenzwert</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.sensorMaxLimit ?? 100}
+                    onChange={e => updateConfig('sensorMaxLimit', parseFloat(e.target.value) || 100)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Slider-Bereich (Hand)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Bereich</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.sensorRangeMin ?? -50}
+                    onChange={e => updateConfig('sensorRangeMin', parseFloat(e.target.value) || -50)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Bereich</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.sensorRangeMax ?? 150}
+                    onChange={e => updateConfig('sensorRangeMax', parseFloat(e.target.value) || 150)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Einheit</label>
+              <input
+                type="text"
+                value={config.sensorUnit ?? ''}
+                placeholder="z.B. C, bar, ppm"
+                onChange={e => updateConfig('sensorUnit', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ueberwachung</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Ueberwachung aktiv</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.sensorMonitoringEnable !== false}
+                    onChange={e => updateConfig('sensorMonitoringEnable', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-cyan-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Alarmverzoegerung (ms)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={config.sensorAlarmDelayMs ?? 5000}
+                  onChange={e => updateConfig('sensorAlarmDelayMs', parseInt(e.target.value) || 5000)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">SensorIn</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">AlarmReset</span></div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">SensorOut</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Sensorbaustein mit Grenzwertueberwachung und Hand/Auto Umschaltung.
             </p>
           </div>
         )}

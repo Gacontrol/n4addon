@@ -1278,7 +1278,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const visuHOA = cfg.valveVisuHOA ?? 2;
 
       const isHandMode = visuHOA === 1;
-      const actualSetpoint = visuSetpoint !== undefined ? toNumber(visuSetpoint) : setpoint;
+      const actualSetpoint = isHandMode && visuSetpoint !== undefined ? toNumber(visuSetpoint) : setpoint;
       const resetInput = visuReset === true ? true : resetInputWire;
 
       const minOutput = cfg.valveMinOutput ?? 0;
