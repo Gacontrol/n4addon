@@ -231,6 +231,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
       const { x: startX, y: startY } = getCoordsFromRect(e);
 
+      try {
+        (e.target as Element).releasePointerCapture(e.pointerId);
+      } catch (_) {}
+
       setLassoState({ startX, startY, currentX: startX, currentY: startY });
       onSelectWidgetRef.current(null);
       onSelectWidgetsRef.current?.([]);
