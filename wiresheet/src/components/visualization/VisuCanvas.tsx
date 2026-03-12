@@ -192,6 +192,90 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [selectedWidgetId, page.widgets, isEditMode, isInDrawingMode]);
 
+  const pageWidgetsRef = useRef(page.widgets);
+  pageWidgetsRef.current = page.widgets;
+  const onSelectWidgetRef = useRef(onSelectWidget);
+  onSelectWidgetRef.current = onSelectWidget;
+  const onSelectWidgetsRef = useRef(onSelectWidgets);
+  onSelectWidgetsRef.current = onSelectWidgets;
+  const isEditModeRef = useRef(isEditMode);
+  isEditModeRef.current = isEditMode;
+  const drawingStateRef = useRef(drawingState);
+  drawingStateRef.current = drawingState;
+  const contextMenuRef = useRef(contextMenu);
+  contextMenuRef.current = contextMenu;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      if (!isEditModeRef.current) return;
+      if (drawingStateRef.current) return;
+      if (contextMenuRef.current) return;
+
+      let el = e.target as HTMLElement | null;
+      while (el && el !== canvas) {
+        if (el.dataset.widgetId) return;
+        el = el.parentElement;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const startX = e.clientX - rect.left + canvas.scrollLeft;
+      const startY = e.clientY - rect.top + canvas.scrollTop;
+
+      setLassoState({ startX, startY, currentX: startX, currentY: startY });
+      onSelectWidgetRef.current(null);
+      onSelectWidgetsRef.current?.([]);
+      e.preventDefault();
+
+      const onMove = (ev: PointerEvent) => {
+        const r = canvas.getBoundingClientRect();
+        const cx = ev.clientX - r.left + canvas.scrollLeft;
+        const cy = ev.clientY - r.top + canvas.scrollTop;
+        setLassoState({ startX, startY, currentX: cx, currentY: cy });
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+
+        const r = canvas.getBoundingClientRect();
+        const cx = ev.clientX - r.left + canvas.scrollLeft;
+        const cy = ev.clientY - r.top + canvas.scrollTop;
+
+        const lx1 = Math.min(startX, cx);
+        const ly1 = Math.min(startY, cy);
+        const lx2 = Math.max(startX, cx);
+        const ly2 = Math.max(startY, cy);
+
+        setLassoState(null);
+
+        const threshold = 5;
+        if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
+          const selected = pageWidgetsRef.current
+            .filter(w => {
+              const wx2 = w.position.x + w.size.width;
+              const wy2 = w.position.y + w.size.height;
+              return w.position.x < lx2 && wx2 > lx1 && w.position.y < ly2 && wy2 > ly1;
+            })
+            .map(w => w.id);
+          if (selected.length > 0) {
+            onSelectWidgetsRef.current?.(selected);
+            onSelectWidgetRef.current(selected[selected.length - 1]);
+          }
+        }
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    return () => canvas.removeEventListener('pointerdown', onPointerDown);
+  }, []);
+
   const WRITE_WIDGET_TYPES = new Set([
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
     'modern-switch', 'modern-button', 'modern-incrementer', 'dash-toggle'
@@ -310,66 +394,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
-  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
-    if (drawingState) return;
-    if (contextMenu) return;
-
-    if (isEditMode && e.button === 0) {
-      let el = e.target as HTMLElement | null;
-      let hitWidget = false;
-      while (el && el !== canvasRef.current) {
-        if (el.dataset.widgetId) { hitWidget = true; break; }
-        el = el.parentElement;
-      }
-      if (!hitWidget && canvasRef.current) {
-        const pos = getCanvasPos(e);
-        const initialLasso = { startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
-        setLassoState(initialLasso);
-        onSelectWidget(null);
-        onSelectWidgets?.([]);
-        e.preventDefault();
-
-        const onMove = (ev: PointerEvent) => {
-          const movePos = getScrolledCanvasPos(ev);
-          lassoStateRef.current = { ...lassoStateRef.current!, currentX: movePos.x, currentY: movePos.y };
-          setLassoState(prev => prev ? { ...prev, currentX: movePos.x, currentY: movePos.y } : null);
-        };
-
-        const onUp = () => {
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-
-          const currentLasso = lassoStateRef.current;
-          if (currentLasso) {
-            const lx1 = Math.min(currentLasso.startX, currentLasso.currentX);
-            const ly1 = Math.min(currentLasso.startY, currentLasso.currentY);
-            const lx2 = Math.max(currentLasso.startX, currentLasso.currentX);
-            const ly2 = Math.max(currentLasso.startY, currentLasso.currentY);
-            const threshold = 5;
-            if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
-              const selected = page.widgets
-                .filter(w => {
-                  const wx1 = w.position.x;
-                  const wy1 = w.position.y;
-                  const wx2 = w.position.x + w.size.width;
-                  const wy2 = w.position.y + w.size.height;
-                  return wx1 < lx2 && wx2 > lx1 && wy1 < ly2 && wy2 > ly1;
-                })
-                .map(w => w.id);
-              if (selected.length > 0) {
-                onSelectWidgets?.(selected);
-                onSelectWidget(selected[selected.length - 1]);
-              }
-            }
-            setLassoState(null);
-          }
-        };
-
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-      }
-    }
-  }, [drawingState, contextMenu, isEditMode, getCanvasPos, getScrolledCanvasPos, page.widgets, onSelectWidget, onSelectWidgets]);
+  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {}, []);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
