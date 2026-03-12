@@ -215,21 +215,48 @@ function App() {
       setHaDevices([]);
       return;
     }
+
+    const extractDeviceName = (entity: HaEntity): string => {
+      if (entity.attributes.device_name) {
+        return entity.attributes.device_name as string;
+      }
+
+      const friendlyName = entity.attributes.friendly_name as string;
+      if (friendlyName) {
+        const parts = friendlyName.split(' ');
+        if (parts.length >= 2) {
+          return parts[0];
+        }
+        return friendlyName;
+      }
+
+      const entityName = entity.entity_id.split('.')[1] || '';
+      const nameParts = entityName.split('_');
+      if (nameParts.length >= 2) {
+        return nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
+      }
+      return entityName.charAt(0).toUpperCase() + entityName.slice(1);
+    };
+
     const deviceMap = new Map<string, HaDevice>();
     for (const entity of haEntities) {
-      const deviceId = (entity.attributes.device_id as string) || '__unassigned__';
-      if (!deviceMap.has(deviceId)) {
-        deviceMap.set(deviceId, {
-          id: deviceId,
-          name: (entity.attributes.device_name as string) || (deviceId === '__unassigned__' ? 'Nicht zugeordnet' : deviceId),
+      const deviceId = (entity.attributes.device_id as string) || '';
+      const derivedDeviceName = extractDeviceName(entity);
+      const effectiveDeviceId = deviceId || `derived_${derivedDeviceName.toLowerCase().replace(/\s+/g, '_')}`;
+
+      if (!deviceMap.has(effectiveDeviceId)) {
+        deviceMap.set(effectiveDeviceId, {
+          id: effectiveDeviceId,
+          name: (entity.attributes.device_name as string) || derivedDeviceName,
           manufacturer: entity.attributes.manufacturer as string,
           model: entity.attributes.model as string,
           entities: []
         });
       }
-      deviceMap.get(deviceId)!.entities.push(entity);
+      deviceMap.get(effectiveDeviceId)!.entities.push(entity);
     }
-    const devices = Array.from(deviceMap.values()).filter(d => d.id !== '__unassigned__');
+
+    const devices = Array.from(deviceMap.values());
     devices.sort((a, b) => a.name.localeCompare(b.name));
     setHaDevices(devices);
   }, [haEntities]);
