@@ -528,6 +528,31 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               />
             </div>
+            <div className="border-t border-slate-700 pt-3 mt-1">
+              <label className="block text-xs text-slate-500 mb-2">Bool-Texte (fuer Boolean-Werte)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Text bei True</label>
+                  <input
+                    type="text"
+                    value={displayCfg.trueText || ''}
+                    placeholder="Ein"
+                    onChange={(e) => onUpdate({ config: { ...config, trueText: e.target.value } })}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Text bei False</label>
+                  <input
+                    type="text"
+                    value={displayCfg.falseText || ''}
+                    placeholder="Aus"
+                    onChange={(e) => onUpdate({ config: { ...config, falseText: e.target.value } })}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  />
+                </div>
+              </div>
+            </div>
           </>
         );
 

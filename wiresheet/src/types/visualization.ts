@@ -150,6 +150,8 @@ export interface DisplayConfig {
   unit?: string;
   decimals?: number;
   fontSize?: number;
+  trueText?: string;
+  falseText?: string;
 }
 
 export interface LedConfig {

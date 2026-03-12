@@ -16,7 +16,11 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
 }) => {
   const formatValue = () => {
     if (value === null || value === undefined) return '---';
-    if (typeof value === 'boolean') return value ? 'Ein' : 'Aus';
+    if (typeof value === 'boolean') {
+      const trueText = config.trueText || 'Ein';
+      const falseText = config.falseText || 'Aus';
+      return value ? trueText : falseText;
+    }
     if (typeof value === 'number') {
       const decimals = config.decimals ?? 1;
       return value.toFixed(decimals);
