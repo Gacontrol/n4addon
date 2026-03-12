@@ -171,6 +171,49 @@ export const useWiresheetPages = () => {
   }, [loadPages, loadHaEntities]);
 
   useEffect(() => {
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let active = true;
+
+    function connect() {
+      if (!active) return;
+      es = new EventSource(`${API_BASE}/sse`);
+
+      es.addEventListener('state', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.liveValues) {
+            setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+          }
+          if (data.nodeConfigs) {
+            setPages(prev => prev.map(page => ({
+              ...page,
+              nodes: page.nodes.map(n => {
+                const cfg = data.nodeConfigs[n.id];
+                if (!cfg) return n;
+                return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
+              })
+            })));
+          }
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es?.close();
+        if (active) reconnectTimer = setTimeout(connect, 2000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      active = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, []);
+
+  useEffect(() => {
     pagesRef.current = pages;
   }, [pages]);
 

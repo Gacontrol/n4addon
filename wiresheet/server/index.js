@@ -1344,6 +1344,7 @@ async function runPageCycle(pageId) {
       console.log(`[CYCLE DEBUG] Page ${pageId} - visuControlledDps:`, JSON.stringify([...visuControlledDps.entries()]));
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
+      broadcastSSE('state', { liveValues: getLiveSnapshot() });
     }
 
     pageInfo.lastRun = Date.now();
@@ -1543,6 +1544,13 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
       if (updated) {
         await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
         res.json({ success: true });
       } else {
         res.status(404).json({ error: 'Node nicht gefunden' });
@@ -1589,7 +1597,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
     }
 
-    console.log(`[WRITE-VALUE DEBUG] FERTIG - Visu-Wert geschrieben: ${nodeId} = ${value}`);
+    broadcastSSE('state', { liveValues: getLiveSnapshot() });
     res.json({ success: true });
   }
 });
@@ -1600,6 +1608,75 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
     Object.assign(merged, values);
   }
   res.json({ values: merged });
+});
+
+const sseClients = new Set();
+
+function broadcastSSE(event, data) {
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(msg); } catch {}
+  }
+}
+
+function getLiveSnapshot() {
+  const merged = {};
+  for (const [, values] of lastNodeValues) {
+    Object.assign(merged, values);
+  }
+  return merged;
+}
+
+async function getNodeConfigSnapshot() {
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    const configs = {};
+    for (const page of pages) {
+      for (const node of (page.nodes || [])) {
+        if (node.data?.config) configs[node.id] = node.data.config;
+      }
+    }
+    return configs;
+  } catch { return {}; }
+}
+
+app.get(['/sse', '/api/sse'], (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  sseClients.add(res);
+  res.write(':ok\n\n');
+
+  (async () => {
+    const liveValues = getLiveSnapshot();
+    const nodeConfigs = await getNodeConfigSnapshot();
+    res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
+  })();
+
+  req.on('close', () => sseClients.delete(res));
+});
+
+visuApp.get(['/sse', '/api/sse'], (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  sseClients.add(res);
+  res.write(':ok\n\n');
+
+  (async () => {
+    const liveValues = getLiveSnapshot();
+    const nodeConfigs = await getNodeConfigSnapshot();
+    res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
+  })();
+
+  req.on('close', () => sseClients.delete(res));
 });
 
 const net = require('net');

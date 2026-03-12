@@ -11,7 +11,6 @@ function getApiBase(): string {
   return '/api';
 }
 
-const POLL_INTERVAL = 200;
 const WRITE_DEBOUNCE_MS = 300;
 
 export function VisuApp() {
@@ -22,12 +21,21 @@ export function VisuApp() {
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const pageHistoryRef = useRef<string[]>([]);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const lastWriteRef = useRef<Map<string, number>>(new Map());
+  const logicNodesRef = useRef<FlowNode[]>([]);
   const apiBase = getApiBase();
 
   visuPagesRef.current = visuPages;
+  logicNodesRef.current = logicNodes;
+
+  const applyNodeConfigs = useCallback((nodeConfigs: Record<string, Record<string, unknown>>) => {
+    setLogicNodes(prev => prev.map(n => {
+      const cfg = nodeConfigs[n.id];
+      if (!cfg) return n;
+      return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
+    }));
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -61,38 +69,41 @@ export function VisuApp() {
     }
   }, [apiBase]);
 
-  const pollLiveValues = useCallback(async () => {
-    try {
-      const [liveRes, pagesRes] = await Promise.all([
-        fetch(`${apiBase}/live-values`),
-        fetch(`${apiBase}/pages`)
-      ]);
-      if (liveRes.ok) {
-        const response = await liveRes.json();
-        const data = response.values || response;
-        setLiveValues(data);
-      }
-      if (pagesRes.ok) {
-        const data = await pagesRes.json();
-        if (Array.isArray(data)) {
-          const allNodes = data.flatMap((p: { nodes: FlowNode[] }) => p.nodes || []);
-          setLogicNodes(allNodes);
-        }
-      }
-    } catch {}
-  }, [apiBase]);
-
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
-    pollLiveValues();
-    pollRef.current = setInterval(pollLiveValues, POLL_INTERVAL);
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let active = true;
+
+    function connect() {
+      if (!active) return;
+      es = new EventSource(`${apiBase}/sse`);
+
+      es.addEventListener('state', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.liveValues) setLiveValues(data.liveValues);
+          if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es?.close();
+        if (active) reconnectTimer = setTimeout(connect, 2000);
+      };
+    }
+
+    connect();
+
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      active = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
     };
-  }, [pollLiveValues]);
+  }, [apiBase, applyNodeConfigs]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
     console.log('[VISUAPP 8098 DEBUG] handleWidgetValueChange aufgerufen');
