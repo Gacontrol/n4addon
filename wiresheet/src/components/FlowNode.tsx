@@ -270,12 +270,12 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     return driverBindings.find(b => b.nodeId === node.id && b.portId === portId);
   };
 
-  const getVisuBindingsForPort = (portId: string, isFirstInput: boolean = false) => {
-    return visuBindings.filter(b => {
-      if (b.portId === portId) return true;
-      if (isFirstInput && !b.portId && b.isWrite) return true;
-      return false;
-    });
+  const getVisuBindingsForPort = (portId: string) => {
+    return visuBindings.filter(b => b.portId === portId);
+  };
+
+  const getVisuBindingsWithoutPort = () => {
+    return visuBindings.filter(b => !b.portId);
   };
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
@@ -881,7 +881,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 const hasPortVal = portVal !== undefined && portVal !== null;
                 const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
                 const driverBinding = getDriverBindingForPort(input.id);
-                const portVisuBindings = getVisuBindingsForPort(input.id, inputIndex === 0);
+                const portVisuBindings = getVisuBindingsForPort(input.id);
                 return (
                   <div key={input.id} className="flex items-center min-h-[20px] relative">
                     {portVisuBindings.length > 0 && !driverBinding && (
@@ -1084,6 +1084,34 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
         </div>
 
+        {getVisuBindingsWithoutPort().length > 0 && (
+          <div className="absolute left-0 right-0 flex flex-col gap-0.5" style={{ top: '100%', marginTop: '4px' }}>
+            {getVisuBindingsWithoutPort().map((vb, vbi) => {
+              const hasValue = vb.value !== undefined && vb.value !== null;
+              const displayVal = hasValue
+                ? (String(vb.value).length > 8 ? String(vb.value).slice(0, 8) + '..' : String(vb.value))
+                : null;
+              return (
+                <div key={vbi} className="flex items-center">
+                  <div
+                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
+                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
+                  >
+                    <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span className="truncate max-w-[120px]">
+                      Visu: {vb.pageName} / {vb.widgetLabel}
+                    </span>
+                    {hasValue && (
+                      <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
+                        {displayVal}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {dpContextMenu && isDPNode && createPortal(
