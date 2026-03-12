@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, Edit2, X, Check, Network, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, CreditCard as Edit2, X, Check, Network, AlertCircle, RefreshCw } from 'lucide-react';
 import { ModbusDevice } from '../types/flow';
 import { modbusDeviceLibrary, ModbusDeviceTemplate } from '../data/modbusDeviceLibrary';
 
