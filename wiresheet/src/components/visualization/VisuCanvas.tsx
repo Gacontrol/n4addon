@@ -304,7 +304,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     setLasso({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
     lassoRef.current = { startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
     lassoPointerIdRef.current = e.pointerId;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    canvasRef.current?.setPointerCapture(e.pointerId);
     onSelectWidget(null);
     onSelectWidgets?.([]);
   }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
@@ -594,7 +594,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const pos = getCanvasPos(e);
     lassoRef.current = { ...lassoRef.current!, currentX: pos.x, currentY: pos.y };
 
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    canvasRef.current?.releasePointerCapture(e.pointerId);
     finishLasso();
   }, [lasso, getCanvasPos, finishLasso]);
 
