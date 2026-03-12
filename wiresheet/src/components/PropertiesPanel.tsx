@@ -860,6 +860,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             </div>
 
+            <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
+              <div>
+                <span className="text-xs text-slate-300">Wirksinn umkehren (Kuehlen)</span>
+                <p className="text-[9px] text-slate-500">Bei aktiviert: Ausgang steigt wenn Istwert ueber Sollwert</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.pidReverseAction === true}
+                  onChange={e => updateConfig('pidReverseAction', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-red-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+              </label>
+            </div>
+
             <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
               <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
               <div className="grid grid-cols-2 gap-1 text-[10px]">
@@ -874,7 +890,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </div>
 
             <p className="text-[10px] text-slate-500">
-              PID-Regler mit Proportional-, Integral- und Differentialanteil. Berechnet die Stellgroesse basierend auf der Regeldifferenz (Sollwert - Istwert).
+              PID-Regler mit Proportional-, Integral- und Differentialanteil. Berechnet die Stellgroesse basierend auf der Regeldifferenz (Sollwert - Istwert). Bei umgekehrtem Wirksinn fuer Kuehlregelungen.
             </p>
           </div>
         )}

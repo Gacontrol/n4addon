@@ -721,6 +721,7 @@ export const nodeTemplates: NodeTemplate[] = [
       pidWindupLimit: 100,
       pidMinOutput: 0,
       pidMaxOutput: 100,
+      pidReverseAction: false,
       pidName: ''
     }
   },
