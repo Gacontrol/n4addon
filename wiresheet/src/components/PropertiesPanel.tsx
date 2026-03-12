@@ -1125,6 +1125,190 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'pump-control' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-cyan-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Pumpenbaustein</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Verzoegerungen</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Einschaltverz. (ms)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={config.pumpStartDelayMs ?? 0}
+                    onChange={e => updateConfig('pumpStartDelayMs', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Ausschaltverz. (ms)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={config.pumpStopDelayMs ?? 0}
+                    onChange={e => updateConfig('pumpStopDelayMs', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Rueckmeldung</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">RM-Ueberwachung aktiv</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.pumpEnableFeedback !== false}
+                    onChange={e => updateConfig('pumpEnableFeedback', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-cyan-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">RM-Timeout (ms)</label>
+                <input
+                  type="number"
+                  min={1000}
+                  step={1000}
+                  value={config.pumpFeedbackTimeoutMs ?? 10000}
+                  onChange={e => updateConfig('pumpFeedbackTimeoutMs', parseInt(e.target.value) || 10000)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Drehzahlregelung</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Drehzahl (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.pumpSpeedMin ?? 0}
+                    onChange={e => updateConfig('pumpSpeedMin', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Drehzahl (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={config.pumpSpeedMax ?? 100}
+                    onChange={e => updateConfig('pumpSpeedMax', parseInt(e.target.value) || 100)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Blockierschutz (Anti-Seize)</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Intervall (Tage)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.round((config.pumpAntiSeizeIntervalMs ?? 604800000) / 86400000)}
+                    onChange={e => updateConfig('pumpAntiSeizeIntervalMs', (parseInt(e.target.value) || 7) * 86400000)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Laufzeit (Sek)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={Math.round((config.pumpAntiSeizeRunMs ?? 60000) / 1000)}
+                    onChange={e => updateConfig('pumpAntiSeizeRunMs', (parseInt(e.target.value) || 60) * 1000)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Drehzahl (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={config.pumpAntiSeizeSpeed ?? 30}
+                  onChange={e => updateConfig('pumpAntiSeizeSpeed', parseInt(e.target.value) || 30)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Betriebsdaten</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Betriebsstunden</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={config.pumpOperatingHours ?? 0}
+                    onChange={e => updateConfig('pumpOperatingHours', parseFloat(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Startanzahl</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={config.pumpStartCount ?? 0}
+                    onChange={e => updateConfig('pumpStartCount', parseInt(e.target.value) || 0)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">StartCmd</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Feedback</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Fault</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-slate-300">Revision</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">HOA</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">HandStart</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">SpeedSP</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">Reset</span></div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">PumpCmd</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">SpeedOut</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Running</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Fault</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Ready</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">OpHours</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">Starts</span></div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Kompletter Pumpenbaustein mit Verzoegerungen, Rueckmeldungsueberwachung, Drehzahlregelung und Blockierschutz.
+            </p>
+          </div>
+        )}
+
         {node.type === 'modbus-driver' && onModbusDevicesChange && onModbusDatapointDragStart && onPingModbusDevice && onModbusDriverEnabledChange && (
           <ModbusDriverPanel
             devices={modbusDevices}
