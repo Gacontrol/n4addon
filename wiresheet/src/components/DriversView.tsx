@@ -57,28 +57,31 @@ export const DriversView: React.FC<DriversViewProps> = ({
       port: newDevice.port || 502,
       unitId: newDevice.unitId || 1,
       pollIntervalMs: newDevice.pollIntervalMs || 1000,
+      enabled: true,
       datapoints: newDevice.datapoints || []
     };
     onModbusDevicesChange([...modbusDevices, device]);
     setNewDevice({ name: '', host: '192.168.1.100', port: 502, unitId: 1, pollIntervalMs: 1000, datapoints: [] });
     setShowAddDevice(false);
+    setExpandedDevices(prev => new Set([...prev, device.id]));
   }, [newDevice, modbusDevices, onModbusDevicesChange]);
 
   const handleAddFromLibrary = useCallback((template: ModbusDeviceTemplate) => {
     const device: ModbusDevice = {
       id: `modbus-device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: template.name,
+      name: template.model,
       host: '192.168.1.100',
       port: 502,
       unitId: 1,
       pollIntervalMs: 1000,
-      datapoints: template.datapoints.map(dp => ({
+      enabled: true,
+      datapoints: template.datapoints.map((dp, idx) => ({
         ...dp,
-        id: `dp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        id: `dp-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`
       })),
-      configDatapoints: template.configDatapoints?.map(dp => ({
+      configDatapoints: template.configDatapoints?.map((dp, idx) => ({
         ...dp,
-        id: `cfg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        id: `cfg-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`
       }))
     };
     onModbusDevicesChange([...modbusDevices, device]);
@@ -506,7 +509,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
                       >
                         <Server className="w-5 h-5 text-blue-400 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-white text-sm">{device.name}</div>
+                          <div className="font-medium text-white text-sm">{device.model}</div>
                           <div className="text-xs text-slate-500">{device.manufacturer}</div>
                           <div className="text-xs text-slate-600 mt-1">{device.datapoints.length} Datenpunkte</div>
                         </div>

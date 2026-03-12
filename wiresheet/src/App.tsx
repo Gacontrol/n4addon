@@ -126,8 +126,25 @@ function App() {
           modbusDevices: devices
         }
       });
+    } else {
+      const newDriverNode: FlowNode = {
+        id: `node-modbus-driver-${Date.now()}`,
+        type: 'modbus-driver',
+        position: { x: 50, y: 50 },
+        data: {
+          label: 'Modbus Treiber',
+          icon: 'Network',
+          inputs: [],
+          outputs: [],
+          config: {
+            modbusDriverEnabled: true,
+            modbusDevices: devices
+          }
+        }
+      };
+      addNode(newDriverNode);
     }
-  }, [modbusDriverNode, updateNodeData]);
+  }, [modbusDriverNode, updateNodeData, addNode]);
 
   const setModbusDriverEnabled = useCallback((enabled: boolean) => {
     if (modbusDriverNode) {
@@ -137,8 +154,25 @@ function App() {
           modbusDriverEnabled: enabled
         }
       });
+    } else {
+      const newDriverNode: FlowNode = {
+        id: `node-modbus-driver-${Date.now()}`,
+        type: 'modbus-driver',
+        position: { x: 50, y: 50 },
+        data: {
+          label: 'Modbus Treiber',
+          icon: 'Network',
+          inputs: [],
+          outputs: [],
+          config: {
+            modbusDriverEnabled: enabled,
+            modbusDevices: []
+          }
+        }
+      };
+      addNode(newDriverNode);
     }
-  }, [modbusDriverNode, updateNodeData]);
+  }, [modbusDriverNode, updateNodeData, addNode]);
 
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
