@@ -217,7 +217,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
       let el = e.target as HTMLElement | null;
       while (el && el !== canvas) {
-        if (el.dataset.widgetId) return;
+        if (el.dataset.widgetId && el.dataset.widgetLocked !== 'true') return;
         el = el.parentElement;
       }
 

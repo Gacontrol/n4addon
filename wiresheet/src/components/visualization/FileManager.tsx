@@ -98,6 +98,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
   };
 
   const imageUrl = (img: ImageFile) => `${apiBase}${img.url}`;
+  const imageStorageUrl = (img: ImageFile) => img.url;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -205,7 +206,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
                       onClick={() => setSelectedFile(selectedFile === img.filename ? null : img.filename)}
                       onDoubleClick={() => {
                         if (pickerMode && onSelectImage) {
-                          onSelectImage(imageUrl(img));
+                          onSelectImage(imageStorageUrl(img));
                           onClose();
                         }
                       }}
@@ -226,7 +227,7 @@ export const FileManager: React.FC<FileManagerProps> = ({ onClose, apiBase, onSe
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onSelectImage) {
-                              onSelectImage(imageUrl(img));
+                              onSelectImage(imageStorageUrl(img));
                               onClose();
                             }
                           }}

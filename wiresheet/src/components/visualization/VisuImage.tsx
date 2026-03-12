@@ -9,6 +9,20 @@ function getApiBase(): string {
   return m ? m[1] : '';
 }
 
+function resolveImageUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const base = getApiBase();
+  const ingressApiMatch = url.match(/^(?:\/api\/hassio_ingress\/[^/]+|\/app\/[^/]+)(\/api\/.*)/);
+  if (ingressApiMatch) {
+    return `${base}${ingressApiMatch[1]}`;
+  }
+  if (url.startsWith('/api/images/') || url.startsWith('/api/')) {
+    return `${base}${url}`;
+  }
+  return url;
+}
+
 interface VisuImageProps {
   config: ImageConfig;
   isEditMode: boolean;
@@ -117,7 +131,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
   return (
     <div className="w-full h-full relative group" style={{ borderRadius: config.borderRadius ?? 0 }}>
       <img
-        src={config.imageUrl}
+        src={resolveImageUrl(config.imageUrl!)}
         alt="Visu Bild"
         style={{
           width: '100%',

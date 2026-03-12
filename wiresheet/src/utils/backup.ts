@@ -2,7 +2,14 @@ import { WiresheetPage } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
+
+export interface BackupImage {
+  filename: string;
+  url: string;
+  data: string;
+  mimeType: string;
+}
 
 export interface WiresheetBackup {
   version: number;
@@ -11,6 +18,64 @@ export interface WiresheetBackup {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
+  images?: BackupImage[];
+}
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
+
+export async function fetchImagesForBackup(visuPages: VisuPage[]): Promise<BackupImage[]> {
+  const apiBase = getApiBase();
+  const imageUrls = new Set<string>();
+
+  for (const page of visuPages) {
+    for (const widget of page.widgets) {
+      const cfg = widget.config as Record<string, unknown>;
+      if (cfg?.imageUrl && typeof cfg.imageUrl === 'string') {
+        const url = cfg.imageUrl as string;
+        if (url.startsWith('/api/images/')) {
+          imageUrls.add(url);
+        } else {
+          const ingressMatch = url.match(/^(?:\/api\/hassio_ingress\/[^/]+|\/app\/[^/]+)(\/api\/images\/.*)/);
+          if (ingressMatch) imageUrls.add(ingressMatch[1]);
+        }
+      }
+    }
+  }
+
+  const images: BackupImage[] = [];
+  for (const url of imageUrls) {
+    try {
+      const res = await fetch(`${apiBase}${url}`);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      const filename = url.split('/').pop() || '';
+      images.push({ filename, url, data, mimeType: blob.type });
+    } catch {}
+  }
+  return images;
+}
+
+export async function restoreImagesFromBackup(images: BackupImage[]): Promise<void> {
+  const apiBase = getApiBase();
+  for (const img of images) {
+    try {
+      const res = await fetch(img.data);
+      const blob = await res.blob();
+      const formData = new FormData();
+      formData.append('image', new File([blob], img.filename, { type: img.mimeType }));
+      await fetch(`${apiBase}/api/images/upload`, { method: 'POST', body: formData });
+    } catch {}
+  }
 }
 
 export interface BackupImportSelection {
@@ -22,7 +87,8 @@ export interface BackupImportSelection {
 export function createBackup(
   wiresheets: WiresheetPage[],
   visuPages: VisuPage[],
-  customBlocks: CustomBlockDefinition[]
+  customBlocks: CustomBlockDefinition[],
+  images?: BackupImage[]
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -30,7 +96,8 @@ export function createBackup(
     appVersion: '1.0.0',
     wiresheets,
     visuPages,
-    customBlocks
+    customBlocks,
+    images: images || []
   };
 }
 

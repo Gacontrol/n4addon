@@ -2387,13 +2387,13 @@ visuApp.use(express.json({ limit: '10mb' }));
 
 const distDir = path.join(__dirname, '../dist');
 
-visuApp.use('/api', async (req, res) => {
+async function proxyToApi(req, res, apiPath) {
   try {
-    const apiUrl = `http://localhost:${PORT}${req.originalUrl}`;
+    const apiUrl = `http://localhost:${PORT}${apiPath}`;
     const response = await axios({
       method: req.method,
       url: apiUrl,
-      data: req.body,
+      data: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/json'
       },
@@ -2414,6 +2414,22 @@ visuApp.use('/api', async (req, res) => {
       res.status(503).json({ error: err.message });
     }
   }
+}
+
+visuApp.use((req, res, next) => {
+  const ingressMatch = req.path.match(/^\/api\/hassio_ingress\/[^/]+(\/api\/.*)$/);
+  if (ingressMatch) {
+    return proxyToApi(req, res, ingressMatch[1]);
+  }
+  const appMatch = req.path.match(/^\/app\/[^/]+(\/api\/.*)$/);
+  if (appMatch) {
+    return proxyToApi(req, res, appMatch[1]);
+  }
+  next();
+});
+
+visuApp.use('/api', async (req, res) => {
+  await proxyToApi(req, res, req.originalUrl);
 });
 
 visuApp.use('/assets', express.static(path.join(distDir, 'assets'), {

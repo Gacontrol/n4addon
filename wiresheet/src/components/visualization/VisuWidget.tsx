@@ -1123,13 +1123,15 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   return (
     <div
       data-widget-id={widget.id}
-      className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
+      data-widget-locked={widget.locked ? 'true' : undefined}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
         width: widget.size.width,
         height: widget.size.height,
         zIndex: widget.zIndex || 1,
+        pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
         border: showSelectionBorder
