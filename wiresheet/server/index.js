@@ -1726,6 +1726,110 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     nodeValues[key] = value;
   }
 
+  const outputBindings = (driverConfig.driverBindings || []).filter(b => b.direction === 'output');
+  const outputBindingPromises = outputBindings.map(async (binding) => {
+    const bindingKey = `${binding.nodeId}:${binding.portId}`;
+    try {
+      const sourceNode = nodes.find(n => n.id === binding.nodeId);
+      if (!sourceNode) {
+        console.log(`Output Binding ${bindingKey}: Node nicht gefunden`);
+        return;
+      }
+
+      const outputPorts = sourceNode.data.outputs || [];
+      const portIndex = outputPorts.findIndex((p, idx) => p.id === binding.portId || `output-${idx}` === binding.portId);
+      let valueToWrite = nodeValues[binding.nodeId];
+
+      const portKey = `${binding.nodeId}:${binding.portId}`;
+      if (nodeValues[portKey] !== undefined) {
+        valueToWrite = nodeValues[portKey];
+      }
+
+      if (valueToWrite === undefined || valueToWrite === null) {
+        console.log(`Output Binding ${bindingKey}: Kein Wert vorhanden`);
+        return;
+      }
+
+      if (binding.driverType === 'modbus') {
+        const device = modbusDeviceMap.get(binding.deviceId);
+        if (!device) {
+          console.log(`Output Binding ${bindingKey}: Modbus-Geraet ${binding.deviceId} nicht gefunden`);
+          return;
+        }
+        const dp = device.datapoints?.find(d => d.id === binding.datapointId);
+        if (!dp) {
+          console.log(`Output Binding ${bindingKey}: Datenpunkt ${binding.datapointId} nicht gefunden`);
+          return;
+        }
+
+        const queueKey = `${device.host}:${device.port}:${device.unitId}`;
+
+        if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
+          const bitValue = valueToWrite ? 1 : 0;
+          await enqueueModbusWrite(queueKey, () => modbusWriteBit(
+            device.host,
+            device.port,
+            device.unitId,
+            dp.address,
+            dp.bitIndex,
+            bitValue,
+            dp.registerType || 'holding',
+            device.timeout || 3000
+          ));
+          console.log(`Output Binding Modbus WriteBit ${device.name}/${dp.name} (${dp.address}:${dp.bitIndex}): ${bitValue}`);
+        } else {
+          let writeValue = Number(valueToWrite);
+          if (dp.scale && dp.scale !== 1) writeValue = writeValue / dp.scale;
+          if (dp.offset) writeValue = writeValue - dp.offset;
+          writeValue = Math.round(writeValue);
+
+          await enqueueModbusWrite(queueKey, () => modbusWriteRegister(
+            device.host,
+            device.port,
+            device.unitId,
+            dp.address,
+            writeValue,
+            dp.registerType || 'holding',
+            dp.dataType || 'uint16',
+            device.timeout || 3000
+          ));
+          console.log(`Output Binding Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
+        }
+      } else if (binding.driverType === 'homeassistant' && binding.haEntityId) {
+        const domain = binding.haDomain || binding.haEntityId.split('.')[0];
+        let service = 'turn_on';
+        let serviceData = {};
+
+        if (domain === 'light') {
+          service = valueToWrite ? 'turn_on' : 'turn_off';
+          serviceData = { entity_id: binding.haEntityId };
+        } else if (domain === 'switch' || domain === 'input_boolean') {
+          service = valueToWrite ? 'turn_on' : 'turn_off';
+          serviceData = { entity_id: binding.haEntityId };
+        } else if (domain === 'input_number' || domain === 'number') {
+          service = 'set_value';
+          serviceData = { entity_id: binding.haEntityId, value: Number(valueToWrite) };
+        } else if (domain === 'climate') {
+          service = 'set_temperature';
+          serviceData = { entity_id: binding.haEntityId, temperature: Number(valueToWrite) };
+        } else if (domain === 'cover') {
+          service = 'set_cover_position';
+          serviceData = { entity_id: binding.haEntityId, position: Number(valueToWrite) };
+        } else {
+          service = valueToWrite ? 'turn_on' : 'turn_off';
+          serviceData = { entity_id: binding.haEntityId };
+        }
+
+        await haPost(`/services/${domain}/${service}`, serviceData);
+        console.log(`Output Binding HA ${domain}.${service} ${binding.haEntityId}: ${valueToWrite}`);
+      }
+    } catch (err) {
+      console.error(`Output Binding ${bindingKey} Write Fehler:`, err.message);
+    }
+  });
+
+  await Promise.all(outputBindingPromises);
+
   return nodeValues;
 }
 

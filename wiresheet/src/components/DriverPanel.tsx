@@ -99,7 +99,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     if (isOutputPanel) {
       return device.entities.filter(e => isWritableHaEntity(e));
     } else {
-      return device.entities.filter(e => !isWritableHaEntity(e));
+      return device.entities;
     }
   };
 

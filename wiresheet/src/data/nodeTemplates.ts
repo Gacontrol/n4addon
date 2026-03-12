@@ -562,52 +562,6 @@ export const nodeTemplates: NodeTemplate[] = [
     }
   },
   {
-    type: 'modbus-driver',
-    label: 'Modbus Treiber',
-    icon: 'Network',
-    category: 'driver',
-    color: '#059669',
-    inputs: [],
-    outputs: [
-      { label: 'Status', type: 'output' }
-    ],
-    description: 'Modbus TCP/RTU Treiber - verwaltet alle Modbus-Geraete',
-    defaultConfig: {
-      modbusDevices: [],
-      modbusPollInterval: 1000,
-      modbusTimeout: 3000,
-      modbusEnabled: true
-    }
-  },
-  {
-    type: 'modbus-device-input',
-    label: 'Modbus Eingang',
-    icon: 'ArrowDownToLine',
-    category: 'driver',
-    color: '#0891b2',
-    inputs: [],
-    outputs: [],
-    description: 'Modbus Geraete-Eingaenge (UI, DI)',
-    defaultConfig: {
-      modbusDeviceId: '',
-      modbusDeviceName: ''
-    }
-  },
-  {
-    type: 'modbus-device-output',
-    label: 'Modbus Ausgang',
-    icon: 'ArrowUpFromLine',
-    category: 'driver',
-    color: '#dc2626',
-    inputs: [],
-    outputs: [],
-    description: 'Modbus Geraete-Ausgaenge (DO, AO)',
-    defaultConfig: {
-      modbusDeviceId: '',
-      modbusDeviceName: ''
-    }
-  },
-  {
     type: 'aggregate-control',
     label: 'Aggregatebaustein',
     icon: 'Fan',
