@@ -17,13 +17,6 @@ interface DrawingState {
   linePhase?: 0 | 1;
 }
 
-interface LassoState {
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-}
-
 interface VisuCanvasProps {
   page: VisuPage;
   liveValues: Record<string, unknown>;
@@ -82,7 +75,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const lassoStateRef = useRef<LassoState | null>(null);
 
   const [dragState, setDragState] = useState<{
     widgetId: string;
@@ -114,32 +106,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
-  const [lassoState, setLassoStateInternal] = useState<LassoState | null>(null);
+  const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
 
-  const setLassoState = useCallback((val: LassoState | null | ((prev: LassoState | null) => LassoState | null)) => {
-    if (typeof val === 'function') {
-      setLassoStateInternal(prev => {
-        const newVal = val(prev);
-        lassoStateRef.current = newVal;
-        return newVal;
-      });
-    } else {
-      lassoStateRef.current = val;
-      setLassoStateInternal(val);
-    }
-  }, []);
-
-  const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
-    const el = canvasRef.current!;
-    const rect = el.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left + el.scrollLeft,
-      y: e.clientY - rect.top + el.scrollTop
-    };
-  }, []);
-
-  const getScrolledCanvasPos = useCallback((e: MouseEvent) => {
-    if (!canvasRef.current) return { x: e.clientX, y: e.clientY };
+  const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
     const el = canvasRef.current;
     const rect = el.getBoundingClientRect();
     return {
@@ -192,99 +162,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [selectedWidgetId, page.widgets, isEditMode, isInDrawingMode]);
 
-  const pageWidgetsRef = useRef(page.widgets);
-  pageWidgetsRef.current = page.widgets;
-  const onSelectWidgetRef = useRef(onSelectWidget);
-  onSelectWidgetRef.current = onSelectWidget;
-  const onSelectWidgetsRef = useRef(onSelectWidgets);
-  onSelectWidgetsRef.current = onSelectWidgets;
-  const isEditModeRef = useRef(isEditMode);
-  isEditModeRef.current = isEditMode;
-  const drawingStateRef = useRef(drawingState);
-  drawingStateRef.current = drawingState;
-  const contextMenuRef = useRef(contextMenu);
-  contextMenuRef.current = contextMenu;
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      if (!isEditModeRef.current) return;
-      if (drawingStateRef.current) return;
-      if (contextMenuRef.current) return;
-
-      if (!e.shiftKey) {
-        let el = e.target as HTMLElement | null;
-        while (el && el !== canvas) {
-          if (el.dataset.widgetId && el.dataset.widgetLocked !== 'true') return;
-          el = el.parentElement;
-        }
-      }
-
-      const initialRect = canvas.getBoundingClientRect();
-      const getCoordsFromRect = (ev: PointerEvent) => ({
-        x: ev.clientX - initialRect.left,
-        y: ev.clientY - initialRect.top
-      });
-
-      const { x: startX, y: startY } = getCoordsFromRect(e);
-
-      try {
-        (e.target as Element).releasePointerCapture(e.pointerId);
-      } catch (_) {}
-
-      setLassoState({ startX, startY, currentX: startX, currentY: startY });
-      onSelectWidgetRef.current(null);
-      onSelectWidgetsRef.current?.([]);
-      e.preventDefault();
-
-      const onMove = (ev: PointerEvent) => {
-        const { x: cx, y: cy } = getCoordsFromRect(ev);
-        setLassoState({ startX, startY, currentX: cx, currentY: cy });
-      };
-
-      const onUp = (ev: PointerEvent) => {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-
-        const { x: cx, y: cy } = getCoordsFromRect(ev);
-        const scrollLeft = canvas.scrollLeft;
-        const scrollTop = canvas.scrollTop;
-
-        const lx1 = Math.min(startX, cx) + scrollLeft;
-        const ly1 = Math.min(startY, cy) + scrollTop;
-        const lx2 = Math.max(startX, cx) + scrollLeft;
-        const ly2 = Math.max(startY, cy) + scrollTop;
-
-        setLassoState(null);
-
-        const threshold = 5;
-        if (Math.abs(cx - startX) > threshold || Math.abs(cy - startY) > threshold) {
-          const widgets = pageWidgetsRef.current;
-          const selected = widgets
-            .filter(w => {
-              const wx1 = w.position.x;
-              const wy1 = w.position.y;
-              const wx2 = wx1 + w.size.width;
-              const wy2 = wy1 + w.size.height;
-              return wx1 < lx2 && wx2 > lx1 && wy1 < ly2 && wy2 > ly1;
-            })
-            .map(w => w.id);
-          if (selected.length > 0) {
-            onSelectWidgetsRef.current?.(selected);
-          }
-        }
-      };
-
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-    };
-
-    canvas.addEventListener('pointerdown', onPointerDown);
-    return () => canvas.removeEventListener('pointerdown', onPointerDown);
-  }, []);
 
   const WRITE_WIDGET_TYPES = new Set([
     'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
@@ -340,12 +217,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) return;
-    if (lassoState) return;
+    if (lasso) return;
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
       onSelectWidgets?.([]);
     }
-  }, [onSelectWidget, onSelectWidgets, contextMenu, drawingState, lassoState]);
+  }, [onSelectWidget, onSelectWidgets, contextMenu, drawingState, lasso]);
 
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
     if (!isEditMode) return;
@@ -404,7 +281,53 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
-  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {}, []);
+  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    if (!isEditMode) return;
+    if (drawingState) return;
+    if (contextMenu) return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-widget-id]')) return;
+
+    const pos = getCanvasPos(e);
+    setLasso({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
+    onSelectWidget(null);
+    onSelectWidgets?.([]);
+  }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
+
+  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
+    if (lasso) {
+      const pos = getCanvasPos(e);
+      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    }
+  }, [lasso, getCanvasPos]);
+
+  const handleCanvasPointerUp = useCallback(() => {
+    if (lasso) {
+      const minX = Math.min(lasso.startX, lasso.currentX);
+      const maxX = Math.max(lasso.startX, lasso.currentX);
+      const minY = Math.min(lasso.startY, lasso.currentY);
+      const maxY = Math.max(lasso.startY, lasso.currentY);
+      const isActualLasso = Math.abs(lasso.currentX - lasso.startX) > 5 || Math.abs(lasso.currentY - lasso.startY) > 5;
+
+      if (isActualLasso) {
+        const selected = page.widgets
+          .filter(w => {
+            const wx1 = w.position.x;
+            const wy1 = w.position.y;
+            const wx2 = wx1 + w.size.width;
+            const wy2 = wy1 + w.size.height;
+            return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
+          })
+          .map(w => w.id);
+        if (selected.length > 0) {
+          onSelectWidgets?.(selected);
+        }
+      }
+      setLasso(null);
+    }
+  }, [lasso, page.widgets, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
@@ -775,29 +698,14 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return null;
   })() : null;
 
-  const lassoOverlay = lassoState ? (() => {
-    const x = Math.min(lassoState.startX, lassoState.currentX);
-    const y = Math.min(lassoState.startY, lassoState.currentY);
-    const w = Math.abs(lassoState.currentX - lassoState.startX);
-    const h = Math.abs(lassoState.currentY - lassoState.startY);
-    return (
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          left: x,
-          top: y,
-          width: w,
-          height: h,
-          border: '1.5px dashed #3b82f6',
-          background: 'rgba(59,130,246,0.08)',
-          zIndex: 9998,
-          borderRadius: 2
-        }}
-      />
-    );
-  })() : null;
+  const lassoRect = lasso && (Math.abs(lasso.currentX - lasso.startX) > 5 || Math.abs(lasso.currentY - lasso.startY) > 5) ? {
+    x: Math.min(lasso.startX, lasso.currentX),
+    y: Math.min(lasso.startY, lasso.currentY),
+    width: Math.abs(lasso.currentX - lasso.startX),
+    height: Math.abs(lasso.currentY - lasso.startY)
+  } : null;
 
-  const drawingCursor = drawingState ? 'crosshair' : (lassoState ? 'crosshair' : undefined);
+  const drawingCursor = drawingState ? 'crosshair' : (lasso ? 'crosshair' : undefined);
 
   const hasFixedSize = page.canvasWidth && page.canvasHeight;
 
@@ -819,6 +727,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
       onPointerDown={handleCanvasPointerDown}
+      onPointerMove={handleCanvasPointerMove}
+      onPointerUp={handleCanvasPointerUp}
       onContextMenu={(e) => {
         if (e.target === canvasRef.current) {
           handleCanvasContextMenu(e);
@@ -858,7 +768,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       ))}
 
       {drawingOverlay}
-      {lassoOverlay}
+      {lassoRect && (
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: lassoRect.x,
+            top: lassoRect.y,
+            width: lassoRect.width,
+            height: lassoRect.height,
+            border: '1.5px dashed #3b82f6',
+            background: 'rgba(59,130,246,0.08)',
+            zIndex: 9998,
+            borderRadius: 2
+          }}
+        />
+      )}
 
       {contextMenu && (
         <div

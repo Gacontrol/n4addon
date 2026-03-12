@@ -12,13 +12,6 @@ interface ContextMenuState {
   targetId?: string;
 }
 
-interface LassoState {
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-}
-
 interface FlowCanvasProps {
   nodes: FlowNodeType[];
   connections: Connection[];
@@ -117,11 +110,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [, forceUpdate] = useState(0);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const lassoRef = useRef<LassoState | null>(null);
-  const [lassoTick, setLassoTick] = useState(0);
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
+
+  const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -233,56 +226,40 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
   }, [onConnectionStart, onConnectionEnd, onConnectionCancel]);
 
-  const handleCanvasPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 2) return;
-    const target = e.target as HTMLElement;
-    const isOnNode = target.closest('[data-node-id]');
-    const isOnPort = target.closest('.port') || target.closest('.node-port');
+  const getCanvasCoords = useCallback((e: React.PointerEvent | React.MouseEvent | PointerEvent | MouseEvent) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left + canvasRef.current.scrollLeft) / zoom,
+      y: (e.clientY - rect.top + canvasRef.current.scrollTop) / zoom
+    };
+  }, [zoom]);
 
-    if (isOnPort) {
+  const handleCanvasPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-node-id]') || target.closest('.port') || target.closest('.node-port')) return;
+
+    if (connectingFrom) {
+      onConnectionCancel();
       return;
     }
 
-    if (!isOnNode) {
-      if (connectingFrom) {
-        onConnectionCancel();
-        return;
-      }
-
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-      const x = e.clientX - rect.left + scrollLeft;
-      const y = e.clientY - rect.top + scrollTop;
-      lassoRef.current = { startX: x, startY: y, currentX: x, currentY: y };
-      setLassoTick(t => t + 1);
-
-      canvasRef.current.setPointerCapture(e.pointerId);
-    }
+    const coords = getCanvasCoords(e);
+    setLasso({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+    onClearSelection();
   };
 
   const handleCanvasPointerMove = (e: React.PointerEvent) => {
-    if (lassoRef.current && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-      lassoRef.current = {
-        ...lassoRef.current,
-        currentX: e.clientX - rect.left + scrollLeft,
-        currentY: e.clientY - rect.top + scrollTop
-      };
-      setLassoTick(t => t + 1);
+    if (lasso) {
+      const coords = getCanvasCoords(e);
+      setLasso(prev => prev ? { ...prev, currentX: coords.x, currentY: coords.y } : null);
     }
 
     if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-      const currentX = e.clientX - rect.left + scrollLeft;
-      const currentY = e.clientY - rect.top + scrollTop;
-      const dx = (currentX - dragStartMouse.current.x) / zoom;
-      const dy = (currentY - dragStartMouse.current.y) / zoom;
+      const coords = getCanvasCoords(e);
+      const dx = coords.x - dragStartMouse.current.x;
+      const dy = coords.y - dragStartMouse.current.y;
 
       const updates: Array<{ id: string; x: number; y: number }> = [];
       dragStartPositions.current.forEach((pos, id) => {
@@ -293,10 +270,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   };
 
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
-    if (canvasRef.current) {
-      canvasRef.current.releasePointerCapture(e.pointerId);
-    }
-
     if (isDraggingMultiple) {
       setIsDraggingMultiple(false);
       dragStartPositions.current.clear();
@@ -305,10 +278,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     if (connectingFromRef.current) {
-      canvasRef.current?.classList.remove('connecting-mode');
-
       const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
-
       for (const el of elementsAtPoint) {
         const portEl = el.closest('[data-port-id]') as HTMLElement | null;
         if (portEl) {
@@ -324,23 +294,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           }
         }
       }
-
-      canvasRef.current?.classList.add('connecting-mode');
     }
 
-    const currentLasso = lassoRef.current;
-    if (currentLasso && canvasRef.current) {
-      lassoRef.current = null;
-      setLassoTick(t => t + 1);
-
-      const minX = Math.min(currentLasso.startX, currentLasso.currentX) / zoom;
-      const maxX = Math.max(currentLasso.startX, currentLasso.currentX) / zoom;
-      const minY = Math.min(currentLasso.startY, currentLasso.currentY) / zoom;
-      const maxY = Math.max(currentLasso.startY, currentLasso.currentY) / zoom;
-
-      const lassoWidth = Math.abs(currentLasso.currentX - currentLasso.startX);
-      const lassoHeight = Math.abs(currentLasso.currentY - currentLasso.startY);
-      const isActualLasso = lassoWidth > 10 || lassoHeight > 10;
+    if (lasso) {
+      const minX = Math.min(lasso.startX, lasso.currentX);
+      const maxX = Math.max(lasso.startX, lasso.currentX);
+      const minY = Math.min(lasso.startY, lasso.currentY);
+      const maxY = Math.max(lasso.startY, lasso.currentY);
+      const isActualLasso = Math.abs(lasso.currentX - lasso.startX) > 5 || Math.abs(lasso.currentY - lasso.startY) > 5;
 
       if (isActualLasso) {
         const selectedIds = nodes.filter(node => {
@@ -350,15 +311,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           const nh = 60;
           return nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
         }).map(n => n.id);
-
         if (selectedIds.length > 0) {
           onNodesSelect(selectedIds);
-        } else {
-          onClearSelection();
         }
-      } else {
-        onClearSelection();
       }
+      setLasso(null);
     }
   };
 
@@ -408,20 +365,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   };
 
   const handleMultiDragStart = (nodeId: string, e: React.PointerEvent) => {
-    if (selectedNodes.size >= 1 && selectedNodes.has(nodeId) && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-      dragStartMouse.current = {
-        x: e.clientX - rect.left + scrollLeft,
-        y: e.clientY - rect.top + scrollTop
-      };
+    if (selectedNodes.size >= 1 && selectedNodes.has(nodeId)) {
+      const coords = getCanvasCoords(e);
+      dragStartMouse.current = coords;
       dragStartPositions.current.clear();
       nodes.filter(n => selectedNodes.has(n.id)).forEach(n => {
         dragStartPositions.current.set(n.id, { x: n.position.x, y: n.position.y });
       });
       setIsDraggingMultiple(true);
-      canvasRef.current.setPointerCapture(e.pointerId);
     }
   };
 
@@ -429,13 +380,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     ? getPortCenter(connectingFrom.nodeId, connectingFrom.portId)
     : null;
 
-  void lassoTick;
-  const lasso = lassoRef.current;
   const lassoRect = lasso ? {
-    x: Math.min(lasso.startX, lasso.currentX) / zoom,
-    y: Math.min(lasso.startY, lasso.currentY) / zoom,
-    width: Math.abs(lasso.currentX - lasso.startX) / zoom,
-    height: Math.abs(lasso.currentY - lasso.startY) / zoom
+    x: Math.min(lasso.startX, lasso.currentX),
+    y: Math.min(lasso.startY, lasso.currentY),
+    width: Math.abs(lasso.currentX - lasso.startX),
+    height: Math.abs(lasso.currentY - lasso.startY)
   } : null;
 
   const handleDragOver = (e: React.DragEvent) => {
