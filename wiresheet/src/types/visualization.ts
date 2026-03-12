@@ -614,6 +614,8 @@ export interface DashMultistateConfig {
 
 export type AggregateSymbolType = 'pump' | 'fan' | 'motor' | 'compressor' | 'heater' | 'cooler';
 
+export type WidgetSizePreset = 'small' | 'medium' | 'large';
+
 export interface PumpWidgetConfig {
   pumpName?: string;
   showSpeed?: boolean;
@@ -625,6 +627,7 @@ export interface PumpWidgetConfig {
   revisionColor?: string;
   orientation?: 'up' | 'down' | 'left' | 'right';
   symbolType?: AggregateSymbolType;
+  widgetSize?: WidgetSizePreset;
 }
 
 export type ValveSymbolType = 'valve-2way' | 'valve-3way' | 'valve-motor' | 'valve-3way-motor' | 'valve-butterfly' | 'valve-ball' | 'valve-gate';
@@ -638,6 +641,7 @@ export interface ValveWidgetConfig {
   showSetpoint?: boolean;
   showFeedback?: boolean;
   showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
@@ -651,6 +655,7 @@ export interface SensorWidgetConfig {
   showValue?: boolean;
   showUnit?: boolean;
   showLimits?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 export type PIDSymbolType = 'pid' | 'controller' | 'regulator';
@@ -664,6 +669,7 @@ export interface PIDWidgetConfig {
   showSetpoint?: boolean;
   showActualValue?: boolean;
   showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 export interface WidgetTemplate {

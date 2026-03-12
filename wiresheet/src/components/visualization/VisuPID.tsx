@@ -2,6 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Settings } from 'lucide-react';
 
 export type PIDSymbolType = 'pid' | 'controller' | 'regulator';
+export type WidgetSizePreset = 'small' | 'medium' | 'large';
+
+const getSizeValues = (size: WidgetSizePreset | undefined) => {
+  switch (size) {
+    case 'small': return { symbolSize: 40, maxWidth: 55, maxHeight: 55, fontSize: 'text-[10px]' };
+    case 'large': return { symbolSize: 80, maxWidth: 100, maxHeight: 100, fontSize: 'text-sm' };
+    case 'medium':
+    default: return { symbolSize: 60, maxWidth: 80, maxHeight: 80, fontSize: 'text-xs' };
+  }
+};
 
 interface PIDWidgetConfig {
   pidName?: string;
@@ -12,6 +22,7 @@ interface PIDWidgetConfig {
   showSetpoint?: boolean;
   showActualValue?: boolean;
   showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 interface PIDValues {
@@ -142,6 +153,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
   const statusColor = getStatusColor();
   const pidName = config.pidName || params?.pidName || 'PID Regler';
   const rotation = config.rotation ?? 0;
+  const sizeValues = getSizeValues(config.widgetSize);
 
   const showSetpointDisplay = config.showSetpoint !== false;
   const showActualValueDisplay = config.showActualValue !== false;
@@ -166,23 +178,23 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
           style={{
             width: '70%',
             height: '50%',
-            maxWidth: 70,
-            maxHeight: 70,
+            maxWidth: sizeValues.maxWidth,
+            maxHeight: sizeValues.maxHeight,
             transform: `rotate(${rotation}deg)`
           }}
         >
           <PIDSymbolRenderer
             symbolType={symbolType}
             color={statusColor}
-            size={55}
+            size={sizeValues.symbolSize}
             active={isActive}
           />
         </div>
-        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
           {pidName}
         </div>
         {showOutputDisplay && (
-          <div className="text-sm font-semibold" style={{ color: statusColor }}>
+          <div className={`${sizeValues.fontSize} font-semibold`} style={{ color: statusColor }}>
             {controlOutput.toFixed(1)} %
           </div>
         )}

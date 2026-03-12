@@ -119,6 +119,12 @@ const PID_SYMBOL_OPTIONS = [
   { value: 'regulator', label: 'Regler Symbol' }
 ];
 
+const WIDGET_SIZE_OPTIONS = [
+  { value: 'small', label: 'Klein' },
+  { value: 'medium', label: 'Mittel' },
+  { value: 'large', label: 'Gross' }
+];
+
 const SHAPE_TYPES = new Set([
   'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
   'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'
@@ -1432,7 +1438,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-pump': {
-        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right'; symbolType?: string };
+        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right'; symbolType?: string; widgetSize?: string };
         return (
           <>
             <div>
@@ -1443,6 +1449,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
                 {SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={pumpCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -1513,7 +1531,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-valve': {
-        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showOutput?: boolean };
+        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showOutput?: boolean; widgetSize?: string };
         return (
           <>
             <div>
@@ -1524,6 +1542,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
                 {VALVE_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={valveCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -1605,7 +1635,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-sensor': {
-        const sensorCfg = config as { sensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showValue?: boolean; showUnit?: boolean; showLimits?: boolean };
+        const sensorCfg = config as { sensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showValue?: boolean; showUnit?: boolean; showLimits?: boolean; widgetSize?: string };
         return (
           <>
             <div>
@@ -1616,6 +1646,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
                 {SENSOR_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={sensorCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -1697,7 +1739,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-pid': {
-        const pidCfg = config as { pidName?: string; normalColor?: string; activeColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showActualValue?: boolean; showOutput?: boolean };
+        const pidCfg = config as { pidName?: string; normalColor?: string; activeColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showActualValue?: boolean; showOutput?: boolean; widgetSize?: string };
         return (
           <>
             <div>
@@ -1708,6 +1750,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
                 {PID_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={pidCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -1782,6 +1836,89 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   className="rounded"
                 />
                 <label className="text-xs text-slate-400">Stellgroesse anzeigen</label>
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-heating-curve': {
+        const hcCfg = config as { hcName?: string; normalColor?: string; activeColor?: string; rotation?: number; showInput?: boolean; showOutput?: boolean; widgetSize?: string };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={hcCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
+              <input
+                type="text"
+                value={hcCfg.hcName || ''}
+                placeholder="Name vom verknuepften Baustein"
+                onChange={(e) => onUpdate({ config: { ...config, hcName: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 placeholder-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Drehung</label>
+              <select
+                value={hcCfg.rotation ?? 0}
+                onChange={(e) => onUpdate({ config: { ...config, rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {ROTATION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Inaktiv</label>
+                <input
+                  type="color"
+                  value={hcCfg.normalColor || '#64748b'}
+                  onChange={(e) => onUpdate({ config: { ...config, normalColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Aktiv</label>
+                <input
+                  type="color"
+                  value={hcCfg.activeColor || '#f97316'}
+                  onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hcCfg.showInput !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showInput: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Eingang anzeigen</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hcCfg.showOutput !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showOutput: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Ausgang anzeigen</label>
               </div>
             </div>
           </>

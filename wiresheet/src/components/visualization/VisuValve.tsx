@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, RotateCcw, X, Settings, Sliders } from 'lucide-react';
-import { ValveWidgetConfig, ValveSymbolType } from '../../types/visualization';
+import { ValveWidgetConfig, ValveSymbolType, WidgetSizePreset } from '../../types/visualization';
+
+const getSizeValues = (size: WidgetSizePreset | undefined) => {
+  switch (size) {
+    case 'small': return { symbolSize: 40, maxWidth: 55, maxHeight: 55, fontSize: 'text-[10px]', iconSize: 10 };
+    case 'large': return { symbolSize: 80, maxWidth: 100, maxHeight: 100, fontSize: 'text-sm', iconSize: 18 };
+    case 'medium':
+    default: return { symbolSize: 60, maxWidth: 80, maxHeight: 80, fontSize: 'text-xs', iconSize: 14 };
+  }
+};
 
 interface ValveValues {
   valveOutput: number;
@@ -186,6 +195,7 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   const valveName = config.valveName || params?.valveName || 'Ventil';
   const symbolType = config.symbolType || 'valve-2way';
   const rotation = config.rotation ?? 0;
+  const sizeValues = getSizeValues(config.widgetSize);
   const isHandMode = localHOA === 1;
 
   const showSetpoint = config.showSetpoint !== false;
@@ -214,8 +224,8 @@ export const VisuValve: React.FC<VisuValveProps> = ({
           style={{
             width: '70%',
             height: '60%',
-            maxWidth: 80,
-            maxHeight: 80,
+            maxWidth: sizeValues.maxWidth,
+            maxHeight: sizeValues.maxHeight,
             transform: `rotate(${rotation}deg)`
           }}
         >
@@ -223,18 +233,18 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             symbolType={symbolType}
             color={statusColor}
             openPercent={valveOutput}
-            size={60}
+            size={sizeValues.symbolSize}
           />
           {alarm && (
             <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
-              <AlertTriangle size={14} className="text-red-500" />
+              <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
             </div>
           )}
         </div>
-        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
           {valveName}
         </div>
-        <div className="text-xs text-slate-400">
+        <div className={`${sizeValues.fontSize} text-slate-400`}>
           {valveOutput.toFixed(0)}%
         </div>
       </div>

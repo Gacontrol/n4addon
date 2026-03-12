@@ -2,6 +2,16 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, RotateCcw, X, Settings } from 'lucide-react';
 
 export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
+export type WidgetSizePreset = 'small' | 'medium' | 'large';
+
+const getSizeValues = (size: WidgetSizePreset | undefined) => {
+  switch (size) {
+    case 'small': return { symbolSize: 35, maxWidth: 50, maxHeight: 50, fontSize: 'text-[9px]', iconSize: 10 };
+    case 'large': return { symbolSize: 70, maxWidth: 90, maxHeight: 90, fontSize: 'text-sm', iconSize: 18 };
+    case 'medium':
+    default: return { symbolSize: 50, maxWidth: 65, maxHeight: 65, fontSize: 'text-xs', iconSize: 14 };
+  }
+};
 
 interface SensorWidgetConfig {
   sensorName?: string;
@@ -12,6 +22,7 @@ interface SensorWidgetConfig {
   showValue?: boolean;
   showUnit?: boolean;
   showLimits?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 interface SensorValues {
@@ -172,6 +183,7 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
   const statusColor = getStatusColor();
   const sensorName = config.sensorName || params?.sensorName || 'Sensor';
   const rotation = config.rotation ?? 0;
+  const sizeValues = getSizeValues(config.widgetSize);
 
   const showValue = config.showValue !== false;
   const showUnit = config.showUnit !== false;
@@ -199,19 +211,19 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
             style={{
               width: '70%',
               height: '50%',
-              maxWidth: 70,
-              maxHeight: 70,
+              maxWidth: sizeValues.maxWidth,
+              maxHeight: sizeValues.maxHeight,
               transform: `rotate(${rotation}deg)`
             }}
           >
             <SensorSymbol
               symbolType={symbolType}
               color={statusColor}
-              size={55}
+              size={sizeValues.symbolSize}
             />
             {alarm && (
               <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
-                <AlertTriangle size={14} className="text-red-500" />
+                <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
               </div>
             )}
           </div>
@@ -219,16 +231,16 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
           <div className="flex-1 flex items-center justify-center">
             {alarm && (
               <div className="absolute top-0.5 right-0.5">
-                <AlertTriangle size={14} className="text-red-500" />
+                <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
               </div>
             )}
           </div>
         )}
-        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
           {sensorName}
         </div>
         {showValue && (
-          <div className={`font-semibold ${hasSymbol ? 'text-sm' : 'text-lg'}`} style={{ color: isOutOfLimits ? '#ef4444' : statusColor }}>
+          <div className={`font-semibold ${sizeValues.fontSize}`} style={{ color: isOutOfLimits ? '#ef4444' : statusColor }}>
             {sensorValue.toFixed(1)}{showUnit && unit ? ` ${unit}` : ''}
           </div>
         )}

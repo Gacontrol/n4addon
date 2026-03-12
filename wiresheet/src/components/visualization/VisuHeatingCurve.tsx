@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Settings } from 'lucide-react';
 
+type WidgetSizePreset = 'small' | 'medium' | 'large';
+
+const getSizeValues = (size: WidgetSizePreset | undefined) => {
+  switch (size) {
+    case 'small': return { symbolSize: 40, maxWidth: 55, maxHeight: 55, fontSize: 'text-[10px]' };
+    case 'large': return { symbolSize: 80, maxWidth: 100, maxHeight: 100, fontSize: 'text-sm' };
+    case 'medium':
+    default: return { symbolSize: 55, maxWidth: 70, maxHeight: 70, fontSize: 'text-xs' };
+  }
+};
+
 interface HeatingCurveWidgetConfig {
   hcName?: string;
   normalColor?: string;
@@ -8,6 +19,7 @@ interface HeatingCurveWidgetConfig {
   rotation?: 0 | 90 | 180 | 270;
   showInput?: boolean;
   showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
 }
 
 interface HeatingCurveValues {
@@ -177,6 +189,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   const statusColor = getStatusColor();
   const hcName = config.hcName || params?.hcName || 'Heizkurve';
   const rotation = config.rotation ?? 0;
+  const sizeValues = getSizeValues(config.widgetSize);
   const showInputDisplay = config.showInput !== false;
   const showOutputDisplay = config.showOutput !== false;
 
@@ -197,23 +210,23 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
           style={{
             width: '70%',
             height: '50%',
-            maxWidth: 70,
-            maxHeight: 70,
+            maxWidth: sizeValues.maxWidth,
+            maxHeight: sizeValues.maxHeight,
             transform: `rotate(${rotation}deg)`
           }}
         >
           <HeatingCurveSymbol
             color={statusColor}
-            size={55}
+            size={sizeValues.symbolSize}
             active={enable}
             reverse={reverseDirection}
           />
         </div>
-        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
           {hcName}
         </div>
         {showOutputDisplay && (
-          <div className="text-sm font-semibold" style={{ color: statusColor }}>
+          <div className={`${sizeValues.fontSize} font-semibold`} style={{ color: statusColor }}>
             {outputValue.toFixed(1)}
           </div>
         )}

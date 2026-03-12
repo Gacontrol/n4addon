@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
-import { PumpWidgetConfig, AggregateSymbolType } from '../../types/visualization';
+import { PumpWidgetConfig, AggregateSymbolType, WidgetSizePreset } from '../../types/visualization';
+
+const getSizeValues = (size: WidgetSizePreset | undefined) => {
+  switch (size) {
+    case 'small': return { symbolSize: 40, maxWidth: 55, maxHeight: 55, fontSize: 'text-[10px]', iconSize: 10 };
+    case 'large': return { symbolSize: 80, maxWidth: 100, maxHeight: 100, fontSize: 'text-sm', iconSize: 18 };
+    case 'medium':
+    default: return { symbolSize: 60, maxWidth: 80, maxHeight: 80, fontSize: 'text-xs', iconSize: 14 };
+  }
+};
 
 interface PumpValues {
   pumpCmd: boolean;
@@ -196,6 +205,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   const pumpName = config.pumpName || params?.pumpName || 'Aggregat';
   const orientation = config.orientation || 'right';
   const symbolType = config.symbolType || 'pump';
+  const sizeValues = getSizeValues(config.widgetSize);
 
   const getRotation = () => {
     switch (orientation) {
@@ -232,8 +242,8 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
           style={{
             width: '70%',
             height: '60%',
-            maxWidth: 80,
-            maxHeight: 80,
+            maxWidth: sizeValues.maxWidth,
+            maxHeight: sizeValues.maxHeight,
             transform: `rotate(${getRotation()}deg)`
           }}
         >
@@ -241,24 +251,24 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
             symbolType={symbolType}
             color={statusColor}
             running={running}
-            size={60}
+            size={sizeValues.symbolSize}
           />
           {(fault || alarm) && (
             <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
-              <AlertTriangle size={14} className="text-red-500" />
+              <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
             </div>
           )}
           {revision && !fault && !alarm && (
             <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
-              <Wrench size={12} className="text-amber-500" />
+              <Wrench size={sizeValues.iconSize - 2} className="text-amber-500" />
             </div>
           )}
         </div>
-        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
           {pumpName}
         </div>
         {showSpeedOnCanvas && (
-          <div className="text-xs text-slate-400">
+          <div className={`${sizeValues.fontSize} text-slate-400`}>
             {speedOut.toFixed(0)}%
           </div>
         )}
