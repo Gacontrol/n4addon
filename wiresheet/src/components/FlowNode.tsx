@@ -270,6 +270,14 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     return driverBindings.find(b => b.nodeId === node.id && b.portId === portId);
   };
 
+  const getVisuBindingsForPort = (portId: string, isFirstInput: boolean = false) => {
+    return visuBindings.filter(b => {
+      if (b.portId === portId) return true;
+      if (isFirstInput && !b.portId && b.isWrite) return true;
+      return false;
+    });
+  };
+
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -868,13 +876,48 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
           <div className="py-1 flex">
             <div className="flex flex-col gap-0">
-              {data.inputs.map(input => {
+              {data.inputs.map((input, inputIndex) => {
                 const portVal = portValues[input.id];
                 const hasPortVal = portVal !== undefined && portVal !== null;
                 const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
                 const driverBinding = getDriverBindingForPort(input.id);
+                const portVisuBindings = getVisuBindingsForPort(input.id, inputIndex === 0);
                 return (
                   <div key={input.id} className="flex items-center min-h-[20px] relative">
+                    {portVisuBindings.length > 0 && !driverBinding && (
+                      <div
+                        className="flex items-center absolute right-full mr-1"
+                        style={{ pointerEvents: 'auto' }}
+                      >
+                        {portVisuBindings.map((vb, vbi) => {
+                          const hasValue = vb.value !== undefined && vb.value !== null;
+                          const displayVal = hasValue
+                            ? (String(vb.value).length > 6 ? String(vb.value).slice(0, 6) + '..' : String(vb.value))
+                            : null;
+                          return (
+                            <div key={vbi} className="flex items-center">
+                              <span
+                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-default"
+                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
+                                  Visu: {vb.pageName} / {vb.widgetLabel}
+                                  {hasValue && (
+                                    <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
+                                      {displayVal}
+                                    </span>
+                                  )}
+                                </span>
+                              </span>
+                              <svg width="20" height="20" className="flex-shrink-0">
+                                <line x1="0" y1="10" x2="20" y2="10" stroke="#ec4899" strokeWidth="2" strokeDasharray="4 2" />
+                              </svg>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     {driverBinding && (
                       <div
                         className="flex items-center group/binding absolute right-full mr-1"
@@ -928,9 +971,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{
                           width: '12px',
                           height: '12px',
-                          borderColor: driverBinding ? '#f59e0b' : (isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569')),
-                          backgroundColor: driverBinding ? '#78350f' : (isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b')),
-                          boxShadow: driverBinding ? '0 0 6px #f59e0b60' : (isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none')),
+                          borderColor: portVisuBindings.length > 0 ? '#ec4899' : (driverBinding ? '#f59e0b' : (isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'))),
+                          backgroundColor: portVisuBindings.length > 0 ? '#831843' : (driverBinding ? '#78350f' : (isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'))),
+                          boxShadow: portVisuBindings.length > 0 ? '0 0 6px #ec489960' : (driverBinding ? '0 0 6px #f59e0b60' : (isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none'))),
                           transform: isHighlighted ? 'scale(1.15)' : 'scale(1)'
                         }}
                       />
@@ -1041,34 +1084,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
         </div>
 
-        {visuBindings.length > 0 && (
-          <div className="absolute left-0 right-0 flex flex-col gap-0.5" style={{ top: '100%', marginTop: '4px' }}>
-            {visuBindings.map((b, bi) => {
-              const hasValue = b.value !== undefined && b.value !== null;
-              const displayVal = hasValue
-                ? (String(b.value).length > 8 ? String(b.value).slice(0, 8) + '..' : String(b.value))
-                : null;
-              return (
-                <div key={bi} className="flex items-center">
-                  <div
-                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
-                    title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''} (${b.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${b.value}` : ''}`}
-                  >
-                    <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
-                    <span className="truncate max-w-[120px]">
-                      Visu: {b.pageName} / {b.widgetLabel}
-                    </span>
-                    {hasValue && (
-                      <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
-                        {displayVal}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {dpContextMenu && isDPNode && createPortal(
