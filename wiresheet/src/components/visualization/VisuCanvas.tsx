@@ -324,6 +324,25 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       });
     } else {
       const isInSelection = selectedWidgetIds.includes(widgetId);
+
+      if (e.ctrlKey || e.metaKey) {
+        if (isInSelection) {
+          const newSelection = selectedWidgetIds.filter(id => id !== widgetId);
+          onSelectWidgets?.(newSelection);
+          if (newSelection.length === 1) {
+            onSelectWidget(newSelection[0]);
+          } else if (newSelection.length === 0) {
+            onSelectWidget(null);
+          }
+        } else {
+          const newSelection = [...selectedWidgetIds, widgetId];
+          onSelectWidgets?.(newSelection);
+          onSelectWidget(widgetId);
+        }
+        e.preventDefault();
+        return;
+      }
+
       if (isInSelection && selectedWidgetIds.length > 1) {
         const initialPositions: Record<string, { x: number; y: number }> = {};
         for (const id of selectedWidgetIds) {
