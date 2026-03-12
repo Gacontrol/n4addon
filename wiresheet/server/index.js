@@ -1064,6 +1064,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'pid-controller') {
       const actual = parseFloat(inputVals[0]);
       const setpoint = parseFloat(inputVals[1]);
+      const enableRaw = inputVals[2];
+      const enabled = enableRaw === null || enableRaw === undefined ? true : toBool(enableRaw);
       const kp = cfg.kp !== undefined ? parseFloat(cfg.kp) : 1.0;
       const ki = cfg.ki !== undefined ? parseFloat(cfg.ki) : 0.1;
       const kd = cfg.kd !== undefined ? parseFloat(cfg.kd) : 0.05;
@@ -1078,7 +1080,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (st.lastTs === undefined) st.lastTs = now;
       let output = null;
       let error = null;
-      if (!isNaN(actual) && !isNaN(setpoint)) {
+      if (enabled && !isNaN(actual) && !isNaN(setpoint)) {
         error = setpoint - actual;
         const dtMs = now - st.lastTs;
         const dt = Math.max(dtMs, sampleTimeMs) / 1000.0;
@@ -1097,6 +1099,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         output = Math.max(outMin, Math.min(outMax, rawOutput));
         st.prevError = error;
         st.lastTs = now;
+      } else if (!enabled) {
+        st.integral = 0;
+        st.prevError = 0;
+        st.lastTs = now;
+        output = outMin;
+        error = 0;
       }
       nodeValues[nodeId] = output;
       nodeValues[`${nodeId}:output-0`] = output;
@@ -1213,9 +1221,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
             if (val !== null && val !== undefined) {
               try {
+                const queueKey = `${device.host}:${device.port}:${device.unitId}:${dp.address}`;
                 if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
                   const bitValue = toBool(val);
-                  await modbusWriteBit(
+                  await enqueueModbusWrite(queueKey, () => modbusWriteBit(
                     device.host,
                     device.port,
                     device.unitId,
@@ -1224,7 +1233,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
                     bitValue,
                     dp.registerType || 'holding',
                     device.timeout || 3000
-                  );
+                  ));
                   console.log(`Modbus WriteBit ${device.name}/${dp.name} (${dp.address}:${dp.bitIndex}): ${bitValue}`);
                 } else {
                   let writeValue = val;
@@ -1234,7 +1243,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
                   if (dp.offset) {
                     writeValue = writeValue - dp.offset;
                   }
-                  await modbusWriteRegister(
+                  await enqueueModbusWrite(queueKey, () => modbusWriteRegister(
                     device.host,
                     device.port,
                     device.unitId,
@@ -1243,7 +1252,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
                     dp.registerType || 'holding',
                     dp.dataType || 'uint16',
                     device.timeout || 3000
-                  );
+                  ));
                   console.log(`Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
                 }
                 nodeValues[`${nodeId}:input-${i}`] = val;
@@ -1799,6 +1808,39 @@ function modbusReadRegister(host, port, unitId, address, registerType, dataType,
     socket.setTimeout(timeout);
     socket.connect(port, host);
   });
+}
+
+const modbusWriteQueues = new Map();
+
+function getModbusWriteQueue(key) {
+  if (!modbusWriteQueues.has(key)) {
+    modbusWriteQueues.set(key, { running: false, tasks: [] });
+  }
+  return modbusWriteQueues.get(key);
+}
+
+function enqueueModbusWrite(key, fn) {
+  const q = getModbusWriteQueue(key);
+  return new Promise((resolve, reject) => {
+    q.tasks.push({ fn, resolve, reject });
+    if (!q.running) drainModbusWriteQueue(key);
+  });
+}
+
+async function drainModbusWriteQueue(key) {
+  const q = getModbusWriteQueue(key);
+  if (q.running || q.tasks.length === 0) return;
+  q.running = true;
+  while (q.tasks.length > 0) {
+    const { fn, resolve, reject } = q.tasks.shift();
+    try {
+      const result = await fn();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
+  }
+  q.running = false;
 }
 
 function modbusWriteRegister(host, port, unitId, address, value, registerType, dataType, timeout = 3000) {

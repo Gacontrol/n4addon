@@ -389,9 +389,7 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'Wert B', type: 'input' }
     ],
     outputs: [
-      { label: 'A > B', type: 'output' },
-      { label: 'A = B', type: 'output' },
-      { label: 'A < B', type: 'output' }
+      { label: 'Ausgang', type: 'output' }
     ],
     description: 'Vergleicht zwei Werte',
     defaultConfig: { compareOperator: '>', compareValue: 0 }
@@ -501,7 +499,8 @@ export const nodeTemplates: NodeTemplate[] = [
     color: '#ef4444',
     inputs: [
       { label: 'Istwert', type: 'input' },
-      { label: 'Sollwert', type: 'input' }
+      { label: 'Sollwert', type: 'input' },
+      { label: 'Enable', type: 'input' }
     ],
     outputs: [
       { label: 'Stellgröße', type: 'output' },
