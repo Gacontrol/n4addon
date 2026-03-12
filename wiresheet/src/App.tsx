@@ -723,6 +723,17 @@ function App() {
   }, [modbusDevices, setModbusDevices]);
 
   const allLogicNodes = pages.flatMap(p => p.nodes);
+  const allNodeIdsStr = allLogicNodes.map(n => n.id).sort().join(',');
+
+  useEffect(() => {
+    const nodeIdSet = new Set(allNodeIdsStr.split(',').filter(Boolean));
+    const orphanedBindings = driverBindings.filter(b => !nodeIdSet.has(b.nodeId));
+    if (orphanedBindings.length > 0) {
+      console.log(`Entferne ${orphanedBindings.length} verwaiste Bindings`);
+      const validBindings = driverBindings.filter(b => nodeIdSet.has(b.nodeId));
+      setDriverBindings(validBindings);
+    }
+  }, [allNodeIdsStr, driverBindings, setDriverBindings]);
 
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,
