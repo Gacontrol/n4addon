@@ -578,26 +578,43 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     setLasso(null);
   }, []);
 
-  const handleLassoPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!lasso) return;
-    if (lassoPointerIdRef.current !== e.pointerId) return;
+  const getCanvasPosFromMouseEvent = useCallback((e: MouseEvent) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
 
-    const pos = getCanvasPos(e);
-    lassoRef.current = { ...lassoRef.current!, currentX: pos.x, currentY: pos.y };
+  const handleGlobalLassoMove = useCallback((e: MouseEvent) => {
+    if (!lassoRef.current) return;
+    const pos = getCanvasPosFromMouseEvent(e);
+    lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
     setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-  }, [lasso, getCanvasPos]);
+  }, [getCanvasPosFromMouseEvent]);
 
-  const handleLassoPointerUp = useCallback((e: React.PointerEvent) => {
-    if (!lasso) return;
+  const handleGlobalLassoUp = useCallback((e: MouseEvent) => {
+    if (!lassoRef.current) return;
     if (e.button !== 0) return;
-    if (lassoPointerIdRef.current !== e.pointerId) return;
-
-    const pos = getCanvasPos(e);
-    lassoRef.current = { ...lassoRef.current!, currentX: pos.x, currentY: pos.y };
-
-    canvasRef.current?.releasePointerCapture(e.pointerId);
+    const pos = getCanvasPosFromMouseEvent(e);
+    lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
     finishLasso();
-  }, [lasso, getCanvasPos, finishLasso]);
+  }, [getCanvasPosFromMouseEvent, finishLasso]);
+
+  useEffect(() => {
+    if (lasso) {
+      window.addEventListener('mousemove', handleGlobalLassoMove);
+      window.addEventListener('mouseup', handleGlobalLassoUp);
+      return () => {
+        window.removeEventListener('mousemove', handleGlobalLassoMove);
+        window.removeEventListener('mouseup', handleGlobalLassoUp);
+      };
+    }
+  }, [lasso, handleGlobalLassoMove, handleGlobalLassoUp]);
+
+  const handleLassoPointerMove = useCallback((_e: React.PointerEvent) => {
+  }, []);
+
+  const handleLassoPointerUp = useCallback((_e: React.PointerEvent) => {
+  }, []);
 
   const handleLassoPointerCancel = useCallback((e: React.PointerEvent) => {
     if (!lasso) return;
