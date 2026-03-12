@@ -209,6 +209,14 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const getCoords = (ev: PointerEvent) => {
+      const r = canvas.getBoundingClientRect();
+      return {
+        x: ev.clientX - r.left,
+        y: ev.clientY - r.top
+      };
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (!isEditModeRef.current) return;
@@ -223,9 +231,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         }
       }
 
-      const rect = canvas.getBoundingClientRect();
-      const startX = e.clientX - rect.left + canvas.scrollLeft;
-      const startY = e.clientY - rect.top + canvas.scrollTop;
+      const { x: startX, y: startY } = getCoords(e);
 
       setLassoState({ startX, startY, currentX: startX, currentY: startY });
       onSelectWidgetRef.current(null);
@@ -233,9 +239,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       e.preventDefault();
 
       const onMove = (ev: PointerEvent) => {
-        const r = canvas.getBoundingClientRect();
-        const cx = ev.clientX - r.left + canvas.scrollLeft;
-        const cy = ev.clientY - r.top + canvas.scrollTop;
+        const { x: cx, y: cy } = getCoords(ev);
         setLassoState({ startX, startY, currentX: cx, currentY: cy });
       };
 
@@ -243,9 +247,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
 
-        const r = canvas.getBoundingClientRect();
-        const cx = ev.clientX - r.left + canvas.scrollLeft;
-        const cy = ev.clientY - r.top + canvas.scrollTop;
+        const { x: cx, y: cy } = getCoords(ev);
 
         const lx1 = Math.min(startX, cx);
         const ly1 = Math.min(startY, cy);
@@ -256,13 +258,16 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
         const threshold = 5;
         if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
-          const selected = pageWidgetsRef.current
+          const widgets = pageWidgetsRef.current;
+          console.log('[Lasso] rect', lx1, ly1, lx2, ly2, 'widgets:', widgets.map(w => `${w.id}@(${w.position.x},${w.position.y},${w.size.width}x${w.size.height})`));
+          const selected = widgets
             .filter(w => {
               const wx2 = w.position.x + w.size.width;
               const wy2 = w.position.y + w.size.height;
               return w.position.x < lx2 && wx2 > lx1 && w.position.y < ly2 && wy2 > ly1;
             })
             .map(w => w.id);
+          console.log('[Lasso] selected:', selected);
           if (selected.length > 0) {
             onSelectWidgetsRef.current?.(selected);
             onSelectWidgetRef.current(selected[selected.length - 1]);
