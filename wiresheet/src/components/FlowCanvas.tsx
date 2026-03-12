@@ -117,8 +117,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [, forceUpdate] = useState(0);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [lasso, setLasso] = useState<LassoState | null>(null);
   const lassoRef = useRef<LassoState | null>(null);
+  const [lassoTick, setLassoTick] = useState(0);
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
@@ -257,9 +257,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const rect = canvasRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const newLasso = { startX: x, startY: y, currentX: x, currentY: y };
-      lassoRef.current = newLasso;
-      setLasso(newLasso);
+      lassoRef.current = { startX: x, startY: y, currentX: x, currentY: y };
+      setLassoTick(t => t + 1);
 
       canvasRef.current.setPointerCapture(e.pointerId);
     }
@@ -268,13 +267,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const handleCanvasPointerMove = (e: React.PointerEvent) => {
     if (lassoRef.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const updated = {
+      lassoRef.current = {
         ...lassoRef.current,
         currentX: e.clientX - rect.left,
         currentY: e.clientY - rect.top
       };
-      lassoRef.current = updated;
-      setLasso({ ...updated });
+      setLassoTick(t => t + 1);
     }
 
     if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
@@ -322,7 +320,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const currentLasso = lassoRef.current;
     if (currentLasso) {
       lassoRef.current = null;
-      setLasso(null);
+      setLassoTick(t => t + 1);
 
       const minX = Math.min(currentLasso.startX, currentLasso.currentX) / zoom;
       const maxX = Math.max(currentLasso.startX, currentLasso.currentX) / zoom;
@@ -417,6 +415,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     ? getPortCenter(connectingFrom.nodeId, connectingFrom.portId)
     : null;
 
+  void lassoTick;
+  const lasso = lassoRef.current;
   const lassoRect = lasso ? {
     x: Math.min(lasso.startX, lasso.currentX) / zoom,
     y: Math.min(lasso.startY, lasso.currentY) / zoom,
