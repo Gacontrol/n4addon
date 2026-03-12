@@ -34,6 +34,7 @@ interface DriverPanelProps {
   haDevices?: HaDevice[];
   haDriverEnabled?: boolean;
   onHaEntityClick?: (device: HaDevice, entity: HaEntity, isOutput: boolean) => void;
+  highlightedBinding?: DriverBinding | null;
 }
 
 export const DriverPanel: React.FC<DriverPanelProps> = ({
@@ -46,13 +47,30 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   onDatapointDragStart,
   haDevices = [],
   haDriverEnabled = false,
-  onHaEntityClick
+  onHaEntityClick,
+  highlightedBinding
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
   const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
 
   const isOutputPanel = side === 'right';
+  const shouldHighlight = highlightedBinding && (
+    (isOutputPanel && highlightedBinding.direction === 'output') ||
+    (!isOutputPanel && highlightedBinding.direction === 'input')
+  );
+
+  React.useEffect(() => {
+    if (shouldHighlight && highlightedBinding) {
+      setIsCollapsed(false);
+      if (highlightedBinding.driverType === 'modbus') {
+        setExpandedDevices(prev => new Set([...prev, highlightedBinding.deviceId]));
+      } else if (highlightedBinding.driverType === 'homeassistant') {
+        setExpandedHaDevices(prev => new Set([...prev, highlightedBinding.deviceId]));
+      }
+    }
+  }, [shouldHighlight, highlightedBinding]);
+
   const panelTitle = isOutputPanel ? 'Ausgaenge' : 'Eingaenge';
 
   const toggleDevice = (deviceId: string) => {
@@ -178,6 +196,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                           (isOutputPanel && dp.writable) ||
                           (!isOutputPanel)
                         );
+                        const isHighlighted = shouldHighlight && highlightedBinding?.datapointId === dp.id && highlightedBinding?.deviceId === device.id;
 
                         return (
                           <div
@@ -186,7 +205,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               canConnect
                                 ? 'hover:bg-blue-600/30 bg-blue-900/20'
                                 : 'hover:bg-slate-700/30'
-                            } ${binding ? 'bg-amber-900/20' : ''}`}
+                            } ${binding ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
                             onClick={() => onDatapointClick(device, dp, isOutputPanel)}
                             onDragStart={(e) => {
                               e.dataTransfer.setData('application/json', JSON.stringify({
@@ -272,6 +291,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         const isConnecting = !!connectingFrom;
                         const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
                         const unit = entity.attributes.unit_of_measurement as string || '';
+                        const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
 
                         return (
                           <div
@@ -280,7 +300,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               isConnecting
                                 ? 'hover:bg-blue-600/30 bg-blue-900/20'
                                 : 'hover:bg-slate-700/30'
-                            } ${binding ? 'bg-cyan-900/20' : ''}`}
+                            } ${binding ? 'bg-cyan-900/20' : ''} ${isHaHighlighted ? 'ring-2 ring-cyan-400 bg-cyan-800/40 animate-pulse' : ''}`}
                             onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
                             draggable
                             onDragStart={(e) => {

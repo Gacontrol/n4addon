@@ -111,70 +111,32 @@ function App() {
   const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
+  const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
+  const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>(() => {
+    const saved = localStorage.getItem('wiresheet-modbus-devices');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(() => {
+    const saved = localStorage.getItem('wiresheet-modbus-driver-enabled');
+    return saved ? JSON.parse(saved) : true;
+  });
   const isDraggingFromPalette = useRef(false);
   const isDraggingModbusDatapoint = useRef(false);
   const modbusDatapointDragRef = useRef<{ device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean } | null>(null);
   const ghostNodeRef = useRef<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
 
-  const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
-  const modbusDevices: ModbusDevice[] = modbusDriverNode?.data.config?.modbusDevices || [];
-  const modbusDriverEnabled: boolean = modbusDriverNode?.data.config?.modbusDriverEnabled ?? true;
+  const modbusDevices = modbusDevicesState;
+  const modbusDriverEnabled = modbusDriverEnabledState;
 
   const setModbusDevices = useCallback((devices: ModbusDevice[]) => {
-    if (modbusDriverNode) {
-      updateNodeData(modbusDriverNode.id, {
-        config: {
-          ...modbusDriverNode.data.config,
-          modbusDevices: devices
-        }
-      });
-    } else {
-      const newDriverNode: FlowNode = {
-        id: `node-modbus-driver-${Date.now()}`,
-        type: 'modbus-driver',
-        position: { x: 50, y: 50 },
-        data: {
-          label: 'Modbus Treiber',
-          icon: 'Network',
-          inputs: [],
-          outputs: [],
-          config: {
-            modbusDriverEnabled: true,
-            modbusDevices: devices
-          }
-        }
-      };
-      addNode(newDriverNode);
-    }
-  }, [modbusDriverNode, updateNodeData, addNode]);
+    setModbusDevicesState(devices);
+    localStorage.setItem('wiresheet-modbus-devices', JSON.stringify(devices));
+  }, []);
 
   const setModbusDriverEnabled = useCallback((enabled: boolean) => {
-    if (modbusDriverNode) {
-      updateNodeData(modbusDriverNode.id, {
-        config: {
-          ...modbusDriverNode.data.config,
-          modbusDriverEnabled: enabled
-        }
-      });
-    } else {
-      const newDriverNode: FlowNode = {
-        id: `node-modbus-driver-${Date.now()}`,
-        type: 'modbus-driver',
-        position: { x: 50, y: 50 },
-        data: {
-          label: 'Modbus Treiber',
-          icon: 'Network',
-          inputs: [],
-          outputs: [],
-          config: {
-            modbusDriverEnabled: enabled,
-            modbusDevices: []
-          }
-        }
-      };
-      addNode(newDriverNode);
-    }
-  }, [modbusDriverNode, updateNodeData, addNode]);
+    setModbusDriverEnabledState(enabled);
+    localStorage.setItem('wiresheet-modbus-driver-enabled', JSON.stringify(enabled));
+  }, []);
 
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
@@ -948,6 +910,7 @@ function App() {
               haDevices={haDevices}
               haDriverEnabled={haDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
+              highlightedBinding={highlightedBinding}
             />
 
             <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
@@ -1038,7 +1001,8 @@ function App() {
               onUpdateNodeData={updateNodeData}
               driverBindings={driverBindings}
               onDriverBindingClick={(binding) => {
-                setMainView('drivers');
+                setHighlightedBinding(binding);
+                setTimeout(() => setHighlightedBinding(null), 3000);
               }}
               onDriverBindingDelete={(binding) => {
                 setDriverBindings(prev => prev.filter(b => b.id !== binding.id));
@@ -1056,6 +1020,7 @@ function App() {
               haDevices={haDevices}
               haDriverEnabled={haDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
+              highlightedBinding={highlightedBinding}
             />
 
             {selectedNodeData && (

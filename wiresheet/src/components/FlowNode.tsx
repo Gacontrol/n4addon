@@ -78,6 +78,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const [resizingCaseIndex, setResizingCaseIndex] = useState<number | null>(null);
   const [dpContextMenu, setDpContextMenu] = useState<ContextMenuState | null>(null);
+  const [bindingContextMenu, setBindingContextMenu] = useState<{ x: number; y: number; binding: DriverBinding } | null>(null);
   const [overrideInput, setOverrideInput] = useState<string>('');
   const resizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
   const caseResizeStartRef = useRef<{ height: number; mouseY: number; caseIndex: number } | null>(null);
@@ -892,6 +893,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBindingContextMenu({ x: e.clientX, y: e.clientY, binding: driverBinding }); }}
                         >
                           {driverBinding.driverType === 'homeassistant' ? 'HA' : 'Modbus'} / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
@@ -1010,6 +1012,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBindingContextMenu({ x: e.clientX, y: e.clientY, binding: driverBinding }); }}
                         >
                           {driverBinding.driverType === 'homeassistant' ? 'HA' : 'Modbus'} / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
@@ -1082,6 +1085,38 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 Loeschen
               </button>
             </div>
+          </div>
+        </>,
+        document.body
+      )}
+
+      {bindingContextMenu && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setBindingContextMenu(null)}
+            onContextMenu={e => { e.preventDefault(); setBindingContextMenu(null); }}
+          />
+          <div
+            className="fixed z-[9999] bg-slate-800 border border-slate-600 rounded-lg shadow-2xl py-1 w-48"
+            style={{ left: bindingContextMenu.x, top: bindingContextMenu.y }}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 border-b border-slate-700">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Treiber-Verbindung</p>
+              <p className="text-[10px] text-white truncate mt-0.5">{bindingContextMenu.binding.deviceName}</p>
+              <p className="text-[10px] text-slate-400 truncate">{bindingContextMenu.binding.datapointName}</p>
+            </div>
+            <button
+              onClick={() => {
+                onDriverBindingDelete?.(bindingContextMenu.binding);
+                setBindingContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-900/30 transition-colors"
+            >
+              <Icons.Trash2 className="w-3.5 h-3.5" />
+              Verbindung loeschen
+            </button>
           </div>
         </>,
         document.body
