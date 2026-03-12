@@ -314,7 +314,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
     const key = `${device.id}:${dp.id}`;
     setLoadingConfig(prev => ({ ...prev, [key]: true }));
     try {
-      const res = await fetch(`${getApiBase()}/modbus/read`, {
+      const res = await fetch(`${getApiBase()}/modbus/read-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,15 +324,18 @@ export const DriversView: React.FC<DriversViewProps> = ({
           address: dp.address,
           registerType: dp.registerType,
           dataType: dp.dataType,
+          scale: dp.scale || 1,
           timeout: device.timeout || 3000
         })
       });
       const data = await res.json();
-      if (data.value !== undefined) {
+      if (data.success && data.value !== undefined) {
         setConfigValues(prev => ({
           ...prev,
           [device.id]: { ...(prev[device.id] || {}), [dp.id]: data.value }
         }));
+      } else if (!data.success) {
+        console.error('Config read failed:', data.error);
       }
     } catch (err) {
       console.error('Config read error:', err);
@@ -345,7 +348,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
     const key = `${device.id}:${dp.id}`;
     setSavingConfig(prev => ({ ...prev, [key]: true }));
     try {
-      await fetch(`${getApiBase()}/modbus/write`, {
+      const res = await fetch(`${getApiBase()}/modbus/write-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -355,14 +358,20 @@ export const DriversView: React.FC<DriversViewProps> = ({
           address: dp.address,
           registerType: dp.registerType,
           dataType: dp.dataType,
+          scale: dp.scale || 1,
           value,
           timeout: device.timeout || 3000
         })
       });
-      setConfigValues(prev => ({
-        ...prev,
-        [device.id]: { ...(prev[device.id] || {}), [dp.id]: value }
-      }));
+      const data = await res.json();
+      if (data.success) {
+        setConfigValues(prev => ({
+          ...prev,
+          [device.id]: { ...(prev[device.id] || {}), [dp.id]: value }
+        }));
+      } else {
+        console.error('Config write failed:', data.error);
+      }
     } catch (err) {
       console.error('Config write error:', err);
     } finally {
