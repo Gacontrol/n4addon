@@ -573,11 +573,6 @@ function App() {
           config: { ...targetNode.data.config, [binding.paramKey]: value }
         });
       }
-    } else {
-      if (binding.portId) {
-        setLiveValue(`${binding.nodeId}:${binding.portId}`, value);
-      }
-      setLiveValue(binding.nodeId, value);
     }
     try {
       const apiBase = (() => {
