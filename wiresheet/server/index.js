@@ -22,6 +22,7 @@ let pagesFile = path.join(dataDir, 'pages.json');
 let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 let dpValuesFile = path.join(dataDir, 'dp-values.json');
+let driverConfigFile = path.join(dataDir, 'driver-config.json');
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -30,6 +31,14 @@ const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
 const visuControlledDps = new Map();
 let dpValuesSaveTimeout = null;
+
+let driverConfig = {
+  modbusDevices: [],
+  modbusDriverEnabled: true,
+  driverBindings: [],
+  haDriverEnabled: true
+};
+const modbusLiveValues = new Map();
 
 async function loadPersistentDpValues() {
   try {
@@ -66,6 +75,33 @@ function savePersistentDpValues() {
 function setPersistentDpValue(nodeId, value) {
   persistentDpValues.set(nodeId, value);
   savePersistentDpValues();
+}
+
+async function loadDriverConfig() {
+  try {
+    const data = await fs.readFile(driverConfigFile, 'utf-8');
+    const cfg = JSON.parse(data);
+    driverConfig = {
+      modbusDevices: cfg.modbusDevices || [],
+      modbusDriverEnabled: cfg.modbusDriverEnabled !== false,
+      driverBindings: cfg.driverBindings || [],
+      haDriverEnabled: cfg.haDriverEnabled !== false
+    };
+    console.log(`Treiber-Konfiguration geladen: ${driverConfig.modbusDevices.length} Modbus-Geraete, ${driverConfig.driverBindings.length} Bindings`);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('Fehler beim Laden der Treiber-Konfiguration:', err.message);
+    }
+  }
+}
+
+async function saveDriverConfig() {
+  try {
+    await fs.writeFile(driverConfigFile, JSON.stringify(driverConfig, null, 2));
+    console.log('Treiber-Konfiguration gespeichert');
+  } catch (err) {
+    console.error('Fehler beim Speichern der Treiber-Konfiguration:', err.message);
+  }
 }
 
 function getNodeState(pageId, nodeId) {
@@ -277,6 +313,27 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
   } catch (err) {
     console.error('Fehler beim Speichern:', err);
     res.status(500).json({ error: 'Fehler beim Speichern der Seiten', details: err.message });
+  }
+});
+
+app.get(['/driver-config', '/api/driver-config'], async (req, res) => {
+  res.json(driverConfig);
+});
+
+app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
+  try {
+    const cfg = req.body;
+    driverConfig = {
+      modbusDevices: cfg.modbusDevices || [],
+      modbusDriverEnabled: cfg.modbusDriverEnabled !== false,
+      driverBindings: cfg.driverBindings || [],
+      haDriverEnabled: cfg.haDriverEnabled !== false
+    };
+    await saveDriverConfig();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -565,12 +622,58 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
   console.log(`[EXEC DEBUG] visuControlledDps aktuell:`, JSON.stringify([...visuControlledDps.entries()]));
   const nodeValues = {};
 
-  const modbusDriverNode = nodes.find(n => n.type === 'modbus-driver');
-  const modbusDevices = modbusDriverNode?.data?.config?.modbusDevices || [];
+  const modbusDevices = driverConfig.modbusDevices || [];
   const modbusDeviceMap = new Map();
   for (const device of modbusDevices) {
     modbusDeviceMap.set(device.id, device);
   }
+
+  const bindingValues = {};
+  const inputBindings = (driverConfig.driverBindings || []).filter(b => b.direction === 'input');
+
+  const bindingPromises = inputBindings.map(async (binding) => {
+    const bindingKey = `${binding.nodeId}:${binding.portId}`;
+    try {
+      if (binding.driverType === 'modbus') {
+        const device = modbusDeviceMap.get(binding.deviceId);
+        if (!device) {
+          console.log(`Binding ${bindingKey}: Modbus-Geraet ${binding.deviceId} nicht gefunden`);
+          return;
+        }
+        const dp = device.datapoints?.find(d => d.id === binding.datapointId);
+        if (!dp) {
+          console.log(`Binding ${bindingKey}: Datenpunkt ${binding.datapointId} nicht gefunden`);
+          return;
+        }
+        let rawValue = await modbusReadRegister(
+          device.host,
+          device.port,
+          device.unitId,
+          dp.address,
+          dp.registerType || 'holding',
+          dp.dataType || 'uint16',
+          device.timeout || 3000
+        );
+        let value = rawValue;
+        if (dp.scale && dp.scale !== 1) value = value * dp.scale;
+        if (dp.offset) value = value + dp.offset;
+        if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
+          value = (rawValue >> dp.bitIndex) & 1 ? true : false;
+        }
+        bindingValues[bindingKey] = value;
+        modbusLiveValues.set(`${binding.deviceId}:${binding.datapointId}`, value);
+        console.log(`Binding Modbus Read ${device.name}/${dp.name}: ${value}`);
+      } else if (binding.driverType === 'homeassistant' && binding.haEntityId) {
+        const state = await haGet(`/states/${binding.haEntityId}`);
+        const rawState = state.state;
+        const numVal = parseFloat(rawState);
+        bindingValues[bindingKey] = !isNaN(numVal) ? numVal : rawState;
+        console.log(`Binding HA Read ${binding.haEntityId}: ${bindingValues[bindingKey]}`);
+      }
+    } catch (err) {
+      console.error(`Binding ${bindingKey} Read Fehler:`, err.message);
+    }
+  });
 
   const statePromises = nodes
     .filter(n => (n.type === 'ha-input') && n.data.entityId)
@@ -642,7 +745,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[n.id] = firstValue;
     });
 
-  await Promise.all([...statePromises, ...modbusInputPromises]);
+  await Promise.all([...bindingPromises, ...statePromises, ...modbusInputPromises]);
 
   const topoOrder = [];
   const visited = new Set();
@@ -724,6 +827,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const nodeInputs = node.data.inputs || [];
     const inputVals = nodeInputs.map((inputPort, idx) => {
       const portKey = `${nodeId}:${inputPort.id}`;
+      if (bindingValues[portKey] !== undefined) {
+        return bindingValues[portKey];
+      }
       if (visuOverrides[portKey] !== undefined) {
         return visuOverrides[portKey];
       }
@@ -1614,6 +1720,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-0`] = statusValue;
       console.log(`Modbus Treiber Status: ${anyOffline ? 'Stoerung (1)' : 'Normal (0)'}`);
     }
+  }
+
+  for (const [key, value] of Object.entries(bindingValues)) {
+    nodeValues[key] = value;
   }
 
   return nodeValues;
@@ -3012,6 +3122,7 @@ async function start() {
     console.log(`Pages-Datei: ${pagesFile}`);
 
     await loadPersistentDpValues();
+    await loadDriverConfig();
 
     console.log(`--- Umgebungsvariablen ---`);
     console.log(`SUPERVISOR_TOKEN: ${process.env.SUPERVISOR_TOKEN ? 'ja (' + process.env.SUPERVISOR_TOKEN.substring(0,10) + '...)' : 'NEIN'}`);

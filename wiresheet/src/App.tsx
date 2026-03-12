@@ -112,14 +112,9 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
-  const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>(() => {
-    const saved = localStorage.getItem('wiresheet-modbus-devices');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(() => {
-    const saved = localStorage.getItem('wiresheet-modbus-driver-enabled');
-    return saved ? JSON.parse(saved) : true;
-  });
+  const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>([]);
+  const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(true);
+  const [driverConfigLoaded, setDriverConfigLoaded] = useState(false);
   const isDraggingFromPalette = useRef(false);
   const isDraggingModbusDatapoint = useRef(false);
   const modbusDatapointDragRef = useRef<{ device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean } | null>(null);
@@ -128,15 +123,69 @@ function App() {
   const modbusDevices = modbusDevicesState;
   const modbusDriverEnabled = modbusDriverEnabledState;
 
+  const getApiBase = useCallback(() => {
+    const path = window.location.pathname;
+    const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+    return m ? `${m[1]}/api` : '/api';
+  }, []);
+
+  useEffect(() => {
+    const loadDriverConfig = async () => {
+      try {
+        const apiBase = getApiBase();
+        const resp = await fetch(`${apiBase}/driver-config`);
+        if (resp.ok) {
+          const cfg = await resp.json();
+          setModbusDevicesState(cfg.modbusDevices || []);
+          setModbusDriverEnabledState(cfg.modbusDriverEnabled !== false);
+          setDriverBindings(cfg.driverBindings || []);
+          setHaDriverEnabled(cfg.haDriverEnabled !== false);
+          console.log('Treiber-Konfiguration geladen');
+        }
+      } catch (err) {
+        console.error('Fehler beim Laden der Treiber-Konfiguration:', err);
+      }
+      setDriverConfigLoaded(true);
+    };
+    loadDriverConfig();
+  }, [getApiBase]);
+
+  const saveDriverConfig = useCallback(async (devices: ModbusDevice[], enabled: boolean, bindings: DriverBinding[], haEnabled: boolean) => {
+    if (!driverConfigLoaded) return;
+    try {
+      const apiBase = getApiBase();
+      await fetch(`${apiBase}/driver-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modbusDevices: devices,
+          modbusDriverEnabled: enabled,
+          driverBindings: bindings,
+          haDriverEnabled: haEnabled
+        })
+      });
+    } catch (err) {
+      console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
+    }
+  }, [getApiBase, driverConfigLoaded]);
+
   const setModbusDevices = useCallback((devices: ModbusDevice[]) => {
     setModbusDevicesState(devices);
-    localStorage.setItem('wiresheet-modbus-devices', JSON.stringify(devices));
-  }, []);
+    saveDriverConfig(devices, modbusDriverEnabledState, driverBindings, haDriverEnabled);
+  }, [saveDriverConfig, modbusDriverEnabledState, driverBindings, haDriverEnabled]);
 
   const setModbusDriverEnabled = useCallback((enabled: boolean) => {
     setModbusDriverEnabledState(enabled);
-    localStorage.setItem('wiresheet-modbus-driver-enabled', JSON.stringify(enabled));
-  }, []);
+    saveDriverConfig(modbusDevicesState, enabled, driverBindings, haDriverEnabled);
+  }, [saveDriverConfig, modbusDevicesState, driverBindings, haDriverEnabled]);
+
+  const updateDriverBindings = useCallback((updater: (prev: DriverBinding[]) => DriverBinding[]) => {
+    setDriverBindings(prev => {
+      const newBindings = updater(prev);
+      saveDriverConfig(modbusDevicesState, modbusDriverEnabledState, newBindings, haDriverEnabled);
+      return newBindings;
+    });
+  }, [saveDriverConfig, modbusDevicesState, modbusDriverEnabledState, haDriverEnabled]);
 
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
@@ -319,18 +368,8 @@ function App() {
   }, [addNode, selectNode, nodes, updateNodeData]);
 
   const handleNodeSelectWithModbusRedirect = useCallback((nodeId: string, addToSelection?: boolean) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (node && (node.type === 'modbus-device-input' || node.type === 'modbus-device-output')) {
-      const deviceId = node.data.config?.modbusDeviceId;
-      const datapointId = node.data.config?.modbusDatapointId;
-      if (modbusDriverNode && deviceId && datapointId) {
-        selectNode(modbusDriverNode.id, addToSelection);
-        setSelectedModbusDatapointPath({ deviceId, datapointId });
-        return;
-      }
-    }
     selectNode(nodeId, addToSelection);
-  }, [nodes, modbusDriverNode, selectNode]);
+  }, [selectNode]);
 
   const selectedNodeData = selectedNodes.size === 1
     ? nodes.find(n => selectedNodes.has(n.id)) || null
@@ -490,7 +529,7 @@ function App() {
         datapointName: datapoint.name,
         direction: isOutput ? 'output' : 'input'
       };
-      setDriverBindings(prev => {
+      updateDriverBindings(prev => {
         const filtered = prev.filter(b =>
           !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
         );
@@ -498,7 +537,7 @@ function App() {
       });
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings]);
 
   const handleHaEntityClick = useCallback((
     device: HaDevice,
@@ -520,7 +559,7 @@ function App() {
         haEntityId: entity.entity_id,
         haDomain: entity.entity_id.split('.')[0]
       };
-      setDriverBindings(prev => {
+      updateDriverBindings(prev => {
         const filtered = prev.filter(b =>
           !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
         );
@@ -528,7 +567,7 @@ function App() {
       });
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings]);
 
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
@@ -1005,7 +1044,7 @@ function App() {
                 setTimeout(() => setHighlightedBinding(null), 3000);
               }}
               onDriverBindingDelete={(binding) => {
-                setDriverBindings(prev => prev.filter(b => b.id !== binding.id));
+                updateDriverBindings(prev => prev.filter(b => b.id !== binding.id));
               }}
             />
 
@@ -1131,14 +1170,15 @@ function App() {
           modbusDevices={modbusDevices}
           modbusDriverEnabled={modbusDriverEnabled}
           driverBindings={driverBindings}
-          onImport={(newWiresheets, newVisuPages, newBlocks, driverConfig) => {
+          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);
             importBlocks(newBlocks as CustomBlockDefinition[]);
-            if (driverConfig) {
-              setModbusDevices(driverConfig.modbusDevices);
-              setModbusDriverEnabled(driverConfig.modbusDriverEnabled);
-              setDriverBindings(driverConfig.driverBindings);
+            if (importedDriverConfig) {
+              setModbusDevicesState(importedDriverConfig.modbusDevices);
+              setModbusDriverEnabledState(importedDriverConfig.modbusDriverEnabled);
+              setDriverBindings(importedDriverConfig.driverBindings);
+              saveDriverConfig(importedDriverConfig.modbusDevices, importedDriverConfig.modbusDriverEnabled, importedDriverConfig.driverBindings, haDriverEnabled);
             }
           }}
           onClose={() => setShowBackupModal(false)}
