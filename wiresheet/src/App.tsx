@@ -781,8 +781,8 @@ function App() {
               <Workflow className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white leading-tight">Wiresheet</h1>
-              <p className="text-xs text-slate-500 leading-tight">Home Assistant</p>
+              <h1 className="text-sm font-bold text-white leading-tight">GA-Control</h1>
+              <p className="text-xs text-slate-500 leading-tight">keep it simple - by Dr. Muff</p>
             </div>
           </div>
 
