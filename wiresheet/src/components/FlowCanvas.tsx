@@ -118,6 +118,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [, forceUpdate] = useState(0);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [lasso, setLasso] = useState<LassoState | null>(null);
+  const lassoRef = useRef<LassoState | null>(null);
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
@@ -256,20 +257,24 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const rect = canvasRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      setLasso({ startX: x, startY: y, currentX: x, currentY: y });
+      const newLasso = { startX: x, startY: y, currentX: x, currentY: y };
+      lassoRef.current = newLasso;
+      setLasso(newLasso);
 
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      canvasRef.current.setPointerCapture(e.pointerId);
     }
   };
 
   const handleCanvasPointerMove = (e: React.PointerEvent) => {
-    if (lasso && canvasRef.current) {
+    if (lassoRef.current && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      setLasso(prev => prev ? {
-        ...prev,
+      const updated = {
+        ...lassoRef.current,
         currentX: e.clientX - rect.left,
         currentY: e.clientY - rect.top
-      } : null);
+      };
+      lassoRef.current = updated;
+      setLasso({ ...updated });
     }
 
     if (isDraggingMultiple && dragStartMouse.current && canvasRef.current) {
@@ -294,7 +299,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       canvasRef.current?.classList.remove('connecting-mode');
 
       const elementsAtPoint = document.elementsFromPoint(e.clientX, e.clientY);
-      console.log('[handleCanvasPointerUp] elementsFromPoint:', elementsAtPoint.map(el => el.className || el.tagName));
 
       for (const el of elementsAtPoint) {
         const portEl = el.closest('[data-port-id]') as HTMLElement | null;
@@ -305,7 +309,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             const portId = parts.slice(-2).join('-');
             const nodeId = parts.slice(0, -2).join('-');
             if (nodeId !== connectingFromRef.current.nodeId) {
-              console.log('[handleCanvasPointerUp] Found port under cursor:', nodeId, portId);
               onConnectionEnd(nodeId, portId, connectingFromRef.current.nodeId, connectingFromRef.current.portId);
               return;
             }
@@ -316,11 +319,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       canvasRef.current?.classList.add('connecting-mode');
     }
 
-    if (lasso) {
-      const minX = Math.min(lasso.startX, lasso.currentX) / zoom;
-      const maxX = Math.max(lasso.startX, lasso.currentX) / zoom;
-      const minY = Math.min(lasso.startY, lasso.currentY) / zoom;
-      const maxY = Math.max(lasso.startY, lasso.currentY) / zoom;
+    const currentLasso = lassoRef.current;
+    if (currentLasso) {
+      lassoRef.current = null;
+      setLasso(null);
+
+      const minX = Math.min(currentLasso.startX, currentLasso.currentX) / zoom;
+      const maxX = Math.max(currentLasso.startX, currentLasso.currentX) / zoom;
+      const minY = Math.min(currentLasso.startY, currentLasso.currentY) / zoom;
+      const maxY = Math.max(currentLasso.startY, currentLasso.currentY) / zoom;
 
       if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
         const selectedIds = nodes.filter(node => {
@@ -335,7 +342,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           onNodesSelect(selectedIds);
         }
       }
-      setLasso(null);
     }
 
     if (isDraggingMultiple) {
