@@ -119,6 +119,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }, []);
 
+  const getScrolledCanvasPos = useCallback((e: MouseEvent) => {
+    if (!canvasRef.current) return { x: e.clientX, y: e.clientY };
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
+
   const snapPos = useCallback((pos: { x: number; y: number }) => {
     if (!page.showGrid) return pos;
     const g = page.gridSize || 10;
@@ -209,11 +215,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       const pos = snapPos(getCanvasPos(e));
       setDrawingState(prev => prev ? { ...prev, cursorPos: pos } : null);
     }
-    if (lassoState) {
-      const pos = getCanvasPos(e);
-      setLassoState(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-    }
-  }, [drawingState, lassoState, getCanvasPos, snapPos]);
+  }, [drawingState, getCanvasPos, snapPos]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (contextMenu) {
@@ -369,6 +371,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [isEditMode, page.widgets, onSelectWidget, onSelectWidgets, selectedWidgetIds, contextMenu, drawingState]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (lassoState) {
+      const pos = getScrolledCanvasPos(e);
+      setLassoState(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    }
+
     if (multiDragState) {
       const rawDeltaX = e.clientX - multiDragState.startX;
       const rawDeltaY = e.clientY - multiDragState.startY;
@@ -508,7 +515,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         size: { width: newWidth, height: newHeight }
       });
     }
-  }, [dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets]);
+  }, [lassoState, dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets, getScrolledCanvasPos]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
     if (lassoState) {
@@ -743,37 +750,24 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         </div>
       )}
       {page.widgets.map((widget) => (
-        <div
+        <VisuWidgetRenderer
           key={widget.id}
+          widget={widget}
+          value={getWidgetValue(widget)}
+          statusValue={getWidgetStatusValue(widget)}
+          onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+          onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
+          isEditMode={isEditMode}
+          isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
+          isMultiSelected={isMultiSelected(widget.id)}
+          onSelect={() => onSelectWidget(widget.id)}
+          onDoubleClick={() => onEditWidgetProperties(widget.id)}
           onMouseDown={(e) => handleWidgetMouseDown(e, widget.id)}
           onContextMenu={(e) => handleWidgetContextMenu(e, widget.id)}
-          style={isMultiSelected(widget.id) && isEditMode ? {
-            outline: '2px solid #3b82f6',
-            outlineOffset: 2,
-            borderRadius: 2,
-            position: 'absolute',
-            left: widget.position.x,
-            top: widget.position.y,
-            width: widget.size.width,
-            height: widget.size.height,
-            zIndex: widget.zIndex ?? 1
-          } : undefined}
-        >
-          <VisuWidgetRenderer
-            widget={widget}
-            value={getWidgetValue(widget)}
-            statusValue={getWidgetStatusValue(widget)}
-            onValueChange={(value) => onWidgetValueChange(widget.id, value)}
-            onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
-            isEditMode={isEditMode}
-            isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
-            onSelect={() => onSelectWidget(widget.id)}
-            onDoubleClick={() => onEditWidgetProperties(widget.id)}
-            onNavigateToPage={onNavigateToPage}
-            onNavigateBack={onNavigateBack}
-            onNavigateHome={onNavigateHome}
-          />
-        </div>
+          onNavigateToPage={onNavigateToPage}
+          onNavigateBack={onNavigateBack}
+          onNavigateHome={onNavigateHome}
+        />
       ))}
 
       {drawingOverlay}

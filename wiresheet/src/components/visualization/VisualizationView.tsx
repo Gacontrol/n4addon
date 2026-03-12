@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
@@ -39,17 +39,36 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   logicNodes,
   onWidgetValueChange
 }) => {
+  const CLIPBOARD_KEY = 'visu-clipboard';
+  const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
+
+  function readClipboard(): VisuWidget | null {
+    try { return JSON.parse(localStorage.getItem(CLIPBOARD_KEY) || 'null'); } catch { return null; }
+  }
+  function readMultiClipboard(): VisuWidget[] | null {
+    try { return JSON.parse(localStorage.getItem(MULTI_CLIPBOARD_KEY) || 'null'); } catch { return null; }
+  }
+
   const [isEditMode, setIsEditMode] = useState(true);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
   const [selectedWidgetIds, setSelectedWidgetIds] = useState<string[]>([]);
   const [showProperties, setShowProperties] = useState(false);
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
-  const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
-  const [multiClipboard, setMultiClipboard] = useState<VisuWidget[] | null>(null);
+  const [clipboard, setClipboard] = useState<VisuWidget | null>(readClipboard);
+  const [multiClipboard, setMultiClipboard] = useState<VisuWidget[] | null>(readMultiClipboard);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === CLIPBOARD_KEY) setClipboard(readClipboard());
+      if (e.key === MULTI_CLIPBOARD_KEY) setMultiClipboard(readMultiClipboard());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   const handleNavigateToPage = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
@@ -128,7 +147,12 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const handleCopyWidget = useCallback((widgetId: string) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
-    if (widget) setClipboard(widget);
+    if (widget) {
+      setClipboard(widget);
+      setMultiClipboard(null);
+      localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(widget));
+      localStorage.removeItem(MULTI_CLIPBOARD_KEY);
+    }
   }, [activePage.widgets]);
 
   const handleDuplicateWidget = useCallback((widgetId: string) => {
@@ -185,9 +209,13 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     if (widgets.length === 1) {
       setClipboard(widgets[0]);
       setMultiClipboard(null);
+      localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(widgets[0]));
+      localStorage.removeItem(MULTI_CLIPBOARD_KEY);
     } else if (widgets.length > 1) {
       setMultiClipboard(widgets);
       setClipboard(widgets[0]);
+      localStorage.setItem(MULTI_CLIPBOARD_KEY, JSON.stringify(widgets));
+      localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(widgets[0]));
     }
   }, [activePage.widgets]);
 

@@ -107,8 +107,11 @@ interface VisuWidgetProps {
   onUpdateConfig?: (config: Record<string, unknown>) => void;
   isEditMode: boolean;
   isSelected: boolean;
+  isMultiSelected?: boolean;
   onSelect: () => void;
   onDoubleClick: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onNavigateToPage?: (pageId: string) => void;
   onNavigateBack?: () => void;
   onNavigateHome?: () => void;
@@ -170,8 +173,11 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onUpdateConfig,
   isEditMode,
   isSelected,
+  isMultiSelected = false,
   onSelect,
   onDoubleClick,
+  onMouseDown,
+  onContextMenu,
   onNavigateToPage,
   onNavigateBack,
   onNavigateHome,
@@ -1112,7 +1118,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const resolvedBorderRadius = widget.style.borderRadius ?? themeVars.borderRadius;
   const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 
-  const isTransparentWidget = isDrawingWidget || isModernWidget || isDashWidget;
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget;
 
   return (
     <div
@@ -1127,12 +1133,16 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
         border: showSelectionBorder
           ? '2px solid #3b82f6'
-          : 'none',
+          : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none'),
+        outline: isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined,
+        outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined,
         boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? 0 : 8
       } as React.CSSProperties}
+      onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
       onClick={(e) => {
         if (isEditMode) {
           e.stopPropagation();
