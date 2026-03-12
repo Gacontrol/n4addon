@@ -1038,16 +1038,25 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </div>
           </div>
 
-          {visuBindings.length > 0 && (
-            <div className="px-2 pb-1.5 flex flex-col gap-0.5">
-              {visuBindings.map((b, bi) => (
-                <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1.5 py-0.5 rounded leading-none truncate" title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''}`}>
-                  Visu: {b.pageName} / {b.widgetLabel}{b.paramKey ? ` (${b.paramKey})` : ''}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
+
+        {visuBindings.length > 0 && (
+          <div className="absolute left-0 right-0 flex flex-col gap-0.5" style={{ top: '100%', marginTop: '4px' }}>
+            {visuBindings.map((b, bi) => (
+              <div key={bi} className="flex items-center">
+                <div
+                  className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
+                  title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''} (${b.isWrite ? 'Write' : 'Read'})`}
+                >
+                  <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
+                  <span className="truncate max-w-[150px]">
+                    Visu: {b.pageName} / {b.widgetLabel}{b.paramKey ? ` (${b.paramKey})` : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {dpContextMenu && isDPNode && createPortal(
