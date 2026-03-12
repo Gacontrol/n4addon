@@ -918,24 +918,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
     const incomingConns = connections.filter(c => c.target === nodeId);
 
-    const isSourceInInactiveCase = (sourceNode) => {
-      if (!sourceNode || !sourceNode.data.parentContainerId) return false;
-      const parentContainer = nodes.find(n => n.id === sourceNode.data.parentContainerId);
-      if (parentContainer && parentContainer.type === 'case-container') {
-        const activeCase = caseContainerActiveCase.get(parentContainer.id) || 0;
-        const nodeCase = sourceNode.data.caseIndex;
-        if (nodeCase !== undefined && nodeCase !== activeCase) {
-          return true;
-        }
-      }
-      return false;
-    };
-
     const getInputValue = (conn) => {
       const sourceNode = nodes.find(n => n.id === conn.source);
-      if (isSourceInInactiveCase(sourceNode)) {
-        return undefined;
-      }
       if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
