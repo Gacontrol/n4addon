@@ -289,6 +289,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
+  const lassoPointerIdRef = useRef<number | null>(null);
+
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     if (!isEditMode) return;
@@ -300,6 +302,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     const pos = getCanvasPos(e);
     setLasso({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
+    lassoRef.current = { startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
+    lassoPointerIdRef.current = e.pointerId;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
     onSelectWidget(null);
     onSelectWidgets?.([]);
   }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
@@ -542,91 +547,62 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [dragState, resizeState, multiDragState, handleMouseMove, handleMouseUp]);
 
-  useEffect(() => {
-    if (!lasso) return;
+  const finishLasso = useCallback(() => {
+    const currentLasso = lassoRef.current;
+    if (currentLasso) {
+      const minX = Math.min(currentLasso.startX, currentLasso.currentX);
+      const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
+      const minY = Math.min(currentLasso.startY, currentLasso.currentY);
+      const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
+      const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
 
-    const finishLasso = () => {
-      const currentLasso = lassoRef.current;
-      if (currentLasso) {
-        const minX = Math.min(currentLasso.startX, currentLasso.currentX);
-        const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
-        const minY = Math.min(currentLasso.startY, currentLasso.currentY);
-        const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
-        const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
-
-        if (isActualLasso) {
-          const widgets = pageWidgetsRef.current;
-          const selected = widgets
-            .filter(w => {
-              const wx1 = w.position.x;
-              const wy1 = w.position.y;
-              const wx2 = wx1 + w.size.width;
-              const wy2 = wy1 + w.size.height;
-              return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
-            })
-            .map(w => w.id);
-          if (selected.length > 0) {
-            onSelectWidgetsRef.current?.(selected);
-          }
+      if (isActualLasso) {
+        const widgets = pageWidgetsRef.current;
+        const selected = widgets
+          .filter(w => {
+            const wx1 = w.position.x;
+            const wy1 = w.position.y;
+            const wx2 = wx1 + w.size.width;
+            const wy2 = wy1 + w.size.height;
+            return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
+          })
+          .map(w => w.id);
+        if (selected.length > 0) {
+          onSelectWidgetsRef.current?.(selected);
         }
-        setLasso(null);
       }
-    };
+    }
+    lassoRef.current = null;
+    lassoPointerIdRef.current = null;
+    setLasso(null);
+  }, []);
 
-    const handleGlobalPointerMove = (e: PointerEvent) => {
-      if (!canvasRef.current) return;
-      const el = canvasRef.current;
-      const rect = el.getBoundingClientRect();
-      const pos = {
-        x: e.clientX - rect.left + el.scrollLeft,
-        y: e.clientY - rect.top + el.scrollTop
-      };
-      if (lassoRef.current) {
-        lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
-      }
-      if (!(e.buttons & 1)) {
-        finishLasso();
-        return;
-      }
-      setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-    };
+  const handleLassoPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!lasso) return;
+    if (lassoPointerIdRef.current !== e.pointerId) return;
 
-    const updateLassoFromEvent = (e: MouseEvent | PointerEvent) => {
-      if (!canvasRef.current || !lassoRef.current) return;
-      const el = canvasRef.current;
-      const rect = el.getBoundingClientRect();
-      lassoRef.current = {
-        ...lassoRef.current,
-        currentX: e.clientX - rect.left + el.scrollLeft,
-        currentY: e.clientY - rect.top + el.scrollTop
-      };
-    };
+    const pos = getCanvasPos(e);
+    lassoRef.current = { ...lassoRef.current!, currentX: pos.x, currentY: pos.y };
+    setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+  }, [lasso, getCanvasPos]);
 
-    const handleGlobalPointerUp = (e: PointerEvent) => {
-      if (e.button === 0) {
-        updateLassoFromEvent(e);
-        finishLasso();
-      }
-    };
+  const handleLassoPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!lasso) return;
+    if (e.button !== 0) return;
+    if (lassoPointerIdRef.current !== e.pointerId) return;
 
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) {
-        updateLassoFromEvent(e);
-        finishLasso();
-      }
-    };
+    const pos = getCanvasPos(e);
+    lassoRef.current = { ...lassoRef.current!, currentX: pos.x, currentY: pos.y };
 
-    window.addEventListener('pointermove', handleGlobalPointerMove);
-    window.addEventListener('pointerup', handleGlobalPointerUp);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('pointercancel', finishLasso);
-    return () => {
-      window.removeEventListener('pointermove', handleGlobalPointerMove);
-      window.removeEventListener('pointerup', handleGlobalPointerUp);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('pointercancel', finishLasso);
-    };
-  }, [lasso]);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    finishLasso();
+  }, [lasso, getCanvasPos, finishLasso]);
+
+  const handleLassoPointerCancel = useCallback((e: React.PointerEvent) => {
+    if (!lasso) return;
+    if (lassoPointerIdRef.current !== e.pointerId) return;
+    finishLasso();
+  }, [lasso, finishLasso]);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -788,6 +764,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
       onPointerDown={handleCanvasPointerDown}
+      onPointerMove={handleLassoPointerMove}
+      onPointerUp={handleLassoPointerUp}
+      onPointerCancel={handleLassoPointerCancel}
       onContextMenu={(e) => {
         if (e.target === canvasRef.current) {
           handleCanvasContextMenu(e);
