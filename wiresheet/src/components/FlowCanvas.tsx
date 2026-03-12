@@ -122,7 +122,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -245,10 +244,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
 
     if (!isOnNode) {
-      if (!e.shiftKey && !connectingFrom) {
-        onClearSelection();
-      }
-
       if (connectingFrom) {
         onConnectionCancel();
         return;
@@ -260,7 +255,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const y = e.clientY - rect.top;
       lassoRef.current = { startX: x, startY: y, currentX: x, currentY: y };
       setLassoTick(t => t + 1);
-      console.log('[LASSO] Started at screen:', { x, y });
 
       canvasRef.current.setPointerCapture(e.pointerId);
     }
@@ -332,32 +326,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       const minY = (Math.min(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
       const maxY = (Math.max(currentLasso.startY, currentLasso.currentY) + scrollTop) / zoom;
 
-      const debugLines: string[] = [];
-      debugLines.push(`Lasso: ${Math.round(minX)},${Math.round(minY)} - ${Math.round(maxX)},${Math.round(maxY)}`);
-      debugLines.push(`Nodes: ${nodes.length}`);
+      const lassoWidth = Math.abs(currentLasso.currentX - currentLasso.startX);
+      const lassoHeight = Math.abs(currentLasso.currentY - currentLasso.startY);
+      const isActualLasso = lassoWidth > 10 || lassoHeight > 10;
 
-      if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
+      if (isActualLasso) {
         const selectedIds = nodes.filter(node => {
           const nx = node.position.x;
           const ny = node.position.y;
           const nw = 180;
           const nh = 60;
-          const isInside = nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
-          debugLines.push(`${node.data.label || node.id}: pos(${Math.round(nx)},${Math.round(ny)}) -> ${isInside ? 'IN' : 'out'}`);
-          return isInside;
+          return nx < maxX && nx + nw > minX && ny < maxY && ny + nh > minY;
         }).map(n => n.id);
-
-        debugLines.push(`Selected: ${selectedIds.length}`);
 
         if (selectedIds.length > 0) {
           onNodesSelect(selectedIds);
+        } else {
+          onClearSelection();
         }
       } else {
-        debugLines.push('Lasso too small');
+        onClearSelection();
       }
-
-      setDebugInfo(debugLines.join('\n'));
-      setTimeout(() => setDebugInfo(null), 5000);
     }
 
     if (isDraggingMultiple) {
@@ -793,12 +782,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           <div className="text-center opacity-40">
             <p className="text-slate-400 text-sm">Bausteine aus der Palette links hierher ziehen</p>
           </div>
-        </div>
-      )}
-
-      {debugInfo && (
-        <div className="absolute bottom-4 left-4 bg-black/80 text-green-400 text-xs font-mono p-3 rounded-lg whitespace-pre z-50 max-w-md">
-          {debugInfo}
         </div>
       )}
 
