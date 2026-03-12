@@ -1,6 +1,27 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle } from 'lucide-react';
-import { ModbusDevice, DriverBinding } from '../types/flow';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer } from 'lucide-react';
+import { ModbusDevice, DriverBinding, HaDevice, HaEntity } from '../types/flow';
+
+const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
+
+function isWritableHaEntity(entity: HaEntity): boolean {
+  const domain = entity.entity_id.split('.')[0];
+  return WRITABLE_HA_DOMAINS.includes(domain);
+}
+
+function getHaEntityIcon(entityId: string): React.ReactNode {
+  const domain = entityId.split('.')[0];
+  const iconClass = "w-3 h-3";
+  switch (domain) {
+    case 'light': return <Lightbulb className={`${iconClass} text-yellow-400`} />;
+    case 'switch':
+    case 'input_boolean': return <Power className={`${iconClass} text-blue-400`} />;
+    case 'sensor': return <Gauge className={`${iconClass} text-green-400`} />;
+    case 'binary_sensor': return <Activity className={`${iconClass} text-cyan-400`} />;
+    case 'climate': return <Thermometer className={`${iconClass} text-orange-400`} />;
+    default: return <Activity className={`${iconClass} text-slate-400`} />;
+  }
+}
 
 interface DriverPanelProps {
   side: 'left' | 'right';
@@ -10,6 +31,9 @@ interface DriverPanelProps {
   connectingFrom: { nodeId: string; portId: string } | null;
   onDatapointClick: (device: ModbusDevice, datapoint: ModbusDevice['datapoints'][0], isOutput: boolean) => void;
   onDatapointDragStart: (device: ModbusDevice, datapoint: ModbusDevice['datapoints'][0], isOutput: boolean) => void;
+  haDevices?: HaDevice[];
+  haDriverEnabled?: boolean;
+  onHaEntityClick?: (device: HaDevice, entity: HaEntity, isOutput: boolean) => void;
 }
 
 export const DriverPanel: React.FC<DriverPanelProps> = ({
@@ -19,10 +43,14 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   driverBindings,
   connectingFrom,
   onDatapointClick,
-  onDatapointDragStart
+  onDatapointDragStart,
+  haDevices = [],
+  haDriverEnabled = false,
+  onHaEntityClick
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
+  const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
 
   const isOutputPanel = side === 'right';
   const panelTitle = isOutputPanel ? 'Ausgaenge' : 'Eingaenge';
@@ -47,11 +75,28 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     }
   };
 
-  const hasDatapoints = modbusDevices.some(d => getDatapointsForPanel(d).length > 0);
+  const hasModbusDatapoints = modbusDevices.some(d => getDatapointsForPanel(d).length > 0);
+
+  const getHaEntitiesForPanel = (device: HaDevice) => {
+    if (isOutputPanel) {
+      return device.entities.filter(e => isWritableHaEntity(e));
+    } else {
+      return device.entities.filter(e => !isWritableHaEntity(e));
+    }
+  };
+
+  const hasHaEntities = haDriverEnabled && haDevices.some(d => getHaEntitiesForPanel(d).length > 0);
+  const hasDatapoints = hasModbusDatapoints || hasHaEntities;
 
   const getBindingForDatapoint = (deviceId: string, datapointId: string) => {
     return driverBindings.find(
       b => b.deviceId === deviceId && b.datapointId === datapointId
+    );
+  };
+
+  const getBindingForHaEntity = (entityId: string) => {
+    return driverBindings.find(
+      b => b.driverType === 'homeassistant' && b.haEntityId === entityId
     );
   };
 
@@ -180,11 +225,99 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               );
             })}
 
-            {modbusDevices.filter(d => d.enabled).length === 0 && (
+            {modbusDevices.filter(d => d.enabled).length === 0 && !hasHaEntities && (
               <div className="px-3 py-4 text-center text-xs text-slate-500">
                 Keine Treiber aktiv
               </div>
             )}
+
+            {haDriverEnabled && haDevices.map(device => {
+              const entities = getHaEntitiesForPanel(device);
+              if (entities.length === 0) return null;
+
+              const isExpanded = expandedHaDevices.has(device.id);
+
+              return (
+                <div key={`ha-${device.id}`} className="border-b border-slate-700/50">
+                  <button
+                    onClick={() => {
+                      setExpandedHaDevices(prev => {
+                        const next = new Set(prev);
+                        if (next.has(device.id)) {
+                          next.delete(device.id);
+                        } else {
+                          next.add(device.id);
+                        }
+                        return next;
+                      });
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors"
+                  >
+                    <Home className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                    <span className="flex-1 text-xs font-medium text-slate-200 truncate text-left">
+                      {device.name}
+                    </span>
+                    <Circle className="w-2 h-2 flex-shrink-0 text-emerald-400 fill-emerald-400" />
+                    {isExpanded ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="bg-slate-900/50">
+                      {entities.map(entity => {
+                        const binding = getBindingForHaEntity(entity.entity_id);
+                        const isConnecting = !!connectingFrom;
+                        const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+                        const unit = entity.attributes.unit_of_measurement as string || '';
+
+                        return (
+                          <div
+                            key={entity.entity_id}
+                            className={`group flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors ${
+                              isConnecting
+                                ? 'hover:bg-blue-600/30 bg-blue-900/20'
+                                : 'hover:bg-slate-700/30'
+                            } ${binding ? 'bg-cyan-900/20' : ''}`}
+                            onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/json', JSON.stringify({
+                                type: 'driver-datapoint',
+                                driverType: 'homeassistant',
+                                device,
+                                entity,
+                                isOutput: isOutputPanel
+                              }));
+                            }}
+                          >
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              binding
+                                ? 'bg-cyan-400'
+                                : isConnecting
+                                  ? 'bg-blue-400 animate-pulse'
+                                  : 'bg-slate-500'
+                            }`} />
+                            {getHaEntityIcon(entity.entity_id)}
+                            <span className={`flex-1 text-[11px] truncate ${binding ? 'text-cyan-300' : 'text-slate-300'}`}>
+                              {friendlyName}
+                            </span>
+                            {binding && (
+                              <span className="text-[9px] text-cyan-500 bg-cyan-900/40 px-1 py-0.5 rounded">verbunden</span>
+                            )}
+                            {unit && !binding && (
+                              <span className="text-[10px] text-slate-500">{unit}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {connectingFrom && (

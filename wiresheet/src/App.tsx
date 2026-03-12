@@ -11,7 +11,7 @@ import { DriverPanel } from './components/DriverPanel';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity } from './types/flow';
 import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
@@ -109,6 +109,8 @@ function App() {
   const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
   const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
   const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
+  const [haDriverEnabled, setHaDriverEnabled] = useState(true);
+  const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const isDraggingFromPalette = useRef(false);
   const isDraggingModbusDatapoint = useRef(false);
   const modbusDatapointDragRef = useRef<{ device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean } | null>(null);
@@ -191,6 +193,30 @@ function App() {
   useEffect(() => {
     console.log('[APP] selectedNodes changed:', selectedNodes.size, Array.from(selectedNodes));
   }, [selectedNodes]);
+
+  useEffect(() => {
+    if (haEntities.length === 0) {
+      setHaDevices([]);
+      return;
+    }
+    const deviceMap = new Map<string, HaDevice>();
+    for (const entity of haEntities) {
+      const deviceId = (entity.attributes.device_id as string) || '__unassigned__';
+      if (!deviceMap.has(deviceId)) {
+        deviceMap.set(deviceId, {
+          id: deviceId,
+          name: (entity.attributes.device_name as string) || (deviceId === '__unassigned__' ? 'Nicht zugeordnet' : deviceId),
+          manufacturer: entity.attributes.manufacturer as string,
+          model: entity.attributes.model as string,
+          entities: []
+        });
+      }
+      deviceMap.get(deviceId)!.entities.push(entity);
+    }
+    const devices = Array.from(deviceMap.values()).filter(d => d.id !== '__unassigned__');
+    devices.sort((a, b) => a.name.localeCompare(b.name));
+    setHaDevices(devices);
+  }, [haEntities]);
 
   useEffect(() => {
     if (selectedNodes.size === 1) {
@@ -501,6 +527,36 @@ function App() {
         datapointId: datapoint.id,
         datapointName: datapoint.name,
         direction: isOutput ? 'output' : 'input'
+      };
+      setDriverBindings(prev => {
+        const filtered = prev.filter(b =>
+          !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
+        );
+        return [...filtered, newBinding];
+      });
+      cancelConnection();
+    }
+  }, [connectingFrom, cancelConnection]);
+
+  const handleHaEntityClick = useCallback((
+    device: HaDevice,
+    entity: HaEntity,
+    isOutput: boolean
+  ) => {
+    if (connectingFrom) {
+      const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+      const newBinding: DriverBinding = {
+        id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        nodeId: connectingFrom.nodeId,
+        portId: connectingFrom.portId,
+        driverType: 'homeassistant',
+        deviceId: device.id,
+        deviceName: device.name,
+        datapointId: entity.entity_id,
+        datapointName: friendlyName,
+        direction: isOutput ? 'output' : 'input',
+        haEntityId: entity.entity_id,
+        haDomain: entity.entity_id.split('.')[0]
       };
       setDriverBindings(prev => {
         const filtered = prev.filter(b =>
@@ -889,6 +945,9 @@ function App() {
               connectingFrom={connectingFrom}
               onDatapointClick={handleDriverDatapointClick}
               onDatapointDragStart={handleDriverPanelDragStart}
+              haDevices={haDevices}
+              haDriverEnabled={haDriverEnabled}
+              onHaEntityClick={handleHaEntityClick}
             />
 
             <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
@@ -994,6 +1053,9 @@ function App() {
               connectingFrom={connectingFrom}
               onDatapointClick={handleDriverDatapointClick}
               onDatapointDragStart={handleDriverPanelDragStart}
+              haDevices={haDevices}
+              haDriverEnabled={haDriverEnabled}
+              onHaEntityClick={handleHaEntityClick}
             />
 
             {selectedNodeData && (
@@ -1073,6 +1135,13 @@ function App() {
           onModbusDriverEnabledChange={setModbusDriverEnabled}
           modbusDeviceStatus={modbusDeviceStatus}
           onPingDevice={handlePingModbusDevice}
+          haEntities={haEntities}
+          haDevices={haDevices}
+          haLoading={haLoading}
+          haError={haError}
+          haDriverEnabled={haDriverEnabled}
+          onHaDriverEnabledChange={setHaDriverEnabled}
+          onRefreshHaEntities={loadHaEntities}
         />
       ) : (
         <VisualizationView

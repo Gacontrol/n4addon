@@ -195,10 +195,29 @@ export interface DriverBinding {
   id: string;
   nodeId: string;
   portId: string;
-  driverType: 'modbus';
+  driverType: 'modbus' | 'homeassistant';
   deviceId: string;
   deviceName: string;
   datapointId: string;
   datapointName: string;
   direction: 'input' | 'output';
+  haEntityId?: string;
+  haDomain?: string;
+}
+
+export interface HaEntity {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, unknown>;
+  last_changed: string;
+  last_updated: string;
+}
+
+export interface HaDevice {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  model?: string;
+  area_id?: string;
+  entities: HaEntity[];
 }

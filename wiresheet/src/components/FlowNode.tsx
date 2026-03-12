@@ -884,15 +884,19 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           <Icons.X className="w-3 h-3 text-red-400" />
                         </button>
                         <span
-                          className="text-[8px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer hover:bg-amber-900/80 transition-colors"
-                          title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          className={`text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-colors ${
+                            driverBinding.driverType === 'homeassistant'
+                              ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
+                              : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
+                          }`}
+                          title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
                         >
-                          Modbus / {driverBinding.deviceName} / {driverBinding.datapointName}
+                          {driverBinding.driverType === 'homeassistant' ? 'HA' : 'Modbus'} / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
                         <svg width="20" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
                       </div>
                     )}
@@ -995,15 +999,19 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     {driverBinding && (
                       <div className="flex items-center ml-1 group/binding" style={{ marginRight: '-220px' }}>
                         <svg width="20" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
                         <span
-                          className="text-[8px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer hover:bg-amber-900/80 transition-colors"
-                          title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          className={`text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-colors ${
+                            driverBinding.driverType === 'homeassistant'
+                              ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
+                              : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
+                          }`}
+                          title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
                         >
-                          Modbus / {driverBinding.deviceName} / {driverBinding.datapointName}
+                          {driverBinding.driverType === 'homeassistant' ? 'HA' : 'Modbus'} / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
                         <button
                           className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/binding:opacity-100 transition-opacity ml-0.5"

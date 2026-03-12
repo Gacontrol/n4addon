@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus } from 'lucide-react';
-import { ModbusDevice, ModbusDatapoint } from '../types/flow';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus, Home, Lightbulb, Thermometer, Power, Gauge, Activity, AlertCircle, Loader2 } from 'lucide-react';
+import { ModbusDevice, ModbusDatapoint, HaEntity, HaDevice } from '../types/flow';
 import { modbusDeviceLibrary, ModbusDeviceTemplate } from '../data/modbusDeviceLibrary';
 
-type DriverType = 'modbus-tcp';
+type DriverType = 'modbus-tcp' | 'homeassistant';
 
 interface CustomLibraryDevice {
   id: string;
@@ -20,10 +20,63 @@ interface DriversViewProps {
   modbusDeviceStatus: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>;
   onPingDevice: (deviceId: string) => void;
   modbusValues?: Record<string, Record<string, number | boolean | null>>;
+  haEntities: HaEntity[];
+  haDevices: HaDevice[];
+  haLoading: boolean;
+  haError: string | null;
+  haDriverEnabled: boolean;
+  onHaDriverEnabledChange: (enabled: boolean) => void;
+  onRefreshHaEntities: () => void;
 }
 
 const REGISTER_TYPES = ['holding', 'input', 'coil', 'discrete'] as const;
 const DATA_TYPES = ['int16', 'uint16', 'int32', 'uint32', 'float32', 'bool'] as const;
+
+const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
+
+function isWritableHaEntity(entity: HaEntity): boolean {
+  const domain = entity.entity_id.split('.')[0];
+  return WRITABLE_HA_DOMAINS.includes(domain);
+}
+
+function getHaEntityIcon(entityId: string): React.ReactNode {
+  const domain = entityId.split('.')[0];
+  const iconClass = "w-3.5 h-3.5";
+  switch (domain) {
+    case 'light':
+      return <Lightbulb className={`${iconClass} text-yellow-400`} />;
+    case 'switch':
+    case 'input_boolean':
+      return <Power className={`${iconClass} text-blue-400`} />;
+    case 'sensor':
+      return <Gauge className={`${iconClass} text-green-400`} />;
+    case 'binary_sensor':
+      return <Activity className={`${iconClass} text-cyan-400`} />;
+    case 'climate':
+      return <Thermometer className={`${iconClass} text-orange-400`} />;
+    default:
+      return <Activity className={`${iconClass} text-slate-400`} />;
+  }
+}
+
+const HaEntityRow: React.FC<{ entity: HaEntity }> = ({ entity }) => {
+  const friendlyName = entity.attributes.friendly_name as string || entity.entity_id;
+  const domain = entity.entity_id.split('.')[0];
+  const unit = entity.attributes.unit_of_measurement as string || '';
+
+  return (
+    <div className="flex items-center gap-2 text-xs bg-slate-900 rounded px-2 py-1.5 hover:bg-slate-800 cursor-pointer group">
+      {getHaEntityIcon(entity.entity_id)}
+      <span className="text-white flex-1 min-w-0 truncate" title={friendlyName}>
+        {friendlyName}
+      </span>
+      <span className="text-slate-600 text-[10px] shrink-0">{domain}</span>
+      <span className={`font-mono shrink-0 min-w-[60px] text-right ${entity.state !== 'unavailable' ? 'text-cyan-400' : 'text-slate-600'}`}>
+        {entity.state}{unit && ` ${unit}`}
+      </span>
+    </div>
+  );
+};
 
 export const DriversView: React.FC<DriversViewProps> = ({
   modbusDevices,
@@ -32,9 +85,18 @@ export const DriversView: React.FC<DriversViewProps> = ({
   onModbusDriverEnabledChange,
   modbusDeviceStatus,
   onPingDevice,
-  modbusValues = {}
+  modbusValues = {},
+  haEntities,
+  haDevices,
+  haLoading,
+  haError,
+  haDriverEnabled,
+  onHaDriverEnabledChange,
+  onRefreshHaEntities
 }) => {
   const [selectedDriverType, setSelectedDriverType] = useState<DriverType | null>('modbus-tcp');
+  const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
+  const [haSearchQuery, setHaSearchQuery] = useState('');
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -394,7 +456,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
           <h2 className="text-sm font-semibold text-white mb-2">Treiber</h2>
           <p className="text-xs text-slate-500">Externe Schnittstellen konfigurieren</p>
         </div>
-        <div className="flex-1 p-3">
+        <div className="flex-1 p-3 space-y-2">
           <button
             onClick={() => setSelectedDriverType('modbus-tcp')}
             className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
@@ -408,6 +470,22 @@ export const DriversView: React.FC<DriversViewProps> = ({
               <div className="font-medium text-sm">Modbus TCP</div>
               <div className={`text-xs ${selectedDriverType === 'modbus-tcp' ? 'text-blue-200' : 'text-slate-500'}`}>
                 {modbusDevices.length} Geraete
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={() => setSelectedDriverType('homeassistant')}
+            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+              selectedDriverType === 'homeassistant'
+                ? 'bg-cyan-600 text-white'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Home className="w-5 h-5" />
+            <div className="text-left">
+              <div className="font-medium text-sm">Home Assistant</div>
+              <div className={`text-xs ${selectedDriverType === 'homeassistant' ? 'text-cyan-200' : 'text-slate-500'}`}>
+                {haDevices.length} Geraete, {haEntities.length} Entities
               </div>
             </div>
           </button>
@@ -626,6 +704,209 @@ export const DriversView: React.FC<DriversViewProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {selectedDriverType === 'homeassistant' && (
+          <>
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
+              <div className="flex items-center gap-3">
+                <Home className="w-5 h-5 text-cyan-400" />
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Home Assistant</h2>
+                  <p className="text-xs text-slate-500">Integration mit Home Assistant Entities</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onRefreshHaEntities}
+                  disabled={haLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {haLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Aktualisieren
+                </button>
+                <button
+                  onClick={() => onHaDriverEnabledChange(!haDriverEnabled)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    haDriverEnabled
+                      ? 'bg-green-600 text-white'
+                      : 'bg-slate-700 text-slate-400'
+                  }`}
+                >
+                  {haDriverEnabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                  {haDriverEnabled ? 'Aktiv' : 'Deaktiviert'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {haError && (
+                <div className="mb-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <span className="text-sm text-red-300">{haError}</span>
+                </div>
+              )}
+
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={haSearchQuery}
+                  onChange={(e) => setHaSearchQuery(e.target.value)}
+                  placeholder="Geraete oder Entities suchen..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              {haLoading && haDevices.length === 0 ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 text-cyan-400 mx-auto mb-3 animate-spin" />
+                  <p className="text-slate-500 text-sm">Lade Home Assistant Entities...</p>
+                </div>
+              ) : haDevices.length === 0 && haEntities.length === 0 ? (
+                <div className="text-center py-12">
+                  <Home className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm">Keine Home Assistant Entities gefunden</p>
+                  <p className="text-slate-600 text-xs mt-1">Stellen Sie sicher, dass die Verbindung zu Home Assistant aktiv ist</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {haDevices
+                    .filter(device => {
+                      if (!haSearchQuery) return true;
+                      const query = haSearchQuery.toLowerCase();
+                      if (device.name.toLowerCase().includes(query)) return true;
+                      return device.entities.some(e =>
+                        e.entity_id.toLowerCase().includes(query) ||
+                        (e.attributes.friendly_name as string || '').toLowerCase().includes(query)
+                      );
+                    })
+                    .map(device => {
+                      const isExpanded = expandedHaDevices.has(device.id);
+                      const inputEntities = device.entities.filter(e => !isWritableHaEntity(e));
+                      const outputEntities = device.entities.filter(e => isWritableHaEntity(e));
+
+                      return (
+                        <div key={device.id} className="bg-slate-800 rounded-lg border border-slate-700">
+                          <div
+                            className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-750"
+                            onClick={() => {
+                              setExpandedHaDevices(prev => {
+                                const next = new Set(prev);
+                                if (next.has(device.id)) {
+                                  next.delete(device.id);
+                                } else {
+                                  next.add(device.id);
+                                }
+                                return next;
+                              });
+                            }}
+                          >
+                            <button className="text-slate-400">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+                            <Home className="w-5 h-5 text-cyan-400" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-white text-sm truncate">{device.name}</div>
+                              <div className="text-xs text-slate-500">
+                                {device.manufacturer && `${device.manufacturer} `}
+                                {device.model && `${device.model} - `}
+                                {device.entities.length} Entities
+                              </div>
+                            </div>
+                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                          </div>
+
+                          {isExpanded && (
+                            <div className="border-t border-slate-700 p-3 space-y-4">
+                              {inputEntities.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-green-400 mb-2 flex items-center gap-1">
+                                    <ChevronRight className="w-3 h-3" />
+                                    Eingaenge ({inputEntities.length})
+                                  </h4>
+                                  <div className="space-y-1 pl-4">
+                                    {inputEntities.map(entity => (
+                                      <HaEntityRow key={entity.entity_id} entity={entity} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {outputEntities.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-blue-400 mb-2 flex items-center gap-1">
+                                    <ChevronRight className="w-3 h-3" />
+                                    Ausgaenge ({outputEntities.length})
+                                  </h4>
+                                  <div className="space-y-1 pl-4">
+                                    {outputEntities.map(entity => (
+                                      <HaEntityRow key={entity.entity_id} entity={entity} />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                  {haEntities.filter(e => !haDevices.some(d => d.entities.includes(e))).length > 0 && (
+                    <div className="bg-slate-800 rounded-lg border border-slate-700">
+                      <div
+                        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-750"
+                        onClick={() => {
+                          setExpandedHaDevices(prev => {
+                            const next = new Set(prev);
+                            if (next.has('__unassigned__')) {
+                              next.delete('__unassigned__');
+                            } else {
+                              next.add('__unassigned__');
+                            }
+                            return next;
+                          });
+                        }}
+                      >
+                        <button className="text-slate-400">
+                          {expandedHaDevices.has('__unassigned__') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
+                        <Activity className="w-5 h-5 text-slate-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white text-sm">Nicht zugeordnete Entities</div>
+                          <div className="text-xs text-slate-500">
+                            {haEntities.filter(e => !haDevices.some(d => d.entities.includes(e))).length} Entities
+                          </div>
+                        </div>
+                      </div>
+
+                      {expandedHaDevices.has('__unassigned__') && (
+                        <div className="border-t border-slate-700 p-3">
+                          <div className="space-y-1">
+                            {haEntities
+                              .filter(e => !haDevices.some(d => d.entities.includes(e)))
+                              .filter(e => {
+                                if (!haSearchQuery) return true;
+                                const query = haSearchQuery.toLowerCase();
+                                return e.entity_id.toLowerCase().includes(query) ||
+                                  (e.attributes.friendly_name as string || '').toLowerCase().includes(query);
+                              })
+                              .slice(0, 100)
+                              .map(entity => (
+                                <HaEntityRow key={entity.entity_id} entity={entity} />
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
