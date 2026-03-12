@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
-import { PumpWidgetConfig } from '../../types/visualization';
+import { PumpWidgetConfig, AggregateSymbolType } from '../../types/visualization';
 
 interface PumpValues {
   pumpCmd: boolean;
@@ -37,33 +37,88 @@ interface VisuPumpProps {
   params?: PumpParams;
 }
 
-const PumpSymbol: React.FC<{ color: string; running: boolean; rotation: number; size: number }> = ({ color, running, size }) => {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ overflow: 'visible', background: 'transparent' }}
-    >
-      <circle
-        cx="50"
-        cy="50"
-        r="46"
-        stroke={color}
-        strokeWidth="3"
-        fill="transparent"
-      />
-      <polygon
-        points="15,20 93,50 15,80"
-        fill={running ? color : 'transparent'}
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+const PumpSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
+    <polygon points="15,20 93,50 15,80" fill={running ? color : 'transparent'} stroke={color} strokeWidth="2.5" strokeLinejoin="round" />
+  </svg>
+);
+
+const FanSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
+    <line x1="16" y1="28" x2="84" y2="72" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <line x1="16" y1="72" x2="84" y2="28" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    {running && (
+      <>
+        <line x1="16" y1="28" x2="84" y2="72" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
+        <line x1="16" y1="72" x2="84" y2="28" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
+      </>
+    )}
+  </svg>
+);
+
+const MotorSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
+    <text x="50" y="58" textAnchor="middle" fontSize="32" fontWeight="bold" fill={running ? color : color} opacity={running ? 1 : 0.6}>M</text>
+    {running && <circle cx="50" cy="50" r="38" stroke={color} strokeWidth="2" fill="transparent" opacity="0.4" />}
+  </svg>
+);
+
+const ValveSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <polygon points="10,20 50,50 10,80" fill={running ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" />
+    <polygon points="90,20 50,50 90,80" fill={running ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" />
+    <line x1="50" y1="50" x2="50" y2="15" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <rect x="40" y="5" width="20" height="12" rx="2" fill={running ? color : 'transparent'} stroke={color} strokeWidth="2" />
+  </svg>
+);
+
+const CompressorSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
+    <path d="M 25 50 Q 37.5 30 50 50 Q 62.5 70 75 50" stroke={color} strokeWidth="3" fill="none" strokeLinecap="round" />
+    {running && <path d="M 25 50 Q 37.5 30 50 50 Q 62.5 70 75 50" stroke={color} strokeWidth="6" fill="none" strokeLinecap="round" opacity="0.3" />}
+  </svg>
+);
+
+const HeaterSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <rect x="15" y="25" width="70" height="50" rx="4" stroke={color} strokeWidth="3" fill="transparent" />
+    <path d="M 30 45 Q 35 35 40 45 Q 45 55 50 45 Q 55 35 60 45 Q 65 55 70 45" stroke={running ? '#ef4444' : color} strokeWidth="3" fill="none" strokeLinecap="round" />
+    <path d="M 30 60 Q 35 50 40 60 Q 45 70 50 60 Q 55 50 60 60 Q 65 70 70 60" stroke={running ? '#ef4444' : color} strokeWidth="3" fill="none" strokeLinecap="round" />
+    {running && (
+      <>
+        <path d="M 30 45 Q 35 35 40 45 Q 45 55 50 45 Q 55 35 60 45 Q 65 55 70 45" stroke="#ef4444" strokeWidth="6" fill="none" strokeLinecap="round" opacity="0.3" />
+        <path d="M 30 60 Q 35 50 40 60 Q 45 70 50 60 Q 55 50 60 60 Q 65 70 70 60" stroke="#ef4444" strokeWidth="6" fill="none" strokeLinecap="round" opacity="0.3" />
+      </>
+    )}
+  </svg>
+);
+
+const CoolerSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
+    <rect x="15" y="25" width="70" height="50" rx="4" stroke={color} strokeWidth="3" fill="transparent" />
+    <line x1="50" y1="32" x2="50" y2="68" stroke={running ? '#3b82f6' : color} strokeWidth="3" strokeLinecap="round" />
+    <line x1="32" y1="50" x2="68" y2="50" stroke={running ? '#3b82f6' : color} strokeWidth="3" strokeLinecap="round" />
+    <line x1="38" y1="38" x2="62" y2="62" stroke={running ? '#3b82f6' : color} strokeWidth="2" strokeLinecap="round" />
+    <line x1="62" y1="38" x2="38" y2="62" stroke={running ? '#3b82f6' : color} strokeWidth="2" strokeLinecap="round" />
+    {running && <circle cx="50" cy="50" r="20" stroke="#3b82f6" strokeWidth="2" fill="transparent" opacity="0.4" />}
+  </svg>
+);
+
+const AggregateSymbol: React.FC<{ symbolType: AggregateSymbolType; color: string; running: boolean; size: number }> = ({ symbolType, color, running, size }) => {
+  switch (symbolType) {
+    case 'fan': return <FanSymbol color={color} running={running} size={size} />;
+    case 'motor': return <MotorSymbol color={color} running={running} size={size} />;
+    case 'valve': return <ValveSymbol color={color} running={running} size={size} />;
+    case 'compressor': return <CompressorSymbol color={color} running={running} size={size} />;
+    case 'heater': return <HeaterSymbol color={color} running={running} size={size} />;
+    case 'cooler': return <CoolerSymbol color={color} running={running} size={size} />;
+    case 'pump':
+    default: return <PumpSymbol color={color} running={running} size={size} />;
+  }
 };
 
 export const VisuPump: React.FC<VisuPumpProps> = ({
@@ -148,8 +203,9 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
     return `${(ms / 86400000).toFixed(1)} d`;
   };
 
-  const pumpName = config.pumpName || params?.pumpName || 'Pumpe';
+  const pumpName = config.pumpName || params?.pumpName || 'Aggregat';
   const orientation = config.orientation || 'right';
+  const symbolType = config.symbolType || 'pump';
 
   const getRotation = () => {
     switch (orientation) {
@@ -191,10 +247,10 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
             transform: `rotate(${getRotation()}deg)`
           }}
         >
-          <PumpSymbol
+          <AggregateSymbol
+            symbolType={symbolType}
             color={statusColor}
             running={running}
-            rotation={0}
             size={60}
           />
           {(fault || alarm) && (
@@ -241,7 +297,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                   className="w-10 h-10 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: statusColor + '30', border: `2px solid ${statusColor}` }}
                 >
-                  <PumpSymbol color={statusColor} running={running} rotation={0} size={28} />
+                  <AggregateSymbol symbolType={symbolType} color={statusColor} running={running} size={28} />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">{pumpName}</h2>

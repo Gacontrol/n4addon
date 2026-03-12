@@ -1117,40 +1117,41 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = output;
       nodeValues[`${nodeId}:output-0`] = output;
       nodeValues[`${nodeId}:output-1`] = error;
-    } else if (node.type === 'pump-control') {
+    } else if (node.type === 'pump-control' || node.type === 'aggregate-control') {
       const startCmd = toBool(inputVals[0]);
-      const pumpFeedback = toBool(inputVals[1]);
+      const aggregateFeedback = toBool(inputVals[1]);
       const faultInput = toBool(inputVals[2]);
       const revisionSwitch = toBool(inputVals[3]);
-      const hoaModeInput = inputVals[4];
-      const handStartInput = inputVals[5];
-      const speedSetpoint = toNumber(inputVals[6]);
-      const resetInputWire = toBool(inputVals[7]);
+      const handStartInput = inputVals[4];
+      const speedSetpoint = toNumber(inputVals[5]);
+      const resetInputWire = toBool(inputVals[6]);
 
-      const visuHOA = cfg.pumpVisuHOA;
-      const visuHandStart = cfg.pumpVisuHandStart;
-      const visuReset = cfg.pumpVisuReset;
+      const visuHOA = cfg.pumpVisuHOA ?? cfg.aggregateVisuHOA;
+      const visuHandStart = cfg.pumpVisuHandStart ?? cfg.aggregateVisuHandStart;
+      const visuReset = cfg.pumpVisuReset ?? cfg.aggregateVisuReset;
 
-      const hoaMode = visuHOA !== undefined ? toNumber(visuHOA) : (hoaModeInput !== null && hoaModeInput !== undefined ? toNumber(hoaModeInput) : 2);
+      const hoaMode = visuHOA !== undefined ? toNumber(visuHOA) : 2;
       const handStart = visuHandStart !== undefined ? toBool(visuHandStart) : toBool(handStartInput);
       const resetInput = visuReset === true ? true : resetInputWire;
 
-      const startDelayMs = cfg.pumpStartDelayMs || 0;
-      const stopDelayMs = cfg.pumpStopDelayMs || 0;
-      const feedbackTimeoutMs = cfg.pumpFeedbackTimeoutMs || 10000;
-      const enableFeedback = cfg.pumpEnableFeedback !== false;
-      const speedMin = cfg.pumpSpeedMin || 0;
-      const speedMax = cfg.pumpSpeedMax || 100;
-      const antiSeizeIntervalMs = cfg.pumpAntiSeizeIntervalMs || 604800000;
-      const antiSeizeRunMs = cfg.pumpAntiSeizeRunMs || 60000;
-      const antiSeizeSpeed = cfg.pumpAntiSeizeSpeed || 30;
+      const startDelayMs = cfg.pumpStartDelayMs ?? cfg.aggregateStartDelayMs ?? 0;
+      const stopDelayMs = cfg.pumpStopDelayMs ?? cfg.aggregateStopDelayMs ?? 0;
+      const feedbackTimeoutMs = cfg.pumpFeedbackTimeoutMs ?? cfg.aggregateFeedbackTimeoutMs ?? 10000;
+      const enableFeedback = (cfg.pumpEnableFeedback ?? cfg.aggregateEnableFeedback) !== false;
+      const speedMin = cfg.pumpSpeedMin ?? cfg.aggregateSpeedMin ?? 0;
+      const speedMax = cfg.pumpSpeedMax ?? cfg.aggregateSpeedMax ?? 100;
+      const antiSeizeIntervalMs = cfg.pumpAntiSeizeIntervalMs ?? cfg.aggregateAntiSeizeIntervalMs ?? 604800000;
+      const antiSeizeRunMs = cfg.pumpAntiSeizeRunMs ?? cfg.aggregateAntiSeizeRunMs ?? 60000;
+      const antiSeizeSpeed = cfg.pumpAntiSeizeSpeed ?? cfg.aggregateAntiSeizeSpeed ?? 30;
 
       const now = Date.now();
-      const st = pageId ? getNodeState(pageId, nodeId) : node.__pumpState || (node.__pumpState = {});
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__aggregateState || (node.__aggregateState = {});
 
-      if (st.operatingHoursMs === undefined) st.operatingHoursMs = (cfg.pumpOperatingHours || 0) * 3600000;
-      if (st.startCount === undefined) st.startCount = cfg.pumpStartCount || 0;
-      if (st.pumpCmd === undefined) st.pumpCmd = false;
+      const initOpHours = cfg.pumpOperatingHours ?? cfg.aggregateOperatingHours ?? 0;
+      const initStartCount = cfg.pumpStartCount ?? cfg.aggregateStartCount ?? 0;
+      if (st.operatingHoursMs === undefined) st.operatingHoursMs = initOpHours * 3600000;
+      if (st.startCount === undefined) st.startCount = initStartCount;
+      if (st.aggregateCmd === undefined) st.aggregateCmd = false;
       if (st.fault === undefined) st.fault = false;
       if (st.faultLatch === undefined) st.faultLatch = false;
       if (st.feedbackFault === undefined) st.feedbackFault = false;
@@ -1160,7 +1161,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (st.startDelayTs === undefined) st.startDelayTs = null;
       if (st.stopDelayTs === undefined) st.stopDelayTs = null;
       if (st.startTs === undefined) st.startTs = null;
-      if (st.prevPumpCmd === undefined) st.prevPumpCmd = false;
+      if (st.prevAggregateCmd === undefined) st.prevAggregateCmd = false;
       if (st.lastTickTs === undefined) st.lastTickTs = now;
 
       if (resetInput && (st.faultLatch || st.feedbackFault)) {
@@ -1203,44 +1204,44 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
       let targetCmd = wantStart;
 
-      if (targetCmd && !st.pumpCmd) {
+      if (targetCmd && !st.aggregateCmd) {
         if (startDelayMs > 0) {
           if (st.startDelayTs === null) st.startDelayTs = now;
           if (now - st.startDelayTs >= startDelayMs) {
-            st.pumpCmd = true;
+            st.aggregateCmd = true;
             st.startDelayTs = null;
           }
         } else {
-          st.pumpCmd = true;
+          st.aggregateCmd = true;
         }
-      } else if (!targetCmd && st.pumpCmd) {
+      } else if (!targetCmd && st.aggregateCmd) {
         if (stopDelayMs > 0) {
           if (st.stopDelayTs === null) st.stopDelayTs = now;
           if (now - st.stopDelayTs >= stopDelayMs) {
-            st.pumpCmd = false;
+            st.aggregateCmd = false;
             st.stopDelayTs = null;
           }
         } else {
-          st.pumpCmd = false;
+          st.aggregateCmd = false;
         }
       } else {
         st.startDelayTs = null;
         st.stopDelayTs = null;
       }
 
-      if (st.pumpCmd && !st.prevPumpCmd) {
+      if (st.aggregateCmd && !st.prevAggregateCmd) {
         st.startCount++;
         st.startTs = now;
       }
-      st.prevPumpCmd = st.pumpCmd;
+      st.prevAggregateCmd = st.aggregateCmd;
 
-      if (enableFeedback && st.pumpCmd && st.startTs !== null) {
-        if (!pumpFeedback && (now - st.startTs > feedbackTimeoutMs)) {
+      if (enableFeedback && st.aggregateCmd && st.startTs !== null) {
+        if (!aggregateFeedback && (now - st.startTs > feedbackTimeoutMs)) {
           st.feedbackFault = true;
         }
       }
 
-      const running = pumpFeedback;
+      const running = aggregateFeedback;
       if (running) {
         const deltaMs = now - st.lastTickTs;
         st.operatingHoursMs += deltaMs;
@@ -1249,7 +1250,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       st.lastTickTs = now;
 
       let speedOutput = 0;
-      if (st.pumpCmd) {
+      if (st.aggregateCmd) {
         let sp = st.antiSeizeActive ? antiSeizeSpeed : speedSetpoint;
         sp = Math.max(speedMin, Math.min(speedMax, sp || 0));
         speedOutput = sp;
@@ -1258,8 +1259,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const alarm = hasFault;
       const operatingHours = st.operatingHoursMs / 3600000;
 
-      nodeValues[nodeId] = st.pumpCmd;
-      nodeValues[`${nodeId}:output-0`] = st.pumpCmd;
+      nodeValues[nodeId] = st.aggregateCmd;
+      nodeValues[`${nodeId}:output-0`] = st.aggregateCmd;
       nodeValues[`${nodeId}:output-1`] = speedOutput;
       nodeValues[`${nodeId}:output-2`] = running;
       nodeValues[`${nodeId}:output-3`] = hasFault;
@@ -1694,34 +1695,35 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     return res.status(400).json({ error: 'nodeId fehlt' });
   }
 
-  if (value && typeof value === 'object' && value.pumpControl) {
-    const pumpCtrl = value.pumpControl;
+  if (value && typeof value === 'object' && (value.pumpControl || value.aggregateControl)) {
+    const aggCtrl = value.pumpControl || value.aggregateControl;
     try {
       const data = await fs.readFile(pagesFile, 'utf-8');
       const pages = JSON.parse(data);
       let updated = false;
       for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && n.type === 'pump-control');
+        const node = page.nodes.find(n => n.id === nodeId && (n.type === 'pump-control' || n.type === 'aggregate-control'));
         if (node) {
           if (!node.data.config) node.data.config = {};
-          if (pumpCtrl.hoaMode !== undefined) {
-            node.data.config.pumpVisuHOA = pumpCtrl.hoaMode;
+          const prefix = node.type === 'aggregate-control' ? 'aggregate' : 'pump';
+          if (aggCtrl.hoaMode !== undefined) {
+            node.data.config[`${prefix}VisuHOA`] = aggCtrl.hoaMode;
           }
-          if (pumpCtrl.handStart !== undefined) {
-            node.data.config.pumpVisuHandStart = pumpCtrl.handStart;
+          if (aggCtrl.handStart !== undefined) {
+            node.data.config[`${prefix}VisuHandStart`] = aggCtrl.handStart;
           }
-          if (pumpCtrl.reset !== undefined && pumpCtrl.reset === true) {
-            node.data.config.pumpVisuReset = true;
-          } else if (pumpCtrl.reset === false) {
-            node.data.config.pumpVisuReset = false;
+          if (aggCtrl.reset !== undefined && aggCtrl.reset === true) {
+            node.data.config[`${prefix}VisuReset`] = true;
+          } else if (aggCtrl.reset === false) {
+            node.data.config[`${prefix}VisuReset`] = false;
           }
-          for (const key of Object.keys(pumpCtrl)) {
+          for (const key of Object.keys(aggCtrl)) {
             if (key.startsWith('param_')) {
               const paramName = key.slice(6);
-              node.data.config[paramName] = pumpCtrl[key];
+              node.data.config[paramName] = aggCtrl[key];
             }
           }
-          console.log(`Pump Control geschrieben: ${nodeId}`, JSON.stringify(pumpCtrl));
+          console.log(`Aggregate Control geschrieben: ${nodeId}`, JSON.stringify(aggCtrl));
           updated = true;
           break;
         }
@@ -1737,10 +1739,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
         broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
         res.json({ success: true });
       } else {
-        res.status(404).json({ error: 'Pump-Control Node nicht gefunden' });
+        res.status(404).json({ error: 'Aggregate-Control Node nicht gefunden' });
       }
     } catch (err) {
-      console.error('Fehler beim Schreiben des Pump-Control Parameters:', err);
+      console.error('Fehler beim Schreiben des Aggregate-Control Parameters:', err);
       res.status(500).json({ error: err.message });
     }
     return;

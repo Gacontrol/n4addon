@@ -66,6 +66,17 @@ const NON_BINDABLE_TYPES = new Set([
 
 const PUMP_WIDGET_TYPE = 'visu-pump';
 const PUMP_CONTROL_NODE_TYPE = 'pump-control';
+const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
+
+const SYMBOL_OPTIONS = [
+  { value: 'pump', label: 'Pumpe' },
+  { value: 'fan', label: 'Ventilator' },
+  { value: 'motor', label: 'Motor' },
+  { value: 'valve', label: 'Ventil' },
+  { value: 'compressor', label: 'Kompressor' },
+  { value: 'heater', label: 'Heizung' },
+  { value: 'cooler', label: 'Kuehlung' }
+];
 
 const SHAPE_TYPES = new Set([
   'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
@@ -168,7 +179,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isPumpWidget = widget.type === PUMP_WIDGET_TYPE;
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
-  const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE);
+  const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
 
   const nodesByCategory = bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
     const cat = getNodeCategory(node.type);
@@ -193,7 +204,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       return;
     }
     const node = availableNodes.find(n => n.id === nodeId);
-    if (isPumpWidget && node?.type === PUMP_CONTROL_NODE_TYPE) {
+    if (isPumpWidget && (node?.type === PUMP_CONTROL_NODE_TYPE || node?.type === AGGREGATE_CONTROL_NODE_TYPE)) {
       const binding: WidgetBinding = {
         nodeId,
         portId: undefined,
@@ -1362,9 +1373,21 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-pump': {
-        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right' };
+        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right'; symbolType?: string };
         return (
           <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Symbol</label>
+              <select
+                value={pumpCfg.symbolType || 'pump'}
+                onChange={(e) => onUpdate({ config: { ...config, symbolType: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
               <input

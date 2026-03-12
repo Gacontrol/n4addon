@@ -606,6 +606,8 @@ export interface DashMultistateConfig {
   activeColor?: string;
 }
 
+export type AggregateSymbolType = 'pump' | 'fan' | 'motor' | 'valve' | 'compressor' | 'heater' | 'cooler';
+
 export interface PumpWidgetConfig {
   pumpName?: string;
   showSpeed?: boolean;
@@ -616,6 +618,7 @@ export interface PumpWidgetConfig {
   faultColor?: string;
   revisionColor?: string;
   orientation?: 'up' | 'down' | 'left' | 'right';
+  symbolType?: AggregateSymbolType;
 }
 
 export interface WidgetTemplate {

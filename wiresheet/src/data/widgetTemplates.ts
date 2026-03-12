@@ -848,7 +848,7 @@ export const widgetTemplates: WidgetTemplate[] = [
   },
   {
     type: 'visu-pump',
-    label: 'Pumpenbaustein',
+    label: 'Aggregat',
     icon: 'Fan',
     category: 'control',
     defaultSize: { width: 120, height: 120 },
@@ -861,10 +861,11 @@ export const widgetTemplates: WidgetTemplate[] = [
       stoppedColor: '#64748b',
       faultColor: '#ef4444',
       revisionColor: '#f59e0b',
-      orientation: 'right'
+      orientation: 'right',
+      symbolType: 'pump'
     },
     defaultStyle: { showLabel: false, labelPosition: 'bottom' },
-    description: 'Pumpen-Widget mit Popup fuer alle Parameter und Steuerung',
+    description: 'Aggregat-Widget (Pumpe, Ventilator, Motor, etc.) mit Popup',
     supportsBinding: true,
     bindingDirection: 'readwrite'
   }
