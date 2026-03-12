@@ -173,9 +173,11 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   }, [activePage, onUpdateVisuPage]);
 
   const handlePasteWidget = useCallback(() => {
-    if (multiClipboard && multiClipboard.length > 0) {
+    const freshMulti = readMultiClipboard();
+    const freshSingle = readClipboard();
+    if (freshMulti !== null && freshMulti.length > 0) {
       const now = Date.now();
-      const newWidgets = multiClipboard.map((src, i) => ({
+      const newWidgets = freshMulti.map((src, i) => ({
         ...src,
         id: `widget-${now + i}-${Math.random().toString(36).substr(2, 9)}`,
         position: { x: src.position.x + 20, y: src.position.y + 20 },
@@ -184,20 +186,23 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           : { ...src.config },
         zIndex: activePage.widgets.length + 1 + i
       }));
+      setMultiClipboard(freshMulti);
       onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, ...newWidgets] });
       setSelectedWidgetIds(newWidgets.map(w => w.id));
       setSelectedWidgetId(newWidgets[newWidgets.length - 1].id);
       return;
     }
-    if (!clipboard) return;
+    const pasteSource = freshSingle;
+    if (!pasteSource) return;
+    setClipboard(pasteSource);
     const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newWidget: VisuWidget = {
-      ...clipboard,
+      ...pasteSource,
       id: newId,
-      position: { x: clipboard.position.x + 20, y: clipboard.position.y + 20 },
-      config: clipboard.type === 'visu-polyline'
-        ? { ...(clipboard.config as PolylineConfig), points: (clipboard.config as PolylineConfig).points.map(p => ({ ...p })) }
-        : { ...clipboard.config },
+      position: { x: pasteSource.position.x + 20, y: pasteSource.position.y + 20 },
+      config: pasteSource.type === 'visu-polyline'
+        ? { ...(pasteSource.config as PolylineConfig), points: (pasteSource.config as PolylineConfig).points.map(p => ({ ...p })) }
+        : { ...pasteSource.config },
       zIndex: activePage.widgets.length + 1
     };
     onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });

@@ -82,6 +82,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const widgetHitRef = useRef(false);
+
   const [dragState, setDragState] = useState<{
     widgetId: string;
     startX: number;
@@ -240,6 +242,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (contextMenu) {
       setContextMenu(null);
+      widgetHitRef.current = false;
       return;
     }
     if (drawingState) {
@@ -285,13 +288,14 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
 
-    if (isEditMode && e.target === canvasRef.current && e.button === 0) {
+    if (isEditMode && !widgetHitRef.current && e.button === 0) {
       const pos = getCanvasPos(e);
       setLassoState({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
       onSelectWidget(null);
       onSelectWidgets?.([]);
       e.preventDefault();
     }
+    widgetHitRef.current = false;
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
@@ -313,6 +317,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     const widget = page.widgets.find(w => w.id === widgetId);
     if (!widget || widget.locked) return;
+
+    widgetHitRef.current = true;
 
     const target = e.target as HTMLElement;
     const isResizeHandle = target.classList.contains('cursor-nw-resize') ||
@@ -577,6 +583,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         return;
       }
 
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        onPasteWidget();
+        return;
+      }
+
       const hasMultiSelection = selectedWidgetIds.length > 1;
 
       if (hasMultiSelection) {
@@ -592,9 +604,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
           e.preventDefault();
           onCopyWidgets?.(selectedWidgetIds);
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-          e.preventDefault();
-          onPasteWidget();
         }
         return;
       }
@@ -610,9 +619,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
         onDuplicateWidget(selectedWidgetId);
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        e.preventDefault();
-        onPasteWidget();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
