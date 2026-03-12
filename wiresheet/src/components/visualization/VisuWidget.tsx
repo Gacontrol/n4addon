@@ -1147,7 +1147,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}
       onClick={(e) => {
-        if (isEditMode) {
+        if (isEditMode && !e.ctrlKey && !e.metaKey) {
           e.stopPropagation();
           onSelect();
         }
