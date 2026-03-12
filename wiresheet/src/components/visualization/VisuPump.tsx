@@ -45,21 +45,21 @@ const PumpSymbol: React.FC<{ color: string; running: boolean; rotation: number; 
       viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ overflow: 'visible' }}
+      style={{ overflow: 'visible', background: 'transparent' }}
     >
       <circle
         cx="50"
         cy="50"
-        r="45"
+        r="46"
         stroke={color}
-        strokeWidth="4"
+        strokeWidth="3"
         fill="transparent"
       />
       <polygon
-        points="25,30 75,50 25,70"
+        points="15,20 93,50 15,80"
         fill={running ? color : 'transparent'}
         stroke={color}
-        strokeWidth="3"
+        strokeWidth="2.5"
         strokeLinejoin="round"
       />
     </svg>

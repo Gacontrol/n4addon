@@ -1207,7 +1207,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     min={0}
                     max={100}
                     value={config.pumpSpeedMax ?? 100}
-                    onChange={e => updateConfig('pumpSpeedMax', parseInt(e.target.value) || 100)}
+                    onChange={e => {
+                      const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                      updateConfig('pumpSpeedMax', isNaN(val) ? 0 : val);
+                    }}
                     className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
                   />
                 </div>

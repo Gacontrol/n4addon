@@ -853,16 +853,17 @@ export const widgetTemplates: WidgetTemplate[] = [
     category: 'control',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
-      pumpName: 'Pumpe',
+      pumpName: '',
       showSpeed: true,
       showOperatingHours: true,
       showStartCount: true,
       runningColor: '#22c55e',
       stoppedColor: '#64748b',
       faultColor: '#ef4444',
-      revisionColor: '#f59e0b'
+      revisionColor: '#f59e0b',
+      orientation: 'right'
     },
-    defaultStyle: { showLabel: true, labelPosition: 'bottom' },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
     description: 'Pumpen-Widget mit Popup fuer alle Parameter und Steuerung',
     supportsBinding: true,
     bindingDirection: 'readwrite'
