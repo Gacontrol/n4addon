@@ -300,6 +300,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const target = e.target as HTMLElement;
     if (target.closest('[data-widget-id]')) return;
 
+    e.preventDefault();
     const pos = getCanvasPos(e);
     setLasso({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
     lassoRef.current = { startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
