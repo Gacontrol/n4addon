@@ -44,6 +44,7 @@ interface FlowCanvasProps {
   onZoomChange?: (zoom: number) => void;
   ghostNode?: { label: string; x: number; y: number; template?: unknown } | null;
   liveValues?: Record<string, unknown>;
+  driverLiveValues?: Record<string, unknown>;
   onOverrideChange?: (nodeId: string, override: DatapointOverride) => void;
   onModbusDatapointDrop?: (data: unknown, x: number, y: number) => void;
   visuPages?: VisuPage[];
@@ -85,6 +86,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onZoomChange,
   ghostNode,
   liveValues = {},
+  driverLiveValues = {},
   onOverrideChange,
   onModbusDatapointDrop,
   visuPages = [],
@@ -123,6 +125,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   const [isDraggingMultiple, setIsDraggingMultiple] = useState(false);
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const dragStartMouse = useRef<{ x: number; y: number } | null>(null);
+  const connectionJustEndedRef = useRef<number>(0);
 
   const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
 
@@ -215,6 +218,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   }, [zoom]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
+    const now = Date.now();
+    if (now - connectionJustEndedRef.current < 100) {
+      console.log('[handlePortClick] Ignored - connection just ended');
+      return;
+    }
     const currentConnecting = connectingFromRef.current;
     console.log('[handlePortClick]', { nodeId, portId, isOutput, currentConnecting });
     if (!currentConnecting) {
@@ -225,9 +233,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       if (currentConnecting.nodeId !== nodeId) {
         console.log('[handlePortClick] Completing connection to:', nodeId, portId);
         onConnectionEnd(nodeId, portId, currentConnecting.nodeId, currentConnecting.portId);
+        connectionJustEndedRef.current = now;
       } else {
         console.log('[handlePortClick] Same node clicked - canceling');
         onConnectionCancel();
+        connectionJustEndedRef.current = now;
       }
     }
   }, [onConnectionStart, onConnectionEnd, onConnectionCancel]);
@@ -567,6 +577,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                   portValues[input.id] = srcVal;
                 }
               }
+              const binding = driverBindings.find(b => b.nodeId === node.id && b.portId === input.id && b.direction === 'input');
+              if (binding) {
+                const driverKey = binding.driverType === 'homeassistant'
+                  ? binding.haEntityId
+                  : `${binding.deviceId}:${binding.datapointId}`;
+                if (driverKey && driverLiveValues[driverKey] !== undefined) {
+                  portValues[input.id] = driverLiveValues[driverKey];
+                }
+              }
             }
             return (
               <FlowNode
@@ -610,6 +629,15 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 const srcVal = liveValues[conn.source];
                 if (srcVal !== undefined && srcVal !== null) {
                   portValues[input.id] = srcVal;
+                }
+              }
+              const binding = driverBindings.find(b => b.nodeId === node.id && b.portId === input.id && b.direction === 'input');
+              if (binding) {
+                const driverKey = binding.driverType === 'homeassistant'
+                  ? binding.haEntityId
+                  : `${binding.deviceId}:${binding.datapointId}`;
+                if (driverKey && driverLiveValues[driverKey] !== undefined) {
+                  portValues[input.id] = driverLiveValues[driverKey];
                 }
               }
             }

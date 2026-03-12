@@ -1078,6 +1078,7 @@ function App() {
               onZoomChange={setZoom}
               ghostNode={ghostNode}
               liveValues={liveValues}
+              driverLiveValues={driverLiveValues}
               onOverrideChange={updateNodeOverride}
               onModbusDatapointDrop={handleModbusDatapointDrop}
               visuPages={visuPages}
