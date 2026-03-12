@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, RotateCcw, X, Settings, Sliders } from 'lucide-react';
+import { AlertTriangle, X, Settings, Sliders } from 'lucide-react';
 import { ValveWidgetConfig, ValveSymbolType } from '../../types/visualization';
 
 interface ValveValues {
@@ -144,11 +144,6 @@ export const VisuValve: React.FC<VisuValveProps> = ({
       setShowPopup(true);
     }
   }, [isEditMode]);
-
-  const handleReset = useCallback(() => {
-    onValueChange?.({ valveControl: { reset: true } });
-    setTimeout(() => onValueChange?.({ valveControl: { reset: false } }), 100);
-  }, [onValueChange]);
 
   const handleSetpointChange = useCallback((newSetpoint: number) => {
     setLocalSetpoint(newSetpoint);
@@ -347,18 +342,12 @@ export const VisuValve: React.FC<VisuValveProps> = ({
 
               {alarm && (
                 <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-red-400">
-                      <AlertTriangle size={20} />
-                      <span className="font-medium">Ventilalarm aktiv</span>
+                  <div className="flex items-center gap-2 text-red-400">
+                    <AlertTriangle size={20} />
+                    <div>
+                      <span className="font-medium block">Ventilalarm aktiv</span>
+                      <span className="text-xs text-red-300/70">Abweichung ueberschreitet Toleranz</span>
                     </div>
-                    <button
-                      onClick={handleReset}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors"
-                    >
-                      <RotateCcw size={16} />
-                      Quittieren
-                    </button>
                   </div>
                 </div>
               )}

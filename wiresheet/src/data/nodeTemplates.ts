@@ -656,13 +656,11 @@ export const nodeTemplates: NodeTemplate[] = [
     color: '#7c3aed',
     inputs: [
       { label: 'Setpoint', type: 'input' },
-      { label: 'Feedback', type: 'input' },
-      { label: 'Reset', type: 'input' }
+      { label: 'Feedback', type: 'input' }
     ],
     outputs: [
       { label: 'ValveOut', type: 'output' },
-      { label: 'Alarm', type: 'output' },
-      { label: 'Deviation', type: 'output' }
+      { label: 'Alarm', type: 'output' }
     ],
     description: 'Ventilsteuerung mit Begrenzung und Ueberwachung',
     defaultConfig: {

@@ -195,6 +195,20 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-valve') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'valve-control') return null;
+      const setpointFromVisu = node.data.config?.valveVisuSetpoint;
+      const setpointFromWire = liveValues[`${nodeId}:input-0`] ?? 0;
+      return {
+        valveOutput: liveValues[`${nodeId}:output-0`] ?? 0,
+        setpoint: setpointFromVisu ?? setpointFromWire ?? 0,
+        feedback: liveValues[`${nodeId}:input-1`] ?? 0,
+        alarm: liveValues[`${nodeId}:output-1`] ?? false,
+        deviation: liveValues[`${nodeId}:deviation`] ?? 0
+      };
+    }
+
     if (paramKey) {
       const node = logicNodes.find(n => n.id === nodeId);
       if (node?.data.config) {
@@ -246,6 +260,23 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       pumpAntiSeizeIntervalMs: cfg.pumpAntiSeizeIntervalMs,
       pumpAntiSeizeRunMs: cfg.pumpAntiSeizeRunMs,
       pumpAntiSeizeSpeed: cfg.pumpAntiSeizeSpeed
+    };
+  }, [logicNodes]);
+
+  const getValveWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-valve' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    if (!node || node.type !== 'valve-control') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const nodeName = customLabel || node.data.label || 'Ventil';
+    return {
+      valveName: nodeName,
+      valveMinOutput: cfg.valveMinOutput,
+      valveMaxOutput: cfg.valveMaxOutput,
+      valveMonitoringEnable: cfg.valveMonitoringEnable,
+      valveTolerance: cfg.valveTolerance,
+      valveAlarmDelayMs: cfg.valveAlarmDelayMs
     };
   }, [logicNodes]);
 
@@ -823,6 +854,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onNavigateBack={onNavigateBack}
           onNavigateHome={onNavigateHome}
           pumpParams={getPumpWidgetParams(widget)}
+          valveParams={getValveWidgetParams(widget)}
         />
       ))}
 
