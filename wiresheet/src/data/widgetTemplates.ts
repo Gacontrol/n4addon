@@ -845,6 +845,27 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Dashboard Mehrfachschalter mit Karten-Design',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-pump',
+    label: 'Pumpenbaustein',
+    icon: 'Fan',
+    category: 'control',
+    defaultSize: { width: 120, height: 120 },
+    defaultConfig: {
+      pumpName: 'Pumpe',
+      showSpeed: true,
+      showOperatingHours: true,
+      showStartCount: true,
+      runningColor: '#22c55e',
+      stoppedColor: '#64748b',
+      faultColor: '#ef4444',
+      revisionColor: '#f59e0b'
+    },
+    defaultStyle: { showLabel: true, labelPosition: 'bottom' },
+    description: 'Pumpen-Widget mit Popup fuer alle Parameter und Steuerung',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 

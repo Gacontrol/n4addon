@@ -51,9 +51,11 @@ import {
   DashLevelConfig,
   DashWindConfig,
   DashMultistateConfig,
-  ModernMultistateConfig
+  ModernMultistateConfig,
+  PumpWidgetConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
+import { VisuPump } from './VisuPump';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -1099,6 +1101,43 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             disabled={isEditMode}
           />
         );
+
+      case 'visu-pump': {
+        const pumpCfg = widget.config as PumpWidgetConfig;
+        const pumpValues = value as {
+          pumpCmd?: boolean;
+          speedOut?: number;
+          running?: boolean;
+          fault?: boolean;
+          ready?: boolean;
+          alarm?: boolean;
+          opHours?: number;
+          starts?: number;
+          hoaMode?: number;
+          revision?: boolean;
+          handStart?: boolean;
+        } | null;
+        return (
+          <VisuPump
+            config={pumpCfg}
+            value={pumpValues ? {
+              pumpCmd: pumpValues.pumpCmd ?? false,
+              speedOut: pumpValues.speedOut ?? 0,
+              running: pumpValues.running ?? false,
+              fault: pumpValues.fault ?? false,
+              ready: pumpValues.ready ?? true,
+              alarm: pumpValues.alarm ?? false,
+              opHours: pumpValues.opHours ?? 0,
+              starts: pumpValues.starts ?? 0,
+              hoaMode: pumpValues.hoaMode ?? 2,
+              revision: pumpValues.revision ?? false,
+              handStart: pumpValues.handStart ?? false
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+          />
+        );
+      }
 
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;

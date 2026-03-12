@@ -58,7 +58,8 @@ export type WidgetType =
   | 'dash-level'
   | 'dash-wind'
   | 'modern-multistate'
-  | 'dash-multistate';
+  | 'dash-multistate'
+  | 'visu-pump';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -387,7 +388,8 @@ export type WidgetConfig =
   | DashLevelConfig
   | DashWindConfig
   | ModernMultistateConfig
-  | DashMultistateConfig;
+  | DashMultistateConfig
+  | PumpWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -602,6 +604,17 @@ export interface DashMultistateConfig {
   options: MultistateOption[];
   defaultValue?: number | string;
   activeColor?: string;
+}
+
+export interface PumpWidgetConfig {
+  pumpName?: string;
+  showSpeed?: boolean;
+  showOperatingHours?: boolean;
+  showStartCount?: boolean;
+  runningColor?: string;
+  stoppedColor?: string;
+  faultColor?: string;
+  revisionColor?: string;
 }
 
 export interface WidgetTemplate {

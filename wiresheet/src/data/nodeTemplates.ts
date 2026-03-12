@@ -606,5 +606,47 @@ export const nodeTemplates: NodeTemplate[] = [
       modbusDeviceId: '',
       modbusDeviceName: ''
     }
+  },
+  {
+    type: 'pump-control',
+    label: 'Pumpenbaustein',
+    icon: 'Fan',
+    category: 'special',
+    color: '#0891b2',
+    inputs: [
+      { label: 'StartCmd', type: 'input' },
+      { label: 'Feedback', type: 'input' },
+      { label: 'Fault', type: 'input' },
+      { label: 'Revision', type: 'input' },
+      { label: 'HOA', type: 'input' },
+      { label: 'HandStart', type: 'input' },
+      { label: 'SpeedSP', type: 'input' },
+      { label: 'Reset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'PumpCmd', type: 'output' },
+      { label: 'SpeedOut', type: 'output' },
+      { label: 'Running', type: 'output' },
+      { label: 'Fault', type: 'output' },
+      { label: 'Ready', type: 'output' },
+      { label: 'Alarm', type: 'output' },
+      { label: 'OpHours', type: 'output' },
+      { label: 'Starts', type: 'output' }
+    ],
+    description: 'Pumpensteuerung mit HOA, Blockierschutz, Betriebsstunden',
+    defaultConfig: {
+      pumpStartDelayMs: 0,
+      pumpStopDelayMs: 0,
+      pumpFeedbackTimeoutMs: 10000,
+      pumpEnableFeedback: true,
+      pumpSpeedMin: 0,
+      pumpSpeedMax: 100,
+      pumpAntiSeizeIntervalMs: 604800000,
+      pumpAntiSeizeRunMs: 60000,
+      pumpAntiSeizeSpeed: 30,
+      pumpOperatingHours: 0,
+      pumpStartCount: 0,
+      pumpName: 'Pumpe 1'
+    }
   }
 ];

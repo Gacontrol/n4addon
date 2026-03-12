@@ -1117,6 +1117,150 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = output;
       nodeValues[`${nodeId}:output-0`] = output;
       nodeValues[`${nodeId}:output-1`] = error;
+    } else if (node.type === 'pump-control') {
+      const startCmd = toBool(inputVals[0]);
+      const pumpFeedback = toBool(inputVals[1]);
+      const faultInput = toBool(inputVals[2]);
+      const revisionSwitch = toBool(inputVals[3]);
+      const hoaMode = toNumber(inputVals[4]);
+      const handStart = toBool(inputVals[5]);
+      const speedSetpoint = toNumber(inputVals[6]);
+      const resetInput = toBool(inputVals[7]);
+
+      const startDelayMs = cfg.pumpStartDelayMs || 0;
+      const stopDelayMs = cfg.pumpStopDelayMs || 0;
+      const feedbackTimeoutMs = cfg.pumpFeedbackTimeoutMs || 10000;
+      const enableFeedback = cfg.pumpEnableFeedback !== false;
+      const speedMin = cfg.pumpSpeedMin || 0;
+      const speedMax = cfg.pumpSpeedMax || 100;
+      const antiSeizeIntervalMs = cfg.pumpAntiSeizeIntervalMs || 604800000;
+      const antiSeizeRunMs = cfg.pumpAntiSeizeRunMs || 60000;
+      const antiSeizeSpeed = cfg.pumpAntiSeizeSpeed || 30;
+
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__pumpState || (node.__pumpState = {});
+
+      if (st.operatingHoursMs === undefined) st.operatingHoursMs = (cfg.pumpOperatingHours || 0) * 3600000;
+      if (st.startCount === undefined) st.startCount = cfg.pumpStartCount || 0;
+      if (st.pumpCmd === undefined) st.pumpCmd = false;
+      if (st.fault === undefined) st.fault = false;
+      if (st.faultLatch === undefined) st.faultLatch = false;
+      if (st.feedbackFault === undefined) st.feedbackFault = false;
+      if (st.lastRunTs === undefined) st.lastRunTs = now;
+      if (st.antiSeizeActive === undefined) st.antiSeizeActive = false;
+      if (st.antiSeizeStartTs === undefined) st.antiSeizeStartTs = null;
+      if (st.startDelayTs === undefined) st.startDelayTs = null;
+      if (st.stopDelayTs === undefined) st.stopDelayTs = null;
+      if (st.startTs === undefined) st.startTs = null;
+      if (st.prevPumpCmd === undefined) st.prevPumpCmd = false;
+      if (st.lastTickTs === undefined) st.lastTickTs = now;
+
+      if (resetInput && (st.faultLatch || st.feedbackFault)) {
+        if (!faultInput && !st.feedbackFault) {
+          st.faultLatch = false;
+        }
+        if (pumpFeedback || !st.pumpCmd) {
+          st.feedbackFault = false;
+        }
+      }
+
+      if (faultInput && !st.faultLatch) {
+        st.faultLatch = true;
+      }
+
+      const hasFault = st.faultLatch || st.feedbackFault;
+      const ready = !hasFault && !revisionSwitch;
+
+      let wantStart = false;
+      if (hoaMode === 2) {
+        wantStart = startCmd && ready;
+      } else if (hoaMode === 1) {
+        wantStart = handStart && !revisionSwitch && !hasFault;
+      }
+
+      if (!st.antiSeizeActive && hoaMode === 2 && !revisionSwitch && !hasFault && !wantStart) {
+        if (now - st.lastRunTs > antiSeizeIntervalMs) {
+          st.antiSeizeActive = true;
+          st.antiSeizeStartTs = now;
+        }
+      }
+
+      if (st.antiSeizeActive) {
+        if (now - st.antiSeizeStartTs >= antiSeizeRunMs) {
+          st.antiSeizeActive = false;
+          st.antiSeizeStartTs = null;
+          st.lastRunTs = now;
+        } else {
+          wantStart = true;
+        }
+      }
+
+      let targetCmd = wantStart;
+
+      if (targetCmd && !st.pumpCmd) {
+        if (startDelayMs > 0) {
+          if (st.startDelayTs === null) st.startDelayTs = now;
+          if (now - st.startDelayTs >= startDelayMs) {
+            st.pumpCmd = true;
+            st.startDelayTs = null;
+          }
+        } else {
+          st.pumpCmd = true;
+        }
+      } else if (!targetCmd && st.pumpCmd) {
+        if (stopDelayMs > 0) {
+          if (st.stopDelayTs === null) st.stopDelayTs = now;
+          if (now - st.stopDelayTs >= stopDelayMs) {
+            st.pumpCmd = false;
+            st.stopDelayTs = null;
+          }
+        } else {
+          st.pumpCmd = false;
+        }
+      } else {
+        st.startDelayTs = null;
+        st.stopDelayTs = null;
+      }
+
+      if (st.pumpCmd && !st.prevPumpCmd) {
+        st.startCount++;
+        st.startTs = now;
+      }
+      st.prevPumpCmd = st.pumpCmd;
+
+      if (enableFeedback && st.pumpCmd && st.startTs !== null) {
+        if (!pumpFeedback && (now - st.startTs > feedbackTimeoutMs)) {
+          st.feedbackFault = true;
+        }
+      }
+
+      const running = pumpFeedback;
+      if (running) {
+        const deltaMs = now - st.lastTickTs;
+        st.operatingHoursMs += deltaMs;
+        st.lastRunTs = now;
+      }
+      st.lastTickTs = now;
+
+      let speedOutput = 0;
+      if (st.pumpCmd) {
+        let sp = st.antiSeizeActive ? antiSeizeSpeed : speedSetpoint;
+        sp = Math.max(speedMin, Math.min(speedMax, sp || 0));
+        speedOutput = sp;
+      }
+
+      const alarm = hasFault;
+      const operatingHours = st.operatingHoursMs / 3600000;
+
+      nodeValues[nodeId] = st.pumpCmd;
+      nodeValues[`${nodeId}:output-0`] = st.pumpCmd;
+      nodeValues[`${nodeId}:output-1`] = speedOutput;
+      nodeValues[`${nodeId}:output-2`] = running;
+      nodeValues[`${nodeId}:output-3`] = hasFault;
+      nodeValues[`${nodeId}:output-4`] = ready;
+      nodeValues[`${nodeId}:output-5`] = alarm;
+      nodeValues[`${nodeId}:output-6`] = operatingHours;
+      nodeValues[`${nodeId}:output-7`] = st.startCount;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
