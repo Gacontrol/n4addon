@@ -97,6 +97,20 @@ export interface BackupImportSelection {
   wiresheets: string[];
   visuPages: string[];
   customBlocks: string[];
+  modbusDevices: string[];
+  customLibrary: string[];
+  includeBindings: boolean;
+  includeImages: boolean;
+}
+
+export interface BackupExportSelection {
+  wiresheets: string[];
+  visuPages: string[];
+  customBlocks: string[];
+  modbusDevices: string[];
+  customLibrary: string[];
+  includeBindings: boolean;
+  includeImages: boolean;
 }
 
 export function createBackup(
@@ -190,7 +204,20 @@ export function applyImport(
     const newWiresheets = importedWiresheets.length > 0 ? importedWiresheets : currentWiresheets;
     const newVisuPages = importedVisuPages.length > 0 ? importedVisuPages : currentVisuPages;
     const newBlocks = importedBlocks.length > 0 ? importedBlocks : currentBlocks;
-    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks };
+
+    let finalDriverConfig: DriverConfig | undefined = currentDriverConfig;
+    if (backup.driverConfig) {
+      const selectedDevices = backup.driverConfig.modbusDevices.filter(d => selection.modbusDevices.includes(d.id));
+      const selectedLibrary = backup.driverConfig.customModbusLibrary.filter(l => selection.customLibrary.includes(l.id));
+      finalDriverConfig = {
+        modbusDevices: selectedDevices.length > 0 ? selectedDevices : (currentDriverConfig?.modbusDevices || []),
+        modbusDriverEnabled: backup.driverConfig.modbusDriverEnabled,
+        driverBindings: selection.includeBindings ? backup.driverConfig.driverBindings : (currentDriverConfig?.driverBindings || []),
+        customModbusLibrary: selectedLibrary.length > 0 ? selectedLibrary : (currentDriverConfig?.customModbusLibrary || [])
+      };
+    }
+
+    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig };
   }
 
   const existingWiresheetIds = new Set(currentWiresheets.map(w => w.id));
@@ -227,38 +254,49 @@ export function applyImport(
   }
 
   let finalDriverConfig: DriverConfig | undefined = currentDriverConfig;
-  if (backup.driverConfig) {
-    if (mode === 'replace') {
-      finalDriverConfig = backup.driverConfig;
-    } else if (currentDriverConfig) {
-      const mergedDevices = [...currentDriverConfig.modbusDevices];
-      for (const dev of backup.driverConfig.modbusDevices) {
-        const exists = mergedDevices.some(d => d.id === dev.id);
-        if (exists) {
-          mergedDevices.push({ ...dev, id: `modbus-device-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${dev.name} (Import)` });
-        } else {
-          mergedDevices.push(dev);
-        }
+  if (backup.driverConfig && currentDriverConfig) {
+    const selectedDevices = backup.driverConfig.modbusDevices.filter(d => selection.modbusDevices.includes(d.id));
+    const selectedLibrary = backup.driverConfig.customModbusLibrary.filter(l => selection.customLibrary.includes(l.id));
+
+    const mergedDevices = [...currentDriverConfig.modbusDevices];
+    for (const dev of selectedDevices) {
+      const exists = mergedDevices.some(d => d.id === dev.id);
+      if (exists) {
+        mergedDevices.push({ ...dev, id: `modbus-device-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${dev.name} (Import)` });
+      } else {
+        mergedDevices.push(dev);
       }
-      const mergedBindings = [...currentDriverConfig.driverBindings, ...backup.driverConfig.driverBindings];
-      const mergedLibrary = [...currentDriverConfig.customModbusLibrary];
-      for (const lib of backup.driverConfig.customModbusLibrary) {
-        const exists = mergedLibrary.some(l => l.id === lib.id);
-        if (exists) {
-          mergedLibrary.push({ ...lib, id: `custom-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${lib.name} (Import)` });
-        } else {
-          mergedLibrary.push(lib);
-        }
-      }
-      finalDriverConfig = {
-        modbusDevices: mergedDevices,
-        modbusDriverEnabled: currentDriverConfig.modbusDriverEnabled || backup.driverConfig.modbusDriverEnabled,
-        driverBindings: mergedBindings,
-        customModbusLibrary: mergedLibrary
-      };
-    } else {
-      finalDriverConfig = backup.driverConfig;
     }
+
+    const mergedBindings = selection.includeBindings
+      ? [...currentDriverConfig.driverBindings, ...backup.driverConfig.driverBindings]
+      : currentDriverConfig.driverBindings;
+
+    const mergedLibrary = [...currentDriverConfig.customModbusLibrary];
+    for (const lib of selectedLibrary) {
+      const exists = mergedLibrary.some(l => l.id === lib.id);
+      if (exists) {
+        mergedLibrary.push({ ...lib, id: `custom-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${lib.name} (Import)` });
+      } else {
+        mergedLibrary.push(lib);
+      }
+    }
+
+    finalDriverConfig = {
+      modbusDevices: mergedDevices,
+      modbusDriverEnabled: currentDriverConfig.modbusDriverEnabled || backup.driverConfig.modbusDriverEnabled,
+      driverBindings: mergedBindings,
+      customModbusLibrary: mergedLibrary
+    };
+  } else if (backup.driverConfig) {
+    const selectedDevices = backup.driverConfig.modbusDevices.filter(d => selection.modbusDevices.includes(d.id));
+    const selectedLibrary = backup.driverConfig.customModbusLibrary.filter(l => selection.customLibrary.includes(l.id));
+    finalDriverConfig = {
+      modbusDevices: selectedDevices,
+      modbusDriverEnabled: backup.driverConfig.modbusDriverEnabled,
+      driverBindings: selection.includeBindings ? backup.driverConfig.driverBindings : [],
+      customModbusLibrary: selectedLibrary
+    };
   }
 
   return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Download, Upload, Check, AlertCircle, ChevronDown, ChevronRight,
-  FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen, Image as ImageIcon
+  FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen, Image as ImageIcon,
+  Server, Library, Link2
 } from 'lucide-react';
 import { WiresheetPage } from '../types/flow';
 import { VisuPage, } from '../types/visualization';
@@ -9,13 +10,15 @@ import { CustomBlockDefinition } from '../types/flow';
 import {
   WiresheetBackup,
   BackupImportSelection,
+  BackupExportSelection,
   createBackup,
   downloadBackup,
   parseBackupFile,
   applyImport,
   fetchImagesForBackup,
   restoreImagesFromBackup,
-  DriverConfig
+  DriverConfig,
+  CustomLibraryDevice
 } from '../utils/backup';
 import { ModbusDevice, DriverBinding } from '../types/flow';
 
@@ -37,12 +40,6 @@ interface BackupModalProps {
 
 type ModalView = 'main' | 'export' | 'import-select' | 'import-confirm';
 
-interface ExportSelection {
-  wiresheets: string[];
-  visuPages: string[];
-  customBlocks: string[];
-}
-
 export const BackupModal: React.FC<BackupModalProps> = ({
   wiresheets,
   visuPages,
@@ -62,17 +59,28 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const [importSelection, setImportSelection] = useState<BackupImportSelection>({
     wiresheets: [],
     visuPages: [],
-    customBlocks: []
+    customBlocks: [],
+    modbusDevices: [],
+    customLibrary: [],
+    includeBindings: true,
+    includeImages: true
   });
-  const [exportSelection, setExportSelection] = useState<ExportSelection>({
+  const customLibrary: CustomLibraryDevice[] = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
+  const [exportSelection, setExportSelection] = useState<BackupExportSelection>({
     wiresheets: wiresheets.map(w => w.id),
     visuPages: visuPages.map(v => v.id),
-    customBlocks: customBlocks.map(b => b.id)
+    customBlocks: customBlocks.map(b => b.id),
+    modbusDevices: modbusDevices.map(d => d.id),
+    customLibrary: customLibrary.map(l => l.id),
+    includeBindings: true,
+    includeImages: true
   });
   const [importDone, setImportDone] = useState(false);
   const [wiresheetsOpen, setWiresheetsOpen] = useState(true);
   const [visuOpen, setVisuOpen] = useState(true);
   const [blocksOpen, setBlocksOpen] = useState(true);
+  const [driversOpen, setDriversOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,7 +100,11 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       setImportSelection({
         wiresheets: backup.wiresheets.map(w => w.id),
         visuPages: backup.visuPages.map(v => v.id),
-        customBlocks: backup.customBlocks.map(b => b.id)
+        customBlocks: backup.customBlocks.map(b => b.id),
+        modbusDevices: backup.driverConfig?.modbusDevices.map(d => d.id) || [],
+        customLibrary: backup.driverConfig?.customModbusLibrary.map(l => l.id) || [],
+        includeBindings: true,
+        includeImages: true
       });
       setView('import-select');
     };
@@ -100,32 +112,42 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     e.target.value = '';
   }, []);
 
-  const toggleExportItem = (key: keyof ExportSelection, id: string) => {
+  const toggleExportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', id: string) => {
     setExportSelection(prev => ({
       ...prev,
-      [key]: prev[key].includes(id) ? prev[key].filter(i => i !== id) : [...prev[key], id]
+      [key]: (prev[key] as string[]).includes(id) ? (prev[key] as string[]).filter(i => i !== id) : [...(prev[key] as string[]), id]
     }));
   };
 
-  const toggleAllExport = (key: keyof ExportSelection, ids: string[]) => {
+  const toggleAllExport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', ids: string[]) => {
     setExportSelection(prev => {
-      const allSelected = ids.every(id => prev[key].includes(id));
-      return { ...prev, [key]: allSelected ? prev[key].filter(id => !ids.includes(id)) : [...new Set([...prev[key], ...ids])] };
+      const arr = prev[key] as string[];
+      const allSelected = ids.every(id => arr.includes(id));
+      return { ...prev, [key]: allSelected ? arr.filter(id => !ids.includes(id)) : [...new Set([...arr, ...ids])] };
     });
   };
 
-  const toggleImportItem = (key: keyof BackupImportSelection, id: string) => {
+  const toggleExportFlag = (key: 'includeBindings' | 'includeImages') => {
+    setExportSelection(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleImportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', id: string) => {
     setImportSelection(prev => ({
       ...prev,
-      [key]: prev[key].includes(id) ? prev[key].filter(i => i !== id) : [...prev[key], id]
+      [key]: (prev[key] as string[]).includes(id) ? (prev[key] as string[]).filter(i => i !== id) : [...(prev[key] as string[]), id]
     }));
   };
 
-  const toggleAllImport = (key: keyof BackupImportSelection, ids: string[]) => {
+  const toggleAllImport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', ids: string[]) => {
     setImportSelection(prev => {
-      const allSelected = ids.every(id => prev[key].includes(id));
-      return { ...prev, [key]: allSelected ? prev[key].filter(id => !ids.includes(id)) : [...new Set([...prev[key], ...ids])] };
+      const arr = prev[key] as string[];
+      const allSelected = ids.every(id => arr.includes(id));
+      return { ...prev, [key]: allSelected ? arr.filter(id => !ids.includes(id)) : [...new Set([...arr, ...ids])] };
     });
+  };
+
+  const toggleImportFlag = (key: 'includeBindings' | 'includeImages') => {
+    setImportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleExport = async () => {
@@ -134,13 +156,14 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       const selectedWiresheets = wiresheets.filter(w => exportSelection.wiresheets.includes(w.id));
       const selectedVisus = visuPages.filter(v => exportSelection.visuPages.includes(v.id));
       const selectedBlocks = customBlocks.filter(b => exportSelection.customBlocks.includes(b.id));
-      const images = await fetchImagesForBackup(selectedVisus);
-      const customLibrary = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
+      const selectedDevices = modbusDevices.filter(d => exportSelection.modbusDevices.includes(d.id));
+      const selectedLibrary = customLibrary.filter(l => exportSelection.customLibrary.includes(l.id));
+      const images = exportSelection.includeImages ? await fetchImagesForBackup(selectedVisus) : [];
       const driverConfig: DriverConfig = {
-        modbusDevices,
+        modbusDevices: selectedDevices,
         modbusDriverEnabled,
-        driverBindings,
-        customModbusLibrary: customLibrary
+        driverBindings: exportSelection.includeBindings ? driverBindings : [],
+        customModbusLibrary: selectedLibrary
       };
       const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig);
       downloadBackup(backup);
@@ -154,10 +177,9 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     if (!loadedBackup) return;
     setImporting(true);
     try {
-      if (loadedBackup.images && loadedBackup.images.length > 0) {
+      if (importSelection.includeImages && loadedBackup.images && loadedBackup.images.length > 0) {
         await restoreImagesFromBackup(loadedBackup.images);
       }
-      const customLibrary = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
       const currentDriverConfig: DriverConfig = {
         modbusDevices,
         modbusDriverEnabled,
@@ -187,12 +209,20 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const totalImportSelected =
     importSelection.wiresheets.length +
     importSelection.visuPages.length +
-    importSelection.customBlocks.length;
+    importSelection.customBlocks.length +
+    importSelection.modbusDevices.length +
+    importSelection.customLibrary.length +
+    (importSelection.includeBindings ? 1 : 0) +
+    (importSelection.includeImages ? 1 : 0);
 
   const totalExportSelected =
     exportSelection.wiresheets.length +
     exportSelection.visuPages.length +
-    exportSelection.customBlocks.length;
+    exportSelection.customBlocks.length +
+    exportSelection.modbusDevices.length +
+    exportSelection.customLibrary.length +
+    (exportSelection.includeBindings ? 1 : 0) +
+    (exportSelection.includeImages ? 1 : 0);
 
   return (
     <div
@@ -350,6 +380,70 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 ))}
                 {customBlocks.length === 0 && <EmptyHint label="Keine Bausteine vorhanden" />}
               </SectionGroup>
+
+              <SectionGroup
+                icon={<Server className="w-3.5 h-3.5" />}
+                label="Modbus-Geraete"
+                color="#8b5cf6"
+                isOpen={driversOpen}
+                onToggle={() => setDriversOpen(v => !v)}
+                allIds={modbusDevices.map(d => d.id)}
+                selectedIds={exportSelection.modbusDevices}
+                onToggleAll={() => toggleAllExport('modbusDevices', modbusDevices.map(d => d.id))}
+              >
+                {modbusDevices.map(d => (
+                  <CheckItem
+                    key={d.id}
+                    label={d.name}
+                    sublabel={`Unit ${d.unitId}, ${d.datapoints.length} Datenpunkte`}
+                    checked={exportSelection.modbusDevices.includes(d.id)}
+                    onChange={() => toggleExportItem('modbusDevices', d.id)}
+                  />
+                ))}
+                {modbusDevices.length === 0 && <EmptyHint label="Keine Modbus-Geraete vorhanden" />}
+              </SectionGroup>
+
+              <SectionGroup
+                icon={<Library className="w-3.5 h-3.5" />}
+                label="Benutzerdefinierte Geraetebibliothek"
+                color="#ec4899"
+                isOpen={libraryOpen}
+                onToggle={() => setLibraryOpen(v => !v)}
+                allIds={customLibrary.map(l => l.id)}
+                selectedIds={exportSelection.customLibrary}
+                onToggleAll={() => toggleAllExport('customLibrary', customLibrary.map(l => l.id))}
+              >
+                {customLibrary.map(l => (
+                  <CheckItem
+                    key={l.id}
+                    label={l.name}
+                    sublabel={`${l.category}, ${l.datapoints.length} Datenpunkte`}
+                    checked={exportSelection.customLibrary.includes(l.id)}
+                    onChange={() => toggleExportItem('customLibrary', l.id)}
+                  />
+                ))}
+                {customLibrary.length === 0 && <EmptyHint label="Keine benutzerdefinierten Geraete" />}
+              </SectionGroup>
+
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-3 py-2.5 text-xs font-semibold text-slate-400" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                  Optionen
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  <CheckItem
+                    label="Treiber-Verbindungen"
+                    sublabel="Verbindungen zwischen Datenpunkten und Modbus"
+                    checked={exportSelection.includeBindings}
+                    onChange={() => toggleExportFlag('includeBindings')}
+                  />
+                  <CheckItem
+                    label="Bilder"
+                    sublabel="Alle in Visus verwendeten Bilder einbetten"
+                    checked={exportSelection.includeImages}
+                    onChange={() => toggleExportFlag('includeImages')}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -362,6 +456,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     {loadedBackup.wiresheets.length} Wiresheets &nbsp;·&nbsp;
                     {loadedBackup.visuPages.length} Visus &nbsp;·&nbsp;
                     {loadedBackup.customBlocks.length} Bausteine
+                    {loadedBackup.driverConfig && loadedBackup.driverConfig.modbusDevices.length > 0 && (
+                      <> &nbsp;·&nbsp; {loadedBackup.driverConfig.modbusDevices.length} Geraete</>
+                    )}
+                    {loadedBackup.driverConfig && loadedBackup.driverConfig.customModbusLibrary.length > 0 && (
+                      <> &nbsp;·&nbsp; {loadedBackup.driverConfig.customModbusLibrary.length} Bibliothek</>
+                    )}
                     {loadedBackup.images && loadedBackup.images.length > 0 && (
                       <> &nbsp;·&nbsp; {loadedBackup.images.length} Bilder</>
                     )}
@@ -473,6 +573,76 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 ))}
                 {loadedBackup.customBlocks.length === 0 && <EmptyHint label="Keine Bausteine im Backup" />}
               </SectionGroup>
+
+              {loadedBackup.driverConfig && loadedBackup.driverConfig.modbusDevices.length > 0 && (
+                <SectionGroup
+                  icon={<Server className="w-3.5 h-3.5" />}
+                  label="Modbus-Geraete"
+                  color="#8b5cf6"
+                  isOpen={driversOpen}
+                  onToggle={() => setDriversOpen(v => !v)}
+                  allIds={loadedBackup.driverConfig.modbusDevices.map(d => d.id)}
+                  selectedIds={importSelection.modbusDevices}
+                  onToggleAll={() => toggleAllImport('modbusDevices', loadedBackup.driverConfig!.modbusDevices.map(d => d.id))}
+                >
+                  {loadedBackup.driverConfig.modbusDevices.map(d => (
+                    <CheckItem
+                      key={d.id}
+                      label={d.name}
+                      sublabel={`Unit ${d.unitId}, ${d.datapoints.length} Datenpunkte`}
+                      checked={importSelection.modbusDevices.includes(d.id)}
+                      onChange={() => toggleImportItem('modbusDevices', d.id)}
+                    />
+                  ))}
+                </SectionGroup>
+              )}
+
+              {loadedBackup.driverConfig && loadedBackup.driverConfig.customModbusLibrary.length > 0 && (
+                <SectionGroup
+                  icon={<Library className="w-3.5 h-3.5" />}
+                  label="Benutzerdefinierte Geraetebibliothek"
+                  color="#ec4899"
+                  isOpen={libraryOpen}
+                  onToggle={() => setLibraryOpen(v => !v)}
+                  allIds={loadedBackup.driverConfig.customModbusLibrary.map(l => l.id)}
+                  selectedIds={importSelection.customLibrary}
+                  onToggleAll={() => toggleAllImport('customLibrary', loadedBackup.driverConfig!.customModbusLibrary.map(l => l.id))}
+                >
+                  {loadedBackup.driverConfig.customModbusLibrary.map(l => (
+                    <CheckItem
+                      key={l.id}
+                      label={l.name}
+                      sublabel={`${l.category}, ${l.datapoints.length} Datenpunkte`}
+                      checked={importSelection.customLibrary.includes(l.id)}
+                      onChange={() => toggleImportItem('customLibrary', l.id)}
+                    />
+                  ))}
+                </SectionGroup>
+              )}
+
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-3 py-2.5 text-xs font-semibold text-slate-400" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                  Optionen
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {loadedBackup.driverConfig && loadedBackup.driverConfig.driverBindings.length > 0 && (
+                    <CheckItem
+                      label="Treiber-Verbindungen"
+                      sublabel={`${loadedBackup.driverConfig.driverBindings.length} Verbindungen`}
+                      checked={importSelection.includeBindings}
+                      onChange={() => toggleImportFlag('includeBindings')}
+                    />
+                  )}
+                  {loadedBackup.images && loadedBackup.images.length > 0 && (
+                    <CheckItem
+                      label="Bilder"
+                      sublabel={`${loadedBackup.images.length} eingebettete Bilder`}
+                      checked={importSelection.includeImages}
+                      onChange={() => toggleImportFlag('includeImages')}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
