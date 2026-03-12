@@ -59,166 +59,443 @@ const UI_RESOLUTION_OPTIONS: ModbusConfigOption[] = [
   { value: 2, label: '1' },
 ];
 
+const AO_MODE_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: 'Analog 0-10V' },
+  { value: 1, label: 'Digital (On/Off)' },
+];
+
+const TRIAC_MODE_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: 'Analog PWM' },
+  { value: 1, label: 'Digital (On/Off)' },
+];
+
+const OPERATION_MODE_OPTIONS: ModbusConfigOption[] = [
+  { value: 0, label: 'Standard' },
+  { value: 1, label: 'Heizen' },
+  { value: 2, label: 'Kuehlen' },
+  { value: 3, label: 'Ventilator Boost' },
+  { value: 4, label: 'Jalousie' },
+];
+
+function createUIDatapoints(count: number, startVoltage: number, startTemp: number) {
+  const inputs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    inputs.push({ name: `UI${i}`, address: startTemp + (i - 1) * 2, registerType: 'input', dataType: 'int16', scale: 0.1, unit: '°C', writable: false });
+  }
+  return inputs;
+}
+
+function createUIConfigDatapoints(count: number) {
+  const configs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    configs.push(
+      { name: `UI${i} Sensortyp`, address: 150 + i - 1, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i}` },
+      { name: `UI${i} Filterzeit`, address: 158 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: `Filterzeit fuer UI${i}` },
+      { name: `UI${i} Offset`, address: 169 + i, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: `Offset-Korrektur fuer UI${i}` }
+    );
+  }
+  configs.push({ name: 'UI Aufloesung', address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung aller Universaleingaenge' });
+  return configs;
+}
+
+function createDIDatapoints(count: number, statusRegister: number) {
+  const inputs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 0; i < count; i++) {
+    inputs.push({ name: `DI${i + 1}`, address: statusRegister - 1, registerType: 'input', dataType: 'bool', scale: 1, unit: '', writable: false, bitIndex: i });
+  }
+  return inputs;
+}
+
+function createDODatapoints(count: number, statusRegister: number) {
+  const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 0; i < count; i++) {
+    outputs.push({ name: `DO${i + 1}`, address: statusRegister - 1, registerType: 'holding', dataType: 'bool', scale: 1, unit: '', writable: true, bitIndex: i });
+  }
+  return outputs;
+}
+
+function createAODatapoints(count: number, startAddress: number) {
+  const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    outputs.push({ name: `AO${i}`, address: startAddress + i - 1, registerType: 'holding', dataType: 'uint16', scale: 0.1, unit: '%', writable: true });
+  }
+  return outputs;
+}
+
+function createAOConfigDatapoints(count: number) {
+  const configs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    configs.push(
+      { name: `AO${i} Modus`, address: 167 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: AO_MODE_OPTIONS, configDescription: `Betriebsmodus fuer AO${i}` },
+      { name: `AO${i} Default`, address: 144 + i, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: `Standardwert bei Watchdog fuer AO${i}` }
+    );
+  }
+  configs.push({ name: 'AO Default (Digital)', address: 143, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Digital-Default fuer alle AO' });
+  return configs;
+}
+
+function createDOConfigDatapoints(count: number) {
+  const configs: Omit<ModbusDatapoint, 'id'>[] = [];
+  configs.push({ name: 'DO Default Status', address: 142, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Standardstatus bei Watchdog fuer alle DO' });
+  return configs;
+}
+
+function createTriacDatapoints(count: number, startAddress: number) {
+  const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    outputs.push({ name: `TO${i}`, address: startAddress + i - 1, registerType: 'holding', dataType: 'uint16', scale: 0.1, unit: '%', writable: true });
+  }
+  return outputs;
+}
+
+function createTriacConfigDatapoints(count: number) {
+  const configs: Omit<ModbusDatapoint, 'id'>[] = [];
+  for (let i = 1; i <= count; i++) {
+    configs.push(
+      { name: `TO${i} Modus`, address: 167 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: TRIAC_MODE_OPTIONS, configDescription: `Betriebsmodus fuer TO${i}` },
+      { name: `TO${i} Default`, address: 144 + i, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: `Standardwert bei Watchdog fuer TO${i}` }
+    );
+  }
+  return configs;
+}
+
 export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
+  {
+    id: 'isma-mix38-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-MIX38-IP',
+    description: '8 UI, 12 DI, 6 AO, 4 DO - Grosses Kombimodul TCP/IP',
+    category: 'iSMA MIX Module',
+    inputDatapoints: [
+      ...createUIDatapoints(8, 70, 71),
+      ...createDIDatapoints(12, 16),
+    ],
+    outputDatapoints: [
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(6, 120),
+    ],
+    configDatapoints: [
+      ...createUIConfigDatapoints(8),
+      ...createDOConfigDatapoints(4),
+      ...createAOConfigDatapoints(6),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: [
+      ...createUIDatapoints(8, 70, 71),
+      ...createDIDatapoints(12, 16),
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(6, 120),
+    ]
+  },
   {
     id: 'isma-mix18-ip',
     manufacturer: 'iSMA / Global Control 5',
     model: 'ISMA-B-MIX18-IP',
-    description: 'Modbus TCP/IP I/O Modul mit 5 UI, 5 DI, 4 AO, 4 DO',
-    category: 'I/O Module',
+    description: '5 UI, 5 DI, 4 AO, 4 DO - Kombimodul TCP/IP',
+    category: 'iSMA MIX Module',
     inputDatapoints: [
-      { name: 'UI1', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI2', address: 73, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI3', address: 75, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI4', address: 77, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI5', address: 79, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'DI1', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 0 },
-      { name: 'DI2', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 1 },
-      { name: 'DI3', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 2 },
-      { name: 'DI4', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 3 },
-      { name: 'DI5', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 4 },
+      ...createUIDatapoints(5, 70, 71),
+      ...createDIDatapoints(5, 16),
     ],
     outputDatapoints: [
-      { name: 'DO1', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 0 },
-      { name: 'DO2', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 1 },
-      { name: 'DO3', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 2 },
-      { name: 'DO4', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 3 },
-      { name: 'AO1', address: 120, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO2', address: 121, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO3', address: 122, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO4', address: 123, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(4, 120),
     ],
     configDatapoints: [
-      { name: 'UI1 Sensortyp', address: 150, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI1' },
-      { name: 'UI1 Filterzeit', address: 160, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
-      { name: 'UI1 Resolution', address: 190, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
-      { name: 'UI1 Offset', address: 170, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
-      { name: 'UI2 Sensortyp', address: 151, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI2' },
-      { name: 'UI2 Filterzeit', address: 161, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
-      { name: 'UI2 Resolution', address: 191, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
-      { name: 'UI2 Offset', address: 171, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
-      { name: 'UI3 Sensortyp', address: 152, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI3' },
-      { name: 'UI3 Filterzeit', address: 162, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
-      { name: 'UI3 Resolution', address: 192, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
-      { name: 'UI3 Offset', address: 172, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
-      { name: 'UI4 Sensortyp', address: 153, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI4' },
-      { name: 'UI4 Filterzeit', address: 163, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
-      { name: 'UI4 Resolution', address: 193, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
-      { name: 'UI4 Offset', address: 173, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
-      { name: 'UI5 Sensortyp', address: 154, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: 'Waehle den Sensortyp fuer UI5' },
-      { name: 'UI5 Filterzeit', address: 164, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: 'Filterzeit zur Glaettung des Eingangssignals' },
-      { name: 'UI5 Resolution', address: 194, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: 'Aufloesung des Messwerts' },
-      { name: 'UI5 Offset', address: 174, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: 'Offset-Korrektur fuer Kalibrierung' },
-      { name: 'DI1 Entprellzeit', address: 180, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI1' },
-      { name: 'DI2 Entprellzeit', address: 181, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI2' },
-      { name: 'DI3 Entprellzeit', address: 182, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI3' },
-      { name: 'DI4 Entprellzeit', address: 183, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI4' },
-      { name: 'DI5 Entprellzeit', address: 184, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: DI_DEBOUNCE_OPTIONS, configDescription: 'Entprellzeit fuer DI5' },
-      { name: 'AO1 Minimum', address: 200, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
-      { name: 'AO1 Maximum', address: 201, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
-      { name: 'AO2 Minimum', address: 202, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
-      { name: 'AO2 Maximum', address: 203, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
-      { name: 'AO3 Minimum', address: 204, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
-      { name: 'AO3 Maximum', address: 205, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
-      { name: 'AO4 Minimum', address: 206, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Minimaler Ausgangswert' },
-      { name: 'AO4 Maximum', address: 207, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: 'Maximaler Ausgangswert' },
+      ...createUIConfigDatapoints(5),
+      ...createDOConfigDatapoints(4),
+      ...createAOConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
     ],
     datapoints: [
-      { name: 'UI1', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI2', address: 73, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI3', address: 75, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI4', address: 77, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI5', address: 79, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'DI1', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 0 },
-      { name: 'DI2', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 1 },
-      { name: 'DI3', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 2 },
-      { name: 'DI4', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 3 },
-      { name: 'DI5', address: 15, registerType: 'input', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: false, bitIndex: 4 },
-      { name: 'DO1', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 0 },
-      { name: 'DO2', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 1 },
-      { name: 'DO3', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 2 },
-      { name: 'DO4', address: 17, registerType: 'holding', dataType: 'bool', scale: 1, offset: 0, unit: '', writable: true, bitIndex: 3 },
-      { name: 'AO1', address: 120, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO2', address: 121, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO3', address: 122, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO4', address: 123, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-    ]
-  },
-  {
-    id: 'isma-mix18',
-    manufacturer: 'iSMA / Global Control 5',
-    model: 'ISMA-B-MIX18',
-    description: 'Modbus RTU I/O Modul mit 5 UI, 5 DI, 4 AO, 4 DO',
-    category: 'I/O Module',
-    datapoints: [
-      { name: 'UI1 Spannung', address: 70, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI1 Temperatur', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI2 Spannung', address: 72, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI2 Temperatur', address: 73, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI3 Spannung', address: 74, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI3 Temperatur', address: 75, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI4 Spannung', address: 76, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI4 Temperatur', address: 77, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI5 Spannung', address: 78, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI5 Temperatur', address: 79, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'DI Status (alle)', address: 15, registerType: 'input', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: false },
-      { name: 'UI als DI Status', address: 16, registerType: 'input', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: false },
-      { name: 'DO Status (alle)', address: 17, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'AO als DO Status', address: 18, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'AO1 Wert', address: 120, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO2 Wert', address: 121, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO3 Wert', address: 122, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-      { name: 'AO4 Wert', address: 123, registerType: 'holding', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: true },
-    ]
-  },
-  {
-    id: 'isma-4u4o-h-ip',
-    manufacturer: 'iSMA / Global Control 5',
-    model: 'ISMA-B-4U4O-H-IP',
-    description: 'Modbus TCP/IP I/O Modul mit 4 UI und 4 Relais-Ausgaengen',
-    category: 'I/O Module',
-    datapoints: [
-      { name: 'UI1 Spannung', address: 70, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI1 Temperatur', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI2 Spannung', address: 72, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI2 Temperatur', address: 73, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI3 Spannung', address: 74, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI3 Temperatur', address: 75, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI4 Spannung', address: 76, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI4 Temperatur', address: 77, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI als DI Status', address: 16, registerType: 'input', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: false },
-      { name: 'DO Status (alle)', address: 17, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'UI1 Konfiguration', address: 150, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'UI2 Konfiguration', address: 151, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'UI3 Konfiguration', address: 152, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
-      { name: 'UI4 Konfiguration', address: 153, registerType: 'holding', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: true },
+      ...createUIDatapoints(5, 70, 71),
+      ...createDIDatapoints(5, 16),
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(4, 120),
     ]
   },
   {
     id: 'isma-8u-ip',
     manufacturer: 'iSMA / Global Control 5',
     model: 'ISMA-B-8U-IP',
-    description: 'Modbus TCP/IP I/O Modul mit 8 Universal-Eingaengen',
-    category: 'I/O Module',
+    description: '8 Universal-Eingaenge TCP/IP',
+    category: 'iSMA Eingaenge',
+    inputDatapoints: createUIDatapoints(8, 70, 71),
+    outputDatapoints: [],
+    configDatapoints: [
+      ...createUIConfigDatapoints(8),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: createUIDatapoints(8, 70, 71)
+  },
+  {
+    id: 'isma-24i-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-24I-IP',
+    description: '24 Digital-Eingaenge TCP/IP',
+    category: 'iSMA Eingaenge',
+    inputDatapoints: createDIDatapoints(24, 16),
+    outputDatapoints: [],
+    configDatapoints: [
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: createDIDatapoints(24, 16)
+  },
+  {
+    id: 'isma-4o-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4O-H-IP',
+    description: '4 Relais-Ausgaenge TCP/IP',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: [
+      ...createDOConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: createDODatapoints(4, 18)
+  },
+  {
+    id: 'isma-12o-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-12O-H-IP',
+    description: '12 Relais-Ausgaenge TCP/IP',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createDODatapoints(12, 18),
+    configDatapoints: [
+      ...createDOConfigDatapoints(12),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: createDODatapoints(12, 18)
+  },
+  {
+    id: 'isma-4u4a-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4U4A-H-IP',
+    description: '4 UI, 4 AO - Analog I/O Modul TCP/IP',
+    category: 'iSMA Kombination',
+    inputDatapoints: createUIDatapoints(4, 70, 71),
+    outputDatapoints: createAODatapoints(4, 120),
+    configDatapoints: [
+      ...createUIConfigDatapoints(4),
+      ...createAOConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
     datapoints: [
-      { name: 'UI1 Spannung', address: 70, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI1 Temperatur', address: 71, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI2 Spannung', address: 72, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI2 Temperatur', address: 73, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI3 Spannung', address: 74, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI3 Temperatur', address: 75, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI4 Spannung', address: 76, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI4 Temperatur', address: 77, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI5 Spannung', address: 78, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI5 Temperatur', address: 79, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI6 Spannung', address: 80, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI6 Temperatur', address: 81, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI7 Spannung', address: 82, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI7 Temperatur', address: 83, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI8 Spannung', address: 84, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: 'mV', writable: false },
-      { name: 'UI8 Temperatur', address: 85, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'UI als DI Status', address: 16, registerType: 'input', dataType: 'uint16', scale: 1, offset: 0, unit: '', writable: false },
+      ...createUIDatapoints(4, 70, 71),
+      ...createAODatapoints(4, 120),
     ]
+  },
+  {
+    id: 'isma-4i4o-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4I4O-H-IP',
+    description: '4 DI, 4 DO - Digital I/O Modul TCP/IP',
+    category: 'iSMA Kombination',
+    inputDatapoints: createDIDatapoints(4, 16),
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: [
+      ...createDOConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+      { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
+    ],
+    datapoints: [
+      ...createDIDatapoints(4, 16),
+      ...createDODatapoints(4, 18),
+    ]
+  },
+  {
+    id: 'isma-4u4o-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4U4O-H-IP',
+    description: '4 UI, 4 DO - Universal/Digital I/O TCP/IP',
+    category: 'iSMA Kombination',
+    inputDatapoints: createUIDatapoints(4, 70, 71),
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: [
+      ...createUIConfigDatapoints(4),
+      ...createDOConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+      { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
+    ],
+    datapoints: [
+      ...createUIDatapoints(4, 70, 71),
+      ...createDODatapoints(4, 18),
+    ]
+  },
+  {
+    id: 'isma-4to-h-ip',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4TO-H-IP',
+    description: '4 Triac-Ausgaenge (PWM) TCP/IP',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createTriacDatapoints(4, 120),
+    configDatapoints: [
+      ...createTriacConfigDatapoints(4),
+      { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
+    ],
+    datapoints: createTriacDatapoints(4, 120)
+  },
+  {
+    id: 'isma-mix38',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-MIX38',
+    description: '8 UI, 12 DI, 6 AO, 4 DO - Grosses Kombimodul RTU',
+    category: 'iSMA MIX Module',
+    inputDatapoints: [
+      ...createUIDatapoints(8, 70, 71),
+      ...createDIDatapoints(12, 16),
+    ],
+    outputDatapoints: [
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(6, 120),
+    ],
+    configDatapoints: [
+      ...createUIConfigDatapoints(8),
+      ...createDOConfigDatapoints(4),
+      ...createAOConfigDatapoints(6),
+    ],
+    datapoints: [
+      ...createUIDatapoints(8, 70, 71),
+      ...createDIDatapoints(12, 16),
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(6, 120),
+    ]
+  },
+  {
+    id: 'isma-mix18',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-MIX18',
+    description: '5 UI, 5 DI, 4 AO, 4 DO - Kombimodul RTU',
+    category: 'iSMA MIX Module',
+    inputDatapoints: [
+      ...createUIDatapoints(5, 70, 71),
+      ...createDIDatapoints(5, 16),
+    ],
+    outputDatapoints: [
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(4, 120),
+    ],
+    configDatapoints: [
+      ...createUIConfigDatapoints(5),
+      ...createDOConfigDatapoints(4),
+      ...createAOConfigDatapoints(4),
+    ],
+    datapoints: [
+      ...createUIDatapoints(5, 70, 71),
+      ...createDIDatapoints(5, 16),
+      ...createDODatapoints(4, 18),
+      ...createAODatapoints(4, 120),
+    ]
+  },
+  {
+    id: 'isma-8u',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-8U',
+    description: '8 Universal-Eingaenge RTU',
+    category: 'iSMA Eingaenge',
+    inputDatapoints: createUIDatapoints(8, 70, 71),
+    outputDatapoints: [],
+    configDatapoints: createUIConfigDatapoints(8),
+    datapoints: createUIDatapoints(8, 70, 71)
+  },
+  {
+    id: 'isma-24i',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-24I',
+    description: '24 Digital-Eingaenge RTU',
+    category: 'iSMA Eingaenge',
+    inputDatapoints: createDIDatapoints(24, 16),
+    outputDatapoints: [],
+    configDatapoints: [],
+    datapoints: createDIDatapoints(24, 16)
+  },
+  {
+    id: 'isma-4o-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4O-H',
+    description: '4 Relais-Ausgaenge RTU',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: createDOConfigDatapoints(4),
+    datapoints: createDODatapoints(4, 18)
+  },
+  {
+    id: 'isma-12o-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-12O-H',
+    description: '12 Relais-Ausgaenge RTU',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createDODatapoints(12, 18),
+    configDatapoints: createDOConfigDatapoints(12),
+    datapoints: createDODatapoints(12, 18)
+  },
+  {
+    id: 'isma-4u4a-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4U4A-H',
+    description: '4 UI, 4 AO - Analog I/O Modul RTU',
+    category: 'iSMA Kombination',
+    inputDatapoints: createUIDatapoints(4, 70, 71),
+    outputDatapoints: createAODatapoints(4, 120),
+    configDatapoints: [
+      ...createUIConfigDatapoints(4),
+      ...createAOConfigDatapoints(4),
+    ],
+    datapoints: [
+      ...createUIDatapoints(4, 70, 71),
+      ...createAODatapoints(4, 120),
+    ]
+  },
+  {
+    id: 'isma-4i4o-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4I4O-H',
+    description: '4 DI, 4 DO - Digital I/O Modul RTU',
+    category: 'iSMA Kombination',
+    inputDatapoints: createDIDatapoints(4, 16),
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: [
+      ...createDOConfigDatapoints(4),
+      { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
+    ],
+    datapoints: [
+      ...createDIDatapoints(4, 16),
+      ...createDODatapoints(4, 18),
+    ]
+  },
+  {
+    id: 'isma-4u4o-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4U4O-H',
+    description: '4 UI, 4 DO - Universal/Digital I/O RTU',
+    category: 'iSMA Kombination',
+    inputDatapoints: createUIDatapoints(4, 70, 71),
+    outputDatapoints: createDODatapoints(4, 18),
+    configDatapoints: [
+      ...createUIConfigDatapoints(4),
+      ...createDOConfigDatapoints(4),
+      { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
+    ],
+    datapoints: [
+      ...createUIDatapoints(4, 70, 71),
+      ...createDODatapoints(4, 18),
+    ]
+  },
+  {
+    id: 'isma-4to-h',
+    manufacturer: 'iSMA / Global Control 5',
+    model: 'ISMA-B-4TO-H',
+    description: '4 Triac-Ausgaenge (PWM) RTU',
+    category: 'iSMA Ausgaenge',
+    inputDatapoints: [],
+    outputDatapoints: createTriacDatapoints(4, 120),
+    configDatapoints: createTriacConfigDatapoints(4),
+    datapoints: createTriacDatapoints(4, 120)
   },
   {
     id: 'generic-temperature',
@@ -226,9 +503,15 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'Temperatursensor',
     description: 'Generischer Modbus Temperatursensor',
     category: 'Sensoren',
+    inputDatapoints: [
+      { name: 'Temperatur', address: 0, registerType: 'input', dataType: 'int16', scale: 0.1, unit: '°C', writable: false },
+      { name: 'Luftfeuchtigkeit', address: 1, registerType: 'input', dataType: 'uint16', scale: 0.1, unit: '%', writable: false },
+    ],
+    outputDatapoints: [],
+    configDatapoints: [],
     datapoints: [
-      { name: 'Temperatur', address: 0, registerType: 'input', dataType: 'int16', scale: 0.1, offset: 0, unit: '°C', writable: false },
-      { name: 'Luftfeuchtigkeit', address: 1, registerType: 'input', dataType: 'uint16', scale: 0.1, offset: 0, unit: '%', writable: false },
+      { name: 'Temperatur', address: 0, registerType: 'input', dataType: 'int16', scale: 0.1, unit: '°C', writable: false },
+      { name: 'Luftfeuchtigkeit', address: 1, registerType: 'input', dataType: 'uint16', scale: 0.1, unit: '%', writable: false },
     ]
   },
   {
@@ -237,15 +520,27 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'Energiezaehler',
     description: 'Generischer Modbus Energiezaehler',
     category: 'Zaehler',
+    inputDatapoints: [
+      { name: 'Spannung L1', address: 0, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Spannung L2', address: 2, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Spannung L3', address: 4, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Strom L1', address: 6, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Strom L2', address: 8, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Strom L3', address: 10, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Wirkleistung Total', address: 12, registerType: 'input', dataType: 'float32', scale: 1, unit: 'kW', writable: false },
+      { name: 'Energie Total', address: 14, registerType: 'input', dataType: 'float32', scale: 1, unit: 'kWh', writable: false },
+    ],
+    outputDatapoints: [],
+    configDatapoints: [],
     datapoints: [
-      { name: 'Spannung L1', address: 0, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'V', writable: false },
-      { name: 'Spannung L2', address: 2, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'V', writable: false },
-      { name: 'Spannung L3', address: 4, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'V', writable: false },
-      { name: 'Strom L1', address: 6, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'A', writable: false },
-      { name: 'Strom L2', address: 8, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'A', writable: false },
-      { name: 'Strom L3', address: 10, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'A', writable: false },
-      { name: 'Wirkleistung Total', address: 12, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'kW', writable: false },
-      { name: 'Energie Total', address: 14, registerType: 'input', dataType: 'float32', scale: 1, offset: 0, unit: 'kWh', writable: false },
+      { name: 'Spannung L1', address: 0, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Spannung L2', address: 2, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Spannung L3', address: 4, registerType: 'input', dataType: 'float32', scale: 1, unit: 'V', writable: false },
+      { name: 'Strom L1', address: 6, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Strom L2', address: 8, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Strom L3', address: 10, registerType: 'input', dataType: 'float32', scale: 1, unit: 'A', writable: false },
+      { name: 'Wirkleistung Total', address: 12, registerType: 'input', dataType: 'float32', scale: 1, unit: 'kW', writable: false },
+      { name: 'Energie Total', address: 14, registerType: 'input', dataType: 'float32', scale: 1, unit: 'kWh', writable: false },
     ]
   }
 ];

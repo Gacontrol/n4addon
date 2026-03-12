@@ -112,6 +112,9 @@ export const DriversView: React.FC<DriversViewProps> = ({
   });
   const [newLibraryCategory, setNewLibraryCategory] = useState('Benutzerdefiniert');
   const [newLibraryName, setNewLibraryName] = useState('');
+  const [configValues, setConfigValues] = useState<Record<string, Record<string, unknown>>>({});
+  const [loadingConfig, setLoadingConfig] = useState<Record<string, boolean>>({});
+  const [savingConfig, setSavingConfig] = useState<Record<string, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newDevice, setNewDevice] = useState<Partial<ModbusDevice>>({
@@ -299,6 +302,135 @@ export const DriversView: React.FC<DriversViewProps> = ({
     if (typeof value === 'boolean') return value ? 'EIN' : 'AUS';
     const scaled = typeof dp.scale === 'number' ? value * dp.scale : value;
     return `${scaled.toFixed(dp.scale && dp.scale < 1 ? 1 : 0)}${dp.unit ? ` ${dp.unit}` : ''}`;
+  };
+
+  const getApiBase = () => {
+    const path = window.location.pathname;
+    const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+    return m ? `${m[1]}/api` : '/api';
+  };
+
+  const loadConfigValue = useCallback(async (device: ModbusDevice, dp: ModbusDatapoint) => {
+    const key = `${device.id}:${dp.id}`;
+    setLoadingConfig(prev => ({ ...prev, [key]: true }));
+    try {
+      const res = await fetch(`${getApiBase()}/modbus/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: device.host,
+          port: device.port,
+          unitId: device.unitId,
+          address: dp.address,
+          registerType: dp.registerType,
+          dataType: dp.dataType,
+          timeout: device.timeout || 3000
+        })
+      });
+      const data = await res.json();
+      if (data.value !== undefined) {
+        setConfigValues(prev => ({
+          ...prev,
+          [device.id]: { ...(prev[device.id] || {}), [dp.id]: data.value }
+        }));
+      }
+    } catch (err) {
+      console.error('Config read error:', err);
+    } finally {
+      setLoadingConfig(prev => ({ ...prev, [key]: false }));
+    }
+  }, []);
+
+  const writeConfigValue = useCallback(async (device: ModbusDevice, dp: ModbusDatapoint, value: number) => {
+    const key = `${device.id}:${dp.id}`;
+    setSavingConfig(prev => ({ ...prev, [key]: true }));
+    try {
+      await fetch(`${getApiBase()}/modbus/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host: device.host,
+          port: device.port,
+          unitId: device.unitId,
+          address: dp.address,
+          registerType: dp.registerType,
+          dataType: dp.dataType,
+          value,
+          timeout: device.timeout || 3000
+        })
+      });
+      setConfigValues(prev => ({
+        ...prev,
+        [device.id]: { ...(prev[device.id] || {}), [dp.id]: value }
+      }));
+    } catch (err) {
+      console.error('Config write error:', err);
+    } finally {
+      setSavingConfig(prev => ({ ...prev, [key]: false }));
+    }
+  }, []);
+
+  const renderConfigDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint) => {
+    const key = `${device.id}:${dp.id}`;
+    const currentValue = configValues[device.id]?.[dp.id];
+    const isLoading = loadingConfig[key];
+    const isSaving = savingConfig[key];
+    const hasValue = currentValue !== undefined;
+
+    return (
+      <div key={dp.id} className="flex items-center gap-2 text-xs bg-slate-900/50 rounded px-2 py-2 border border-slate-700/50">
+        <Settings className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        <span className="text-slate-300 flex-1 min-w-0 truncate" title={dp.configDescription}>
+          {dp.name}
+        </span>
+        {dp.configOptions ? (
+          <select
+            value={hasValue ? (currentValue as number) : ''}
+            onChange={(e) => writeConfigValue(device, dp, parseInt(e.target.value))}
+            disabled={!hasValue || isSaving}
+            className="px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-white min-w-[120px] disabled:opacity-50"
+          >
+            {!hasValue && <option value="">--</option>}
+            {dp.configOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="number"
+            value={hasValue ? (currentValue as number) : ''}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val)) {
+                setConfigValues(prev => ({
+                  ...prev,
+                  [device.id]: { ...(prev[device.id] || {}), [dp.id]: val }
+                }));
+              }
+            }}
+            onBlur={(e) => {
+              const val = parseFloat(e.target.value);
+              if (!isNaN(val) && hasValue) {
+                writeConfigValue(device, dp, val);
+              }
+            }}
+            disabled={!hasValue || isSaving}
+            className="w-20 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-white text-right disabled:opacity-50"
+            placeholder="--"
+          />
+        )}
+        {dp.unit && <span className="text-slate-500 text-[10px]">{dp.unit}</span>}
+        <button
+          onClick={() => loadConfigValue(device, dp)}
+          disabled={isLoading}
+          className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50"
+          title="Wert vom Geraet lesen"
+        >
+          {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+        </button>
+        {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />}
+      </div>
+    );
   };
 
   const renderDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint, isOutput: boolean) => {
@@ -550,8 +682,9 @@ export const DriversView: React.FC<DriversViewProps> = ({
                   {modbusDevices.map(device => {
                     const isExpanded = expandedDevices.has(device.id);
                     const status = modbusDeviceStatus[device.id];
-                    const inputDatapoints = device.datapoints.filter(dp => !dp.writable);
-                    const outputDatapoints = device.datapoints.filter(dp => dp.writable);
+                    const inputDatapoints = device.datapoints.filter(dp => !dp.writable && !dp.isConfig);
+                    const outputDatapoints = device.datapoints.filter(dp => dp.writable && !dp.isConfig);
+                    const configDatapoints = device.configDatapoints || [];
 
                     return (
                       <div key={device.id} className="bg-slate-800 rounded-lg border border-slate-700">
@@ -691,6 +824,32 @@ export const DriversView: React.FC<DriversViewProps> = ({
                                   <div className="space-y-1 pl-4">
                                     {outputDatapoints.map(dp => renderDatapointRow(device, dp, true))}
                                   </div>
+                                </div>
+                              )}
+
+                              {configDatapoints.length > 0 && (
+                                <div className="border-t border-slate-700 pt-3 mt-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                                      <Settings className="w-3 h-3" />
+                                      Konfiguration ({configDatapoints.length})
+                                    </h4>
+                                    <button
+                                      onClick={() => {
+                                        configDatapoints.forEach(dp => loadConfigValue(device, dp));
+                                      }}
+                                      className="flex items-center gap-1 px-2 py-1 text-[10px] text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                                    >
+                                      <RefreshCw className="w-3 h-3" />
+                                      Alle lesen
+                                    </button>
+                                  </div>
+                                  <div className="space-y-1.5 pl-4 max-h-60 overflow-y-auto">
+                                    {configDatapoints.map(dp => renderConfigDatapointRow(device, dp))}
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 mt-2 pl-4">
+                                    Klicke auf den Refresh-Button um den aktuellen Wert vom Geraet zu lesen bevor du ihn aenderst.
+                                  </p>
                                 </div>
                               )}
 
