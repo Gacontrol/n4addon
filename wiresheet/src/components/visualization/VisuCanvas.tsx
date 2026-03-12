@@ -323,21 +323,18 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         widgetStartY: widget.position.y
       });
     } else {
-      const isInSelection = selectedWidgetIds.includes(widgetId);
+      const currentSelection = selectedWidgetIds.length > 0
+        ? selectedWidgetIds
+        : (selectedWidgetId ? [selectedWidgetId] : []);
+      const isInSelection = currentSelection.includes(widgetId);
 
       if (e.ctrlKey || e.metaKey) {
         if (isInSelection) {
-          const newSelection = selectedWidgetIds.filter(id => id !== widgetId);
+          const newSelection = currentSelection.filter(id => id !== widgetId);
           onSelectWidgets?.(newSelection);
-          if (newSelection.length === 1) {
-            onSelectWidget(newSelection[0]);
-          } else if (newSelection.length === 0) {
-            onSelectWidget(null);
-          }
         } else {
-          const newSelection = [...selectedWidgetIds, widgetId];
+          const newSelection = [...currentSelection, widgetId];
           onSelectWidgets?.(newSelection);
-          onSelectWidget(widgetId);
         }
         e.preventDefault();
         return;

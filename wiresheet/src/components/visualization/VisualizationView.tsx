@@ -522,6 +522,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               if (ids.length > 0) {
                 setSelectedWidgetId(ids[ids.length - 1]);
                 setShowProperties(ids.length === 1);
+              } else {
+                setSelectedWidgetId(null);
+                setShowProperties(false);
               }
             }}
             onUpdateWidget={handleUpdateWidget}
