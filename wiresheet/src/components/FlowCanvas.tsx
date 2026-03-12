@@ -255,6 +255,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (target.closest('[data-node-id]') || target.closest('.port') || target.closest('.node-port')) return;
+    if (target.tagName === 'path' || target.closest('svg#canvas-svg g')) return;
 
     if (connectingFrom) {
       onConnectionCancel();
@@ -484,15 +485,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 1,
+          zIndex: 10,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
           height: '5000px',
           minWidth: `${100 / zoom}%`,
           minHeight: `${100 / zoom}%`,
-          overflow: 'visible',
-          fill: 'none'
+          overflow: 'visible'
         }}
       >
         <defs>
@@ -507,7 +507,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           </marker>
         </defs>
 
-        <g>
+        <g fill="none">
           {connections.map(conn => {
             const start = getPortCenter(conn.source, conn.sourcePort);
             const end = getPortCenter(conn.target, conn.targetPort);

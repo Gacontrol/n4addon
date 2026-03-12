@@ -1038,11 +1038,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </div>
           </div>
 
-          {visuBindings.filter(b => b.paramKey).length > 0 && (
+          {visuBindings.length > 0 && (
             <div className="px-2 pb-1.5 flex flex-col gap-0.5">
-              {visuBindings.filter(b => b.paramKey).map((b, bi) => (
-                <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1.5 py-0.5 rounded leading-none truncate" title={`Visu: ${b.pageName} / ${b.widgetLabel} -> ${b.paramKey}`}>
-                  Visu: {b.pageName} / {b.widgetLabel} ({b.paramKey})
+              {visuBindings.map((b, bi) => (
+                <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1.5 py-0.5 rounded leading-none truncate" title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''}`}>
+                  Visu: {b.pageName} / {b.widgetLabel}{b.paramKey ? ` (${b.paramKey})` : ''}
                 </span>
               ))}
             </div>

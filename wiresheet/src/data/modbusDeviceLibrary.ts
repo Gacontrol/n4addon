@@ -108,7 +108,7 @@ function createUIConfigDatapoints(count: number) {
 function createDIDatapoints(count: number, statusRegister: number) {
   const inputs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 0; i < count; i++) {
-    inputs.push({ name: `DI${i + 1}`, address: statusRegister - 1, registerType: 'input', dataType: 'bool', scale: 1, unit: '', writable: false, bitIndex: i });
+    inputs.push({ name: `DI${i + 1}`, address: statusRegister, registerType: 'input', dataType: 'bool', scale: 1, unit: '', writable: false, bitIndex: i });
   }
   return inputs;
 }
@@ -116,7 +116,7 @@ function createDIDatapoints(count: number, statusRegister: number) {
 function createDODatapoints(count: number, statusRegister: number) {
   const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 0; i < count; i++) {
-    outputs.push({ name: `DO${i + 1}`, address: statusRegister - 1, registerType: 'holding', dataType: 'bool', scale: 1, unit: '', writable: true, bitIndex: i });
+    outputs.push({ name: `DO${i + 1}`, address: statusRegister, registerType: 'holding', dataType: 'bool', scale: 1, unit: '', writable: true, bitIndex: i });
   }
   return outputs;
 }
