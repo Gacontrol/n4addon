@@ -121,18 +121,28 @@ export function VisuApp() {
     }
     console.log('[VISUAPP 8098 DEBUG] Binding gefunden:', JSON.stringify(binding));
 
+    if (binding.paramKey) {
+      setLogicNodes(prev => prev.map(n => {
+        if (n.id !== binding.nodeId) return n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            config: { ...(n.data.config || {}), [binding.paramKey!]: value }
+          }
+        };
+      }));
+    }
+
     try {
       const payload = { nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value };
-      console.log('[VISUAPP 8098 DEBUG] Sende an Server:', apiBase + '/visu/write-value');
-      console.log('[VISUAPP 8098 DEBUG] Payload:', JSON.stringify(payload));
       const resp = await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      console.log('[VISUAPP 8098 DEBUG] Server Response Status:', resp.status);
       const respData = await resp.json();
-      console.log('[VISUAPP 8098 DEBUG] Server Response Body:', JSON.stringify(respData));
+      console.log('[VISUAPP 8098 DEBUG] Server Response Status:', resp.status, JSON.stringify(respData));
     } catch (err) {
       console.error('[VISUAPP 8098 DEBUG] write value error:', err);
     }

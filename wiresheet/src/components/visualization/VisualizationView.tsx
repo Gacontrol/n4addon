@@ -41,10 +41,12 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 }) => {
   const [isEditMode, setIsEditMode] = useState(true);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
+  const [selectedWidgetIds, setSelectedWidgetIds] = useState<string[]>([]);
   const [showProperties, setShowProperties] = useState(false);
   const [editingPageName, setEditingPageName] = useState<string | null>(null);
   const [showPageSettings, setShowPageSettings] = useState(false);
   const [clipboard, setClipboard] = useState<VisuWidget | null>(null);
+  const [multiClipboard, setMultiClipboard] = useState<VisuWidget[] | null>(null);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
@@ -147,6 +149,22 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   }, [activePage, onUpdateVisuPage]);
 
   const handlePasteWidget = useCallback(() => {
+    if (multiClipboard && multiClipboard.length > 0) {
+      const now = Date.now();
+      const newWidgets = multiClipboard.map((src, i) => ({
+        ...src,
+        id: `widget-${now + i}-${Math.random().toString(36).substr(2, 9)}`,
+        position: { x: src.position.x + 20, y: src.position.y + 20 },
+        config: src.type === 'visu-polyline'
+          ? { ...(src.config as PolylineConfig), points: (src.config as PolylineConfig).points.map(p => ({ ...p })) }
+          : { ...src.config },
+        zIndex: activePage.widgets.length + 1 + i
+      }));
+      onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, ...newWidgets] });
+      setSelectedWidgetIds(newWidgets.map(w => w.id));
+      setSelectedWidgetId(newWidgets[newWidgets.length - 1].id);
+      return;
+    }
     if (!clipboard) return;
     const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newWidget: VisuWidget = {
@@ -160,7 +178,36 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     };
     onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
     setSelectedWidgetId(newId);
-  }, [clipboard, activePage, onUpdateVisuPage]);
+  }, [clipboard, multiClipboard, activePage, onUpdateVisuPage]);
+
+  const handleCopyWidgets = useCallback((widgetIds: string[]) => {
+    const widgets = widgetIds.map(id => activePage.widgets.find(w => w.id === id)).filter(Boolean) as VisuWidget[];
+    if (widgets.length === 1) {
+      setClipboard(widgets[0]);
+      setMultiClipboard(null);
+    } else if (widgets.length > 1) {
+      setMultiClipboard(widgets);
+      setClipboard(widgets[0]);
+    }
+  }, [activePage.widgets]);
+
+  const handleDeleteWidgets = useCallback((widgetIds: string[]) => {
+    const idSet = new Set(widgetIds);
+    const updatedWidgets = activePage.widgets.filter(w => !idSet.has(w.id));
+    onUpdateVisuPage(activePage.id, { widgets: updatedWidgets });
+    setSelectedWidgetId(null);
+    setSelectedWidgetIds([]);
+    setShowProperties(false);
+  }, [activePage, onUpdateVisuPage]);
+
+  const handleUpdateWidgets = useCallback((updates: { widgetId: string; updates: Partial<VisuWidget> }[]) => {
+    const updateMap = new Map(updates.map(u => [u.widgetId, u.updates]));
+    const updatedWidgets = activePage.widgets.map(w => {
+      const upd = updateMap.get(w.id);
+      return upd ? { ...w, ...upd } : w;
+    });
+    onUpdateVisuPage(activePage.id, { widgets: updatedWidgets });
+  }, [activePage, onUpdateVisuPage]);
 
   const handleWidgetValueChange = useCallback((widgetId: string, value: unknown) => {
     const widget = activePage.widgets.find(w => w.id === widgetId);
@@ -426,15 +473,31 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             logicNodes={logicNodes}
             isEditMode={isEditMode}
             selectedWidgetId={selectedWidgetId}
-            clipboard={clipboard}
+            selectedWidgetIds={selectedWidgetIds}
+            clipboard={multiClipboard ? multiClipboard[0] : clipboard}
             onSelectWidget={(id) => {
               setSelectedWidgetId(id);
-              if (id) setShowProperties(true);
+              if (id) {
+                setSelectedWidgetIds([id]);
+                setShowProperties(true);
+              } else {
+                setSelectedWidgetIds([]);
+              }
+            }}
+            onSelectWidgets={(ids) => {
+              setSelectedWidgetIds(ids);
+              if (ids.length > 0) {
+                setSelectedWidgetId(ids[ids.length - 1]);
+                setShowProperties(ids.length === 1);
+              }
             }}
             onUpdateWidget={handleUpdateWidget}
+            onUpdateWidgets={handleUpdateWidgets}
             onDeleteWidget={handleDeleteWidget}
+            onDeleteWidgets={handleDeleteWidgets}
             onDuplicateWidget={handleDuplicateWidget}
             onCopyWidget={handleCopyWidget}
+            onCopyWidgets={handleCopyWidgets}
             onPasteWidget={handlePasteWidget}
             onWidgetValueChange={handleWidgetValueChange}
             onEditWidgetProperties={(id) => {

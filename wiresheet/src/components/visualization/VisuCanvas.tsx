@@ -6,7 +6,7 @@ import { VisuWidgetRenderer } from './VisuWidget';
 interface ContextMenuState {
   x: number;
   y: number;
-  widgetId: string;
+  widgetId: string | null;
 }
 
 interface DrawingState {
@@ -17,18 +17,30 @@ interface DrawingState {
   linePhase?: 0 | 1;
 }
 
+interface LassoState {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
+
 interface VisuCanvasProps {
   page: VisuPage;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
   isEditMode: boolean;
   selectedWidgetId: string | null;
+  selectedWidgetIds?: string[];
   clipboard: VisuWidget | null;
   onSelectWidget: (widgetId: string | null) => void;
+  onSelectWidgets?: (widgetIds: string[]) => void;
   onUpdateWidget: (widgetId: string, updates: Partial<VisuWidget>) => void;
+  onUpdateWidgets?: (updates: { widgetId: string; updates: Partial<VisuWidget> }[]) => void;
   onDeleteWidget: (widgetId: string) => void;
+  onDeleteWidgets?: (widgetIds: string[]) => void;
   onDuplicateWidget: (widgetId: string) => void;
   onCopyWidget: (widgetId: string) => void;
+  onCopyWidgets?: (widgetIds: string[]) => void;
   onPasteWidget: () => void;
   onWidgetValueChange: (widgetId: string, value: unknown) => void;
   onEditWidgetProperties: (widgetId: string) => void;
@@ -47,12 +59,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   logicNodes,
   isEditMode,
   selectedWidgetId,
+  selectedWidgetIds = [],
   clipboard,
   onSelectWidget,
+  onSelectWidgets,
   onUpdateWidget,
+  onUpdateWidgets,
   onDeleteWidget,
+  onDeleteWidgets,
   onDuplicateWidget,
   onCopyWidget,
+  onCopyWidgets,
   onPasteWidget,
   onWidgetValueChange,
   onEditWidgetProperties,
@@ -75,6 +92,13 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     initialConfig?: Record<string, unknown>;
   } | null>(null);
 
+  const [multiDragState, setMultiDragState] = useState<{
+    widgetIds: string[];
+    startX: number;
+    startY: number;
+    initialPositions: Record<string, { x: number; y: number }>;
+  } | null>(null);
+
   const [resizeState, setResizeState] = useState<{
     widgetId: string;
     corner: string;
@@ -88,6 +112,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
+  const [lassoState, setLassoState] = useState<LassoState | null>(null);
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -184,7 +209,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       const pos = snapPos(getCanvasPos(e));
       setDrawingState(prev => prev ? { ...prev, cursorPos: pos } : null);
     }
-  }, [drawingState, getCanvasPos, snapPos]);
+    if (lassoState) {
+      const pos = getCanvasPos(e);
+      setLassoState(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    }
+  }, [drawingState, lassoState, getCanvasPos, snapPos]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (contextMenu) {
@@ -192,53 +221,76 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) return;
+    if (lassoState) return;
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
+      onSelectWidgets?.([]);
     }
-  }, [onSelectWidget, contextMenu, drawingState]);
+  }, [onSelectWidget, onSelectWidgets, contextMenu, drawingState, lassoState]);
+
+  const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!isEditMode) return;
+    if (e.target !== canvasRef.current) return;
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, widgetId: null });
+  }, [isEditMode]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!drawingState) return;
-    if (e.target !== canvasRef.current) return;
-    e.stopPropagation();
-    e.preventDefault();
-
-    const pos = snapPos(getCanvasPos(e));
-
-    if (drawingState.type === 'line') {
-      if (drawingState.linePhase === 0) {
-        setDrawingState(prev => prev ? { ...prev, points: [pos], linePhase: 1 } : null);
-      } else {
-        const pts = drawingState.points;
-        if (pts.length >= 1) {
-          const lCfg = page.widgets.find(w => w.id === drawingState.widgetId)?.config as LineConfig;
-          onUpdateWidget(drawingState.widgetId, {
-            config: { ...lCfg, x1: pts[0].x, y1: pts[0].y, x2: pos.x, y2: pos.y },
-            position: { x: 0, y: 0 },
-            size: { width: 1, height: 1 }
-          });
-          setDrawingState(null);
-        }
-      }
-    } else if (drawingState.type === 'polygon') {
-      const pts = drawingState.points;
-      if (pts.length >= 3) {
-        const firstPt = pts[0];
-        const dist = Math.sqrt((pos.x - firstPt.x) ** 2 + (pos.y - firstPt.y) ** 2);
-        if (dist < 15) {
-          const pCfg = page.widgets.find(w => w.id === drawingState.widgetId)?.config as PolygonConfig;
-          onUpdateWidget(drawingState.widgetId, {
-            config: { ...pCfg, points: pts },
-            position: { x: 0, y: 0 },
-            size: { width: 1, height: 1 }
-          });
-          setDrawingState(null);
-          return;
-        }
-      }
-      setDrawingState(prev => prev ? { ...prev, points: [...prev.points, pos] } : null);
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
     }
-  }, [drawingState, getCanvasPos, snapPos, page.widgets, onUpdateWidget]);
+    if (drawingState) {
+      if (e.target !== canvasRef.current) return;
+      e.stopPropagation();
+      e.preventDefault();
+
+      const pos = snapPos(getCanvasPos(e));
+
+      if (drawingState.type === 'line') {
+        if (drawingState.linePhase === 0) {
+          setDrawingState(prev => prev ? { ...prev, points: [pos], linePhase: 1 } : null);
+        } else {
+          const pts = drawingState.points;
+          if (pts.length >= 1) {
+            const lCfg = page.widgets.find(w => w.id === drawingState.widgetId)?.config as LineConfig;
+            onUpdateWidget(drawingState.widgetId, {
+              config: { ...lCfg, x1: pts[0].x, y1: pts[0].y, x2: pos.x, y2: pos.y },
+              position: { x: 0, y: 0 },
+              size: { width: 1, height: 1 }
+            });
+            setDrawingState(null);
+          }
+        }
+      } else if (drawingState.type === 'polygon') {
+        const pts = drawingState.points;
+        if (pts.length >= 3) {
+          const firstPt = pts[0];
+          const dist = Math.sqrt((pos.x - firstPt.x) ** 2 + (pos.y - firstPt.y) ** 2);
+          if (dist < 15) {
+            const pCfg = page.widgets.find(w => w.id === drawingState.widgetId)?.config as PolygonConfig;
+            onUpdateWidget(drawingState.widgetId, {
+              config: { ...pCfg, points: pts },
+              position: { x: 0, y: 0 },
+              size: { width: 1, height: 1 }
+            });
+            setDrawingState(null);
+            return;
+          }
+        }
+        setDrawingState(prev => prev ? { ...prev, points: [...prev.points, pos] } : null);
+      }
+      return;
+    }
+
+    if (isEditMode && e.target === canvasRef.current && e.button === 0) {
+      const pos = getCanvasPos(e);
+      setLassoState({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
+      onSelectWidget(null);
+      onSelectWidgets?.([]);
+      e.preventDefault();
+    }
+  }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
@@ -284,23 +336,76 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         widgetStartY: widget.position.y
       });
     } else {
-      const isVertex = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
-      setDragState({
-        widgetId,
-        startX: e.clientX,
-        startY: e.clientY,
-        widgetStartX: widget.position.x,
-        widgetStartY: widget.position.y,
-        isVertex,
-        initialConfig: isVertex ? JSON.parse(JSON.stringify(widget.config)) : undefined
-      });
+      const isInSelection = selectedWidgetIds.includes(widgetId);
+      if (isInSelection && selectedWidgetIds.length > 1) {
+        const initialPositions: Record<string, { x: number; y: number }> = {};
+        for (const id of selectedWidgetIds) {
+          const w = page.widgets.find(ww => ww.id === id);
+          if (w) initialPositions[id] = { x: w.position.x, y: w.position.y };
+        }
+        setMultiDragState({
+          widgetIds: selectedWidgetIds,
+          startX: e.clientX,
+          startY: e.clientY,
+          initialPositions
+        });
+      } else {
+        const isVertex = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
+        setDragState({
+          widgetId,
+          startX: e.clientX,
+          startY: e.clientY,
+          widgetStartX: widget.position.x,
+          widgetStartY: widget.position.y,
+          isVertex,
+          initialConfig: isVertex ? JSON.parse(JSON.stringify(widget.config)) : undefined
+        });
+        onSelectWidgets?.([widgetId]);
+      }
     }
 
     onSelectWidget(widgetId);
     e.preventDefault();
-  }, [isEditMode, page.widgets, onSelectWidget, contextMenu, drawingState]);
+  }, [isEditMode, page.widgets, onSelectWidget, onSelectWidgets, selectedWidgetIds, contextMenu, drawingState]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (multiDragState) {
+      const rawDeltaX = e.clientX - multiDragState.startX;
+      const rawDeltaY = e.clientY - multiDragState.startY;
+      const gridSize = page.gridSize || 10;
+      let dx = rawDeltaX;
+      let dy = rawDeltaY;
+      if (page.showGrid) {
+        dx = Math.round(dx / gridSize) * gridSize;
+        dy = Math.round(dy / gridSize) * gridSize;
+      }
+      if (onUpdateWidgets) {
+        const updates = multiDragState.widgetIds.map(id => {
+          const initial = multiDragState.initialPositions[id];
+          return {
+            widgetId: id,
+            updates: {
+              position: {
+                x: Math.max(0, initial.x + dx),
+                y: Math.max(0, initial.y + dy)
+              }
+            }
+          };
+        });
+        onUpdateWidgets(updates);
+      } else {
+        for (const id of multiDragState.widgetIds) {
+          const initial = multiDragState.initialPositions[id];
+          onUpdateWidget(id, {
+            position: {
+              x: Math.max(0, initial.x + dx),
+              y: Math.max(0, initial.y + dy)
+            }
+          });
+        }
+      }
+    }
+
     if (dragState) {
       const rawDeltaX = e.clientX - dragState.startX;
       const rawDeltaY = e.clientY - dragState.startY;
@@ -403,15 +508,40 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         size: { width: newWidth, height: newHeight }
       });
     }
-  }, [dragState, resizeState, page.gridSize, page.showGrid, onUpdateWidget]);
+  }, [dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: MouseEvent) => {
+    if (lassoState) {
+      const lx1 = Math.min(lassoState.startX, lassoState.currentX);
+      const ly1 = Math.min(lassoState.startY, lassoState.currentY);
+      const lx2 = Math.max(lassoState.startX, lassoState.currentX);
+      const ly2 = Math.max(lassoState.startY, lassoState.currentY);
+      const threshold = 5;
+      if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
+        const selected = page.widgets
+          .filter(w => {
+            const wx1 = w.position.x;
+            const wy1 = w.position.y;
+            const wx2 = w.position.x + w.size.width;
+            const wy2 = w.position.y + w.size.height;
+            return wx1 < lx2 && wx2 > lx1 && wy1 < ly2 && wy2 > ly1;
+          })
+          .map(w => w.id);
+        if (selected.length > 0) {
+          onSelectWidgets?.(selected);
+          onSelectWidget(selected[selected.length - 1]);
+        }
+      }
+      setLassoState(null);
+      return;
+    }
     setDragState(null);
+    setMultiDragState(null);
     setResizeState(null);
-  }, []);
+  }, [lassoState, page.widgets, onSelectWidget, onSelectWidgets]);
 
   useEffect(() => {
-    if (dragState || resizeState) {
+    if (dragState || resizeState || multiDragState || lassoState) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -419,7 +549,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [dragState, resizeState, handleMouseMove, handleMouseUp]);
+  }, [dragState, resizeState, multiDragState, lassoState, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -431,6 +561,34 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         const widget = page.widgets.find(w => w.id === drawingState.widgetId);
         if (widget) onDeleteWidget(drawingState.widgetId);
         setDrawingState(null);
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        onSelectWidget(null);
+        onSelectWidgets?.([]);
+        return;
+      }
+
+      const hasMultiSelection = selectedWidgetIds.length > 1;
+
+      if (hasMultiSelection) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          if (onDeleteWidgets) {
+            onDeleteWidgets(selectedWidgetIds);
+          } else {
+            for (const id of selectedWidgetIds) onDeleteWidget(id);
+          }
+          onSelectWidgets?.([]);
+          onSelectWidget(null);
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+          e.preventDefault();
+          onCopyWidgets?.(selectedWidgetIds);
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+          e.preventDefault();
+          onPasteWidget();
+        }
         return;
       }
 
@@ -452,7 +610,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditMode, selectedWidgetId, drawingState, onDeleteWidget, onCopyWidget, onDuplicateWidget, onPasteWidget, page.widgets]);
+  }, [isEditMode, selectedWidgetId, selectedWidgetIds, drawingState, onDeleteWidget, onDeleteWidgets, onCopyWidget, onCopyWidgets, onDuplicateWidget, onPasteWidget, page.widgets, onSelectWidget, onSelectWidgets]);
 
   const gridPattern = page.showGrid && page.gridSize ? (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.1 }}>
@@ -524,9 +682,33 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return null;
   })() : null;
 
-  const drawingCursor = drawingState ? 'crosshair' : undefined;
+  const lassoOverlay = lassoState ? (() => {
+    const x = Math.min(lassoState.startX, lassoState.currentX);
+    const y = Math.min(lassoState.startY, lassoState.currentY);
+    const w = Math.abs(lassoState.currentX - lassoState.startX);
+    const h = Math.abs(lassoState.currentY - lassoState.startY);
+    return (
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          left: x,
+          top: y,
+          width: w,
+          height: h,
+          border: '1.5px dashed #3b82f6',
+          background: 'rgba(59,130,246,0.08)',
+          zIndex: 9998,
+          borderRadius: 2
+        }}
+      />
+    );
+  })() : null;
+
+  const drawingCursor = drawingState ? 'crosshair' : (lassoState ? 'crosshair' : undefined);
 
   const hasFixedSize = page.canvasWidth && page.canvasHeight;
+
+  const isMultiSelected = (widgetId: string) => selectedWidgetIds.includes(widgetId);
 
   return (
     <div
@@ -544,7 +726,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
       onContextMenu={(e) => {
-        if (e.target === canvasRef.current) e.preventDefault();
+        if (e.target === canvasRef.current) {
+          handleCanvasContextMenu(e);
+        }
       }}
     >
       {gridPattern}
@@ -563,6 +747,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           key={widget.id}
           onMouseDown={(e) => handleWidgetMouseDown(e, widget.id)}
           onContextMenu={(e) => handleWidgetContextMenu(e, widget.id)}
+          style={isMultiSelected(widget.id) && isEditMode ? {
+            outline: '2px solid #3b82f6',
+            outlineOffset: 2,
+            borderRadius: 2,
+            position: 'absolute',
+            left: widget.position.x,
+            top: widget.position.y,
+            width: widget.size.width,
+            height: widget.size.height,
+            zIndex: widget.zIndex ?? 1
+          } : undefined}
         >
           <VisuWidgetRenderer
             widget={widget}
@@ -571,7 +766,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
             onValueChange={(value) => onWidgetValueChange(widget.id, value)}
             onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
             isEditMode={isEditMode}
-            isSelected={selectedWidgetId === widget.id}
+            isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
             onSelect={() => onSelectWidget(widget.id)}
             onDoubleClick={() => onEditWidgetProperties(widget.id)}
             onNavigateToPage={onNavigateToPage}
@@ -582,6 +777,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       ))}
 
       {drawingOverlay}
+      {lassoOverlay}
 
       {contextMenu && (
         <div
@@ -590,54 +786,102 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-            onClick={() => { onBringToFront(contextMenu.widgetId); setContextMenu(null); }}>
-            Ganz nach vorne
-          </button>
-          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-            onClick={() => { onBringForward(contextMenu.widgetId); setContextMenu(null); }}>
-            Eine Ebene nach vorne
-          </button>
-          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-            onClick={() => { onSendBackward(contextMenu.widgetId); setContextMenu(null); }}>
-            Eine Ebene nach hinten
-          </button>
-          <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
-            onClick={() => { onSendToBack(contextMenu.widgetId); setContextMenu(null); }}>
-            Ganz nach hinten
-          </button>
-          <div className="border-t border-slate-700 my-1" />
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
-            onClick={() => { onDuplicateWidget(contextMenu.widgetId); setContextMenu(null); }}
-          >
-            <span>Duplizieren</span>
-            <span className="text-slate-500 text-xs">Strg+D</span>
-          </button>
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
-            onClick={() => { onCopyWidget(contextMenu.widgetId); setContextMenu(null); }}
-          >
-            <span>Kopieren</span>
-            <span className="text-slate-500 text-xs">Strg+C</span>
-          </button>
-          {clipboard && (
-            <button
-              className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
-              onClick={() => { onPasteWidget(); setContextMenu(null); }}
-            >
-              <span>Einfuegen</span>
-              <span className="text-slate-500 text-xs">Strg+V</span>
-            </button>
+          {contextMenu.widgetId && (
+            <>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                onClick={() => { onBringToFront(contextMenu.widgetId!); setContextMenu(null); }}>
+                Ganz nach vorne
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                onClick={() => { onBringForward(contextMenu.widgetId!); setContextMenu(null); }}>
+                Eine Ebene nach vorne
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                onClick={() => { onSendBackward(contextMenu.widgetId!); setContextMenu(null); }}>
+                Eine Ebene nach hinten
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                onClick={() => { onSendToBack(contextMenu.widgetId!); setContextMenu(null); }}>
+                Ganz nach hinten
+              </button>
+              <div className="border-t border-slate-700 my-1" />
+              {selectedWidgetIds.length > 1 ? (
+                <>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    onClick={() => { onCopyWidgets?.(selectedWidgetIds); setContextMenu(null); }}
+                  >
+                    <span>{selectedWidgetIds.length} Widgets kopieren</span>
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/30"
+                    onClick={() => {
+                      if (onDeleteWidgets) {
+                        onDeleteWidgets(selectedWidgetIds);
+                      } else {
+                        for (const id of selectedWidgetIds) onDeleteWidget(id);
+                      }
+                      onSelectWidgets?.([]);
+                      onSelectWidget(null);
+                      setContextMenu(null);
+                    }}
+                  >
+                    {selectedWidgetIds.length} Widgets loschen
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+                    onClick={() => { onDuplicateWidget(contextMenu.widgetId!); setContextMenu(null); }}
+                  >
+                    <span>Duplizieren</span>
+                    <span className="text-slate-500 text-xs">Strg+D</span>
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+                    onClick={() => { onCopyWidget(contextMenu.widgetId!); setContextMenu(null); }}
+                  >
+                    <span>Kopieren</span>
+                    <span className="text-slate-500 text-xs">Strg+C</span>
+                  </button>
+                  {clipboard && (
+                    <button
+                      className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+                      onClick={() => { onPasteWidget(); setContextMenu(null); }}
+                    >
+                      <span>Einfuegen</span>
+                      <span className="text-slate-500 text-xs">Strg+V</span>
+                    </button>
+                  )}
+                  <div className="border-t border-slate-700 my-1" />
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/30 flex items-center justify-between"
+                    onClick={() => { onDeleteWidget(contextMenu.widgetId!); setContextMenu(null); }}
+                  >
+                    <span>Loschen</span>
+                    <span className="text-slate-500 text-xs">Entf</span>
+                  </button>
+                </>
+              )}
+            </>
           )}
-          <div className="border-t border-slate-700 my-1" />
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-900/30 flex items-center justify-between"
-            onClick={() => { onDeleteWidget(contextMenu.widgetId); setContextMenu(null); }}
-          >
-            <span>Loeschen</span>
-            <span className="text-slate-500 text-xs">Entf</span>
-          </button>
+          {!contextMenu.widgetId && (
+            <>
+              {clipboard && (
+                <button
+                  className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 flex items-center justify-between"
+                  onClick={() => { onPasteWidget(); setContextMenu(null); }}
+                >
+                  <span>Einfuegen</span>
+                  <span className="text-slate-500 text-xs">Strg+V</span>
+                </button>
+              )}
+              {!clipboard && (
+                <div className="px-4 py-2 text-sm text-slate-500">Kein Widget in Zwischenablage</div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
