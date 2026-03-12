@@ -179,7 +179,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     if (widget.type === 'visu-pump') {
       const node = logicNodes.find(n => n.id === nodeId);
-      if (!node || node.type !== 'pump-control') return null;
+      if (!node || (node.type !== 'pump-control' && node.type !== 'aggregate-control')) return null;
       return {
         pumpCmd: liveValues[`${nodeId}:output-0`] ?? false,
         speedOut: liveValues[`${nodeId}:output-1`] ?? 0,
@@ -189,9 +189,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         alarm: liveValues[`${nodeId}:output-5`] ?? false,
         opHours: liveValues[`${nodeId}:output-6`] ?? 0,
         starts: liveValues[`${nodeId}:output-7`] ?? 0,
-        hoaMode: node.data.config?.pumpVisuHOA ?? 2,
+        hoaMode: node.data.config?.pumpVisuHOA ?? node.data.config?.aggregateVisuHOA ?? 2,
         revision: liveValues[`${nodeId}:input-3`] ?? false,
-        handStart: node.data.config?.pumpVisuHandStart ?? false
+        handStart: node.data.config?.pumpVisuHandStart ?? node.data.config?.aggregateVisuHandStart ?? false
       };
     }
 
@@ -245,10 +245,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const getPumpWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-pump' || !widget.binding) return undefined;
     const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
-    if (!node || node.type !== 'pump-control') return undefined;
+    if (!node || (node.type !== 'pump-control' && node.type !== 'aggregate-control')) return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
-    const nodeName = customLabel || node.data.label || 'Pumpe';
+    const configName = (cfg.pumpName || cfg.aggregateName) as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Aggregat';
     return {
       pumpName: nodeName,
       pumpStartDelayMs: cfg.pumpStartDelayMs,
@@ -269,7 +270,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (!node || node.type !== 'valve-control') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
-    const nodeName = customLabel || node.data.label || 'Ventil';
+    const configName = cfg.valveName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Ventil';
     return {
       valveName: nodeName,
       valveMinOutput: cfg.valveMinOutput,

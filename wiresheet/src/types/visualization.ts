@@ -608,7 +608,7 @@ export interface DashMultistateConfig {
   activeColor?: string;
 }
 
-export type AggregateSymbolType = 'pump' | 'fan' | 'motor' | 'valve' | 'compressor' | 'heater' | 'cooler';
+export type AggregateSymbolType = 'pump' | 'fan' | 'motor' | 'compressor' | 'heater' | 'cooler';
 
 export interface PumpWidgetConfig {
   pumpName?: string;

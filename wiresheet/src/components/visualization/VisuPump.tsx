@@ -47,12 +47,12 @@ const PumpSymbol: React.FC<{ color: string; running: boolean; size: number }> = 
 const FanSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
     <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
-    <line x1="16" y1="28" x2="84" y2="72" stroke={color} strokeWidth="3" strokeLinecap="round" />
-    <line x1="16" y1="72" x2="84" y2="28" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <line x1="18" y1="25" x2="82" y2="55" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    <line x1="18" y1="45" x2="82" y2="75" stroke={color} strokeWidth="3" strokeLinecap="round" />
     {running && (
       <>
-        <line x1="16" y1="28" x2="84" y2="72" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
-        <line x1="16" y1="72" x2="84" y2="28" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
+        <line x1="18" y1="25" x2="82" y2="55" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
+        <line x1="18" y1="45" x2="82" y2="75" stroke={color} strokeWidth="6" strokeLinecap="round" opacity="0.3" />
       </>
     )}
   </svg>
@@ -63,15 +63,6 @@ const MotorSymbol: React.FC<{ color: string; running: boolean; size: number }> =
     <circle cx="50" cy="50" r="46" stroke={color} strokeWidth="3" fill="transparent" />
     <text x="50" y="58" textAnchor="middle" fontSize="32" fontWeight="bold" fill={running ? color : color} opacity={running ? 1 : 0.6}>M</text>
     {running && <circle cx="50" cy="50" r="38" stroke={color} strokeWidth="2" fill="transparent" opacity="0.4" />}
-  </svg>
-);
-
-const ValveSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    <polygon points="10,20 50,50 10,80" fill={running ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" />
-    <polygon points="90,20 50,50 90,80" fill={running ? color : 'transparent'} stroke={color} strokeWidth="3" strokeLinejoin="round" />
-    <line x1="50" y1="50" x2="50" y2="15" stroke={color} strokeWidth="3" strokeLinecap="round" />
-    <rect x="40" y="5" width="20" height="12" rx="2" fill={running ? color : 'transparent'} stroke={color} strokeWidth="2" />
   </svg>
 );
 
@@ -112,7 +103,6 @@ const AggregateSymbol: React.FC<{ symbolType: AggregateSymbolType; color: string
   switch (symbolType) {
     case 'fan': return <FanSymbol color={color} running={running} size={size} />;
     case 'motor': return <MotorSymbol color={color} running={running} size={size} />;
-    case 'valve': return <ValveSymbol color={color} running={running} size={size} />;
     case 'compressor': return <CompressorSymbol color={color} running={running} size={size} />;
     case 'heater': return <HeaterSymbol color={color} running={running} size={size} />;
     case 'cooler': return <CoolerSymbol color={color} running={running} size={size} />;

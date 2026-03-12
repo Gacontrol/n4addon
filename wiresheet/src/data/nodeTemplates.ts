@@ -645,7 +645,7 @@ export const nodeTemplates: NodeTemplate[] = [
       aggregateAntiSeizeSpeed: 30,
       aggregateOperatingHours: 0,
       aggregateStartCount: 0,
-      aggregateName: 'Aggregat 1'
+      aggregateName: ''
     }
   },
   {
@@ -656,7 +656,8 @@ export const nodeTemplates: NodeTemplate[] = [
     color: '#7c3aed',
     inputs: [
       { label: 'Setpoint', type: 'input' },
-      { label: 'Feedback', type: 'input' }
+      { label: 'Feedback', type: 'input' },
+      { label: 'Reset', type: 'input' }
     ],
     outputs: [
       { label: 'ValveOut', type: 'output' },
@@ -669,7 +670,7 @@ export const nodeTemplates: NodeTemplate[] = [
       valveMonitoringEnable: true,
       valveTolerance: 5,
       valveAlarmDelayMs: 10000,
-      valveName: 'Ventil 1'
+      valveName: ''
     }
   }
 ];

@@ -1271,9 +1271,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'valve-control') {
       const setpoint = toNumber(inputVals[0]);
       const feedback = toNumber(inputVals[1]);
+      const resetInputWire = toBool(inputVals[2]);
 
       const visuSetpoint = cfg.valveVisuSetpoint;
+      const visuReset = cfg.valveVisuReset;
+
       const actualSetpoint = visuSetpoint !== undefined ? toNumber(visuSetpoint) : setpoint;
+      const resetInput = visuReset === true ? true : resetInputWire;
 
       const minOutput = cfg.valveMinOutput ?? 0;
       const maxOutput = cfg.valveMaxOutput ?? 100;
@@ -1285,25 +1289,29 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const st = pageId ? getNodeState(pageId, nodeId) : node.__valveState || (node.__valveState = {});
 
       if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
-      if (st.alarm === undefined) st.alarm = false;
+      if (st.alarmLatch === undefined) st.alarmLatch = false;
 
       const valveOutput = Math.max(minOutput, Math.min(maxOutput, actualSetpoint || 0));
       const deviation = Math.abs(valveOutput - feedback);
+
+      if (resetInput && st.alarmLatch) {
+        st.alarmLatch = false;
+        st.alarmTimerStart = null;
+      }
 
       if (monitoringEnable && deviation > tolerance) {
         if (st.alarmTimerStart === null) {
           st.alarmTimerStart = now;
         } else if (now - st.alarmTimerStart >= alarmDelayMs) {
-          st.alarm = true;
+          st.alarmLatch = true;
         }
       } else {
         st.alarmTimerStart = null;
-        st.alarm = false;
       }
 
       nodeValues[nodeId] = valveOutput;
       nodeValues[`${nodeId}:output-0`] = valveOutput;
-      nodeValues[`${nodeId}:output-1`] = st.alarm;
+      nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
       nodeValues[`${nodeId}:deviation`] = deviation;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
@@ -1797,6 +1805,11 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
           if (!node.data.config) node.data.config = {};
           if (valveCtrl.setpoint !== undefined) {
             node.data.config.valveVisuSetpoint = valveCtrl.setpoint;
+          }
+          if (valveCtrl.reset !== undefined && valveCtrl.reset === true) {
+            node.data.config.valveVisuReset = true;
+          } else if (valveCtrl.reset === false) {
+            node.data.config.valveVisuReset = false;
           }
           for (const key of Object.keys(valveCtrl)) {
             if (key.startsWith('param_')) {

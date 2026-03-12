@@ -74,7 +74,6 @@ const SYMBOL_OPTIONS = [
   { value: 'pump', label: 'Pumpe' },
   { value: 'fan', label: 'Ventilator' },
   { value: 'motor', label: 'Motor' },
-  { value: 'valve', label: 'Ventil' },
   { value: 'compressor', label: 'Kompressor' },
   { value: 'heater', label: 'Heizung' },
   { value: 'cooler', label: 'Kuehlung' }
