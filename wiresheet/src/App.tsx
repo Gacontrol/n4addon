@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
+import { VisuBindingInfo } from './components/FlowNode';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { CustomBlockLibrary } from './components/CustomBlockLibrary';
 import { CustomBlockEditor } from './components/CustomBlockEditor';
@@ -113,6 +114,7 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
+  const [highlightedVisuWidget, setHighlightedVisuWidget] = useState<{ pageId: string; widgetId: string } | null>(null);
   const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>([]);
   const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(true);
   const [driverConfigLoaded, setDriverConfigLoaded] = useState(false);
@@ -1089,6 +1091,11 @@ function App() {
               onDriverBindingDelete={(binding) => {
                 updateDriverBindings(prev => prev.filter(b => b.id !== binding.id));
               }}
+              onVisuBindingClick={(binding: VisuBindingInfo) => {
+                setActiveVisuPageId(binding.pageId);
+                setHighlightedVisuWidget({ pageId: binding.pageId, widgetId: binding.widgetId });
+                setMainView('visu');
+              }}
             />
 
             <DriverPanel
@@ -1203,6 +1210,8 @@ function App() {
           liveValues={liveValues}
           logicNodes={allLogicNodes}
           onWidgetValueChange={handleVisuWidgetValueChange}
+          highlightWidgetId={highlightedVisuWidget?.widgetId}
+          onClearHighlight={() => setHighlightedVisuWidget(null)}
         />
       )}
 

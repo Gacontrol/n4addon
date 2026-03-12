@@ -25,6 +25,8 @@ interface VisualizationViewProps {
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
   onWidgetValueChange: (widgetId: string, binding: { nodeId: string; portId?: string }, value: unknown) => void;
+  highlightWidgetId?: string | null;
+  onClearHighlight?: () => void;
 }
 
 export const VisualizationView: React.FC<VisualizationViewProps> = ({
@@ -37,7 +39,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   onUpdateVisuPage,
   liveValues,
   logicNodes,
-  onWidgetValueChange
+  onWidgetValueChange,
+  highlightWidgetId,
+  onClearHighlight
 }) => {
   const CLIPBOARD_KEY = 'visu-clipboard';
   const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
@@ -69,6 +73,19 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+
+  useEffect(() => {
+    if (highlightWidgetId) {
+      setSelectedWidgetId(highlightWidgetId);
+      setSelectedWidgetIds([highlightWidgetId]);
+      setShowProperties(true);
+      setIsEditMode(true);
+      const timer = setTimeout(() => {
+        onClearHighlight?.();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightWidgetId, onClearHighlight]);
 
   const handleNavigateToPage = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
