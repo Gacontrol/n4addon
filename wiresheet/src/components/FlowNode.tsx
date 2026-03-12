@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition } from '../types/flow';
+import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition, DriverBinding } from '../types/flow';
 import * as Icons from 'lucide-react';
 
 interface ContextMenuState {
@@ -40,6 +40,7 @@ interface FlowNodeProps {
   parentContainer?: FlowNodeType | null;
   zoom?: number;
   visuBindings?: VisuBindingInfo[];
+  driverBindings?: DriverBinding[];
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -65,7 +66,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   isDraggingMultiple = false,
   parentContainer = null,
   zoom = 1,
-  visuBindings = []
+  visuBindings = [],
+  driverBindings = []
 }) => {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -257,6 +259,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     : node.type === 'dp-boolean'
       ? getBooleanLabel(liveValue)
       : String(liveValue);
+
+  const getDriverBindingForPort = (portId: string) => {
+    return driverBindings.find(b => b.nodeId === node.id && b.portId === portId);
+  };
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation();
@@ -860,14 +866,25 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 const portVal = portValues[input.id];
                 const hasPortVal = portVal !== undefined && portVal !== null;
                 const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
+                const driverBinding = getDriverBindingForPort(input.id);
                 return (
                   <div key={input.id} className="flex items-center min-h-[20px]">
+                    {driverBinding && (
+                      <div className="flex items-center mr-1" style={{ marginLeft: '-60px' }}>
+                        <svg width="40" height="20" className="flex-shrink-0">
+                          <line x1="0" y1="10" x2="40" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                        </svg>
+                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[80px] truncate" title={`${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
+                          {driverBinding.deviceName.slice(0, 6)}:{driverBinding.datapointName.slice(0, 6)}
+                        </span>
+                      </div>
+                    )}
                     <div
                       className="port node-port flex-shrink-0 cursor-pointer"
                       style={{
                         width: '28px',
                         height: '20px',
-                        marginLeft: '-14px',
+                        marginLeft: driverBinding ? '0' : '-14px',
                         position: 'relative',
                         zIndex: 9999,
                         display: 'flex',
@@ -884,9 +901,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{
                           width: '12px',
                           height: '12px',
-                          borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
-                          backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
-                          boxShadow: isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none'),
+                          borderColor: driverBinding ? '#f59e0b' : (isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569')),
+                          backgroundColor: driverBinding ? '#78350f' : (isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b')),
+                          boxShadow: driverBinding ? '0 0 6px #f59e0b60' : (isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none')),
                           transform: isHighlighted ? 'scale(1.15)' : 'scale(1)'
                         }}
                       />
@@ -917,6 +934,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   outVal = liveValues[node.id];
                 }
                 const hasOutVal = outVal !== undefined && outVal !== null;
+                const driverBinding = getDriverBindingForPort(output.id);
                 return (
                   <div key={output.id} className="flex items-center justify-end min-h-[20px]">
                     <div className="flex items-center gap-1 min-w-0">
@@ -934,7 +952,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       style={{
                         width: '28px',
                         height: '20px',
-                        marginRight: '-14px',
+                        marginRight: driverBinding ? '0' : '-14px',
                         position: 'relative',
                         zIndex: 9999,
                         display: 'flex',
@@ -951,12 +969,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{
                           width: '12px',
                           height: '12px',
-                          borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
-                          backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
-                          boxShadow: hasOutVal ? `0 0 3px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
+                          borderColor: driverBinding ? '#f59e0b' : (hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569'),
+                          backgroundColor: driverBinding ? '#78350f' : (hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b'),
+                          boxShadow: driverBinding ? '0 0 6px #f59e0b60' : (hasOutVal ? `0 0 3px ${isManual ? '#dc262660' : '#10b98160'}` : 'none')
                         }}
                       />
                     </div>
+                    {driverBinding && (
+                      <div className="flex items-center ml-1" style={{ marginRight: '-60px' }}>
+                        <svg width="40" height="20" className="flex-shrink-0">
+                          <line x1="0" y1="10" x2="40" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                        </svg>
+                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[80px] truncate" title={`${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
+                          {driverBinding.deviceName.slice(0, 6)}:{driverBinding.datapointName.slice(0, 6)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

@@ -190,3 +190,15 @@ export interface CustomBlockInstance extends FlowNode {
     instanceConnections?: Connection[];
   };
 }
+
+export interface DriverBinding {
+  id: string;
+  nodeId: string;
+  portId: string;
+  driverType: 'modbus';
+  deviceId: string;
+  deviceName: string;
+  datapointId: string;
+  datapointName: string;
+  direction: 'input' | 'output';
+}

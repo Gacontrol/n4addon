@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode, VisuBindingInfo } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
-import { FlowNode as FlowNodeType, Connection, DatapointOverride } from '../types/flow';
+import { FlowNode as FlowNodeType, Connection, DatapointOverride, DriverBinding } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -48,6 +48,7 @@ interface FlowCanvasProps {
   onModbusDatapointDrop?: (data: unknown, x: number, y: number) => void;
   visuPages?: VisuPage[];
   onUpdateNodeData?: (nodeId: string, updates: Partial<FlowNodeType['data']>) => void;
+  driverBindings?: DriverBinding[];
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -85,7 +86,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onOverrideChange,
   onModbusDatapointDrop,
   visuPages = [],
-  onUpdateNodeData
+  onUpdateNodeData,
+  driverBindings = []
 }) => {
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
     const result: VisuBindingInfo[] = [];
@@ -105,6 +107,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     }
     return result;
   }, [visuPages]);
+
+  const getDriverBindingsForNode = useCallback((nodeId: string): DriverBinding[] => {
+    return driverBindings.filter(b => b.nodeId === nodeId);
+  }, [driverBindings]);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -588,6 +594,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 isDraggingMultiple={isDraggingMultiple}
                 zoom={zoom}
                 visuBindings={getVisuBindingsForNode(node.id)}
+                driverBindings={getDriverBindingsForNode(node.id)}
               />
             );
           })}
@@ -697,6 +704,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 parentContainer={parentContainer}
                 zoom={zoom}
                 visuBindings={getVisuBindingsForNode(node.id)}
+                driverBindings={getDriverBindingsForNode(node.id)}
               />
             );
           })}

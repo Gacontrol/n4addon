@@ -6,15 +6,17 @@ import { CustomBlockLibrary } from './components/CustomBlockLibrary';
 import { CustomBlockEditor } from './components/CustomBlockEditor';
 import { VisualizationView } from './components/visualization/VisualizationView';
 import { BackupModal } from './components/BackupModal';
+import { DriversView } from './components/DriversView';
+import { DriverPanel } from './components/DriverPanel';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding } from './types/flow';
 import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup
+  Monitor, Cpu, DatabaseBackup, Network
 } from 'lucide-react';
 
 function App() {
@@ -93,7 +95,7 @@ function App() {
     setAllVisuPages
   } = useVisualization();
 
-  const [mainView, setMainView] = useState<'logic' | 'visu'>('logic');
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -106,6 +108,7 @@ function App() {
   const [zoom, setZoom] = useState(1);
   const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
   const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
+  const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
   const isDraggingFromPalette = useRef(false);
   const isDraggingModbusDatapoint = useRef(false);
   const modbusDatapointDragRef = useRef<{ device: ModbusDevice; datapoint: ModbusDevice['datapoints'][0]; isOutput: boolean } | null>(null);
@@ -448,6 +451,42 @@ function App() {
     }
   }, [handlePlaceModbusDatapoint]);
 
+  const handleDriverDatapointClick = useCallback((
+    device: ModbusDevice,
+    datapoint: ModbusDevice['datapoints'][0],
+    isOutput: boolean
+  ) => {
+    if (connectingFrom) {
+      const newBinding: DriverBinding = {
+        id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        nodeId: connectingFrom.nodeId,
+        portId: connectingFrom.portId,
+        driverType: 'modbus',
+        deviceId: device.id,
+        deviceName: device.name,
+        datapointId: datapoint.id,
+        datapointName: datapoint.name,
+        direction: isOutput ? 'output' : 'input'
+      };
+      setDriverBindings(prev => {
+        const filtered = prev.filter(b =>
+          !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
+        );
+        return [...filtered, newBinding];
+      });
+      cancelConnection();
+    }
+  }, [connectingFrom, cancelConnection]);
+
+  const handleDriverPanelDragStart = useCallback((
+    device: ModbusDevice,
+    datapoint: ModbusDevice['datapoints'][0],
+    isOutput: boolean
+  ) => {
+    isDraggingModbusDatapoint.current = true;
+    modbusDatapointDragRef.current = { device, datapoint, isOutput };
+  }, []);
+
   const handlePingModbusDevice = useCallback(async (deviceId: string) => {
     const device = modbusDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -627,6 +666,17 @@ function App() {
               Logik
             </button>
             <button
+              onClick={() => setMainView('drivers')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'drivers'
+                  ? 'bg-amber-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              Treiber
+            </button>
+            <button
               onClick={() => { setMainView('visu'); executeAllPages(); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'visu'
@@ -797,6 +847,16 @@ function App() {
       {mainView === 'logic' ? (
         <>
           <div className="flex flex-1 overflow-hidden">
+            <DriverPanel
+              side="left"
+              modbusDevices={modbusDevices}
+              modbusDeviceStatus={modbusDeviceStatus}
+              driverBindings={driverBindings.filter(b => b.direction === 'input')}
+              connectingFrom={connectingFrom}
+              onDatapointClick={handleDriverDatapointClick}
+              onDatapointDragStart={handleDriverPanelDragStart}
+            />
+
             <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
               <div className="flex border-b border-slate-700">
                 <button
@@ -883,6 +943,17 @@ function App() {
               onModbusDatapointDrop={handleModbusDatapointDrop}
               visuPages={visuPages}
               onUpdateNodeData={updateNodeData}
+              driverBindings={driverBindings}
+            />
+
+            <DriverPanel
+              side="right"
+              modbusDevices={modbusDevices}
+              modbusDeviceStatus={modbusDeviceStatus}
+              driverBindings={driverBindings.filter(b => b.direction === 'output')}
+              connectingFrom={connectingFrom}
+              onDatapointClick={handleDriverDatapointClick}
+              onDatapointDragStart={handleDriverPanelDragStart}
             />
 
             {selectedNodeData && (
@@ -954,6 +1025,15 @@ function App() {
             />
           )}
         </>
+      ) : mainView === 'drivers' ? (
+        <DriversView
+          modbusDevices={modbusDevices}
+          modbusDriverEnabled={modbusDriverEnabled}
+          onModbusDevicesChange={setModbusDevices}
+          onModbusDriverEnabledChange={setModbusDriverEnabled}
+          modbusDeviceStatus={modbusDeviceStatus}
+          onPingDevice={handlePingModbusDevice}
+        />
       ) : (
         <VisualizationView
           visuPages={visuPages}
