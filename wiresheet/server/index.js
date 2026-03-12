@@ -1431,6 +1431,38 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:input-2`] = enable;
       nodeValues[`${nodeId}:hoaMode`] = visuHOA;
       nodeValues[`${nodeId}:manualOutput`] = manualOutput;
+    } else if (node.type === 'heating-curve') {
+      const inputValue = toNumber(inputVals[0]);
+      const enableRaw = inputVals[1];
+      const enable = enableRaw === null || enableRaw === undefined ? true : toBool(enableRaw);
+
+      const minInput = cfg.hcMinInput ?? -20;
+      const maxInput = cfg.hcMaxInput ?? 20;
+      const minOutput = cfg.hcMinOutput ?? 20;
+      const maxOutput = cfg.hcMaxOutput ?? 80;
+      const reverseDirection = cfg.hcReverseDirection !== false;
+
+      let outputValue = 0;
+
+      if (enable && inputValue !== null && inputValue !== undefined && !isNaN(inputValue)) {
+        const inputLimited = Math.max(minInput, Math.min(maxInput, inputValue));
+        const inputRange = maxInput - minInput;
+
+        if (inputRange !== 0) {
+          if (reverseDirection) {
+            outputValue = maxOutput - ((inputLimited - minInput) * (maxOutput - minOutput) / inputRange);
+          } else {
+            outputValue = minOutput + ((inputLimited - minInput) * (maxOutput - minOutput) / inputRange);
+          }
+        } else {
+          outputValue = minOutput;
+        }
+      }
+
+      nodeValues[nodeId] = outputValue;
+      nodeValues[`${nodeId}:output-0`] = outputValue;
+      nodeValues[`${nodeId}:input-0`] = inputValue;
+      nodeValues[`${nodeId}:input-1`] = enable;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';

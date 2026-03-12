@@ -723,5 +723,28 @@ export const nodeTemplates: NodeTemplate[] = [
       pidMaxOutput: 100,
       pidName: ''
     }
+  },
+  {
+    type: 'heating-curve',
+    label: 'Heizkurve',
+    icon: 'TrendingUp',
+    category: 'special',
+    color: '#ea580c',
+    inputs: [
+      { label: 'InputValue', type: 'input' },
+      { label: 'Enable', type: 'input' }
+    ],
+    outputs: [
+      { label: 'OutputValue', type: 'output' }
+    ],
+    description: 'Heizkurvenbaustein mit linearer Kennlinie',
+    defaultConfig: {
+      hcMinInput: -20,
+      hcMaxInput: 20,
+      hcMinOutput: 20,
+      hcMaxOutput: 80,
+      hcReverseDirection: true,
+      hcName: ''
+    }
   }
 ];

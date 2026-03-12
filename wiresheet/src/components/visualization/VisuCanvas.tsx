@@ -233,6 +233,16 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-heating-curve') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'heating-curve') return null;
+      return {
+        outputValue: liveValues[`${nodeId}:output-0`] ?? 0,
+        inputValue: liveValues[`${nodeId}:input-0`] ?? 0,
+        enable: liveValues[`${nodeId}:input-1`] ?? true
+      };
+    }
+
     if (paramKey) {
       const node = logicNodes.find(n => n.id === nodeId);
       if (node?.data.config) {
@@ -342,6 +352,24 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       pidWindupLimit: cfg.pidWindupLimit,
       pidMinOutput: cfg.pidMinOutput,
       pidMaxOutput: cfg.pidMaxOutput
+    };
+  }, [logicNodes]);
+
+  const getHeatingCurveWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-heating-curve' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    if (!node || node.type !== 'heating-curve') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const configName = cfg.hcName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Heizkurve';
+    return {
+      hcName: nodeName,
+      hcMinInput: cfg.hcMinInput,
+      hcMaxInput: cfg.hcMaxInput,
+      hcMinOutput: cfg.hcMinOutput,
+      hcMaxOutput: cfg.hcMaxOutput,
+      hcReverseDirection: cfg.hcReverseDirection
     };
   }, [logicNodes]);
 
@@ -922,6 +950,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           valveParams={getValveWidgetParams(widget)}
           sensorParams={getSensorWidgetParams(widget)}
           pidParams={getPIDWidgetParams(widget)}
+          heatingCurveParams={getHeatingCurveWidgetParams(widget)}
         />
       ))}
 

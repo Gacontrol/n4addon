@@ -931,6 +931,25 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'PID-Regler Widget mit Sollwert, Istwert und Stellgroesse',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-heating-curve',
+    label: 'Heizkurve',
+    icon: 'TrendingUp',
+    category: 'control',
+    defaultSize: { width: 120, height: 120 },
+    defaultConfig: {
+      hcName: '',
+      normalColor: '#64748b',
+      activeColor: '#f97316',
+      rotation: 0,
+      showInput: true,
+      showOutput: true
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Heizkurven-Widget mit grafischer Kennlinie',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 

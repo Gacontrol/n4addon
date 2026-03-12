@@ -879,6 +879,106 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'heating-curve' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-orange-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Heizkurve</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.hcName ?? ''}
+                placeholder="Heizkurvenname"
+                onChange={e => updateConfig('hcName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Eingangsbereich</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Eingang</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.hcMinInput ?? -20}
+                    onChange={e => updateConfig('hcMinInput', parseFloat(e.target.value) || -20)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Eingang</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.hcMaxInput ?? 20}
+                    onChange={e => updateConfig('hcMaxInput', parseFloat(e.target.value) || 20)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbereich</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Min. Ausgang</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.hcMinOutput ?? 20}
+                    onChange={e => updateConfig('hcMinOutput', parseFloat(e.target.value) || 20)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Max. Ausgang</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={config.hcMaxOutput ?? 80}
+                    onChange={e => updateConfig('hcMaxOutput', parseFloat(e.target.value) || 80)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-2 py-2 bg-slate-700/40 rounded">
+              <span className="text-xs text-slate-300">Richtung umkehren (fallende Kennlinie)</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.hcReverseDirection !== false}
+                  onChange={e => updateConfig('hcReverseDirection', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-orange-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+              </label>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">InputValue (z.B. AT)</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Enable</span></div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-400" /><span className="text-slate-300">OutputValue (z.B. VL-SP)</span></div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              Lineare Heizkurve: Berechnet den Vorlauf-Sollwert basierend auf der Aussentemperatur. Bei aktivierter Richtungsumkehr sinkt der Ausgang mit steigendem Eingang.
+            </p>
+          </div>
+        )}
+
         {node.type === 'scaling' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-violet-400">

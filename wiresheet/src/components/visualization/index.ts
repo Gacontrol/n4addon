@@ -14,3 +14,4 @@ export { VisuLabel } from './VisuLabel';
 export { VisuValve } from './VisuValve';
 export { VisuSensor } from './VisuSensor';
 export { VisuPID } from './VisuPID';
+export { VisuHeatingCurve } from './VisuHeatingCurve';

@@ -62,6 +62,7 @@ import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
 import { VisuSensor } from './VisuSensor';
 import { VisuPID } from './VisuPID';
+import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -150,6 +151,15 @@ interface PIDParams {
   pidMaxOutput?: number;
 }
 
+interface HeatingCurveParams {
+  hcName?: string;
+  hcMinInput?: number;
+  hcMaxInput?: number;
+  hcMinOutput?: number;
+  hcMaxOutput?: number;
+  hcReverseDirection?: boolean;
+}
+
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
@@ -171,6 +181,7 @@ interface VisuWidgetProps {
   valveParams?: ValveParams;
   sensorParams?: SensorParams;
   pidParams?: PIDParams;
+  heatingCurveParams?: HeatingCurveParams;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -240,7 +251,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   pumpParams,
   valveParams,
   sensorParams,
-  pidParams
+  pidParams,
+  heatingCurveParams
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1271,6 +1283,35 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={pidParams}
+          />
+        );
+      }
+
+      case 'visu-heating-curve': {
+        const hcCfg = widget.config as {
+          hcName?: string;
+          normalColor?: string;
+          activeColor?: string;
+          rotation?: 0 | 90 | 180 | 270;
+          showInput?: boolean;
+          showOutput?: boolean;
+        };
+        const hcValues = value as {
+          outputValue?: number;
+          inputValue?: number;
+          enable?: boolean;
+        } | null;
+        return (
+          <VisuHeatingCurve
+            config={hcCfg}
+            value={hcValues ? {
+              outputValue: hcValues.outputValue ?? 0,
+              inputValue: hcValues.inputValue ?? 0,
+              enable: hcValues.enable ?? true
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={heatingCurveParams}
           />
         );
       }
