@@ -647,11 +647,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           }}
         >
           <div
-            className="px-3 py-2 rounded-t flex items-center justify-between gap-2"
+            className="px-2 py-1 rounded-t flex items-center justify-between gap-1"
             style={{ backgroundColor: nodeColor }}
           >
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              {IconComponent && <IconComponent className="w-3.5 h-3.5 text-white flex-shrink-0" />}
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              {IconComponent && <IconComponent className="w-3 h-3 text-white flex-shrink-0" />}
               {isRenamingNode ? (
                 <input
                   type="text"
@@ -724,44 +724,44 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           </div>
 
           {isHANode && (
-            <div className="px-3 py-1.5 border-b border-white/10">
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 text-xs">
-                <Icons.Link className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                <span className="text-slate-300 truncate font-mono text-[10px]">
-                  {data.entityId || 'entity.id waehlen...'}
+            <div className="px-2 py-0.5 border-b border-white/10">
+              <div className="flex items-center gap-1 px-1 py-0.5 rounded bg-white/5">
+                <Icons.Link className="w-2.5 h-2.5 text-slate-400 flex-shrink-0" />
+                <span className="text-slate-300 truncate font-mono text-[9px]">
+                  {data.entityId || 'entity.id...'}
                 </span>
               </div>
             </div>
           )}
 
           {isDPNode && data.config?.dpUnit && (
-            <div className="px-3 py-1 border-b border-white/10">
-              <span className="text-[10px] text-slate-400">Einheit: </span>
-              <span className="text-[10px] text-slate-300 font-mono">{String(data.config.dpUnit)}</span>
+            <div className="px-2 py-0.5 border-b border-white/10">
+              <span className="text-[9px] text-slate-400">Einheit: </span>
+              <span className="text-[9px] text-slate-300 font-mono">{String(data.config.dpUnit)}</span>
             </div>
           )}
 
           {isDPNode && data.config?.dpFacet && (
-            <div className="px-3 py-1 border-b border-white/10">
-              <span className="text-[10px] text-slate-400 truncate block">{String(data.config.dpFacet)}</span>
+            <div className="px-2 py-0.5 border-b border-white/10">
+              <span className="text-[9px] text-slate-400 truncate block">{String(data.config.dpFacet)}</span>
             </div>
           )}
 
           {hasLive && (
-            <div className={`px-3 py-1 border-b border-white/5 ${isManual ? 'bg-red-950/40' : ''}`}>
+            <div className={`px-2 py-0.5 border-b border-white/5 ${isManual ? 'bg-red-950/40' : ''}`}>
               <div
-                className="flex items-center gap-1.5 px-2 py-1 rounded border"
+                className="flex items-center gap-1 px-1 py-0.5 rounded border"
                 style={isManual
                   ? { backgroundColor: '#450a0a60', borderColor: '#dc262650' }
                   : { backgroundColor: '#022c2260', borderColor: '#059669' + '40' }
                 }
               >
                 {isManual
-                  ? <Icons.HandMetal className="w-2.5 h-2.5 text-red-400 flex-shrink-0" />
-                  : <Icons.Activity className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0" />
+                  ? <Icons.HandMetal className="w-2 h-2 text-red-400 flex-shrink-0" />
+                  : <Icons.Activity className="w-2 h-2 text-emerald-400 flex-shrink-0" />
                 }
                 <span
-                  className="font-mono text-[10px] truncate"
+                  className="font-mono text-[9px] truncate"
                   style={{ color: isManual ? '#fca5a5' : '#6ee7b7' }}
                 >
                   {displayValue}
@@ -854,117 +854,113 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
             </div>
           )}
 
-          <div className="py-1.5">
-            {data.inputs.map(input => {
-              const portVal = portValues[input.id];
-              const hasPortVal = portVal !== undefined && portVal !== null;
-              const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
-              return (
-                <div key={input.id} className="flex items-center py-0.5 min-h-[28px]">
-                  <div
-                    className="port node-port flex-shrink-0 cursor-pointer"
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      marginLeft: '-18px',
-                      position: 'relative',
-                      zIndex: 9999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      isolation: 'isolate'
-                    }}
-                    data-port-id={`${node.id}-${input.id}`}
-                    onClick={e => { console.log('[INPUT PORT] click', node.id, input.id); e.stopPropagation(); onPortClick(node.id, input.id, false); }}
-                    onPointerDown={e => { console.log('[INPUT PORT] pointerdown', node.id, input.id); e.stopPropagation(); }}
-                    onMouseEnter={() => { console.log('[INPUT PORT] mouseenter', node.id, input.id); }}
-                  >
+          <div className="py-1 flex">
+            <div className="flex flex-col gap-0">
+              {data.inputs.map(input => {
+                const portVal = portValues[input.id];
+                const hasPortVal = portVal !== undefined && portVal !== null;
+                const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
+                return (
+                  <div key={input.id} className="flex items-center min-h-[20px]">
                     <div
-                      className="rounded-full border-2 transition-all pointer-events-none"
+                      className="port node-port flex-shrink-0 cursor-pointer"
                       style={{
-                        width: '16px',
-                        height: '16px',
-                        borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
-                        backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
-                        boxShadow: isHighlighted ? '0 0 12px #60a5fa' : (hasPortVal ? '0 0 4px #10b98160' : 'none'),
-                        transform: isHighlighted ? 'scale(1.2)' : 'scale(1)'
+                        width: '28px',
+                        height: '20px',
+                        marginLeft: '-14px',
+                        position: 'relative',
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        isolation: 'isolate'
                       }}
-                    />
-                  </div>
-                  <div style={{ width: 16 }} />
-                  <div className="pr-3 flex flex-col min-w-0 gap-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
+                      data-port-id={`${node.id}-${input.id}`}
+                      onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
+                      onPointerDown={e => { e.stopPropagation(); }}
+                    >
+                      <div
+                        className="rounded-full border-2 transition-all pointer-events-none"
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          borderColor: isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'),
+                          backgroundColor: isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'),
+                          boxShadow: isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none'),
+                          transform: isHighlighted ? 'scale(1.15)' : 'scale(1)'
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
                       {hasPortVal && (
-                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/60 px-1 py-0.5 rounded leading-none max-w-16 truncate">
-                          {String(portVal).length > 8 ? String(portVal).slice(0, 8) + '...' : String(portVal)}
+                        <span className="text-[8px] font-mono text-emerald-400 bg-emerald-950/60 px-0.5 rounded leading-none max-w-12 truncate">
+                          {String(portVal).length > 6 ? String(portVal).slice(0, 6) + '..' : String(portVal)}
                         </span>
                       )}
                     </div>
-                    {visuBindings.filter(b => b.portId === input.id).map((b, bi) => (
-                      <span key={bi} className="text-[9px] text-amber-400/80 bg-amber-950/40 px-1 py-0.5 rounded leading-none truncate max-w-[120px]" title={`Visu: ${b.pageName} / ${b.widgetLabel}`}>
-                        Visu: {b.pageName} / {b.widgetLabel}
-                      </span>
-                    ))}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
-            {data.outputs.map((output, outputIndex) => {
-              let outVal;
-              if (isManual) {
-                outVal = data.override?.value;
-              } else if (isPythonScript) {
-                outVal = liveValues[`${node.id}:${output.id}`] ?? liveValues[node.id];
-              } else {
-                outVal = liveValues[node.id];
-              }
-              const hasOutVal = outVal !== undefined && outVal !== null;
-              return (
-                <div key={output.id} className="flex items-center justify-end py-0.5 min-h-[28px]">
-                  <div className="pl-3 flex items-center gap-1.5 min-w-0">
-                    {hasOutVal && (
-                      <span className={`text-[9px] font-mono px-1 py-0.5 rounded leading-none max-w-16 truncate ${
-                        isManual ? 'text-red-400 bg-red-950/60' : 'text-emerald-400 bg-emerald-950/60'
-                      }`}>
-                        {String(outVal).length > 8 ? String(outVal).slice(0, 8) + '...' : String(outVal)}
-                      </span>
-                    )}
-                    <span className="text-xs text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
-                  </div>
-                  <div
-                    className="port node-port flex-shrink-0 cursor-pointer"
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      marginRight: '-18px',
-                      position: 'relative',
-                      zIndex: 9999,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      isolation: 'isolate'
-                    }}
-                    data-port-id={`${node.id}-${output.id}`}
-                    onClick={e => { console.log('[OUTPUT PORT] click', node.id, output.id); e.stopPropagation(); onPortClick(node.id, output.id, true); }}
-                    onPointerDown={e => { console.log('[OUTPUT PORT] pointerdown', node.id, output.id); e.stopPropagation(); }}
-                    onMouseEnter={() => { console.log('[OUTPUT PORT] mouseenter', node.id, output.id); }}
-                  >
+            <div className="flex-1" />
+
+            <div className="flex flex-col gap-0">
+              {data.outputs.map((output) => {
+                let outVal;
+                if (isManual) {
+                  outVal = data.override?.value;
+                } else if (isPythonScript) {
+                  outVal = liveValues[`${node.id}:${output.id}`] ?? liveValues[node.id];
+                } else {
+                  outVal = liveValues[node.id];
+                }
+                const hasOutVal = outVal !== undefined && outVal !== null;
+                return (
+                  <div key={output.id} className="flex items-center justify-end min-h-[20px]">
+                    <div className="flex items-center gap-1 min-w-0">
+                      {hasOutVal && (
+                        <span className={`text-[8px] font-mono px-0.5 rounded leading-none max-w-12 truncate ${
+                          isManual ? 'text-red-400 bg-red-950/60' : 'text-emerald-400 bg-emerald-950/60'
+                        }`}>
+                          {String(outVal).length > 6 ? String(outVal).slice(0, 6) + '..' : String(outVal)}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 leading-none whitespace-nowrap">{output.label}</span>
+                    </div>
                     <div
-                      className="rounded-full border-2 transition-all pointer-events-none"
+                      className="port node-port flex-shrink-0 cursor-pointer"
                       style={{
-                        width: '16px',
-                        height: '16px',
-                        borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
-                        backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
-                        boxShadow: hasOutVal ? `0 0 4px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
+                        width: '28px',
+                        height: '20px',
+                        marginRight: '-14px',
+                        position: 'relative',
+                        zIndex: 9999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        isolation: 'isolate'
                       }}
-                    />
+                      data-port-id={`${node.id}-${output.id}`}
+                      onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
+                      onPointerDown={e => { e.stopPropagation(); }}
+                    >
+                      <div
+                        className="rounded-full border-2 transition-all pointer-events-none"
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          borderColor: hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569',
+                          backgroundColor: hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b',
+                          boxShadow: hasOutVal ? `0 0 3px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {visuBindings.filter(b => b.paramKey).length > 0 && (
