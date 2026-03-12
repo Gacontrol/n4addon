@@ -293,6 +293,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   };
 
   const handleCanvasPointerUp = (e: React.PointerEvent) => {
+    if (canvasRef.current) {
+      canvasRef.current.releasePointerCapture(e.pointerId);
+    }
+
+    if (isDraggingMultiple) {
+      setIsDraggingMultiple(false);
+      dragStartPositions.current.clear();
+      dragStartMouse.current = null;
+      return;
+    }
+
     if (connectingFromRef.current) {
       canvasRef.current?.classList.remove('connecting-mode');
 
@@ -349,12 +360,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         onClearSelection();
       }
     }
-
-    if (isDraggingMultiple) {
-      setIsDraggingMultiple(false);
-      dragStartPositions.current.clear();
-      dragStartMouse.current = null;
-    }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -403,7 +408,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   };
 
   const handleMultiDragStart = (nodeId: string, e: React.PointerEvent) => {
-    if (selectedNodes.size > 1 && selectedNodes.has(nodeId) && canvasRef.current) {
+    if (selectedNodes.size >= 1 && selectedNodes.has(nodeId) && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       const scrollLeft = canvasRef.current.scrollLeft;
       const scrollTop = canvasRef.current.scrollTop;
@@ -416,6 +421,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         dragStartPositions.current.set(n.id, { x: n.position.x, y: n.position.y });
       });
       setIsDraggingMultiple(true);
+      canvasRef.current.setPointerCapture(e.pointerId);
     }
   };
 
