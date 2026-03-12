@@ -259,7 +259,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         const threshold = 5;
         if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
           const widgets = pageWidgetsRef.current;
-          console.log('[Lasso] rect', lx1, ly1, lx2, ly2, 'widgets:', widgets.map(w => `${w.id}@(${w.position.x},${w.position.y},${w.size.width}x${w.size.height})`));
           const selected = widgets
             .filter(w => {
               const wx2 = w.position.x + w.size.width;
@@ -267,10 +266,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               return w.position.x < lx2 && wx2 > lx1 && w.position.y < ly2 && wy2 > ly1;
             })
             .map(w => w.id);
-          console.log('[Lasso] selected:', selected);
           if (selected.length > 0) {
             onSelectWidgetsRef.current?.(selected);
-            onSelectWidgetRef.current(selected[selected.length - 1]);
           }
         }
       };
@@ -475,7 +472,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       }
     }
 
-    onSelectWidget(widgetId);
+    const isInMultiSelection = selectedWidgetIds.includes(widgetId) && selectedWidgetIds.length > 1;
+    if (!isInMultiSelection) {
+      onSelectWidget(widgetId);
+    }
     e.preventDefault();
   }, [isEditMode, page.widgets, onSelectWidget, onSelectWidgets, selectedWidgetIds, contextMenu, drawingState]);
 
