@@ -74,16 +74,16 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
+  const processedHighlightRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (highlightWidgetId) {
+    if (highlightWidgetId && highlightWidgetId !== processedHighlightRef.current) {
+      processedHighlightRef.current = highlightWidgetId;
       setSelectedWidgetId(highlightWidgetId);
       setSelectedWidgetIds([highlightWidgetId]);
       setShowProperties(true);
       setIsEditMode(true);
-      const timer = setTimeout(() => {
-        onClearHighlight?.();
-      }, 3000);
-      return () => clearTimeout(timer);
+      onClearHighlight?.();
     }
   }, [highlightWidgetId, onClearHighlight]);
 
