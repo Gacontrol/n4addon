@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Fan, AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
 import { PumpWidgetConfig } from '../../types/visualization';
 
 interface PumpValues {
@@ -37,6 +37,35 @@ interface VisuPumpProps {
   params?: PumpParams;
 }
 
+const PumpSymbol: React.FC<{ color: string; running: boolean; rotation: number; size: number }> = ({ color, running, size }) => {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ overflow: 'visible' }}
+    >
+      <circle
+        cx="50"
+        cy="50"
+        r="45"
+        stroke={color}
+        strokeWidth="4"
+        fill="transparent"
+      />
+      <polygon
+        points="25,30 75,50 25,70"
+        fill={running ? color : 'transparent'}
+        stroke={color}
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
+
 export const VisuPump: React.FC<VisuPumpProps> = ({
   config,
   value,
@@ -46,7 +75,6 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [rotation, setRotation] = useState(0);
   const [localParams, setLocalParams] = useState<PumpParams>({});
 
   const running = value?.running ?? false;
@@ -61,21 +89,15 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   const revision = value?.revision ?? false;
   const handStart = value?.handStart ?? false;
 
+  const speedMin = params?.pumpSpeedMin ?? 0;
+  const speedMax = params?.pumpSpeedMax ?? 100;
+  const showSpeedOnCanvas = (speedMin > 0 || speedMax > 0) && speedMax > speedMin;
+
   useEffect(() => {
     if (params) {
       setLocalParams(params);
     }
   }, [params]);
-
-  useEffect(() => {
-    if (running) {
-      const speed = Math.max(1, speedOut / 10);
-      const interval = setInterval(() => {
-        setRotation(r => (r + speed) % 360);
-      }, 50);
-      return () => clearInterval(interval);
-    }
-  }, [running, speedOut]);
 
   const getStatusColor = useCallback(() => {
     if (fault || alarm) return config.faultColor || '#ef4444';
@@ -99,9 +121,9 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
     setTimeout(() => onValueChange?.({ reset: false }), 100);
   }, [onValueChange]);
 
-  const handleHandStart = useCallback((active: boolean) => {
-    onValueChange?.({ handStart: active });
-  }, [onValueChange]);
+  const handleHandStartToggle = useCallback(() => {
+    onValueChange?.({ handStart: !handStart });
+  }, [onValueChange, handStart]);
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
@@ -126,56 +148,70 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
     return `${(ms / 86400000).toFixed(1)} d`;
   };
 
-  const pumpName = params?.pumpName || config.pumpName || 'Pumpe';
+  const pumpName = config.pumpName || params?.pumpName || 'Pumpe';
+  const orientation = config.orientation || 'right';
+
+  const getRotation = () => {
+    switch (orientation) {
+      case 'up': return -90;
+      case 'down': return 90;
+      case 'left': return 180;
+      case 'right':
+      default: return 0;
+    }
+  };
+
+  const isNotAuto = hoaMode !== 2;
 
   return (
     <>
       <div
-        className="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none"
+        className="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none relative"
         onClick={handleClick}
         style={{ backgroundColor: 'transparent' }}
       >
+        {isNotAuto && (
+          <div
+            className="absolute top-0.5 left-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10"
+            style={{
+              backgroundColor: hoaMode === 0 ? '#64748b' : '#f59e0b',
+              color: 'white'
+            }}
+          >
+            {hoaMode === 0 ? 'AUS' : 'HAND'}
+          </div>
+        )}
         <div
           className="relative flex items-center justify-center"
           style={{
             width: '70%',
-            height: '70%',
+            height: '60%',
             maxWidth: 80,
-            maxHeight: 80
+            maxHeight: 80,
+            transform: `rotate(${getRotation()}deg)`
           }}
         >
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              backgroundColor: `${statusColor}20`,
-              border: `3px solid ${statusColor}`,
-              boxShadow: running ? `0 0 20px ${statusColor}60` : 'none',
-              transition: 'all 0.3s ease'
-            }}
-          />
-          <Fan
-            size={40}
-            style={{
-              color: statusColor,
-              transform: `rotate(${rotation}deg)`,
-              transition: running ? 'none' : 'transform 0.3s ease'
-            }}
+          <PumpSymbol
+            color={statusColor}
+            running={running}
+            rotation={0}
+            size={60}
           />
           {(fault || alarm) && (
-            <div className="absolute -top-1 -right-1">
-              <AlertTriangle size={16} className="text-red-500" />
+            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
+              <AlertTriangle size={14} className="text-red-500" />
             </div>
           )}
           {revision && !fault && !alarm && (
-            <div className="absolute -top-1 -right-1">
-              <Wrench size={14} className="text-amber-500" />
+            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
+              <Wrench size={12} className="text-amber-500" />
             </div>
           )}
         </div>
-        <div className="mt-1 text-xs text-center text-slate-300 truncate w-full px-1">
+        <div className="text-xs text-center text-slate-300 truncate w-full px-1">
           {pumpName}
         </div>
-        {config.showSpeed && running && (
+        {showSpeedOnCanvas && (
           <div className="text-xs text-slate-400">
             {speedOut.toFixed(0)}%
           </div>
@@ -205,13 +241,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                   className="w-10 h-10 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: statusColor + '30', border: `2px solid ${statusColor}` }}
                 >
-                  <Fan
-                    size={24}
-                    style={{
-                      color: statusColor,
-                      transform: `rotate(${rotation}deg)`
-                    }}
-                  />
+                  <PumpSymbol color={statusColor} running={running} rotation={0} size={28} />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">{pumpName}</h2>
@@ -311,20 +341,26 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
               {hoaMode === 1 && (
                 <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4">
                   <h3 className="text-sm font-medium text-amber-300 mb-3">Handbetrieb</h3>
-                  <button
-                    onMouseDown={() => handleHandStart(true)}
-                    onMouseUp={() => handleHandStart(false)}
-                    onMouseLeave={() => handleHandStart(false)}
-                    onTouchStart={() => handleHandStart(true)}
-                    onTouchEnd={() => handleHandStart(false)}
-                    className={`w-full py-3 rounded-lg font-medium transition-all ${
-                      handStart
-                        ? 'bg-green-600 text-white'
-                        : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                    }`}
-                  >
-                    {handStart ? 'Pumpe laeuft...' : 'Pumpe starten (halten)'}
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-200">Pumpe einschalten</span>
+                    <button
+                      onClick={handleHandStartToggle}
+                      className={`relative w-14 h-7 rounded-full transition-colors ${
+                        handStart ? 'bg-green-600' : 'bg-slate-600'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
+                          handStart ? 'translate-x-8' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {handStart && (
+                    <div className="mt-2 text-sm text-green-400 flex items-center gap-1">
+                      <Play size={12} /> Pumpe laeuft im Handbetrieb
+                    </div>
+                  )}
                 </div>
               )}
 

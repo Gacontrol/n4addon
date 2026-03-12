@@ -228,6 +228,27 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return liveValues[nodeId];
   }, [liveValues]);
 
+  const getPumpWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-pump' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    if (!node || node.type !== 'pump-control') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const nodeName = customLabel || node.data.label || 'Pumpe';
+    return {
+      pumpName: nodeName,
+      pumpStartDelayMs: cfg.pumpStartDelayMs,
+      pumpStopDelayMs: cfg.pumpStopDelayMs,
+      pumpFeedbackTimeoutMs: cfg.pumpFeedbackTimeoutMs,
+      pumpEnableFeedback: cfg.pumpEnableFeedback,
+      pumpSpeedMin: cfg.pumpSpeedMin,
+      pumpSpeedMax: cfg.pumpSpeedMax,
+      pumpAntiSeizeIntervalMs: cfg.pumpAntiSeizeIntervalMs,
+      pumpAntiSeizeRunMs: cfg.pumpAntiSeizeRunMs,
+      pumpAntiSeizeSpeed: cfg.pumpAntiSeizeSpeed
+    };
+  }, [logicNodes]);
+
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (drawingState) {
       const pos = snapPos(getCanvasPos(e));
@@ -801,6 +822,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onNavigateToPage={onNavigateToPage}
           onNavigateBack={onNavigateBack}
           onNavigateHome={onNavigateHome}
+          pumpParams={getPumpWidgetParams(widget)}
         />
       ))}
 

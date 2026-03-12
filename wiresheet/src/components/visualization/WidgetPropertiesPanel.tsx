@@ -1361,6 +1361,75 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-pump': {
+        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right' };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
+              <input
+                type="text"
+                value={pumpCfg.pumpName || ''}
+                placeholder="Name vom verknuepften Baustein"
+                onChange={(e) => onUpdate({ config: { ...config, pumpName: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 placeholder-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ausrichtung</label>
+              <select
+                value={pumpCfg.orientation || 'right'}
+                onChange={(e) => onUpdate({ config: { ...config, orientation: e.target.value as 'up' | 'down' | 'left' | 'right' } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="right">Nach rechts</option>
+                <option value="left">Nach links</option>
+                <option value="up">Nach oben</option>
+                <option value="down">Nach unten</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Laufend</label>
+                <input
+                  type="color"
+                  value={pumpCfg.runningColor || '#22c55e'}
+                  onChange={(e) => onUpdate({ config: { ...config, runningColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Gestoppt</label>
+                <input
+                  type="color"
+                  value={pumpCfg.stoppedColor || '#64748b'}
+                  onChange={(e) => onUpdate({ config: { ...config, stoppedColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Stoerung</label>
+                <input
+                  type="color"
+                  value={pumpCfg.faultColor || '#ef4444'}
+                  onChange={(e) => onUpdate({ config: { ...config, faultColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Revision</label>
+                <input
+                  type="color"
+                  value={pumpCfg.revisionColor || '#f59e0b'}
+                  onChange={(e) => onUpdate({ config: { ...config, revisionColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }

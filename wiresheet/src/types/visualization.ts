@@ -615,6 +615,7 @@ export interface PumpWidgetConfig {
   stoppedColor?: string;
   faultColor?: string;
   revisionColor?: string;
+  orientation?: 'up' | 'down' | 'left' | 'right';
 }
 
 export interface WidgetTemplate {

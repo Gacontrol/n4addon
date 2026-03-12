@@ -101,6 +101,19 @@ import {
   DashMultistate
 } from './DashboardWidgets';
 
+interface PumpParams {
+  pumpName?: string;
+  pumpStartDelayMs?: number;
+  pumpStopDelayMs?: number;
+  pumpFeedbackTimeoutMs?: number;
+  pumpEnableFeedback?: boolean;
+  pumpSpeedMin?: number;
+  pumpSpeedMax?: number;
+  pumpAntiSeizeIntervalMs?: number;
+  pumpAntiSeizeRunMs?: number;
+  pumpAntiSeizeSpeed?: number;
+}
+
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
@@ -118,6 +131,7 @@ interface VisuWidgetProps {
   onNavigateBack?: () => void;
   onNavigateHome?: () => void;
   visuPages?: { id: string; name: string }[];
+  pumpParams?: PumpParams;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -183,7 +197,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateToPage,
   onNavigateBack,
   onNavigateHome,
-  visuPages = []
+  visuPages = [],
+  pumpParams
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1135,6 +1150,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             } : null}
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
+            params={pumpParams}
           />
         );
       }
