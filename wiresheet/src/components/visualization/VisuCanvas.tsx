@@ -574,10 +574,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     };
 
     const handleGlobalPointerMove = (e: PointerEvent) => {
-      if (!(e.buttons & 1)) {
-        finishLasso();
-        return;
-      }
       if (!canvasRef.current) return;
       const el = canvasRef.current;
       const rect = el.getBoundingClientRect();
@@ -585,17 +581,37 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         x: e.clientX - rect.left + el.scrollLeft,
         y: e.clientY - rect.top + el.scrollTop
       };
+      if (lassoRef.current) {
+        lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
+      }
+      if (!(e.buttons & 1)) {
+        finishLasso();
+        return;
+      }
       setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+    };
+
+    const updateLassoFromEvent = (e: MouseEvent | PointerEvent) => {
+      if (!canvasRef.current || !lassoRef.current) return;
+      const el = canvasRef.current;
+      const rect = el.getBoundingClientRect();
+      lassoRef.current = {
+        ...lassoRef.current,
+        currentX: e.clientX - rect.left + el.scrollLeft,
+        currentY: e.clientY - rect.top + el.scrollTop
+      };
     };
 
     const handleGlobalPointerUp = (e: PointerEvent) => {
       if (e.button === 0) {
+        updateLassoFromEvent(e);
         finishLasso();
       }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (e.button === 0) {
+        updateLassoFromEvent(e);
         finishLasso();
       }
     };
