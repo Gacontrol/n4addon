@@ -107,6 +107,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
   const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+  const [lassoPending, setLassoPending] = useState<{ startX: number; startY: number; clientX: number; clientY: number } | null>(null);
   const lassoRef = useRef(lasso);
   lassoRef.current = lasso;
 
@@ -302,10 +303,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     e.preventDefault();
     const pos = getCanvasPos(e);
-    setLasso({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
-    lassoRef.current = { startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
+    setLassoPending({ startX: pos.x, startY: pos.y, clientX: e.clientX, clientY: e.clientY });
     lassoPointerIdRef.current = e.pointerId;
-    canvasRef.current?.setPointerCapture(e.pointerId);
     onSelectWidget(null);
     onSelectWidgets?.([]);
   }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
@@ -585,22 +584,38 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, []);
 
   const handleGlobalLassoMove = useCallback((e: MouseEvent) => {
+    if (lassoPending && !lassoRef.current) {
+      const dx = Math.abs(e.clientX - lassoPending.clientX);
+      const dy = Math.abs(e.clientY - lassoPending.clientY);
+      if (dx > 5 || dy > 5) {
+        const pos = getCanvasPosFromMouseEvent(e);
+        lassoRef.current = { startX: lassoPending.startX, startY: lassoPending.startY, currentX: pos.x, currentY: pos.y };
+        setLasso({ startX: lassoPending.startX, startY: lassoPending.startY, currentX: pos.x, currentY: pos.y });
+        setLassoPending(null);
+      }
+      return;
+    }
     if (!lassoRef.current) return;
     const pos = getCanvasPosFromMouseEvent(e);
     lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
     setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-  }, [getCanvasPosFromMouseEvent]);
+  }, [lassoPending, getCanvasPosFromMouseEvent]);
 
   const handleGlobalLassoUp = useCallback((e: MouseEvent) => {
+    if (lassoPending) {
+      setLassoPending(null);
+      lassoPointerIdRef.current = null;
+      return;
+    }
     if (!lassoRef.current) return;
     if (e.button !== 0) return;
     const pos = getCanvasPosFromMouseEvent(e);
     lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
     finishLasso();
-  }, [getCanvasPosFromMouseEvent, finishLasso]);
+  }, [lassoPending, getCanvasPosFromMouseEvent, finishLasso]);
 
   useEffect(() => {
-    if (lasso) {
+    if (lasso || lassoPending) {
       window.addEventListener('mousemove', handleGlobalLassoMove);
       window.addEventListener('mouseup', handleGlobalLassoUp);
       return () => {
@@ -608,7 +623,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('mouseup', handleGlobalLassoUp);
       };
     }
-  }, [lasso, handleGlobalLassoMove, handleGlobalLassoUp]);
+  }, [lasso, lassoPending, handleGlobalLassoMove, handleGlobalLassoUp]);
 
   const handleLassoPointerMove = useCallback((_e: React.PointerEvent) => {
   }, []);
@@ -617,6 +632,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, []);
 
   const handleLassoPointerCancel = useCallback((e: React.PointerEvent) => {
+    setLassoPending(null);
     if (!lasso) return;
     if (lassoPointerIdRef.current !== e.pointerId) return;
     finishLasso();
