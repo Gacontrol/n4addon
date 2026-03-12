@@ -665,7 +665,7 @@ function App() {
       });
       const data = await response.json();
       if (data.success) {
-        const updatedDevices = modbusDevices.map(d => {
+        setModbusDevicesState(prev => prev.map(d => {
           if (d.id !== deviceId) return d;
           return {
             ...d,
@@ -674,13 +674,12 @@ function App() {
               return { ...dp, currentValue: data.value, lastReadAt: Date.now() };
             })
           };
-        });
-        setModbusDevices(updatedDevices);
+        }));
       }
     } catch (err) {
       console.error('Config read error:', err);
     }
-  }, [modbusDevices, setModbusDevices]);
+  }, [modbusDevices]);
 
   const handleWriteConfigValue = useCallback(async (deviceId: string, datapointId: string, value: number | string | boolean) => {
     const device = modbusDevices.find(d => d.id === deviceId);
@@ -705,7 +704,7 @@ function App() {
       });
       const data = await response.json();
       if (data.success) {
-        const updatedDevices = modbusDevices.map(d => {
+        setModbusDevicesState(prev => prev.map(d => {
           if (d.id !== deviceId) return d;
           return {
             ...d,
@@ -714,13 +713,12 @@ function App() {
               return { ...dp, currentValue: Number(value), pendingValue: undefined, lastReadAt: Date.now() };
             })
           };
-        });
-        setModbusDevices(updatedDevices);
+        }));
       }
     } catch (err) {
       console.error('Config write error:', err);
     }
-  }, [modbusDevices, setModbusDevices]);
+  }, [modbusDevices]);
 
   const allLogicNodes = pages.flatMap(p => p.nodes);
   const allNodeIdsStr = allLogicNodes.map(n => n.id).sort().join(',');
