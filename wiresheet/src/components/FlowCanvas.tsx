@@ -582,8 +582,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 const driverKey = binding.driverType === 'homeassistant'
                   ? binding.haEntityId
                   : `${binding.deviceId}:${binding.datapointId}`;
-                if (driverKey && driverLiveValues[driverKey] !== undefined) {
-                  portValues[input.id] = driverLiveValues[driverKey];
+                const liveStore = (driverLiveValues as { modbus?: Record<string, unknown>; ha?: Record<string, unknown> });
+                const storeKey = binding.driverType === 'homeassistant' ? 'ha' : 'modbus';
+                if (driverKey && liveStore[storeKey]?.[driverKey] !== undefined) {
+                  portValues[input.id] = liveStore[storeKey]?.[driverKey];
                 }
               }
             }
@@ -636,8 +638,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 const driverKey = binding.driverType === 'homeassistant'
                   ? binding.haEntityId
                   : `${binding.deviceId}:${binding.datapointId}`;
-                if (driverKey && driverLiveValues[driverKey] !== undefined) {
-                  portValues[input.id] = driverLiveValues[driverKey];
+                const liveStore = (driverLiveValues as { modbus?: Record<string, unknown>; ha?: Record<string, unknown> });
+                const storeKey = binding.driverType === 'homeassistant' ? 'ha' : 'modbus';
+                if (driverKey && liveStore[storeKey]?.[driverKey] !== undefined) {
+                  portValues[input.id] = liveStore[storeKey]?.[driverKey];
                 }
               }
             }

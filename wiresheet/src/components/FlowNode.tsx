@@ -907,7 +907,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       style={{
                         width: '28px',
                         height: '20px',
-                        marginLeft: driverBinding ? '0' : '-14px',
+                        marginLeft: '-14px',
                         position: 'relative',
                         zIndex: 9999,
                         display: 'flex',
@@ -975,7 +975,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       style={{
                         width: '28px',
                         height: '20px',
-                        marginRight: driverBinding ? '0' : '-14px',
+                        marginRight: '-14px',
                         position: 'relative',
                         zIndex: 9999,
                         display: 'flex',
