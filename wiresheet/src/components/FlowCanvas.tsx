@@ -483,7 +483,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 10,
+          zIndex: 1,
           pointerEvents: 'none',
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
