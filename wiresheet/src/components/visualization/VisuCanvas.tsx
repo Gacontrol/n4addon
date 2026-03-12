@@ -82,6 +82,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const lassoStateRef = useRef<LassoState | null>(null);
 
   const [dragState, setDragState] = useState<{
     widgetId: string;
@@ -113,7 +114,20 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
-  const [lassoState, setLassoState] = useState<LassoState | null>(null);
+  const [lassoState, setLassoStateInternal] = useState<LassoState | null>(null);
+
+  const setLassoState = useCallback((val: LassoState | null | ((prev: LassoState | null) => LassoState | null)) => {
+    if (typeof val === 'function') {
+      setLassoStateInternal(prev => {
+        const newVal = val(prev);
+        lassoStateRef.current = newVal;
+        return newVal;
+      });
+    } else {
+      lassoStateRef.current = val;
+      setLassoStateInternal(val);
+    }
+  }, []);
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
     const el = canvasRef.current!;
@@ -388,7 +402,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [isEditMode, page.widgets, onSelectWidget, onSelectWidgets, selectedWidgetIds, contextMenu, drawingState]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (lassoState) {
+    if (lassoStateRef.current) {
       const pos = getScrolledCanvasPos(e);
       setLassoState(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
     }
@@ -532,14 +546,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         size: { width: newWidth, height: newHeight }
       });
     }
-  }, [lassoState, dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets, getScrolledCanvasPos]);
+  }, [dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets, getScrolledCanvasPos, setLassoState]);
 
   const handleMouseUp = useCallback((e: MouseEvent) => {
-    if (lassoState) {
-      const lx1 = Math.min(lassoState.startX, lassoState.currentX);
-      const ly1 = Math.min(lassoState.startY, lassoState.currentY);
-      const lx2 = Math.max(lassoState.startX, lassoState.currentX);
-      const ly2 = Math.max(lassoState.startY, lassoState.currentY);
+    const currentLasso = lassoStateRef.current;
+    if (currentLasso) {
+      const lx1 = Math.min(currentLasso.startX, currentLasso.currentX);
+      const ly1 = Math.min(currentLasso.startY, currentLasso.currentY);
+      const lx2 = Math.max(currentLasso.startX, currentLasso.currentX);
+      const ly2 = Math.max(currentLasso.startY, currentLasso.currentY);
       const threshold = 5;
       if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
         const selected = page.widgets
@@ -562,7 +577,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     setDragState(null);
     setMultiDragState(null);
     setResizeState(null);
-  }, [lassoState, page.widgets, onSelectWidget, onSelectWidgets]);
+  }, [page.widgets, onSelectWidget, onSelectWidgets, setLassoState]);
 
   useEffect(() => {
     if (dragState || resizeState || multiDragState || lassoState) {
