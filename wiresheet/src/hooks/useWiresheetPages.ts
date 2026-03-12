@@ -29,6 +29,7 @@ export const useWiresheetPages = () => {
   const [pages, setPages] = useState<WiresheetPage[]>([defaultPage()]);
   const [activePageId, setActivePageId] = useState<string>(pages[0].id);
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
+  const [driverLiveValues, setDriverLiveValues] = useState<{ modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> }>({ modbus: {}, ha: {} });
   const [haEntities, setHaEntities] = useState<Array<{ entity_id: string; state: string; attributes: Record<string, unknown> }>>([]);
   const [haLoading, setHaLoading] = useState(false);
   const [haError, setHaError] = useState<string | null>(null);
@@ -201,6 +202,13 @@ export const useWiresheetPages = () => {
               })
             })));
           }
+        } catch {}
+      });
+
+      es.addEventListener('driver-values', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          setDriverLiveValues(data);
         } catch {}
       });
 
@@ -822,6 +830,7 @@ export const useWiresheetPages = () => {
     startPage,
     stopPage,
     liveValues,
+    driverLiveValues,
     haEntities,
     haLoading,
     haError,

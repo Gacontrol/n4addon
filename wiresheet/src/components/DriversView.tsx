@@ -27,6 +27,7 @@ interface DriversViewProps {
   haDriverEnabled: boolean;
   onHaDriverEnabledChange: (enabled: boolean) => void;
   onRefreshHaEntities: () => void;
+  driverLiveValues?: { modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> };
 }
 
 const REGISTER_TYPES = ['holding', 'input', 'coil', 'discrete'] as const;
@@ -59,10 +60,11 @@ function getHaEntityIcon(entityId: string): React.ReactNode {
   }
 }
 
-const HaEntityRow: React.FC<{ entity: HaEntity }> = ({ entity }) => {
+const HaEntityRow: React.FC<{ entity: HaEntity; liveData?: { state: string; attributes: Record<string, unknown> } }> = ({ entity, liveData }) => {
   const friendlyName = entity.attributes.friendly_name as string || entity.entity_id;
   const domain = entity.entity_id.split('.')[0];
   const unit = entity.attributes.unit_of_measurement as string || '';
+  const state = liveData?.state ?? entity.state;
 
   return (
     <div className="flex items-center gap-2 text-xs bg-slate-900 rounded px-2 py-1.5 hover:bg-slate-800 cursor-pointer group">
@@ -71,8 +73,8 @@ const HaEntityRow: React.FC<{ entity: HaEntity }> = ({ entity }) => {
         {friendlyName}
       </span>
       <span className="text-slate-600 text-[10px] shrink-0">{domain}</span>
-      <span className={`font-mono shrink-0 min-w-[60px] text-right ${entity.state !== 'unavailable' ? 'text-cyan-400' : 'text-slate-600'}`}>
-        {entity.state}{unit && ` ${unit}`}
+      <span className={`font-mono shrink-0 min-w-[60px] text-right ${state !== 'unavailable' ? 'text-cyan-400' : 'text-slate-600'}`}>
+        {state}{unit && ` ${unit}`}
       </span>
     </div>
   );
@@ -92,7 +94,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
   haError,
   haDriverEnabled,
   onHaDriverEnabledChange,
-  onRefreshHaEntities
+  onRefreshHaEntities,
+  driverLiveValues = { modbus: {}, ha: {} }
 }) => {
   const [selectedDriverType, setSelectedDriverType] = useState<DriverType | null>('modbus-tcp');
   const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
@@ -300,8 +303,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
 
   const renderDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint, isOutput: boolean) => {
     const isEditing = editingDatapoint === dp.id;
-    const deviceValues = modbusValues[device.id] || {};
-    const liveValue = deviceValues[dp.id];
+    const modbusKey = `${device.id}:${dp.id}`;
+    const liveValue = driverLiveValues.modbus[modbusKey] ?? modbusValues[device.id]?.[dp.id];
 
     if (isEditing) {
       return (
@@ -834,7 +837,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
                                   </h4>
                                   <div className="space-y-1 pl-4">
                                     {inputEntities.map(entity => (
-                                      <HaEntityRow key={entity.entity_id} entity={entity} />
+                                      <HaEntityRow key={entity.entity_id} entity={entity} liveData={driverLiveValues.ha[entity.entity_id]} />
                                     ))}
                                   </div>
                                 </div>
@@ -848,7 +851,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
                                   </h4>
                                   <div className="space-y-1 pl-4">
                                     {outputEntities.map(entity => (
-                                      <HaEntityRow key={entity.entity_id} entity={entity} />
+                                      <HaEntityRow key={entity.entity_id} entity={entity} liveData={driverLiveValues.ha[entity.entity_id]} />
                                     ))}
                                   </div>
                                 </div>
@@ -900,7 +903,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
                               })
                               .slice(0, 100)
                               .map(entity => (
-                                <HaEntityRow key={entity.entity_id} entity={entity} />
+                                <HaEntityRow key={entity.entity_id} entity={entity} liveData={driverLiveValues.ha[entity.entity_id]} />
                               ))}
                           </div>
                         </div>

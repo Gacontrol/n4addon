@@ -39,6 +39,90 @@ let driverConfig = {
   haDriverEnabled: true
 };
 const modbusLiveValues = new Map();
+const haLiveValues = new Map();
+let driverPollingInterval = null;
+const DRIVER_POLL_INTERVAL = 2000;
+
+async function pollAllDrivers() {
+  if (!driverConfig.modbusDriverEnabled && !driverConfig.haDriverEnabled) {
+    return;
+  }
+
+  if (driverConfig.modbusDriverEnabled) {
+    const enabledDevices = (driverConfig.modbusDevices || []).filter(d => d.enabled);
+    for (const device of enabledDevices) {
+      for (const dp of (device.datapoints || [])) {
+        if (dp.isConfig) continue;
+        try {
+          let rawValue = await modbusReadRegister(
+            device.host,
+            device.port,
+            device.unitId,
+            dp.address,
+            dp.registerType || 'holding',
+            dp.dataType || 'uint16',
+            device.timeout || 3000
+          );
+          let value = rawValue;
+          if (dp.scale && dp.scale !== 1) value = value * dp.scale;
+          if (dp.offset) value = value + dp.offset;
+          if (dp.bitIndex !== undefined && dp.bitIndex >= 0) {
+            value = (rawValue >> dp.bitIndex) & 1 ? true : false;
+          }
+          modbusLiveValues.set(`${device.id}:${dp.id}`, value);
+        } catch (err) {
+          console.log(`Modbus poll error ${device.name}/${dp.name}: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  if (driverConfig.haDriverEnabled) {
+    try {
+      const token = getToken();
+      if (token) {
+        const haRes = await fetch('http://supervisor/core/api/states', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (haRes.ok) {
+          const states = await haRes.json();
+          for (const entity of states) {
+            haLiveValues.set(entity.entity_id, {
+              state: entity.state,
+              attributes: entity.attributes
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.log(`HA poll error: ${err.message}`);
+    }
+  }
+
+  broadcastSSE('driver-values', {
+    modbus: Object.fromEntries(modbusLiveValues),
+    ha: Object.fromEntries(haLiveValues)
+  });
+}
+
+function startDriverPolling() {
+  if (driverPollingInterval) {
+    clearInterval(driverPollingInterval);
+  }
+  if (driverConfig.modbusDriverEnabled || driverConfig.haDriverEnabled) {
+    console.log('Starte Treiber-Polling...');
+    pollAllDrivers();
+    driverPollingInterval = setInterval(pollAllDrivers, DRIVER_POLL_INTERVAL);
+  }
+}
+
+function stopDriverPolling() {
+  if (driverPollingInterval) {
+    clearInterval(driverPollingInterval);
+    driverPollingInterval = null;
+    console.log('Treiber-Polling gestoppt');
+  }
+}
 
 async function loadPersistentDpValues() {
   try {
@@ -88,6 +172,7 @@ async function loadDriverConfig() {
       haDriverEnabled: cfg.haDriverEnabled !== false
     };
     console.log(`Treiber-Konfiguration geladen: ${driverConfig.modbusDevices.length} Modbus-Geraete, ${driverConfig.driverBindings.length} Bindings`);
+    startDriverPolling();
   } catch (err) {
     if (err.code !== 'ENOENT') {
       console.error('Fehler beim Laden der Treiber-Konfiguration:', err.message);
@@ -330,11 +415,19 @@ app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
       haDriverEnabled: cfg.haDriverEnabled !== false
     };
     await saveDriverConfig();
+    startDriverPolling();
     res.json({ success: true });
   } catch (err) {
     console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get(['/driver-live-values', '/api/driver-live-values'], (req, res) => {
+  res.json({
+    modbus: Object.fromEntries(modbusLiveValues),
+    ha: Object.fromEntries(haLiveValues)
+  });
 });
 
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {

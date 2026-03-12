@@ -32,6 +32,7 @@ function App() {
     startPage,
     stopPage,
     liveValues,
+    driverLiveValues,
     haEntities,
     haLoading,
     haError,
@@ -1178,6 +1179,7 @@ function App() {
           haDriverEnabled={haDriverEnabled}
           onHaDriverEnabledChange={setHaDriverEnabled}
           onRefreshHaEntities={loadHaEntities}
+          driverLiveValues={driverLiveValues}
         />
       ) : (
         <VisualizationView
