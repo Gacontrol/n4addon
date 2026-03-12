@@ -283,9 +283,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (!isEditMode) return;
     e.preventDefault();
     e.stopPropagation();
-    onSelectWidget(widgetId);
+    const isInSelection = selectedWidgetIds.includes(widgetId);
+    if (!isInSelection) {
+      onSelectWidget(widgetId);
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, widgetId });
-  }, [isEditMode, onSelectWidget]);
+  }, [isEditMode, onSelectWidget, selectedWidgetIds]);
 
   const handleWidgetMouseDown = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
