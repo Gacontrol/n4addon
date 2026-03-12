@@ -250,22 +250,26 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('pointerup', onUp);
 
         const { x: cx, y: cy } = getCoordsFromRect(ev);
+        const scrollLeft = canvas.scrollLeft;
+        const scrollTop = canvas.scrollTop;
 
-        const lx1 = Math.min(startX, cx);
-        const ly1 = Math.min(startY, cy);
-        const lx2 = Math.max(startX, cx);
-        const ly2 = Math.max(startY, cy);
+        const lx1 = Math.min(startX, cx) + scrollLeft;
+        const ly1 = Math.min(startY, cy) + scrollTop;
+        const lx2 = Math.max(startX, cx) + scrollLeft;
+        const ly2 = Math.max(startY, cy) + scrollTop;
 
         setLassoState(null);
 
         const threshold = 5;
-        if (lx2 - lx1 > threshold || ly2 - ly1 > threshold) {
+        if (Math.abs(cx - startX) > threshold || Math.abs(cy - startY) > threshold) {
           const widgets = pageWidgetsRef.current;
           const selected = widgets
             .filter(w => {
-              const wx2 = w.position.x + w.size.width;
-              const wy2 = w.position.y + w.size.height;
-              return w.position.x < lx2 && wx2 > lx1 && w.position.y < ly2 && wy2 > ly1;
+              const wx1 = w.position.x;
+              const wy1 = w.position.y;
+              const wx2 = wx1 + w.size.width;
+              const wy2 = wy1 + w.size.height;
+              return wx1 < lx2 && wx2 > lx1 && wy1 < ly2 && wy2 > ly1;
             })
             .map(w => w.id);
           if (selected.length > 0) {
