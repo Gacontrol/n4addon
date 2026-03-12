@@ -106,16 +106,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
-  const [lasso, setLasso] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
-  const [lassoPending, setLassoPending] = useState<{ startX: number; startY: number; clientX: number; clientY: number } | null>(null);
-  const lassoRef = useRef(lasso);
-  lassoRef.current = lasso;
-
-  const pageWidgetsRef = useRef(page.widgets);
-  pageWidgetsRef.current = page.widgets;
-
-  const onSelectWidgetsRef = useRef(onSelectWidgets);
-  onSelectWidgetsRef.current = onSelectWidgets;
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -226,12 +216,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) return;
-    if (lasso) return;
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
       onSelectWidgets?.([]);
     }
-  }, [onSelectWidget, onSelectWidgets, contextMenu, drawingState, lasso]);
+  }, [onSelectWidget, onSelectWidgets, contextMenu, drawingState]);
 
   const handleCanvasContextMenu = useCallback((e: React.MouseEvent) => {
     if (!isEditMode) return;
@@ -289,25 +278,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
 
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
-
-  const lassoPointerIdRef = useRef<number | null>(null);
-
-  const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    if (!isEditMode) return;
-    if (drawingState) return;
-    if (contextMenu) return;
-
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-widget-id]')) return;
-
-    e.preventDefault();
-    const pos = getCanvasPos(e);
-    setLassoPending({ startX: pos.x, startY: pos.y, clientX: e.clientX, clientY: e.clientY });
-    lassoPointerIdRef.current = e.pointerId;
-    onSelectWidget(null);
-    onSelectWidgets?.([]);
-  }, [isEditMode, drawingState, contextMenu, getCanvasPos, onSelectWidget, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
     if (!isEditMode) return;
@@ -547,97 +517,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
   }, [dragState, resizeState, multiDragState, handleMouseMove, handleMouseUp]);
 
-  const finishLasso = useCallback(() => {
-    const currentLasso = lassoRef.current;
-    if (currentLasso) {
-      const minX = Math.min(currentLasso.startX, currentLasso.currentX);
-      const maxX = Math.max(currentLasso.startX, currentLasso.currentX);
-      const minY = Math.min(currentLasso.startY, currentLasso.currentY);
-      const maxY = Math.max(currentLasso.startY, currentLasso.currentY);
-      const isActualLasso = Math.abs(currentLasso.currentX - currentLasso.startX) > 5 || Math.abs(currentLasso.currentY - currentLasso.startY) > 5;
-
-      if (isActualLasso) {
-        const widgets = pageWidgetsRef.current;
-        const selected = widgets
-          .filter(w => {
-            const wx1 = w.position.x;
-            const wy1 = w.position.y;
-            const wx2 = wx1 + w.size.width;
-            const wy2 = wy1 + w.size.height;
-            return wx1 < maxX && wx2 > minX && wy1 < maxY && wy2 > minY;
-          })
-          .map(w => w.id);
-        if (selected.length > 0) {
-          onSelectWidgetsRef.current?.(selected);
-        }
-      }
-    }
-    lassoRef.current = null;
-    lassoPointerIdRef.current = null;
-    setLasso(null);
-  }, []);
-
-  const getCanvasPosFromMouseEvent = useCallback((e: MouseEvent) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }, []);
-
-  const handleGlobalLassoMove = useCallback((e: MouseEvent) => {
-    if (lassoPending && !lassoRef.current) {
-      const dx = Math.abs(e.clientX - lassoPending.clientX);
-      const dy = Math.abs(e.clientY - lassoPending.clientY);
-      if (dx > 5 || dy > 5) {
-        const pos = getCanvasPosFromMouseEvent(e);
-        lassoRef.current = { startX: lassoPending.startX, startY: lassoPending.startY, currentX: pos.x, currentY: pos.y };
-        setLasso({ startX: lassoPending.startX, startY: lassoPending.startY, currentX: pos.x, currentY: pos.y });
-        setLassoPending(null);
-      }
-      return;
-    }
-    if (!lassoRef.current) return;
-    const pos = getCanvasPosFromMouseEvent(e);
-    lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
-    setLasso(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
-  }, [lassoPending, getCanvasPosFromMouseEvent]);
-
-  const handleGlobalLassoUp = useCallback((e: MouseEvent) => {
-    if (lassoPending) {
-      setLassoPending(null);
-      lassoPointerIdRef.current = null;
-      return;
-    }
-    if (!lassoRef.current) return;
-    if (e.button !== 0) return;
-    const pos = getCanvasPosFromMouseEvent(e);
-    lassoRef.current = { ...lassoRef.current, currentX: pos.x, currentY: pos.y };
-    finishLasso();
-  }, [lassoPending, getCanvasPosFromMouseEvent, finishLasso]);
-
-  useEffect(() => {
-    if (lasso || lassoPending) {
-      window.addEventListener('mousemove', handleGlobalLassoMove);
-      window.addEventListener('mouseup', handleGlobalLassoUp);
-      return () => {
-        window.removeEventListener('mousemove', handleGlobalLassoMove);
-        window.removeEventListener('mouseup', handleGlobalLassoUp);
-      };
-    }
-  }, [lasso, lassoPending, handleGlobalLassoMove, handleGlobalLassoUp]);
-
-  const handleLassoPointerMove = useCallback((_e: React.PointerEvent) => {
-  }, []);
-
-  const handleLassoPointerUp = useCallback((_e: React.PointerEvent) => {
-  }, []);
-
-  const handleLassoPointerCancel = useCallback((e: React.PointerEvent) => {
-    setLassoPending(null);
-    if (!lasso) return;
-    if (lassoPointerIdRef.current !== e.pointerId) return;
-    finishLasso();
-  }, [lasso, finishLasso]);
-
   useEffect(() => {
     if (!isEditMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -769,14 +648,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     return null;
   })() : null;
 
-  const lassoRect = lasso && (Math.abs(lasso.currentX - lasso.startX) > 5 || Math.abs(lasso.currentY - lasso.startY) > 5) ? {
-    x: Math.min(lasso.startX, lasso.currentX),
-    y: Math.min(lasso.startY, lasso.currentY),
-    width: Math.abs(lasso.currentX - lasso.startX),
-    height: Math.abs(lasso.currentY - lasso.startY)
-  } : null;
-
-  const drawingCursor = drawingState ? 'crosshair' : (lasso ? 'crosshair' : undefined);
+  const drawingCursor = drawingState ? 'crosshair' : undefined;
 
   const hasFixedSize = page.canvasWidth && page.canvasHeight;
 
@@ -797,10 +669,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onClick={handleCanvasClick}
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
-      onPointerDown={handleCanvasPointerDown}
-      onPointerMove={handleLassoPointerMove}
-      onPointerUp={handleLassoPointerUp}
-      onPointerCancel={handleLassoPointerCancel}
       onContextMenu={(e) => {
         if (e.target === canvasRef.current) {
           handleCanvasContextMenu(e);
@@ -840,21 +708,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       ))}
 
       {drawingOverlay}
-      {lassoRect && (
-        <div
-          className="absolute pointer-events-none"
-          style={{
-            left: lassoRect.x,
-            top: lassoRect.y,
-            width: lassoRect.width,
-            height: lassoRect.height,
-            border: '1.5px dashed #3b82f6',
-            background: 'rgba(59,130,246,0.08)',
-            zIndex: 9998,
-            borderRadius: 2
-          }}
-        />
-      )}
 
       {contextMenu && (
         <div
