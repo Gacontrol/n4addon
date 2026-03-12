@@ -106,6 +106,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [drawingState, setDrawingState] = useState<DrawingState | null>(null);
+  const [lassoState, setLassoState] = useState<{
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
@@ -277,6 +283,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
 
+    if (isEditMode && e.target === canvasRef.current && e.button === 0) {
+      const pos = getCanvasPos(e);
+      if (!e.ctrlKey && !e.metaKey) {
+        onSelectWidget(null);
+        onSelectWidgets?.([]);
+      }
+      setLassoState({
+        startX: pos.x,
+        startY: pos.y,
+        currentX: pos.x,
+        currentY: pos.y
+      });
+      e.preventDefault();
+    }
+
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
@@ -378,6 +399,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [isEditMode, page.widgets, onSelectWidget, onSelectWidgets, selectedWidgetIds, contextMenu, drawingState]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (lassoState) {
+      const pos = getCanvasPos(e);
+      setLassoState(prev => prev ? { ...prev, currentX: pos.x, currentY: pos.y } : null);
+      return;
+    }
+
     if (multiDragState) {
       const rawDeltaX = e.clientX - multiDragState.startX;
       const rawDeltaY = e.clientY - multiDragState.startY;
@@ -517,16 +544,48 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         size: { width: newWidth, height: newHeight }
       });
     }
-  }, [dragState, multiDragState, resizeState, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets]);
+  }, [dragState, multiDragState, resizeState, lassoState, getCanvasPos, page.gridSize, page.showGrid, page.widgets, onUpdateWidget, onUpdateWidgets]);
 
   const handleMouseUp = useCallback(() => {
+    if (lassoState) {
+      const minX = Math.min(lassoState.startX, lassoState.currentX);
+      const maxX = Math.max(lassoState.startX, lassoState.currentX);
+      const minY = Math.min(lassoState.startY, lassoState.currentY);
+      const maxY = Math.max(lassoState.startY, lassoState.currentY);
+
+      const lassoRect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+
+      if (lassoRect.width > 5 || lassoRect.height > 5) {
+        const intersectingWidgets = page.widgets.filter(widget => {
+          const wx = widget.position.x;
+          const wy = widget.position.y;
+          const ww = widget.size.width;
+          const wh = widget.size.height;
+
+          return !(wx + ww < lassoRect.x || wx > lassoRect.x + lassoRect.width ||
+                   wy + wh < lassoRect.y || wy > lassoRect.y + lassoRect.height);
+        });
+
+        const newIds = intersectingWidgets.map(w => w.id);
+        if (newIds.length > 0) {
+          onSelectWidgets?.(newIds);
+          if (newIds.length === 1) {
+            onSelectWidget(newIds[0]);
+          }
+        }
+      }
+
+      setLassoState(null);
+      return;
+    }
+
     setDragState(null);
     setMultiDragState(null);
     setResizeState(null);
-  }, []);
+  }, [lassoState, page.widgets, onSelectWidget, onSelectWidgets]);
 
   useEffect(() => {
-    if (dragState || resizeState || multiDragState) {
+    if (dragState || resizeState || multiDragState || lassoState) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -534,7 +593,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [dragState, resizeState, multiDragState, handleMouseMove, handleMouseUp]);
+  }, [dragState, resizeState, multiDragState, lassoState, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -727,6 +786,19 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       ))}
 
       {drawingOverlay}
+
+      {lassoState && (
+        <div
+          className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10"
+          style={{
+            left: Math.min(lassoState.startX, lassoState.currentX),
+            top: Math.min(lassoState.startY, lassoState.currentY),
+            width: Math.abs(lassoState.currentX - lassoState.startX),
+            height: Math.abs(lassoState.currentY - lassoState.startY),
+            zIndex: 9998
+          }}
+        />
+      )}
 
       {contextMenu && (
         <div
