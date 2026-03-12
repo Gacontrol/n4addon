@@ -122,7 +122,7 @@ export function VisuApp() {
     console.log('[VISUAPP 8098 DEBUG] Binding gefunden:', JSON.stringify(binding));
 
     try {
-      const payload = { nodeId: binding.nodeId, portId: binding.portId, value };
+      const payload = { nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value };
       console.log('[VISUAPP 8098 DEBUG] Sende an Server:', apiBase + '/visu/write-value');
       console.log('[VISUAPP 8098 DEBUG] Payload:', JSON.stringify(payload));
       const resp = await fetch(`${apiBase}/visu/write-value`, {
