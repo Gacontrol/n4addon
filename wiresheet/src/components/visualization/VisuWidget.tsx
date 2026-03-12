@@ -1122,6 +1122,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
   return (
     <div
+      data-widget-id={widget.id}
       className={`absolute ${isEditMode ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,

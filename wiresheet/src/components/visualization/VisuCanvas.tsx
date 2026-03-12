@@ -82,7 +82,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const widgetHitRef = useRef(false);
 
   const [dragState, setDragState] = useState<{
     widgetId: string;
@@ -117,14 +116,22 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const [lassoState, setLassoState] = useState<LassoState | null>(null);
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent) => {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const el = canvasRef.current!;
+    const rect = el.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left + el.scrollLeft,
+      y: e.clientY - rect.top + el.scrollTop
+    };
   }, []);
 
   const getScrolledCanvasPos = useCallback((e: MouseEvent) => {
     if (!canvasRef.current) return { x: e.clientX, y: e.clientY };
-    const rect = canvasRef.current.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const el = canvasRef.current;
+    const rect = el.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left + el.scrollLeft,
+      y: e.clientY - rect.top + el.scrollTop
+    };
   }, []);
 
   const snapPos = useCallback((pos: { x: number; y: number }) => {
@@ -242,7 +249,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (contextMenu) {
       setContextMenu(null);
-      widgetHitRef.current = false;
       return;
     }
     if (drawingState) {
@@ -288,14 +294,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
 
-    if (isEditMode && !widgetHitRef.current && e.button === 0) {
-      const pos = getCanvasPos(e);
-      setLassoState({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
-      onSelectWidget(null);
-      onSelectWidgets?.([]);
-      e.preventDefault();
+    if (isEditMode && e.button === 0) {
+      let el = e.target as HTMLElement | null;
+      let hitWidget = false;
+      while (el && el !== canvasRef.current) {
+        if (el.dataset.widgetId) { hitWidget = true; break; }
+        el = el.parentElement;
+      }
+      if (!hitWidget) {
+        const pos = getCanvasPos(e);
+        setLassoState({ startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y });
+        onSelectWidget(null);
+        onSelectWidgets?.([]);
+        e.preventDefault();
+      }
     }
-    widgetHitRef.current = false;
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
 
   const handleWidgetContextMenu = useCallback((e: React.MouseEvent, widgetId: string) => {
@@ -317,8 +330,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     const widget = page.widgets.find(w => w.id === widgetId);
     if (!widget || widget.locked) return;
-
-    widgetHitRef.current = true;
 
     const target = e.target as HTMLElement;
     const isResizeHandle = target.classList.contains('cursor-nw-resize') ||
