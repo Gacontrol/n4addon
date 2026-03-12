@@ -62,7 +62,8 @@ export type WidgetType =
   | 'visu-pump'
   | 'visu-valve'
   | 'visu-sensor'
-  | 'visu-pid';
+  | 'visu-pid'
+  | 'visu-heating-curve';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -83,12 +84,15 @@ export type WidgetTheme =
   | 'warm-amber'
   | 'arctic-white';
 
+export type FontFamily = 'system' | 'sans' | 'serif' | 'mono';
+
 export interface WidgetStyle {
   backgroundColor?: string;
   borderColor?: string;
   textColor?: string;
   accentColor?: string;
   fontSize?: number;
+  fontFamily?: FontFamily;
   borderRadius?: number;
   showLabel?: boolean;
   labelPosition?: 'top' | 'bottom' | 'left' | 'right';
@@ -395,7 +399,8 @@ export type WidgetConfig =
   | PumpWidgetConfig
   | ValveWidgetConfig
   | SensorWidgetConfig
-  | PIDWidgetConfig;
+  | PIDWidgetConfig
+  | HeatingCurveWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -616,6 +621,8 @@ export type AggregateSymbolType = 'pump' | 'fan' | 'motor' | 'compressor' | 'hea
 
 export type WidgetSizePreset = 'small' | 'medium' | 'large';
 
+export type LabelPosition = 'left' | 'right' | 'top' | 'bottom' | 'none';
+
 export interface PumpWidgetConfig {
   pumpName?: string;
   showSpeed?: boolean;
@@ -628,6 +635,9 @@ export interface PumpWidgetConfig {
   orientation?: 'up' | 'down' | 'left' | 'right';
   symbolType?: AggregateSymbolType;
   widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
 }
 
 export type ValveSymbolType = 'valve-2way' | 'valve-3way' | 'valve-motor' | 'valve-3way-motor' | 'valve-butterfly' | 'valve-ball' | 'valve-gate';
@@ -642,6 +652,9 @@ export interface ValveWidgetConfig {
   showFeedback?: boolean;
   showOutput?: boolean;
   widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
 }
 
 export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
@@ -656,6 +669,9 @@ export interface SensorWidgetConfig {
   showUnit?: boolean;
   showLimits?: boolean;
   widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
 }
 
 export type PIDSymbolType = 'pid' | 'controller' | 'regulator';
@@ -670,6 +686,22 @@ export interface PIDWidgetConfig {
   showActualValue?: boolean;
   showOutput?: boolean;
   widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
+}
+
+export interface HeatingCurveWidgetConfig {
+  hcName?: string;
+  normalColor?: string;
+  activeColor?: string;
+  rotation?: 0 | 90 | 180 | 270;
+  showInput?: boolean;
+  showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
 }
 
 export interface WidgetTemplate {

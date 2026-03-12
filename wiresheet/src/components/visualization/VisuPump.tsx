@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
 import { PumpWidgetConfig, AggregateSymbolType, WidgetSizePreset } from '../../types/visualization';
 
@@ -274,9 +275,10 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
         )}
       </div>
 
-      {showPopup && (
+      {showPopup && createPortal(
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center"
+          style={{ zIndex: 99999 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowPopup(false);
@@ -586,7 +588,8 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

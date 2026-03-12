@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Settings } from 'lucide-react';
 
 type WidgetSizePreset = 'small' | 'medium' | 'large';
@@ -232,9 +233,10 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
         )}
       </div>
 
-      {showPopup && (
+      {showPopup && createPortal(
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center"
+          style={{ zIndex: 99999 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowPopup(false);
@@ -379,7 +381,8 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

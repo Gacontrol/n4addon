@@ -125,6 +125,21 @@ const WIDGET_SIZE_OPTIONS = [
   { value: 'large', label: 'Gross' }
 ];
 
+const LABEL_POSITION_OPTIONS = [
+  { value: 'none', label: 'Kein Text' },
+  { value: 'left', label: 'Links' },
+  { value: 'right', label: 'Rechts' },
+  { value: 'top', label: 'Oben' },
+  { value: 'bottom', label: 'Unten' }
+];
+
+const FONT_FAMILY_OPTIONS = [
+  { value: 'system', label: 'System' },
+  { value: 'sans', label: 'Sans-Serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'mono', label: 'Monospace' }
+];
+
 const SHAPE_TYPES = new Set([
   'visu-rect', 'visu-circle', 'visu-line', 'visu-arrow',
   'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'
@@ -1438,7 +1453,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-pump': {
-        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right'; symbolType?: string; widgetSize?: string };
+        const pumpCfg = config as { pumpName?: string; runningColor?: string; stoppedColor?: string; faultColor?: string; revisionColor?: string; orientation?: 'up' | 'down' | 'left' | 'right'; symbolType?: string; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
           <>
             <div>
@@ -1488,6 +1503,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <option value="down">Nach unten</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={pumpCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={pumpCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={pumpCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Laufend</label>
@@ -1531,7 +1583,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-valve': {
-        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showOutput?: boolean; widgetSize?: string };
+        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showOutput?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
           <>
             <div>
@@ -1579,6 +1631,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={valveCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={valveCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={valveCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1635,7 +1724,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-sensor': {
-        const sensorCfg = config as { sensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showValue?: boolean; showUnit?: boolean; showLimits?: boolean; widgetSize?: string };
+        const sensorCfg = config as { sensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showValue?: boolean; showUnit?: boolean; showLimits?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
           <>
             <div>
@@ -1683,6 +1772,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={sensorCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={sensorCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={sensorCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1739,7 +1865,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-pid': {
-        const pidCfg = config as { pidName?: string; normalColor?: string; activeColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showActualValue?: boolean; showOutput?: boolean; widgetSize?: string };
+        const pidCfg = config as { pidName?: string; normalColor?: string; activeColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showActualValue?: boolean; showOutput?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
           <>
             <div>
@@ -1787,6 +1913,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={pidCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={pidCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={pidCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1843,7 +2006,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       }
 
       case 'visu-heating-curve': {
-        const hcCfg = config as { hcName?: string; normalColor?: string; activeColor?: string; rotation?: number; showInput?: boolean; showOutput?: boolean; widgetSize?: string };
+        const hcCfg = config as { hcName?: string; normalColor?: string; activeColor?: string; rotation?: number; showInput?: boolean; showOutput?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
           <>
             <div>
@@ -1879,6 +2042,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={hcCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={hcCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={hcCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -2469,34 +2669,29 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
         {activeTab === 'style' && (
           <>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Design-Vorlage</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {([
-                  { value: 'default', label: 'Standard', preview: 'bg-slate-800 border-slate-600' },
-                  { value: 'dark-glass', label: 'Dark Glass', preview: 'bg-slate-900/80 border-blue-500/30' },
-                  { value: 'neon-glow', label: 'Neon Glow', preview: 'bg-slate-950 border-cyan-400' },
-                  { value: 'minimal-flat', label: 'Minimal Flat', preview: 'bg-slate-700 border-transparent' },
-                  { value: 'industrial', label: 'Industrial', preview: 'bg-zinc-800 border-orange-600' },
-                  { value: 'soft-light', label: 'Soft Light', preview: 'bg-slate-200 border-slate-300' },
-                  { value: 'midnight-blue', label: 'Midnight Blue', preview: 'bg-blue-950 border-blue-700' },
-                  { value: 'carbon-fiber', label: 'Carbon Fiber', preview: 'bg-neutral-900 border-neutral-600' },
-                  { value: 'warm-amber', label: 'Warm Amber', preview: 'bg-amber-950 border-amber-600' },
-                  { value: 'arctic-white', label: 'Arctic White', preview: 'bg-white border-slate-200' },
-                ] as { value: WidgetTheme; label: string; preview: string }[]).map(({ value, label, preview }) => (
-                  <button
-                    key={value}
-                    onClick={() => onUpdate({ style: { ...widget.style, theme: value } })}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded border text-xs transition-colors ${
-                      (widget.style.theme ?? 'default') === value
-                        ? 'border-blue-500 bg-blue-900/30 text-blue-300'
-                        : 'border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-300'
-                    }`}
-                  >
-                    <span className={`w-3 h-3 rounded-sm border flex-shrink-0 ${preview}`} />
-                    {label}
-                  </button>
-                ))}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={48}
+                  value={widget.style.fontSize ?? 14}
+                  onChange={(e) => onUpdate({ style: { ...widget.style, fontSize: parseInt(e.target.value) || 14 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={(widget.style as { fontFamily?: string }).fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ style: { ...widget.style, fontFamily: e.target.value } as typeof widget.style })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <hr className="border-slate-700" />

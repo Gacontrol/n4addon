@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, RotateCcw, X, Settings } from 'lucide-react';
 
 export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic' | 'none';
@@ -246,9 +247,10 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
         )}
       </div>
 
-      {showPopup && (
+      {showPopup && createPortal(
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center"
+          style={{ zIndex: 99999 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowPopup(false);
@@ -481,7 +483,8 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
