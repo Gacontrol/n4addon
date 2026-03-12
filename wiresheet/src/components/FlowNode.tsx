@@ -14,6 +14,7 @@ export interface VisuBindingInfo {
   portId?: string;
   paramKey?: string;
   isWrite: boolean;
+  value?: unknown;
 }
 
 interface FlowNodeProps {
@@ -1042,19 +1043,30 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
 
         {visuBindings.length > 0 && (
           <div className="absolute left-0 right-0 flex flex-col gap-0.5" style={{ top: '100%', marginTop: '4px' }}>
-            {visuBindings.map((b, bi) => (
-              <div key={bi} className="flex items-center">
-                <div
-                  className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
-                  title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''} (${b.isWrite ? 'Write' : 'Read'})`}
-                >
-                  <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
-                  <span className="truncate max-w-[150px]">
-                    Visu: {b.pageName} / {b.widgetLabel}{b.paramKey ? ` (${b.paramKey})` : ''}
-                  </span>
+            {visuBindings.map((b, bi) => {
+              const hasValue = b.value !== undefined && b.value !== null;
+              const displayVal = hasValue
+                ? (String(b.value).length > 8 ? String(b.value).slice(0, 8) + '..' : String(b.value))
+                : null;
+              return (
+                <div key={bi} className="flex items-center">
+                  <div
+                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
+                    title={`Visu: ${b.pageName} / ${b.widgetLabel}${b.paramKey ? ` -> ${b.paramKey}` : ''} (${b.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${b.value}` : ''}`}
+                  >
+                    <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
+                    <span className="truncate max-w-[120px]">
+                      Visu: {b.pageName} / {b.widgetLabel}
+                    </span>
+                    {hasValue && (
+                      <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
+                        {displayVal}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

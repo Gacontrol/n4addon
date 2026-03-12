@@ -102,17 +102,19 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       for (const widget of page.widgets) {
         if (!widget.binding || widget.binding.nodeId !== nodeId) continue;
         const isWrite = WRITE_TYPES.includes(widget.type) || widget.binding.direction === 'write' || widget.binding.direction === 'readwrite';
+        const bindingValue = liveValues[nodeId];
         result.push({
           widgetLabel: widget.label || widget.type,
           pageName: page.name,
           portId: widget.binding.portId,
           paramKey: widget.binding.paramKey,
-          isWrite
+          isWrite,
+          value: bindingValue
         });
       }
     }
     return result;
-  }, [visuPages]);
+  }, [visuPages, liveValues]);
 
   const getDriverBindingsForNode = useCallback((nodeId: string): DriverBinding[] => {
     return driverBindings.filter(b => b.nodeId === nodeId);
