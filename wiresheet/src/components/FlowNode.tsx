@@ -870,13 +870,13 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 return (
                   <div key={input.id} className="flex items-center min-h-[20px]">
                     {driverBinding && (
-                      <div className="flex items-center mr-1" style={{ marginLeft: '-60px' }}>
-                        <svg width="40" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="40" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
-                        </svg>
-                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[80px] truncate" title={`${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
-                          {driverBinding.deviceName.slice(0, 6)}:{driverBinding.datapointName.slice(0, 6)}
+                      <div className="flex items-center mr-1" style={{ marginLeft: '-120px' }}>
+                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[100px] truncate" title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
+                          Modbus/{driverBinding.deviceName}/{driverBinding.datapointName}
                         </span>
+                        <svg width="20" height="20" className="flex-shrink-0">
+                          <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                        </svg>
                       </div>
                     )}
                     <div
@@ -976,12 +976,12 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       />
                     </div>
                     {driverBinding && (
-                      <div className="flex items-center ml-1" style={{ marginRight: '-60px' }}>
-                        <svg width="40" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="40" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
+                      <div className="flex items-center ml-1" style={{ marginRight: '-120px' }}>
+                        <svg width="20" height="20" className="flex-shrink-0">
+                          <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
-                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[80px] truncate" title={`${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
-                          {driverBinding.deviceName.slice(0, 6)}:{driverBinding.datapointName.slice(0, 6)}
+                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[100px] truncate" title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
+                          Modbus/{driverBinding.deviceName}/{driverBinding.datapointName}
                         </span>
                       </div>
                     )}

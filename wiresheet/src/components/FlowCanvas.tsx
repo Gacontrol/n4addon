@@ -214,12 +214,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const currentConnecting = connectingFromRef.current;
     console.log('[handlePortClick]', { nodeId, portId, isOutput, currentConnecting });
     if (!currentConnecting) {
-      if (isOutput) {
-        console.log('[handlePortClick] Starting connection from output:', nodeId, portId);
-        onConnectionStart(nodeId, portId);
-      } else {
-        console.log('[handlePortClick] Clicked input but no connection in progress - ignoring');
-      }
+      console.log('[handlePortClick] Starting connection from port:', nodeId, portId, 'isOutput:', isOutput);
+      onConnectionStart(nodeId, portId);
     } else {
       console.log('[handlePortClick] Connection in progress from:', currentConnecting);
       if (currentConnecting.nodeId !== nodeId) {
