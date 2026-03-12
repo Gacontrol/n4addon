@@ -647,5 +647,31 @@ export const nodeTemplates: NodeTemplate[] = [
       aggregateStartCount: 0,
       aggregateName: 'Aggregat 1'
     }
+  },
+  {
+    type: 'valve-control',
+    label: 'Ventilbaustein',
+    icon: 'Pipette',
+    category: 'special',
+    color: '#7c3aed',
+    inputs: [
+      { label: 'Setpoint', type: 'input' },
+      { label: 'Feedback', type: 'input' },
+      { label: 'Reset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'ValveOut', type: 'output' },
+      { label: 'Alarm', type: 'output' },
+      { label: 'Deviation', type: 'output' }
+    ],
+    description: 'Ventilsteuerung mit Begrenzung und Ueberwachung',
+    defaultConfig: {
+      valveMinOutput: 0,
+      valveMaxOutput: 100,
+      valveMonitoringEnable: true,
+      valveTolerance: 5,
+      valveAlarmDelayMs: 10000,
+      valveName: 'Ventil 1'
+    }
   }
 ];

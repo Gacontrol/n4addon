@@ -59,7 +59,8 @@ export type WidgetType =
   | 'dash-wind'
   | 'modern-multistate'
   | 'dash-multistate'
-  | 'visu-pump';
+  | 'visu-pump'
+  | 'visu-valve';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -389,7 +390,8 @@ export type WidgetConfig =
   | DashWindConfig
   | ModernMultistateConfig
   | DashMultistateConfig
-  | PumpWidgetConfig;
+  | PumpWidgetConfig
+  | ValveWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -619,6 +621,19 @@ export interface PumpWidgetConfig {
   revisionColor?: string;
   orientation?: 'up' | 'down' | 'left' | 'right';
   symbolType?: AggregateSymbolType;
+}
+
+export type ValveSymbolType = 'valve-2way' | 'valve-3way' | 'valve-motor' | 'valve-butterfly' | 'valve-ball' | 'valve-gate';
+
+export interface ValveWidgetConfig {
+  valveName?: string;
+  normalColor?: string;
+  alarmColor?: string;
+  orientation?: 'horizontal' | 'vertical';
+  symbolType?: ValveSymbolType;
+  showSetpoint?: boolean;
+  showFeedback?: boolean;
+  showDeviation?: boolean;
 }
 
 export interface WidgetTemplate {

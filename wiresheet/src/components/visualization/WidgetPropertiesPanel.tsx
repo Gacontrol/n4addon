@@ -65,8 +65,10 @@ const NON_BINDABLE_TYPES = new Set([
 ]);
 
 const PUMP_WIDGET_TYPE = 'visu-pump';
+const VALVE_WIDGET_TYPE = 'visu-valve';
 const PUMP_CONTROL_NODE_TYPE = 'pump-control';
 const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
+const VALVE_CONTROL_NODE_TYPE = 'valve-control';
 
 const SYMBOL_OPTIONS = [
   { value: 'pump', label: 'Pumpe' },
@@ -76,6 +78,15 @@ const SYMBOL_OPTIONS = [
   { value: 'compressor', label: 'Kompressor' },
   { value: 'heater', label: 'Heizung' },
   { value: 'cooler', label: 'Kuehlung' }
+];
+
+const VALVE_SYMBOL_OPTIONS = [
+  { value: 'valve-2way', label: '2-Wege Ventil' },
+  { value: 'valve-3way', label: '3-Wege Ventil' },
+  { value: 'valve-motor', label: 'Motorventil' },
+  { value: 'valve-butterfly', label: 'Klappenventil' },
+  { value: 'valve-ball', label: 'Kugelventil' },
+  { value: 'valve-gate', label: 'Schieberventil' }
 ];
 
 const SHAPE_TYPES = new Set([
@@ -177,9 +188,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
   const isShapeWidget = SHAPE_TYPES.has(widget.type);
   const isPumpWidget = widget.type === PUMP_WIDGET_TYPE;
+  const isValveWidget = widget.type === VALVE_WIDGET_TYPE;
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
   const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
+  const valveControlNodes = availableNodes.filter(n => n.type === VALVE_CONTROL_NODE_TYPE);
 
   const nodesByCategory = bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
     const cat = getNodeCategory(node.type);
@@ -205,6 +218,16 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     }
     const node = availableNodes.find(n => n.id === nodeId);
     if (isPumpWidget && (node?.type === PUMP_CONTROL_NODE_TYPE || node?.type === AGGREGATE_CONTROL_NODE_TYPE)) {
+      const binding: WidgetBinding = {
+        nodeId,
+        portId: undefined,
+        paramKey: undefined,
+        direction: 'readwrite'
+      };
+      onUpdate({ binding });
+      return;
+    }
+    if (isValveWidget && node?.type === VALVE_CONTROL_NODE_TYPE) {
       const binding: WidgetBinding = {
         nodeId,
         portId: undefined,
@@ -1453,6 +1476,97 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-valve': {
+        const valveCfg = config as { valveName?: string; normalColor?: string; alarmColor?: string; orientation?: 'horizontal' | 'vertical'; symbolType?: string; showSetpoint?: boolean; showFeedback?: boolean; showDeviation?: boolean };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Symbol</label>
+              <select
+                value={valveCfg.symbolType || 'valve-2way'}
+                onChange={(e) => onUpdate({ config: { ...config, symbolType: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {VALVE_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
+              <input
+                type="text"
+                value={valveCfg.valveName || ''}
+                placeholder="Name vom verknuepften Baustein"
+                onChange={(e) => onUpdate({ config: { ...config, valveName: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 placeholder-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Ausrichtung</label>
+              <select
+                value={valveCfg.orientation || 'horizontal'}
+                onChange={(e) => onUpdate({ config: { ...config, orientation: e.target.value as 'horizontal' | 'vertical' } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertikal</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Normal</label>
+                <input
+                  type="color"
+                  value={valveCfg.normalColor || '#22c55e'}
+                  onChange={(e) => onUpdate({ config: { ...config, normalColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Alarm</label>
+                <input
+                  type="color"
+                  value={valveCfg.alarmColor || '#ef4444'}
+                  onChange={(e) => onUpdate({ config: { ...config, alarmColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={valveCfg.showSetpoint ?? true}
+                  onChange={(e) => onUpdate({ config: { ...config, showSetpoint: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Sollwert anzeigen</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={valveCfg.showFeedback ?? true}
+                  onChange={(e) => onUpdate({ config: { ...config, showFeedback: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Istwert anzeigen</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={valveCfg.showDeviation ?? true}
+                  onChange={(e) => onUpdate({ config: { ...config, showDeviation: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Abweichung anzeigen</label>
+              </div>
+            </div>
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }
@@ -1556,6 +1670,50 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
                       <p className="font-medium">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                    </div>
+                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
+                    <Unlink className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  </div>
+                )}
+              </>
+            ) : isValveWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe das Ventil-Widget mit einem Ventilbaustein in der Logik. Alle Ein- und Ausgaenge werden automatisch verknuepft.
+                </p>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Ventilbaustein</label>
+                  <select
+                    value={widget.binding?.nodeId || ''}
+                    onChange={(e) => handleNodeChange(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  >
+                    <option value="">-- Keine Verknuepfung --</option>
+                    {valveControlNodes.map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {getNodeLabel(node)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {valveControlNodes.length === 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
+                    <Settings className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-400">Kein Ventilbaustein in der Logik vorhanden. Bitte zuerst einen Ventilbaustein hinzufuegen.</span>
+                  </div>
+                )}
+                {widget.binding ? (
+                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <Link2 className="w-4 h-4 text-green-500" />
+                    <div className="text-xs text-green-400">
+                      <p className="font-medium">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">

@@ -11,3 +11,4 @@ export { VisuBar } from './VisuBar';
 export { VisuTank } from './VisuTank';
 export { VisuThermometer } from './VisuThermometer';
 export { VisuLabel } from './VisuLabel';
+export { VisuValve } from './VisuValve';

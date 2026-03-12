@@ -1268,6 +1268,51 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-5`] = alarm;
       nodeValues[`${nodeId}:output-6`] = operatingHours;
       nodeValues[`${nodeId}:output-7`] = st.startCount;
+    } else if (node.type === 'valve-control') {
+      const setpoint = toNumber(inputVals[0]);
+      const feedback = toNumber(inputVals[1]);
+      const resetInputWire = toBool(inputVals[2]);
+
+      const visuSetpoint = cfg.valveVisuSetpoint;
+      const visuReset = cfg.valveVisuReset;
+
+      const actualSetpoint = visuSetpoint !== undefined ? toNumber(visuSetpoint) : setpoint;
+      const resetInput = visuReset === true ? true : resetInputWire;
+
+      const minOutput = cfg.valveMinOutput ?? 0;
+      const maxOutput = cfg.valveMaxOutput ?? 100;
+      const monitoringEnable = cfg.valveMonitoringEnable !== false;
+      const tolerance = cfg.valveTolerance ?? 5;
+      const alarmDelayMs = cfg.valveAlarmDelayMs ?? 10000;
+
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__valveState || (node.__valveState = {});
+
+      if (st.alarmLatch === undefined) st.alarmLatch = false;
+      if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
+
+      const valveOutput = Math.max(minOutput, Math.min(maxOutput, actualSetpoint || 0));
+      const deviation = Math.abs(actualSetpoint - feedback);
+
+      if (resetInput && st.alarmLatch) {
+        st.alarmLatch = false;
+        st.alarmTimerStart = null;
+      }
+
+      if (monitoringEnable && deviation > tolerance) {
+        if (st.alarmTimerStart === null) {
+          st.alarmTimerStart = now;
+        } else if (now - st.alarmTimerStart >= alarmDelayMs) {
+          st.alarmLatch = true;
+        }
+      } else {
+        st.alarmTimerStart = null;
+      }
+
+      nodeValues[nodeId] = valveOutput;
+      nodeValues[`${nodeId}:output-0`] = valveOutput;
+      nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
+      nodeValues[`${nodeId}:output-2`] = deviation;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
@@ -1743,6 +1788,55 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
     } catch (err) {
       console.error('Fehler beim Schreiben des Aggregate-Control Parameters:', err);
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
+  if (value && typeof value === 'object' && value.valveControl) {
+    const valveCtrl = value.valveControl;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId && n.type === 'valve-control');
+        if (node) {
+          if (!node.data.config) node.data.config = {};
+          if (valveCtrl.setpoint !== undefined) {
+            node.data.config.valveVisuSetpoint = valveCtrl.setpoint;
+          }
+          if (valveCtrl.reset !== undefined && valveCtrl.reset === true) {
+            node.data.config.valveVisuReset = true;
+          } else if (valveCtrl.reset === false) {
+            node.data.config.valveVisuReset = false;
+          }
+          for (const key of Object.keys(valveCtrl)) {
+            if (key.startsWith('param_')) {
+              const paramName = key.slice(6);
+              node.data.config[paramName] = valveCtrl[key];
+            }
+          }
+          console.log(`Valve Control geschrieben: ${nodeId}`, JSON.stringify(valveCtrl));
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Valve-Control Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des Valve-Control Parameters:', err);
       res.status(500).json({ error: err.message });
     }
     return;

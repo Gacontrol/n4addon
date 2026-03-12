@@ -52,10 +52,12 @@ import {
   DashWindConfig,
   DashMultistateConfig,
   ModernMultistateConfig,
-  PumpWidgetConfig
+  PumpWidgetConfig,
+  ValveWidgetConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
+import { VisuValve } from './VisuValve';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -114,6 +116,15 @@ interface PumpParams {
   pumpAntiSeizeSpeed?: number;
 }
 
+interface ValveParams {
+  valveName?: string;
+  valveMinOutput?: number;
+  valveMaxOutput?: number;
+  valveMonitoringEnable?: boolean;
+  valveTolerance?: number;
+  valveAlarmDelayMs?: number;
+}
+
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
@@ -132,6 +143,7 @@ interface VisuWidgetProps {
   onNavigateHome?: () => void;
   visuPages?: { id: string; name: string }[];
   pumpParams?: PumpParams;
+  valveParams?: ValveParams;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -198,7 +210,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateBack,
   onNavigateHome,
   visuPages = [],
-  pumpParams
+  pumpParams,
+  valveParams
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1155,6 +1168,32 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-valve': {
+        const valveCfg = widget.config as ValveWidgetConfig;
+        const valveValues = value as {
+          valveOutput?: number;
+          setpoint?: number;
+          feedback?: number;
+          alarm?: boolean;
+          deviation?: number;
+        } | null;
+        return (
+          <VisuValve
+            config={valveCfg}
+            value={valveValues ? {
+              valveOutput: valveValues.valveOutput ?? 0,
+              setpoint: valveValues.setpoint ?? 0,
+              feedback: valveValues.feedback ?? 0,
+              alarm: valveValues.alarm ?? false,
+              deviation: valveValues.deviation ?? 0
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={valveParams}
+          />
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
@@ -1174,13 +1213,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 
   const isPumpWidget = widget.type === 'visu-pump';
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget;
+  const isValveWidget = widget.type === 'visu-valve';
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget;
 
   return (
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget ? '' : 'flex items-center justify-center'}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
@@ -1198,7 +1238,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget ? 0 : 8
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8
       } as React.CSSProperties}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}

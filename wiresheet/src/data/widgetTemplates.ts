@@ -868,6 +868,27 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Aggregat-Widget (Pumpe, Ventilator, Motor, etc.) mit Popup',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-valve',
+    label: 'Ventil',
+    icon: 'Pipette',
+    category: 'control',
+    defaultSize: { width: 120, height: 120 },
+    defaultConfig: {
+      valveName: '',
+      normalColor: '#3b82f6',
+      alarmColor: '#ef4444',
+      orientation: 'horizontal',
+      symbolType: 'valve-2way',
+      showSetpoint: true,
+      showFeedback: true,
+      showDeviation: true
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Ventil-Widget mit Popup fuer Sollwert und Ueberwachung',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
   }
 ];
 
