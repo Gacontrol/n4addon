@@ -31,6 +31,8 @@ interface FlowNodeProps {
   onDropIntoContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   onDropOutOfContainer?: (nodeId: string) => void;
   onRenameNode?: (nodeId: string, newLabel: string) => void;
+  onDriverBindingClick?: (binding: DriverBinding) => void;
+  onDriverBindingDelete?: (binding: DriverBinding) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -58,6 +60,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onDropIntoContainer,
   onDropOutOfContainer,
   onRenameNode,
+  onDriverBindingClick,
+  onDriverBindingDelete,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -870,9 +874,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 return (
                   <div key={input.id} className="flex items-center min-h-[20px]">
                     {driverBinding && (
-                      <div className="flex items-center mr-1" style={{ marginLeft: '-120px' }}>
-                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[100px] truncate" title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
-                          Modbus/{driverBinding.deviceName}/{driverBinding.datapointName}
+                      <div className="flex items-center mr-1 group/binding" style={{ marginLeft: '-220px' }}>
+                        <button
+                          className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/binding:opacity-100 transition-opacity mr-0.5"
+                          title="Verbindung loeschen"
+                          onClick={(e) => { e.stopPropagation(); onDriverBindingDelete?.(driverBinding); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <Icons.X className="w-3 h-3 text-red-400" />
+                        </button>
+                        <span
+                          className="text-[8px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer hover:bg-amber-900/80 transition-colors"
+                          title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          Modbus / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
                         <svg width="20" height="20" className="flex-shrink-0">
                           <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
@@ -976,13 +993,26 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       />
                     </div>
                     {driverBinding && (
-                      <div className="flex items-center ml-1" style={{ marginRight: '-120px' }}>
+                      <div className="flex items-center ml-1 group/binding" style={{ marginRight: '-220px' }}>
                         <svg width="20" height="20" className="flex-shrink-0">
                           <line x1="0" y1="10" x2="20" y2="10" stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
-                        <span className="text-[8px] text-amber-400 bg-amber-950/60 px-1 py-0.5 rounded whitespace-nowrap max-w-[100px] truncate" title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName}`}>
-                          Modbus/{driverBinding.deviceName}/{driverBinding.datapointName}
+                        <span
+                          className="text-[8px] text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer hover:bg-amber-900/80 transition-colors"
+                          title={`Modbus TCP / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          Modbus / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
+                        <button
+                          className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/binding:opacity-100 transition-opacity ml-0.5"
+                          title="Verbindung loeschen"
+                          onClick={(e) => { e.stopPropagation(); onDriverBindingDelete?.(driverBinding); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <Icons.X className="w-3 h-3 text-red-400" />
+                        </button>
                       </div>
                     )}
                   </div>

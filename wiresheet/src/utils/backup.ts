@@ -1,14 +1,28 @@
-import { WiresheetPage } from '../types/flow';
+import { WiresheetPage, ModbusDevice, DriverBinding } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
 
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 
 export interface BackupImage {
   filename: string;
   url: string;
   data: string;
   mimeType: string;
+}
+
+export interface CustomLibraryDevice {
+  id: string;
+  name: string;
+  category: string;
+  datapoints: Omit<ModbusDevice['datapoints'][0], 'id'>[];
+}
+
+export interface DriverConfig {
+  modbusDevices: ModbusDevice[];
+  modbusDriverEnabled: boolean;
+  driverBindings: DriverBinding[];
+  customModbusLibrary: CustomLibraryDevice[];
 }
 
 export interface WiresheetBackup {
@@ -19,6 +33,7 @@ export interface WiresheetBackup {
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
   images?: BackupImage[];
+  driverConfig?: DriverConfig;
 }
 
 function getApiBase(): string {
@@ -88,7 +103,8 @@ export function createBackup(
   wiresheets: WiresheetPage[],
   visuPages: VisuPage[],
   customBlocks: CustomBlockDefinition[],
-  images?: BackupImage[]
+  images?: BackupImage[],
+  driverConfig?: DriverConfig
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -97,7 +113,8 @@ export function createBackup(
     wiresheets,
     visuPages,
     customBlocks,
-    images: images || []
+    images: images || [],
+    driverConfig
   };
 }
 
@@ -155,11 +172,13 @@ export function applyImport(
   currentWiresheets: WiresheetPage[],
   currentVisuPages: VisuPage[],
   currentBlocks: CustomBlockDefinition[],
-  mode: 'merge' | 'replace'
+  mode: 'merge' | 'replace',
+  currentDriverConfig?: DriverConfig
 ): {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
+  driverConfig?: DriverConfig;
 } {
   const now = Date.now();
 
@@ -207,5 +226,40 @@ export function applyImport(
     }
   }
 
-  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks };
+  let finalDriverConfig: DriverConfig | undefined = currentDriverConfig;
+  if (backup.driverConfig) {
+    if (mode === 'replace') {
+      finalDriverConfig = backup.driverConfig;
+    } else if (currentDriverConfig) {
+      const mergedDevices = [...currentDriverConfig.modbusDevices];
+      for (const dev of backup.driverConfig.modbusDevices) {
+        const exists = mergedDevices.some(d => d.id === dev.id);
+        if (exists) {
+          mergedDevices.push({ ...dev, id: `modbus-device-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${dev.name} (Import)` });
+        } else {
+          mergedDevices.push(dev);
+        }
+      }
+      const mergedBindings = [...currentDriverConfig.driverBindings, ...backup.driverConfig.driverBindings];
+      const mergedLibrary = [...currentDriverConfig.customModbusLibrary];
+      for (const lib of backup.driverConfig.customModbusLibrary) {
+        const exists = mergedLibrary.some(l => l.id === lib.id);
+        if (exists) {
+          mergedLibrary.push({ ...lib, id: `custom-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${lib.name} (Import)` });
+        } else {
+          mergedLibrary.push(lib);
+        }
+      }
+      finalDriverConfig = {
+        modbusDevices: mergedDevices,
+        modbusDriverEnabled: currentDriverConfig.modbusDriverEnabled || backup.driverConfig.modbusDriverEnabled,
+        driverBindings: mergedBindings,
+        customModbusLibrary: mergedLibrary
+      };
+    } else {
+      finalDriverConfig = backup.driverConfig;
+    }
+  }
+
+  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };
 }

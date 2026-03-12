@@ -43,7 +43,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     if (isOutputPanel) {
       return device.datapoints.filter(dp => dp.writable && !dp.isConfig);
     } else {
-      return device.datapoints.filter(dp => !dp.isConfig);
+      return device.datapoints.filter(dp => !dp.writable && !dp.isConfig);
     }
   };
 
@@ -162,10 +162,13 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                   ? 'bg-blue-400 animate-pulse'
                                   : 'bg-slate-500'
                             }`} />
-                            <span className="flex-1 text-[11px] text-slate-300 truncate">
+                            <span className={`flex-1 text-[11px] truncate ${binding ? 'text-amber-300' : 'text-slate-300'}`}>
                               {dp.name}
                             </span>
-                            {dp.unit && (
+                            {binding && (
+                              <span className="text-[9px] text-amber-500 bg-amber-900/40 px-1 py-0.5 rounded">verbunden</span>
+                            )}
+                            {dp.unit && !binding && (
                               <span className="text-[10px] text-slate-500">{dp.unit}</span>
                             )}
                           </div>

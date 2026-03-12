@@ -14,17 +14,23 @@ import {
   parseBackupFile,
   applyImport,
   fetchImagesForBackup,
-  restoreImagesFromBackup
+  restoreImagesFromBackup,
+  DriverConfig
 } from '../utils/backup';
+import { ModbusDevice, DriverBinding } from '../types/flow';
 
 interface BackupModalProps {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
+  modbusDevices: ModbusDevice[];
+  modbusDriverEnabled: boolean;
+  driverBindings: DriverBinding[];
   onImport: (
     wiresheets: WiresheetPage[],
     visuPages: VisuPage[],
-    customBlocks: CustomBlockDefinition[]
+    customBlocks: CustomBlockDefinition[],
+    driverConfig?: DriverConfig
   ) => void;
   onClose: () => void;
 }
@@ -41,6 +47,9 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   wiresheets,
   visuPages,
   customBlocks,
+  modbusDevices,
+  modbusDriverEnabled,
+  driverBindings,
   onImport,
   onClose
 }) => {
@@ -126,7 +135,14 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       const selectedVisus = visuPages.filter(v => exportSelection.visuPages.includes(v.id));
       const selectedBlocks = customBlocks.filter(b => exportSelection.customBlocks.includes(b.id));
       const images = await fetchImagesForBackup(selectedVisus);
-      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images);
+      const customLibrary = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
+      const driverConfig: DriverConfig = {
+        modbusDevices,
+        modbusDriverEnabled,
+        driverBindings,
+        customModbusLibrary: customLibrary
+      };
+      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig);
       downloadBackup(backup);
       onClose();
     } finally {
@@ -141,15 +157,26 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       if (loadedBackup.images && loadedBackup.images.length > 0) {
         await restoreImagesFromBackup(loadedBackup.images);
       }
+      const customLibrary = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
+      const currentDriverConfig: DriverConfig = {
+        modbusDevices,
+        modbusDriverEnabled,
+        driverBindings,
+        customModbusLibrary: customLibrary
+      };
       const result = applyImport(
         importSelection,
         loadedBackup,
         wiresheets,
         visuPages,
         customBlocks,
-        importMode
+        importMode,
+        currentDriverConfig
       );
-      onImport(result.wiresheets, result.visuPages, result.customBlocks);
+      if (result.driverConfig?.customModbusLibrary) {
+        localStorage.setItem('wiresheet-custom-modbus-library', JSON.stringify(result.driverConfig.customModbusLibrary));
+      }
+      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig);
       setImportDone(true);
       setTimeout(() => onClose(), 1200);
     } finally {

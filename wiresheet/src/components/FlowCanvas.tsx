@@ -49,6 +49,8 @@ interface FlowCanvasProps {
   visuPages?: VisuPage[];
   onUpdateNodeData?: (nodeId: string, updates: Partial<FlowNodeType['data']>) => void;
   driverBindings?: DriverBinding[];
+  onDriverBindingClick?: (binding: DriverBinding) => void;
+  onDriverBindingDelete?: (binding: DriverBinding) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -87,7 +89,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onModbusDatapointDrop,
   visuPages = [],
   onUpdateNodeData,
-  driverBindings = []
+  driverBindings = [],
+  onDriverBindingClick,
+  onDriverBindingDelete
 }) => {
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
     const result: VisuBindingInfo[] = [];
@@ -591,6 +595,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 zoom={zoom}
                 visuBindings={getVisuBindingsForNode(node.id)}
                 driverBindings={getDriverBindingsForNode(node.id)}
+                onDriverBindingClick={onDriverBindingClick}
+                onDriverBindingDelete={onDriverBindingDelete}
               />
             );
           })}
@@ -701,6 +707,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 zoom={zoom}
                 visuBindings={getVisuBindingsForNode(node.id)}
                 driverBindings={getDriverBindingsForNode(node.id)}
+                onDriverBindingClick={onDriverBindingClick}
+                onDriverBindingDelete={onDriverBindingDelete}
               />
             );
           })}

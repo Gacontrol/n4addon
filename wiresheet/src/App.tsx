@@ -978,6 +978,12 @@ function App() {
               visuPages={visuPages}
               onUpdateNodeData={updateNodeData}
               driverBindings={driverBindings}
+              onDriverBindingClick={(binding) => {
+                setMainView('drivers');
+              }}
+              onDriverBindingDelete={(binding) => {
+                setDriverBindings(prev => prev.filter(b => b.id !== binding.id));
+              }}
             />
 
             <DriverPanel
@@ -1088,10 +1094,18 @@ function App() {
           wiresheets={pages}
           visuPages={visuPages}
           customBlocks={customBlocks}
-          onImport={(newWiresheets, newVisuPages, newBlocks) => {
+          modbusDevices={modbusDevices}
+          modbusDriverEnabled={modbusDriverEnabled}
+          driverBindings={driverBindings}
+          onImport={(newWiresheets, newVisuPages, newBlocks, driverConfig) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);
             importBlocks(newBlocks as CustomBlockDefinition[]);
+            if (driverConfig) {
+              setModbusDevices(driverConfig.modbusDevices);
+              setModbusDriverEnabled(driverConfig.modbusDriverEnabled);
+              setDriverBindings(driverConfig.driverBindings);
+            }
           }}
           onClose={() => setShowBackupModal(false)}
         />
