@@ -2000,6 +2000,47 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     return;
   }
 
+  if (value && typeof value === 'object' && value.heatingCurveControl) {
+    const hcCtrl = value.heatingCurveControl;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId && n.type === 'heating-curve');
+        if (node) {
+          if (!node.data.config) node.data.config = {};
+          for (const key of Object.keys(hcCtrl)) {
+            if (key.startsWith('param_')) {
+              const paramName = key.slice(6);
+              node.data.config[paramName] = hcCtrl[key];
+            }
+          }
+          console.log(`Heating Curve Control geschrieben: ${nodeId}`, JSON.stringify(hcCtrl));
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Heating-Curve Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des Heating-Curve Parameters:', err);
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   if (value && typeof value === 'object' && value.pidControl) {
     const pidCtrl = value.pidControl;
     try {
