@@ -398,6 +398,14 @@ function toBool(val) {
   return !!val;
 }
 
+function toNumber(val) {
+  if (val === true) return 1;
+  if (val === false) return 0;
+  if (val === null || val === undefined) return 0;
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : n;
+}
+
 function getDefaultValueForNodeType(nodeType) {
   switch (nodeType) {
     case 'and-gate':
@@ -801,28 +809,28 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       const sel = toBool(inputVals[2]);
       nodeValues[nodeId] = sel ? b : a;
     } else if (node.type === 'math-add') {
-      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) + (parseFloat(inputVals[1]) || 0);
+      nodeValues[nodeId] = toNumber(inputVals[0]) + toNumber(inputVals[1]);
     } else if (node.type === 'math-sub') {
-      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) - (parseFloat(inputVals[1]) || 0);
+      nodeValues[nodeId] = toNumber(inputVals[0]) - toNumber(inputVals[1]);
     } else if (node.type === 'math-mul') {
-      nodeValues[nodeId] = (parseFloat(inputVals[0]) || 0) * (parseFloat(inputVals[1]) || 0);
+      nodeValues[nodeId] = toNumber(inputVals[0]) * toNumber(inputVals[1]);
     } else if (node.type === 'math-div') {
-      const divisor = parseFloat(inputVals[1]) || 0;
-      nodeValues[nodeId] = divisor !== 0 ? (parseFloat(inputVals[0]) || 0) / divisor : 0;
+      const divisor = toNumber(inputVals[1]);
+      nodeValues[nodeId] = divisor !== 0 ? toNumber(inputVals[0]) / divisor : 0;
     } else if (node.type === 'math-min') {
-      nodeValues[nodeId] = Math.min(parseFloat(inputVals[0]) || 0, parseFloat(inputVals[1]) || 0);
+      nodeValues[nodeId] = Math.min(toNumber(inputVals[0]), toNumber(inputVals[1]));
     } else if (node.type === 'math-max') {
-      nodeValues[nodeId] = Math.max(parseFloat(inputVals[0]) || 0, parseFloat(inputVals[1]) || 0);
+      nodeValues[nodeId] = Math.max(toNumber(inputVals[0]), toNumber(inputVals[1]));
     } else if (node.type === 'math-avg') {
-      const validVals = inputVals.filter(v => v !== null && v !== undefined).map(v => parseFloat(v) || 0);
+      const validVals = inputVals.filter(v => v !== null && v !== undefined).map(v => toNumber(v));
       nodeValues[nodeId] = validVals.length > 0 ? validVals.reduce((a, b) => a + b, 0) / validVals.length : 0;
     } else if (node.type === 'math-abs') {
-      nodeValues[nodeId] = Math.abs(parseFloat(inputVals[0]) || 0);
+      nodeValues[nodeId] = Math.abs(toNumber(inputVals[0]));
     } else if (node.type === 'const-value') {
       nodeValues[nodeId] = cfg.constValue !== undefined ? cfg.constValue : 0;
     } else if (node.type === 'compare') {
-      const a = parseFloat(inputVals[0]) || 0;
-      const b = cfg.compareValue !== undefined ? parseFloat(cfg.compareValue) : (parseFloat(inputVals[1]) || 0);
+      const a = toNumber(inputVals[0]);
+      const b = cfg.compareValue !== undefined ? toNumber(cfg.compareValue) : toNumber(inputVals[1]);
       const op = cfg.compareOperator || '>';
       if (op === '>') nodeValues[nodeId] = a > b;
       else if (op === '>=') nodeValues[nodeId] = a >= b;
@@ -832,8 +840,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       else if (op === '!=') nodeValues[nodeId] = a != b;
       else nodeValues[nodeId] = false;
     } else if (node.type === 'threshold') {
-      const val = parseFloat(inputVals[0]) || 0;
-      const thr = cfg.thresholdValue !== undefined ? parseFloat(cfg.thresholdValue) : 0;
+      const val = toNumber(inputVals[0]);
+      const thr = cfg.thresholdValue !== undefined ? toNumber(cfg.thresholdValue) : 0;
       nodeValues[nodeId] = val > thr ? 'above' : 'below';
     } else if (node.type === 'timer') {
       const inputVal = toBool(inputVals[0]);
@@ -909,13 +917,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       }
       nodeValues[nodeId] = st.lastOutput !== undefined ? st.lastOutput : null;
     } else if (node.type === 'smoothing') {
-      const inputVal = parseFloat(inputVals[0]);
+      const inputVal = toNumber(inputVals[0]);
       const now = Date.now();
       const durationMs = cfg.smoothingDuration !== undefined ? cfg.smoothingDuration : 86400000;
       const method = cfg.smoothingMethod || 'average';
       const st = pageId ? getNodeState(pageId, nodeId) : node.__smoothingState || (node.__smoothingState = {});
       if (!st.history) st.history = [];
-      if (!isNaN(inputVal)) {
+      if (inputVals[0] !== null && inputVals[0] !== undefined) {
         st.history.push({ value: inputVal, ts: now });
       }
       const cutoff = now - durationMs;
@@ -1047,13 +1055,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = triggered;
       nodeValues[`${nodeId}:output-0`] = triggered;
     } else if (node.type === 'scaling') {
-      const inputVal = parseFloat(inputVals[0]);
-      const inMin = cfg.scalingInMin !== undefined ? parseFloat(cfg.scalingInMin) : 0;
-      const inMax = cfg.scalingInMax !== undefined ? parseFloat(cfg.scalingInMax) : 100;
-      const outMin = cfg.scalingOutMin !== undefined ? parseFloat(cfg.scalingOutMin) : 0;
-      const outMax = cfg.scalingOutMax !== undefined ? parseFloat(cfg.scalingOutMax) : 100;
+      const inputVal = toNumber(inputVals[0]);
+      const inMin = cfg.scalingInMin !== undefined ? toNumber(cfg.scalingInMin) : 0;
+      const inMax = cfg.scalingInMax !== undefined ? toNumber(cfg.scalingInMax) : 100;
+      const outMin = cfg.scalingOutMin !== undefined ? toNumber(cfg.scalingOutMin) : 0;
+      const outMax = cfg.scalingOutMax !== undefined ? toNumber(cfg.scalingOutMax) : 100;
       let scaled = null;
-      if (!isNaN(inputVal) && inMax !== inMin) {
+      if (inputVals[0] !== null && inputVals[0] !== undefined && inMax !== inMin) {
         scaled = outMin + ((inputVal - inMin) / (inMax - inMin)) * (outMax - outMin);
         if (cfg.scalingClamp) {
           scaled = Math.max(Math.min(outMin, outMax), Math.min(Math.max(outMin, outMax), scaled));
@@ -1062,8 +1070,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = scaled;
       nodeValues[`${nodeId}:output-0`] = scaled;
     } else if (node.type === 'pid-controller') {
-      const actual = parseFloat(inputVals[0]);
-      const setpoint = parseFloat(inputVals[1]);
+      const actual = toNumber(inputVals[0]);
+      const setpoint = toNumber(inputVals[1]);
       const enableRaw = inputVals[2];
       const enabled = enableRaw === null || enableRaw === undefined ? true : toBool(enableRaw);
       const kp = cfg.kp !== undefined ? parseFloat(cfg.kp) : 1.0;
