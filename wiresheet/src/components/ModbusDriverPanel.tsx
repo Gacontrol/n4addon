@@ -235,13 +235,15 @@ interface ConfigDatapointRowProps {
   datapoint: ModbusDatapoint;
   onUpdate: (deviceId: string, dpId: string, value: number | string | boolean) => void;
   onRead?: (deviceId: string, dpId: string) => void;
+  onWrite?: (deviceId: string, dpId: string, value: number | string | boolean) => void;
 }
 
 const ConfigDatapointRow: React.FC<ConfigDatapointRowProps> = ({
   deviceId,
   datapoint,
   onUpdate,
-  onRead
+  onRead,
+  onWrite
 }) => {
   const [localValue, setLocalValue] = useState<string>(
     String(datapoint.pendingValue ?? datapoint.currentValue ?? '')
@@ -288,13 +290,27 @@ const ConfigDatapointRow: React.FC<ConfigDatapointRowProps> = ({
             </span>
           )}
         </div>
-        <button
-          onClick={() => onRead?.(deviceId, datapoint.id)}
-          className="p-1 text-slate-500 hover:text-purple-400 transition-colors flex-shrink-0"
-          title="Wert vom Geraet lesen"
-        >
-          <Download className="w-3 h-3" />
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => onRead?.(deviceId, datapoint.id)}
+            className="p-1 text-slate-500 hover:text-purple-400 transition-colors"
+            title="Wert vom Geraet lesen"
+          >
+            <Download className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => {
+              const val = datapoint.pendingValue ?? datapoint.currentValue;
+              if (val !== undefined) {
+                onWrite?.(deviceId, datapoint.id, val);
+              }
+            }}
+            className="p-1 text-slate-500 hover:text-orange-400 transition-colors"
+            title="Wert zum Geraet schreiben"
+          >
+            <Upload className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {datapoint.configDescription && (
@@ -510,9 +526,6 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
 
   const updateConfigValue = (deviceId: string, dpId: string, value: number | string | boolean) => {
     updateDatapoint(deviceId, dpId, { pendingValue: value });
-    if (onWriteConfigValue) {
-      onWriteConfigValue(deviceId, dpId, value);
-    }
   };
 
   const readAllConfigValues = (deviceId: string) => {
@@ -945,6 +958,7 @@ export const ModbusDriverPanel: React.FC<ModbusDriverPanelProps> = ({
                   datapoint={dp}
                   onUpdate={updateConfigValue}
                   onRead={onReadConfigValue}
+                  onWrite={onWriteConfigValue}
                 />
               ))}
             </div>

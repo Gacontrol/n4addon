@@ -305,6 +305,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             const nodeId = parts.slice(0, -2).join('-');
             if (nodeId !== connectingFromRef.current.nodeId) {
               onConnectionEnd(nodeId, portId, connectingFromRef.current.nodeId, connectingFromRef.current.portId);
+              connectionJustEndedRef.current = Date.now();
               return;
             }
           }
