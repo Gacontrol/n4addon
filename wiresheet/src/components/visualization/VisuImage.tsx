@@ -23,6 +23,15 @@ function resolveImageUrl(url: string): string {
   return url;
 }
 
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 interface VisuImageProps {
   config: ImageConfig;
   isEditMode: boolean;
@@ -45,17 +54,24 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
     if (fileRef.current) fileRef.current.value = '';
 
     try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const response = await fetch('/api/images/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      const base64 = await fileToBase64(file);
 
-      if (!response.ok) throw new Error('Upload fehlgeschlagen');
+      const apiBase = getApiBase();
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await fetch(`${apiBase}/api/images/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          onUpdateConfig({ ...config, imageUrl: base64, storagePath: data.url });
+          return;
+        }
+      } catch {}
 
-      const data = await response.json();
-      onUpdateConfig({ ...config, imageUrl: data.url, storagePath: data.url });
+      onUpdateConfig({ ...config, imageUrl: base64, storagePath: undefined });
     } catch (err) {
       setError('Upload fehlgeschlagen');
       console.error(err);
@@ -66,14 +82,37 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
 
   const handleRemove = async () => {
     if (config.storagePath) {
+      const apiBase = getApiBase();
       const filename = config.storagePath.split('/').pop();
-      if (filename) {
+      if (filename && !config.storagePath.startsWith('data:')) {
         try {
-          await fetch(`/api/images/${filename}`, { method: 'DELETE' });
+          await fetch(`${apiBase}/api/images/${filename}`, { method: 'DELETE' });
         } catch {}
       }
     }
     onUpdateConfig({ ...config, imageUrl: undefined, storagePath: undefined });
+  };
+
+  const handleFilePickerSelect = async (url: string) => {
+    const apiBase = getApiBase();
+    try {
+      const res = await fetch(`${apiBase}${url}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        onUpdateConfig({ ...config, imageUrl: base64, storagePath: url });
+      } else {
+        onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+      }
+    } catch {
+      onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
+    }
+    setShowFilePicker(false);
   };
 
   if (!config.imageUrl) {
@@ -117,10 +156,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
           <FileManager
             apiBase={getApiBase()}
             pickerMode
-            onSelectImage={(url) => {
-              onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
-              setShowFilePicker(false);
-            }}
+            onSelectImage={handleFilePickerSelect}
             onClose={() => setShowFilePicker(false)}
           />
         )}
@@ -128,10 +164,12 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
     );
   }
 
+  const displayUrl = config.imageUrl.startsWith('data:') ? config.imageUrl : resolveImageUrl(config.imageUrl);
+
   return (
     <div className="w-full h-full relative group" style={{ borderRadius: config.borderRadius ?? 0 }}>
       <img
-        src={resolveImageUrl(config.imageUrl!)}
+        src={displayUrl}
         alt="Visu Bild"
         style={{
           width: '100%',
@@ -172,10 +210,7 @@ export const VisuImage: React.FC<VisuImageProps> = ({ config, isEditMode, onUpda
         <FileManager
           apiBase={getApiBase()}
           pickerMode
-          onSelectImage={(url) => {
-            onUpdateConfig({ ...config, imageUrl: url, storagePath: url });
-            setShowFilePicker(false);
-          }}
+          onSelectImage={handleFilePickerSelect}
           onClose={() => setShowFilePicker(false)}
         />
       )}

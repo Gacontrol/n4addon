@@ -215,10 +215,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       if (drawingStateRef.current) return;
       if (contextMenuRef.current) return;
 
-      let el = e.target as HTMLElement | null;
-      while (el && el !== canvas) {
-        if (el.dataset.widgetId && el.dataset.widgetLocked !== 'true') return;
-        el = el.parentElement;
+      if (!e.shiftKey) {
+        let el = e.target as HTMLElement | null;
+        while (el && el !== canvas) {
+          if (el.dataset.widgetId && el.dataset.widgetLocked !== 'true') return;
+          el = el.parentElement;
+        }
       }
 
       const rect = canvas.getBoundingClientRect();
