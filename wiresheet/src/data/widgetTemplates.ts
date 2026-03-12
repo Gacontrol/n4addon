@@ -879,16 +879,37 @@ export const widgetTemplates: WidgetTemplate[] = [
       valveName: '',
       normalColor: '#3b82f6',
       alarmColor: '#ef4444',
-      orientation: 'horizontal',
+      rotation: 0,
       symbolType: 'valve-2way',
       showSetpoint: true,
       showFeedback: true,
-      showDeviation: true
+      showOutput: true
     },
     defaultStyle: { showLabel: false, labelPosition: 'bottom' },
     description: 'Ventil-Widget mit Popup fuer Sollwert und Ueberwachung',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-sensor',
+    label: 'Sensor',
+    icon: 'Thermometer',
+    category: 'display',
+    defaultSize: { width: 110, height: 110 },
+    defaultConfig: {
+      sensorName: '',
+      normalColor: '#0891b2',
+      alarmColor: '#ef4444',
+      rotation: 0,
+      symbolType: 'temperature',
+      showValue: true,
+      showUnit: true,
+      showLimits: true
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Sensor-Widget mit Grenzwertueberwachung',
+    supportsBinding: true,
+    bindingDirection: 'read'
   }
 ];
 

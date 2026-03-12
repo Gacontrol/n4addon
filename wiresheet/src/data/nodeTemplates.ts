@@ -672,5 +672,29 @@ export const nodeTemplates: NodeTemplate[] = [
       valveAlarmDelayMs: 10000,
       valveName: ''
     }
+  },
+  {
+    type: 'sensor-control',
+    label: 'Sensorbaustein',
+    icon: 'Thermometer',
+    category: 'special',
+    color: '#0891b2',
+    inputs: [
+      { label: 'SensorIn', type: 'input' },
+      { label: 'AlarmReset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'SensorOut', type: 'output' },
+      { label: 'Alarm', type: 'output' }
+    ],
+    description: 'Sensorbaustein mit Grenzwertueberwachung',
+    defaultConfig: {
+      sensorMinLimit: 0,
+      sensorMaxLimit: 100,
+      sensorUnit: '',
+      sensorMonitoringEnable: true,
+      sensorAlarmDelayMs: 5000,
+      sensorName: ''
+    }
   }
 ];

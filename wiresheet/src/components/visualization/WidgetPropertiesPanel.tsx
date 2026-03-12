@@ -66,9 +66,11 @@ const NON_BINDABLE_TYPES = new Set([
 
 const PUMP_WIDGET_TYPE = 'visu-pump';
 const VALVE_WIDGET_TYPE = 'visu-valve';
+const SENSOR_WIDGET_TYPE = 'visu-sensor';
 const PUMP_CONTROL_NODE_TYPE = 'pump-control';
 const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
 const VALVE_CONTROL_NODE_TYPE = 'valve-control';
+const SENSOR_CONTROL_NODE_TYPE = 'sensor-control';
 
 const SYMBOL_OPTIONS = [
   { value: 'pump', label: 'Pumpe' },
@@ -94,6 +96,16 @@ const ROTATION_OPTIONS = [
   { value: 90, label: '90 Grad' },
   { value: 180, label: '180 Grad' },
   { value: 270, label: '270 Grad' }
+];
+
+const SENSOR_SYMBOL_OPTIONS = [
+  { value: 'temperature', label: 'Temperatur' },
+  { value: 'pressure', label: 'Druck' },
+  { value: 'humidity', label: 'Feuchte' },
+  { value: 'co2', label: 'CO2' },
+  { value: 'flow', label: 'Durchfluss' },
+  { value: 'level', label: 'Fuellstand' },
+  { value: 'generic', label: 'Allgemein' }
 ];
 
 const SHAPE_TYPES = new Set([
@@ -196,10 +208,12 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isShapeWidget = SHAPE_TYPES.has(widget.type);
   const isPumpWidget = widget.type === PUMP_WIDGET_TYPE;
   const isValveWidget = widget.type === VALVE_WIDGET_TYPE;
+  const isSensorWidget = widget.type === SENSOR_WIDGET_TYPE;
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
   const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
   const valveControlNodes = availableNodes.filter(n => n.type === VALVE_CONTROL_NODE_TYPE);
+  const sensorControlNodes = availableNodes.filter(n => n.type === SENSOR_CONTROL_NODE_TYPE);
 
   const nodesByCategory = bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
     const cat = getNodeCategory(node.type);
@@ -1575,6 +1589,98 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-sensor': {
+        const sensorCfg = config as { sensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showValue?: boolean; showUnit?: boolean; showLimits?: boolean };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Symbol</label>
+              <select
+                value={sensorCfg.symbolType || 'temperature'}
+                onChange={(e) => onUpdate({ config: { ...config, symbolType: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {SENSOR_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
+              <input
+                type="text"
+                value={sensorCfg.sensorName || ''}
+                placeholder="Name vom verknuepften Baustein"
+                onChange={(e) => onUpdate({ config: { ...config, sensorName: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 placeholder-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Drehung</label>
+              <select
+                value={sensorCfg.rotation ?? 0}
+                onChange={(e) => onUpdate({ config: { ...config, rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {ROTATION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Normal</label>
+                <input
+                  type="color"
+                  value={sensorCfg.normalColor || '#0891b2'}
+                  onChange={(e) => onUpdate({ config: { ...config, normalColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Alarm</label>
+                <input
+                  type="color"
+                  value={sensorCfg.alarmColor || '#ef4444'}
+                  onChange={(e) => onUpdate({ config: { ...config, alarmColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sensorCfg.showValue !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showValue: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Messwert anzeigen</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sensorCfg.showUnit !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showUnit: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Einheit anzeigen</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sensorCfg.showLimits !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showLimits: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Grenzwerte anzeigen</label>
+              </div>
+            </div>
+          </>
+        );
+      }
+
       default:
         return <p className="text-xs text-slate-500">Keine Konfiguration verfuegbar</p>;
     }
@@ -1723,6 +1829,50 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <div className="text-xs text-green-400">
                       <p className="font-medium">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                    </div>
+                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
+                    <Unlink className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  </div>
+                )}
+              </>
+            ) : isSensorWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe dieses Sensor-Widget mit einem Sensorbaustein um den Messwert und Alarmzustand anzuzeigen.
+                </p>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Sensorbaustein</label>
+                  <select
+                    value={widget.binding?.nodeId || ''}
+                    onChange={(e) => handleNodeChange(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                  >
+                    <option value="">-- Keine Verknuepfung --</option>
+                    {sensorControlNodes.map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {getNodeLabel(node)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {sensorControlNodes.length === 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
+                    <Settings className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-400">Kein Sensorbaustein in der Logik vorhanden. Bitte zuerst einen Sensorbaustein hinzufuegen.</span>
+                  </div>
+                )}
+                {widget.binding ? (
+                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <Link2 className="w-4 h-4 text-green-500" />
+                    <div className="text-xs text-green-400">
+                      <p className="font-medium">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === widget.binding?.nodeId)!)}</p>
+                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Messwert + Alarm)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
                       <X className="w-3.5 h-3.5" />

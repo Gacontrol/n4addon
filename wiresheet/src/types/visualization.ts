@@ -60,7 +60,8 @@ export type WidgetType =
   | 'modern-multistate'
   | 'dash-multistate'
   | 'visu-pump'
-  | 'visu-valve';
+  | 'visu-valve'
+  | 'visu-sensor';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -634,6 +635,19 @@ export interface ValveWidgetConfig {
   showSetpoint?: boolean;
   showFeedback?: boolean;
   showOutput?: boolean;
+}
+
+export type SensorSymbolType = 'temperature' | 'pressure' | 'humidity' | 'co2' | 'flow' | 'level' | 'generic';
+
+export interface SensorWidgetConfig {
+  sensorName?: string;
+  normalColor?: string;
+  alarmColor?: string;
+  rotation?: 0 | 90 | 180 | 270;
+  symbolType?: SensorSymbolType;
+  showValue?: boolean;
+  showUnit?: boolean;
+  showLimits?: boolean;
 }
 
 export interface WidgetTemplate {

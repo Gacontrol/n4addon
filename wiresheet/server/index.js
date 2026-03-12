@@ -1320,6 +1320,46 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-0`] = valveOutput;
       nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
       nodeValues[`${nodeId}:hoaMode`] = visuHOA;
+    } else if (node.type === 'sensor-control') {
+      const sensorIn = toNumber(inputVals[0]);
+      const resetInputWire = toBool(inputVals[1]);
+
+      const visuReset = cfg.sensorVisuReset;
+      const resetInput = visuReset === true ? true : resetInputWire;
+
+      const minLimit = cfg.sensorMinLimit ?? 0;
+      const maxLimit = cfg.sensorMaxLimit ?? 100;
+      const monitoringEnable = cfg.sensorMonitoringEnable !== false;
+      const alarmDelayMs = cfg.sensorAlarmDelayMs ?? 5000;
+
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__sensorState || (node.__sensorState = {});
+
+      if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
+      if (st.alarmLatch === undefined) st.alarmLatch = false;
+
+      const sensorOut = sensorIn;
+      const outOfLimits = sensorIn < minLimit || sensorIn > maxLimit;
+
+      if (resetInput && st.alarmLatch) {
+        st.alarmLatch = false;
+        st.alarmTimerStart = null;
+      }
+
+      if (monitoringEnable && outOfLimits) {
+        if (st.alarmTimerStart === null) {
+          st.alarmTimerStart = now;
+        } else if (now - st.alarmTimerStart >= alarmDelayMs) {
+          st.alarmLatch = true;
+        }
+      } else {
+        st.alarmTimerStart = null;
+      }
+
+      nodeValues[nodeId] = sensorOut;
+      nodeValues[`${nodeId}:output-0`] = sensorOut;
+      nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
+      nodeValues[`${nodeId}:input-0`] = sensorIn;
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';
@@ -1847,6 +1887,52 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
     } catch (err) {
       console.error('Fehler beim Schreiben des Valve-Control Parameters:', err);
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
+  if (value && typeof value === 'object' && value.sensorControl) {
+    const sensorCtrl = value.sensorControl;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      let updated = false;
+      for (const page of pages) {
+        const node = page.nodes.find(n => n.id === nodeId && n.type === 'sensor-control');
+        if (node) {
+          if (!node.data.config) node.data.config = {};
+          if (sensorCtrl.reset !== undefined && sensorCtrl.reset === true) {
+            node.data.config.sensorVisuReset = true;
+          } else if (sensorCtrl.reset === false) {
+            node.data.config.sensorVisuReset = false;
+          }
+          for (const key of Object.keys(sensorCtrl)) {
+            if (key.startsWith('param_')) {
+              const paramName = key.slice(6);
+              node.data.config[paramName] = sensorCtrl[key];
+            }
+          }
+          console.log(`Sensor Control geschrieben: ${nodeId}`, JSON.stringify(sensorCtrl));
+          updated = true;
+          break;
+        }
+      }
+      if (updated) {
+        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+        const nodeConfigs = {};
+        for (const page of pages) {
+          for (const node of (page.nodes || [])) {
+            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Sensor-Control Node nicht gefunden' });
+      }
+    } catch (err) {
+      console.error('Fehler beim Schreiben des Sensor-Control Parameters:', err);
       res.status(500).json({ error: err.message });
     }
     return;

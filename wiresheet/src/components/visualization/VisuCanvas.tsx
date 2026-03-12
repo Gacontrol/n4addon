@@ -209,6 +209,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-sensor') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'sensor-control') return null;
+      return {
+        sensorValue: liveValues[`${nodeId}:output-0`] ?? 0,
+        alarm: liveValues[`${nodeId}:output-1`] ?? false
+      };
+    }
+
     if (paramKey) {
       const node = logicNodes.find(n => n.id === nodeId);
       if (node?.data.config) {
@@ -279,6 +288,24 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       valveMonitoringEnable: cfg.valveMonitoringEnable,
       valveTolerance: cfg.valveTolerance,
       valveAlarmDelayMs: cfg.valveAlarmDelayMs
+    };
+  }, [logicNodes]);
+
+  const getSensorWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-sensor' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    if (!node || node.type !== 'sensor-control') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const configName = cfg.sensorName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Sensor';
+    return {
+      sensorName: nodeName,
+      sensorMinLimit: cfg.sensorMinLimit,
+      sensorMaxLimit: cfg.sensorMaxLimit,
+      sensorUnit: cfg.sensorUnit,
+      sensorMonitoringEnable: cfg.sensorMonitoringEnable,
+      sensorAlarmDelayMs: cfg.sensorAlarmDelayMs
     };
   }, [logicNodes]);
 
@@ -857,6 +884,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onNavigateHome={onNavigateHome}
           pumpParams={getPumpWidgetParams(widget)}
           valveParams={getValveWidgetParams(widget)}
+          sensorParams={getSensorWidgetParams(widget)}
         />
       ))}
 

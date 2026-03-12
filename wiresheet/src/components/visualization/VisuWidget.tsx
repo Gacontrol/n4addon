@@ -53,11 +53,13 @@ import {
   DashMultistateConfig,
   ModernMultistateConfig,
   PumpWidgetConfig,
-  ValveWidgetConfig
+  ValveWidgetConfig,
+  SensorWidgetConfig
 } from '../../types/visualization';
 import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
+import { VisuSensor } from './VisuSensor';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -125,6 +127,15 @@ interface ValveParams {
   valveAlarmDelayMs?: number;
 }
 
+interface SensorParams {
+  sensorName?: string;
+  sensorMinLimit?: number;
+  sensorMaxLimit?: number;
+  sensorUnit?: string;
+  sensorMonitoringEnable?: boolean;
+  sensorAlarmDelayMs?: number;
+}
+
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
@@ -144,6 +155,7 @@ interface VisuWidgetProps {
   visuPages?: { id: string; name: string }[];
   pumpParams?: PumpParams;
   valveParams?: ValveParams;
+  sensorParams?: SensorParams;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -211,7 +223,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onNavigateHome,
   visuPages = [],
   pumpParams,
-  valveParams
+  valveParams,
+  sensorParams
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1175,7 +1188,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           setpoint?: number;
           feedback?: number;
           alarm?: boolean;
-          deviation?: number;
+          hoaMode?: number;
         } | null;
         return (
           <VisuValve
@@ -1185,11 +1198,31 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
               setpoint: valveValues.setpoint ?? 0,
               feedback: valveValues.feedback ?? 0,
               alarm: valveValues.alarm ?? false,
-              deviation: valveValues.deviation ?? 0
+              hoaMode: valveValues.hoaMode ?? 2
             } : null}
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={valveParams}
+          />
+        );
+      }
+
+      case 'visu-sensor': {
+        const sensorCfg = widget.config as SensorWidgetConfig;
+        const sensorValues = value as {
+          sensorValue?: number;
+          alarm?: boolean;
+        } | null;
+        return (
+          <VisuSensor
+            config={sensorCfg}
+            value={sensorValues ? {
+              sensorValue: sensorValues.sensorValue ?? 0,
+              alarm: sensorValues.alarm ?? false
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={sensorParams}
           />
         );
       }
@@ -1214,13 +1247,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
 
   const isPumpWidget = widget.type === 'visu-pump';
   const isValveWidget = widget.type === 'visu-valve';
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget;
+  const isSensorWidget = widget.type === 'visu-sensor';
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget;
 
   return (
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? '' : 'flex items-center justify-center'}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
