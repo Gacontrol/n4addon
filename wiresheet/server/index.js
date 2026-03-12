@@ -635,9 +635,17 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const bindingKey = `${binding.nodeId}:${binding.portId}`;
     try {
       if (binding.driverType === 'modbus') {
+        if (!driverConfig.modbusDriverEnabled) {
+          console.log(`Binding ${bindingKey}: Modbus-Treiber deaktiviert`);
+          return;
+        }
         const device = modbusDeviceMap.get(binding.deviceId);
         if (!device) {
           console.log(`Binding ${bindingKey}: Modbus-Geraet ${binding.deviceId} nicht gefunden`);
+          return;
+        }
+        if (!device.enabled) {
+          console.log(`Binding ${bindingKey}: Geraet ${device.name} deaktiviert`);
           return;
         }
         const dp = device.datapoints?.find(d => d.id === binding.datapointId);
@@ -664,6 +672,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         modbusLiveValues.set(`${binding.deviceId}:${binding.datapointId}`, value);
         console.log(`Binding Modbus Read ${device.name}/${dp.name}: ${value}`);
       } else if (binding.driverType === 'homeassistant' && binding.haEntityId) {
+        if (!driverConfig.haDriverEnabled) {
+          console.log(`Binding ${bindingKey}: HA-Treiber deaktiviert`);
+          return;
+        }
         const state = await haGet(`/states/${binding.haEntityId}`);
         const rawState = state.state;
         const numVal = parseFloat(rawState);
@@ -1751,9 +1763,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       }
 
       if (binding.driverType === 'modbus') {
+        if (!driverConfig.modbusDriverEnabled) {
+          return;
+        }
         const device = modbusDeviceMap.get(binding.deviceId);
         if (!device) {
           console.log(`Output Binding ${bindingKey}: Modbus-Geraet ${binding.deviceId} nicht gefunden`);
+          return;
+        }
+        if (!device.enabled) {
+          console.log(`Output Binding ${bindingKey}: Geraet ${device.name} deaktiviert`);
           return;
         }
         const dp = device.datapoints?.find(d => d.id === binding.datapointId);
@@ -1796,6 +1815,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
           console.log(`Output Binding Modbus Write ${device.name}/${dp.name} (${dp.address}): ${writeValue}`);
         }
       } else if (binding.driverType === 'homeassistant' && binding.haEntityId) {
+        if (!driverConfig.haDriverEnabled) {
+          return;
+        }
         const domain = binding.haDomain || binding.haEntityId.split('.')[0];
         let service = 'turn_on';
         let serviceData = {};

@@ -46,10 +46,16 @@ export const useWiresheetPages = () => {
 
   const activePage = pages.find(p => p.id === activePageId) || pages[0];
 
-  const loadPages = useCallback(async () => {
+  const loadPages = useCallback(async (retryCount = 0) => {
     setLoadError(null);
     try {
       const res = await fetch(`${API_BASE}/pages`);
+      if (res.status === 502 && retryCount < 5) {
+        console.log(`Server nicht bereit, Wiederholung in ${(retryCount + 1) * 2}s... (${retryCount + 1}/5)`);
+        setLoadError(`Server startet... (${retryCount + 1}/5)`);
+        setTimeout(() => loadPages(retryCount + 1), (retryCount + 1) * 2000);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
