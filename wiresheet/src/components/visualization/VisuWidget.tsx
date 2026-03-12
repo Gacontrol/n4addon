@@ -1173,13 +1173,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const resolvedBorderRadius = widget.style.borderRadius ?? themeVars.borderRadius;
   const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget;
+  const isPumpWidget = widget.type === 'visu-pump';
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget;
 
   return (
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? '' : 'flex items-center justify-center'}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
@@ -1197,7 +1198,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget ? 0 : 8
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget ? 0 : 8
       } as React.CSSProperties}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}
