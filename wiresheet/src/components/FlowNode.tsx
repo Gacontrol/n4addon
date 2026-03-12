@@ -873,9 +873,12 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
                 const driverBinding = getDriverBindingForPort(input.id);
                 return (
-                  <div key={input.id} className="flex items-center min-h-[20px]">
+                  <div key={input.id} className="flex items-center min-h-[20px] relative">
                     {driverBinding && (
-                      <div className="flex items-center mr-1 group/binding" style={{ marginLeft: '-220px' }}>
+                      <div
+                        className="flex items-center group/binding absolute right-full mr-1"
+                        style={{ pointerEvents: 'auto' }}
+                      >
                         <button
                           className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/binding:opacity-100 transition-opacity mr-0.5"
                           title="Verbindung loeschen"
@@ -959,7 +962,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 const hasOutVal = outVal !== undefined && outVal !== null;
                 const driverBinding = getDriverBindingForPort(output.id);
                 return (
-                  <div key={output.id} className="flex items-center justify-end min-h-[20px]">
+                  <div key={output.id} className="flex items-center justify-end min-h-[20px] relative">
                     <div className="flex items-center gap-1 min-w-0">
                       {hasOutVal && (
                         <span className={`text-[8px] font-mono px-0.5 rounded leading-none max-w-12 truncate ${
@@ -999,7 +1002,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       />
                     </div>
                     {driverBinding && (
-                      <div className="flex items-center ml-1 group/binding" style={{ marginRight: '-220px' }}>
+                      <div
+                        className="flex items-center group/binding absolute left-full ml-1"
+                        style={{ pointerEvents: 'auto' }}
+                      >
                         <svg width="20" height="20" className="flex-shrink-0">
                           <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
