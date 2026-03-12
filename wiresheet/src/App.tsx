@@ -187,6 +187,11 @@ function App() {
     });
   }, [saveDriverConfig, modbusDevicesState, modbusDriverEnabledState, haDriverEnabled]);
 
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    deleteNode(nodeId);
+    updateDriverBindings(prev => prev.filter(b => b.nodeId !== nodeId));
+  }, [deleteNode, updateDriverBindings]);
+
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
   }, [activePageId, activePage.cycleMs]);
@@ -1014,7 +1019,7 @@ function App() {
               onMultipleNodePositionsChange={updateMultipleNodePositions}
               onNodeSelect={handleNodeSelectWithModbusRedirect}
               onNodesSelect={selectNodes}
-              onNodeDelete={deleteNode}
+              onNodeDelete={handleNodeDelete}
               onConnectionStart={startConnection}
               onConnectionEnd={endConnection}
               onConnectionCancel={cancelConnection}

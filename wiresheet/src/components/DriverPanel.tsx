@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer } from 'lucide-react';
 import { ModbusDevice, DriverBinding, HaDevice, HaEntity } from '../types/flow';
 
@@ -37,6 +37,8 @@ interface DriverPanelProps {
   highlightedBinding?: DriverBinding | null;
 }
 
+const STORAGE_KEY_PREFIX = 'wiresheet-driver-panel-';
+
 export const DriverPanel: React.FC<DriverPanelProps> = ({
   side,
   modbusDevices,
@@ -50,9 +52,44 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   onHaEntityClick,
   highlightedBinding
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
-  const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
+  const storageKey = `${STORAGE_KEY_PREFIX}${side}`;
+
+  const loadExpandedState = () => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          isCollapsed: parsed.isCollapsed ?? true,
+          expandedDriverTypes: new Set<string>(parsed.expandedDriverTypes || []),
+          expandedDevices: new Set<string>(parsed.expandedDevices || []),
+          expandedHaDevices: new Set<string>(parsed.expandedHaDevices || [])
+        };
+      }
+    } catch {}
+    return {
+      isCollapsed: true,
+      expandedDriverTypes: new Set<string>(),
+      expandedDevices: new Set<string>(),
+      expandedHaDevices: new Set<string>()
+    };
+  };
+
+  const initialState = loadExpandedState();
+  const [isCollapsed, setIsCollapsed] = useState(initialState.isCollapsed);
+  const [expandedDriverTypes, setExpandedDriverTypes] = useState<Set<string>>(initialState.expandedDriverTypes);
+  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(initialState.expandedDevices);
+  const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(initialState.expandedHaDevices);
+
+  useEffect(() => {
+    const state = {
+      isCollapsed,
+      expandedDriverTypes: Array.from(expandedDriverTypes),
+      expandedDevices: Array.from(expandedDevices),
+      expandedHaDevices: Array.from(expandedHaDevices)
+    };
+    localStorage.setItem(storageKey, JSON.stringify(state));
+  }, [isCollapsed, expandedDriverTypes, expandedDevices, expandedHaDevices, storageKey]);
 
   const isOutputPanel = side === 'right';
   const shouldHighlight = highlightedBinding && (
@@ -60,12 +97,14 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     (!isOutputPanel && highlightedBinding.direction === 'input')
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (shouldHighlight && highlightedBinding) {
       setIsCollapsed(false);
       if (highlightedBinding.driverType === 'modbus') {
+        setExpandedDriverTypes(prev => new Set([...prev, 'modbus']));
         setExpandedDevices(prev => new Set([...prev, highlightedBinding.deviceId]));
       } else if (highlightedBinding.driverType === 'homeassistant') {
+        setExpandedDriverTypes(prev => new Set([...prev, 'homeassistant']));
         setExpandedHaDevices(prev => new Set([...prev, highlightedBinding.deviceId]));
       }
     }
@@ -73,8 +112,32 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
 
   const panelTitle = isOutputPanel ? 'Ausgaenge' : 'Eingaenge';
 
+  const toggleDriverType = (driverType: string) => {
+    setExpandedDriverTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(driverType)) {
+        next.delete(driverType);
+      } else {
+        next.add(driverType);
+      }
+      return next;
+    });
+  };
+
   const toggleDevice = (deviceId: string) => {
     setExpandedDevices(prev => {
+      const next = new Set(prev);
+      if (next.has(deviceId)) {
+        next.delete(deviceId);
+      } else {
+        next.add(deviceId);
+      }
+      return next;
+    });
+  };
+
+  const toggleHaDevice = (deviceId: string) => {
+    setExpandedHaDevices(prev => {
       const next = new Set(prev);
       if (next.has(deviceId)) {
         next.delete(deviceId);
@@ -93,7 +156,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     }
   };
 
-  const hasModbusDatapoints = modbusDevices.some(d => getDatapointsForPanel(d).length > 0);
+  const modbusDevicesWithData = modbusDevices.filter(d => d.enabled && getDatapointsForPanel(d).length > 0);
+  const hasModbusDatapoints = modbusDevicesWithData.length > 0;
 
   const getHaEntitiesForPanel = (device: HaDevice) => {
     if (isOutputPanel) {
@@ -103,7 +167,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     }
   };
 
-  const hasHaEntities = haDriverEnabled && haDevices.some(d => getHaEntitiesForPanel(d).length > 0);
+  const haDevicesWithEntities = haDevices.filter(d => getHaEntitiesForPanel(d).length > 0);
+  const hasHaEntities = haDriverEnabled && haDevicesWithEntities.length > 0;
   const hasDatapoints = hasModbusDatapoints || hasHaEntities;
 
   const getBindingForDatapoint = (deviceId: string, datapointId: string) => {
@@ -158,186 +223,222 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {modbusDevices.filter(d => d.enabled).map(device => {
-              const datapoints = getDatapointsForPanel(device);
-              if (datapoints.length === 0) return null;
-
-              const isExpanded = expandedDevices.has(device.id);
-              const status = modbusDeviceStatus[device.id];
-
-              return (
-                <div key={device.id} className="border-b border-slate-700/50">
-                  <button
-                    onClick={() => toggleDevice(device.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors"
-                  >
-                    <Cpu className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span className="flex-1 text-xs font-medium text-slate-200 truncate text-left">
-                      {device.name}
-                    </span>
-                    <Circle
-                      className={`w-2 h-2 flex-shrink-0 ${
-                        status?.online ? 'text-emerald-400 fill-emerald-400' : 'text-slate-500'
-                      }`}
-                    />
-                    {isExpanded ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="bg-slate-900/50">
-                      {datapoints.map(dp => {
-                        const binding = getBindingForDatapoint(device.id, dp.id);
-                        const isConnecting = !!connectingFrom;
-                        const canConnect = isConnecting && (
-                          (isOutputPanel && dp.writable) ||
-                          (!isOutputPanel)
-                        );
-                        const isHighlighted = shouldHighlight && highlightedBinding?.datapointId === dp.id && highlightedBinding?.deviceId === device.id;
-
-                        return (
-                          <div
-                            key={dp.id}
-                            className={`group flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors ${
-                              canConnect
-                                ? 'hover:bg-blue-600/30 bg-blue-900/20'
-                                : 'hover:bg-slate-700/30'
-                            } ${binding ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
-                            onClick={() => onDatapointClick(device, dp, isOutputPanel)}
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/json', JSON.stringify({
-                                type: 'driver-datapoint',
-                                driverType: 'modbus',
-                                device,
-                                datapoint: dp,
-                                isOutput: isOutputPanel
-                              }));
-                              onDatapointDragStart(device, dp, isOutputPanel);
-                            }}
-                            draggable
-                          >
-                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                              binding
-                                ? 'bg-amber-400'
-                                : canConnect
-                                  ? 'bg-blue-400 animate-pulse'
-                                  : 'bg-slate-500'
-                            }`} />
-                            <span className={`flex-1 text-[11px] truncate ${binding ? 'text-amber-300' : 'text-slate-300'}`}>
-                              {dp.name}
-                            </span>
-                            {binding && (
-                              <span className="text-[9px] text-amber-500 bg-amber-900/40 px-1 py-0.5 rounded">verbunden</span>
-                            )}
-                            {dp.unit && !binding && (
-                              <span className="text-[10px] text-slate-500">{dp.unit}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+            {hasModbusDatapoints && (
+              <div className="border-b border-slate-700">
+                <button
+                  onClick={() => toggleDriverType('modbus')}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors bg-slate-900/30"
+                >
+                  <Cpu className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span className="flex-1 text-xs font-semibold text-amber-300 text-left">
+                    Modbus
+                  </span>
+                  <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
+                    {modbusDevicesWithData.length}
+                  </span>
+                  {expandedDriverTypes.has('modbus') ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                   )}
-                </div>
-              );
-            })}
+                </button>
 
-            {modbusDevices.filter(d => d.enabled).length === 0 && !hasHaEntities && (
+                {expandedDriverTypes.has('modbus') && (
+                  <div className="bg-slate-900/20">
+                    {modbusDevicesWithData.map(device => {
+                      const datapoints = getDatapointsForPanel(device);
+                      const isExpanded = expandedDevices.has(device.id);
+                      const status = modbusDeviceStatus[device.id];
+
+                      return (
+                        <div key={device.id} className="border-b border-slate-700/30">
+                          <button
+                            onClick={() => toggleDevice(device.id)}
+                            className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700/50 transition-colors"
+                          >
+                            <Circle
+                              className={`w-2 h-2 flex-shrink-0 ${
+                                status?.online ? 'text-emerald-400 fill-emerald-400' : 'text-slate-500'
+                              }`}
+                            />
+                            <span className="flex-1 text-[11px] font-medium text-slate-200 truncate text-left">
+                              {device.name}
+                            </span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3 h-3 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 text-slate-400" />
+                            )}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="bg-slate-900/50">
+                              {datapoints.map(dp => {
+                                const binding = getBindingForDatapoint(device.id, dp.id);
+                                const isConnecting = !!connectingFrom;
+                                const canConnect = isConnecting && (
+                                  (isOutputPanel && dp.writable) ||
+                                  (!isOutputPanel)
+                                );
+                                const isHighlighted = shouldHighlight && highlightedBinding?.datapointId === dp.id && highlightedBinding?.deviceId === device.id;
+
+                                return (
+                                  <div
+                                    key={dp.id}
+                                    className={`group flex items-center gap-2 px-5 py-1 cursor-pointer transition-colors ${
+                                      canConnect
+                                        ? 'hover:bg-blue-600/30 bg-blue-900/20'
+                                        : 'hover:bg-slate-700/30'
+                                    } ${binding ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
+                                    onClick={() => onDatapointClick(device, dp, isOutputPanel)}
+                                    onDragStart={(e) => {
+                                      e.dataTransfer.setData('application/json', JSON.stringify({
+                                        type: 'driver-datapoint',
+                                        driverType: 'modbus',
+                                        device,
+                                        datapoint: dp,
+                                        isOutput: isOutputPanel
+                                      }));
+                                      onDatapointDragStart(device, dp, isOutputPanel);
+                                    }}
+                                    draggable
+                                  >
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                      binding
+                                        ? 'bg-amber-400'
+                                        : canConnect
+                                          ? 'bg-blue-400 animate-pulse'
+                                          : 'bg-slate-500'
+                                    }`} />
+                                    <span className={`flex-1 text-[10px] truncate ${binding ? 'text-amber-300' : 'text-slate-300'}`}>
+                                      {dp.name}
+                                    </span>
+                                    {binding && (
+                                      <span className="text-[8px] text-amber-500 bg-amber-900/40 px-1 py-0.5 rounded">verb.</span>
+                                    )}
+                                    {dp.unit && !binding && (
+                                      <span className="text-[9px] text-slate-500">{dp.unit}</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {hasHaEntities && (
+              <div className="border-b border-slate-700">
+                <button
+                  onClick={() => toggleDriverType('homeassistant')}
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors bg-slate-900/30"
+                >
+                  <Home className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <span className="flex-1 text-xs font-semibold text-cyan-300 text-left">
+                    Home Assistant
+                  </span>
+                  <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
+                    {haDevicesWithEntities.length}
+                  </span>
+                  {expandedDriverTypes.has('homeassistant') ? (
+                    <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                </button>
+
+                {expandedDriverTypes.has('homeassistant') && (
+                  <div className="bg-slate-900/20">
+                    {haDevicesWithEntities.map(device => {
+                      const entities = getHaEntitiesForPanel(device);
+                      const isExpanded = expandedHaDevices.has(device.id);
+
+                      return (
+                        <div key={`ha-${device.id}`} className="border-b border-slate-700/30">
+                          <button
+                            onClick={() => toggleHaDevice(device.id)}
+                            className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700/50 transition-colors"
+                          >
+                            <Circle className="w-2 h-2 flex-shrink-0 text-emerald-400 fill-emerald-400" />
+                            <span className="flex-1 text-[11px] font-medium text-slate-200 truncate text-left">
+                              {device.name}
+                            </span>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3 h-3 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3 text-slate-400" />
+                            )}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="bg-slate-900/50">
+                              {entities.map(entity => {
+                                const binding = getBindingForHaEntity(entity.entity_id);
+                                const isConnecting = !!connectingFrom;
+                                const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+                                const unit = entity.attributes.unit_of_measurement as string || '';
+                                const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
+
+                                return (
+                                  <div
+                                    key={entity.entity_id}
+                                    className={`group flex items-center gap-2 px-5 py-1 cursor-pointer transition-colors ${
+                                      isConnecting
+                                        ? 'hover:bg-blue-600/30 bg-blue-900/20'
+                                        : 'hover:bg-slate-700/30'
+                                    } ${binding ? 'bg-cyan-900/20' : ''} ${isHaHighlighted ? 'ring-2 ring-cyan-400 bg-cyan-800/40 animate-pulse' : ''}`}
+                                    onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.dataTransfer.setData('application/json', JSON.stringify({
+                                        type: 'driver-datapoint',
+                                        driverType: 'homeassistant',
+                                        device,
+                                        entity,
+                                        isOutput: isOutputPanel
+                                      }));
+                                    }}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                      binding
+                                        ? 'bg-cyan-400'
+                                        : isConnecting
+                                          ? 'bg-blue-400 animate-pulse'
+                                          : 'bg-slate-500'
+                                    }`} />
+                                    {getHaEntityIcon(entity.entity_id)}
+                                    <span className={`flex-1 text-[10px] truncate ${binding ? 'text-cyan-300' : 'text-slate-300'}`}>
+                                      {friendlyName}
+                                    </span>
+                                    {binding && (
+                                      <span className="text-[8px] text-cyan-500 bg-cyan-900/40 px-1 py-0.5 rounded">verb.</span>
+                                    )}
+                                    {unit && !binding && (
+                                      <span className="text-[9px] text-slate-500">{unit}</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!hasModbusDatapoints && !hasHaEntities && (
               <div className="px-3 py-4 text-center text-xs text-slate-500">
                 Keine Treiber aktiv
               </div>
             )}
-
-            {haDriverEnabled && haDevices.map(device => {
-              const entities = getHaEntitiesForPanel(device);
-              if (entities.length === 0) return null;
-
-              const isExpanded = expandedHaDevices.has(device.id);
-
-              return (
-                <div key={`ha-${device.id}`} className="border-b border-slate-700/50">
-                  <button
-                    onClick={() => {
-                      setExpandedHaDevices(prev => {
-                        const next = new Set(prev);
-                        if (next.has(device.id)) {
-                          next.delete(device.id);
-                        } else {
-                          next.add(device.id);
-                        }
-                        return next;
-                      });
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors"
-                  >
-                    <Home className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                    <span className="flex-1 text-xs font-medium text-slate-200 truncate text-left">
-                      {device.name}
-                    </span>
-                    <Circle className="w-2 h-2 flex-shrink-0 text-emerald-400 fill-emerald-400" />
-                    {isExpanded ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="bg-slate-900/50">
-                      {entities.map(entity => {
-                        const binding = getBindingForHaEntity(entity.entity_id);
-                        const isConnecting = !!connectingFrom;
-                        const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
-                        const unit = entity.attributes.unit_of_measurement as string || '';
-                        const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
-
-                        return (
-                          <div
-                            key={entity.entity_id}
-                            className={`group flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors ${
-                              isConnecting
-                                ? 'hover:bg-blue-600/30 bg-blue-900/20'
-                                : 'hover:bg-slate-700/30'
-                            } ${binding ? 'bg-cyan-900/20' : ''} ${isHaHighlighted ? 'ring-2 ring-cyan-400 bg-cyan-800/40 animate-pulse' : ''}`}
-                            onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/json', JSON.stringify({
-                                type: 'driver-datapoint',
-                                driverType: 'homeassistant',
-                                device,
-                                entity,
-                                isOutput: isOutputPanel
-                              }));
-                            }}
-                          >
-                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                              binding
-                                ? 'bg-cyan-400'
-                                : isConnecting
-                                  ? 'bg-blue-400 animate-pulse'
-                                  : 'bg-slate-500'
-                            }`} />
-                            {getHaEntityIcon(entity.entity_id)}
-                            <span className={`flex-1 text-[11px] truncate ${binding ? 'text-cyan-300' : 'text-slate-300'}`}>
-                              {friendlyName}
-                            </span>
-                            {binding && (
-                              <span className="text-[9px] text-cyan-500 bg-cyan-900/40 px-1 py-0.5 rounded">verbunden</span>
-                            )}
-                            {unit && !binding && (
-                              <span className="text-[10px] text-slate-500">{unit}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
 
           {connectingFrom && (

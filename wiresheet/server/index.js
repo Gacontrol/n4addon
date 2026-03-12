@@ -870,11 +870,22 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       console.log(`[DP-EVAL DEBUG]   inputVals[0]=${inputVals[0]}`);
       console.log(`[DP-EVAL DEBUG]   visuControlledDps size=${visuControlledDps.size}`);
 
+      const convertToDpType = (val) => {
+        if (node.type === 'dp-boolean') {
+          if (typeof val === 'boolean') return val;
+          if (typeof val === 'number') return val > 0;
+          if (typeof val === 'string') return val === 'true' || val === '1' || val === 'on';
+          return Boolean(val);
+        }
+        return val;
+      };
+
       if (visuVal !== undefined) {
         console.log(`[DP-EVAL DEBUG]   -> NEUER VISU-WERT: ${visuVal}`);
-        visuControlledDps.set(nodeId, visuVal);
-        nodeValues[nodeId] = visuVal;
-        setPersistentDpValue(nodeId, visuVal);
+        const converted = convertToDpType(visuVal);
+        visuControlledDps.set(nodeId, converted);
+        nodeValues[nodeId] = converted;
+        setPersistentDpValue(nodeId, converted);
         delete visuOverrides[visuKey];
         delete visuOverrides[nodeId];
         for (const key of Object.keys(visuOverrides)) {
@@ -884,17 +895,19 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         }
       } else if (visuControlledVal !== undefined) {
         console.log(`[DP-EVAL DEBUG]   -> VISU-KONTROLLE AKTIV: ${visuControlledVal}`);
-        nodeValues[nodeId] = visuControlledVal;
+        nodeValues[nodeId] = convertToDpType(visuControlledVal);
       } else if (inputVals[0] !== undefined) {
         console.log(`[DP-EVAL DEBUG]   -> INPUT-WERT: ${inputVals[0]}`);
-        nodeValues[nodeId] = inputVals[0];
-        setPersistentDpValue(nodeId, inputVals[0]);
+        const converted = convertToDpType(inputVals[0]);
+        nodeValues[nodeId] = converted;
+        setPersistentDpValue(nodeId, converted);
       } else {
         const persistentVal = persistentDpValues.get(nodeId);
         if (persistentVal !== undefined) {
           console.log(`[DP-EVAL DEBUG]   -> PERSISTENTER WERT: ${persistentVal}`);
-          visuControlledDps.set(nodeId, persistentVal);
-          nodeValues[nodeId] = persistentVal;
+          const converted = convertToDpType(persistentVal);
+          visuControlledDps.set(nodeId, converted);
+          nodeValues[nodeId] = converted;
         } else {
           console.log(`[DP-EVAL DEBUG]   -> DEFAULT-WERT`);
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
