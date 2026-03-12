@@ -934,7 +934,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const getInputValue = (conn) => {
       const sourceNode = nodes.find(n => n.id === conn.source);
       if (isSourceInInactiveCase(sourceNode)) {
-        return getDefaultValueForNodeType(sourceNode.type);
+        return undefined;
       }
       if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
