@@ -478,13 +478,13 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         </div>
       )}
       <svg
-        id="canvas-bg"
+        id="canvas-svg"
         className="origin-top-left"
         style={{
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 10,
+          zIndex: 1,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
@@ -492,7 +492,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           minWidth: `${100 / zoom}%`,
           minHeight: `${100 / zoom}%`,
           overflow: 'visible',
-          pointerEvents: 'none'
+          fill: 'none'
         }}
       >
         <defs>
@@ -507,7 +507,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           </marker>
         </defs>
 
-        <g style={{ pointerEvents: 'auto' }}>
+        <g>
           {connections.map(conn => {
             const start = getPortCenter(conn.source, conn.sourcePort);
             const end = getPortCenter(conn.target, conn.targetPort);
