@@ -1,8 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Download, Upload, Check, AlertCircle, ChevronDown, ChevronRight,
-  FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen, Image as ImageIcon,
-  Server, Library, Link2
+  FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen,
+  Server, Library, Bell
 } from 'lucide-react';
 import { WiresheetPage } from '../types/flow';
 import { VisuPage, } from '../types/visualization';
@@ -18,9 +18,11 @@ import {
   fetchImagesForBackup,
   restoreImagesFromBackup,
   DriverConfig,
-  CustomLibraryDevice
+  CustomLibraryDevice,
+  AlarmConfig
 } from '../utils/backup';
 import { ModbusDevice, DriverBinding } from '../types/flow';
+import { AlarmClass, AlarmConsole } from '../types/alarm';
 
 interface BackupModalProps {
   wiresheets: WiresheetPage[];
@@ -29,11 +31,14 @@ interface BackupModalProps {
   modbusDevices: ModbusDevice[];
   modbusDriverEnabled: boolean;
   driverBindings: DriverBinding[];
+  alarmClasses: AlarmClass[];
+  alarmConsoles: AlarmConsole[];
   onImport: (
     wiresheets: WiresheetPage[],
     visuPages: VisuPage[],
     customBlocks: CustomBlockDefinition[],
-    driverConfig?: DriverConfig
+    driverConfig?: DriverConfig,
+    alarmConfig?: AlarmConfig
   ) => void;
   onClose: () => void;
 }
@@ -47,6 +52,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   modbusDevices,
   modbusDriverEnabled,
   driverBindings,
+  alarmClasses,
+  alarmConsoles,
   onImport,
   onClose
 }) => {
@@ -62,8 +69,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     customBlocks: [],
     modbusDevices: [],
     customLibrary: [],
+    alarmClasses: [],
+    alarmConsoles: [],
     includeBindings: true,
-    includeImages: true
+    includeImages: true,
+    includeActiveAlarms: false,
+    includeAlarmHistory: false
   });
   const customLibrary: CustomLibraryDevice[] = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
   const [exportSelection, setExportSelection] = useState<BackupExportSelection>({
@@ -72,8 +83,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     customBlocks: customBlocks.map(b => b.id),
     modbusDevices: modbusDevices.map(d => d.id),
     customLibrary: customLibrary.map(l => l.id),
+    alarmClasses: alarmClasses.map(c => c.id),
+    alarmConsoles: alarmConsoles.map(c => c.id),
     includeBindings: true,
-    includeImages: true
+    includeImages: true,
+    includeActiveAlarms: false,
+    includeAlarmHistory: false
   });
   const [importDone, setImportDone] = useState(false);
   const [wiresheetsOpen, setWiresheetsOpen] = useState(true);
@@ -81,6 +96,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const [blocksOpen, setBlocksOpen] = useState(true);
   const [driversOpen, setDriversOpen] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(true);
+  const [alarmsOpen, setAlarmsOpen] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,8 +119,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         customBlocks: backup.customBlocks.map(b => b.id),
         modbusDevices: backup.driverConfig?.modbusDevices.map(d => d.id) || [],
         customLibrary: backup.driverConfig?.customModbusLibrary.map(l => l.id) || [],
+        alarmClasses: backup.alarmConfig?.alarmClasses.map(c => c.id) || [],
+        alarmConsoles: backup.alarmConfig?.alarmConsoles.map(c => c.id) || [],
         includeBindings: true,
-        includeImages: true
+        includeImages: true,
+        includeActiveAlarms: false,
+        includeAlarmHistory: false
       });
       setView('import-select');
     };
@@ -112,14 +132,14 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     e.target.value = '';
   }, []);
 
-  const toggleExportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', id: string) => {
+  const toggleExportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary' | 'alarmClasses' | 'alarmConsoles', id: string) => {
     setExportSelection(prev => ({
       ...prev,
       [key]: (prev[key] as string[]).includes(id) ? (prev[key] as string[]).filter(i => i !== id) : [...(prev[key] as string[]), id]
     }));
   };
 
-  const toggleAllExport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', ids: string[]) => {
+  const toggleAllExport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary' | 'alarmClasses' | 'alarmConsoles', ids: string[]) => {
     setExportSelection(prev => {
       const arr = prev[key] as string[];
       const allSelected = ids.every(id => arr.includes(id));
@@ -127,18 +147,18 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleExportFlag = (key: 'includeBindings' | 'includeImages') => {
+  const toggleExportFlag = (key: 'includeBindings' | 'includeImages' | 'includeActiveAlarms' | 'includeAlarmHistory') => {
     setExportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const toggleImportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', id: string) => {
+  const toggleImportItem = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary' | 'alarmClasses' | 'alarmConsoles', id: string) => {
     setImportSelection(prev => ({
       ...prev,
       [key]: (prev[key] as string[]).includes(id) ? (prev[key] as string[]).filter(i => i !== id) : [...(prev[key] as string[]), id]
     }));
   };
 
-  const toggleAllImport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary', ids: string[]) => {
+  const toggleAllImport = (key: 'wiresheets' | 'visuPages' | 'customBlocks' | 'modbusDevices' | 'customLibrary' | 'alarmClasses' | 'alarmConsoles', ids: string[]) => {
     setImportSelection(prev => {
       const arr = prev[key] as string[];
       const allSelected = ids.every(id => arr.includes(id));
@@ -146,7 +166,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleImportFlag = (key: 'includeBindings' | 'includeImages') => {
+  const toggleImportFlag = (key: 'includeBindings' | 'includeImages' | 'includeActiveAlarms' | 'includeAlarmHistory') => {
     setImportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -158,6 +178,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       const selectedBlocks = customBlocks.filter(b => exportSelection.customBlocks.includes(b.id));
       const selectedDevices = modbusDevices.filter(d => exportSelection.modbusDevices.includes(d.id));
       const selectedLibrary = customLibrary.filter(l => exportSelection.customLibrary.includes(l.id));
+      const selectedAlarmClasses = alarmClasses.filter(c => exportSelection.alarmClasses.includes(c.id));
+      const selectedAlarmConsoles = alarmConsoles.filter(c => exportSelection.alarmConsoles.includes(c.id));
       const images = exportSelection.includeImages ? await fetchImagesForBackup(selectedVisus) : [];
       const driverConfig: DriverConfig = {
         modbusDevices: selectedDevices,
@@ -165,7 +187,13 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         driverBindings: exportSelection.includeBindings ? driverBindings : [],
         customModbusLibrary: selectedLibrary
       };
-      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig);
+      const alarmConfig: AlarmConfig = {
+        alarmClasses: selectedAlarmClasses,
+        alarmConsoles: selectedAlarmConsoles,
+        activeAlarms: exportSelection.includeActiveAlarms ? [] : undefined,
+        alarmHistory: exportSelection.includeAlarmHistory ? [] : undefined
+      };
+      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig, alarmConfig);
       downloadBackup(backup);
       onClose();
     } finally {
@@ -186,6 +214,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         driverBindings,
         customModbusLibrary: customLibrary
       };
+      const currentAlarmConfig: AlarmConfig = {
+        alarmClasses,
+        alarmConsoles,
+        activeAlarms: [],
+        alarmHistory: []
+      };
       const result = applyImport(
         importSelection,
         loadedBackup,
@@ -193,12 +227,13 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         visuPages,
         customBlocks,
         importMode,
-        currentDriverConfig
+        currentDriverConfig,
+        currentAlarmConfig
       );
       if (result.driverConfig?.customModbusLibrary) {
         localStorage.setItem('wiresheet-custom-modbus-library', JSON.stringify(result.driverConfig.customModbusLibrary));
       }
-      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig);
+      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig, result.alarmConfig);
       setImportDone(true);
       setTimeout(() => onClose(), 1200);
     } finally {
@@ -212,8 +247,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     importSelection.customBlocks.length +
     importSelection.modbusDevices.length +
     importSelection.customLibrary.length +
+    importSelection.alarmClasses.length +
+    importSelection.alarmConsoles.length +
     (importSelection.includeBindings ? 1 : 0) +
-    (importSelection.includeImages ? 1 : 0);
+    (importSelection.includeImages ? 1 : 0) +
+    (importSelection.includeActiveAlarms ? 1 : 0) +
+    (importSelection.includeAlarmHistory ? 1 : 0);
 
   const totalExportSelected =
     exportSelection.wiresheets.length +
@@ -221,8 +260,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     exportSelection.customBlocks.length +
     exportSelection.modbusDevices.length +
     exportSelection.customLibrary.length +
+    exportSelection.alarmClasses.length +
+    exportSelection.alarmConsoles.length +
     (exportSelection.includeBindings ? 1 : 0) +
-    (exportSelection.includeImages ? 1 : 0);
+    (exportSelection.includeImages ? 1 : 0) +
+    (exportSelection.includeActiveAlarms ? 1 : 0) +
+    (exportSelection.includeAlarmHistory ? 1 : 0);
 
   return (
     <div
@@ -425,6 +468,46 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 {customLibrary.length === 0 && <EmptyHint label="Keine benutzerdefinierten Geraete" />}
               </SectionGroup>
 
+              <SectionGroup
+                icon={<Bell className="w-3.5 h-3.5" />}
+                label="Alarm-Konfiguration"
+                color="#ef4444"
+                isOpen={alarmsOpen}
+                onToggle={() => setAlarmsOpen(v => !v)}
+                allIds={[...alarmClasses.map(c => c.id), ...alarmConsoles.map(c => c.id)]}
+                selectedIds={[...exportSelection.alarmClasses, ...exportSelection.alarmConsoles]}
+                onToggleAll={() => {
+                  toggleAllExport('alarmClasses', alarmClasses.map(c => c.id));
+                  toggleAllExport('alarmConsoles', alarmConsoles.map(c => c.id));
+                }}
+              >
+                {alarmClasses.length > 0 && (
+                  <div className="px-3 py-1.5 text-[10px] text-slate-500 font-medium border-b border-white/[0.04]">Alarmklassen</div>
+                )}
+                {alarmClasses.map(c => (
+                  <CheckItem
+                    key={c.id}
+                    label={c.name}
+                    sublabel={`Prioritaet: ${c.priority}`}
+                    checked={exportSelection.alarmClasses.includes(c.id)}
+                    onChange={() => toggleExportItem('alarmClasses', c.id)}
+                  />
+                ))}
+                {alarmConsoles.length > 0 && (
+                  <div className="px-3 py-1.5 text-[10px] text-slate-500 font-medium border-b border-white/[0.04]">Alarmkonsolen</div>
+                )}
+                {alarmConsoles.map(c => (
+                  <CheckItem
+                    key={c.id}
+                    label={c.name}
+                    sublabel={`${c.alarmClassIds?.length || 0} Klassen zugewiesen`}
+                    checked={exportSelection.alarmConsoles.includes(c.id)}
+                    onChange={() => toggleExportItem('alarmConsoles', c.id)}
+                  />
+                ))}
+                {alarmClasses.length === 0 && alarmConsoles.length === 0 && <EmptyHint label="Keine Alarm-Konfiguration vorhanden" />}
+              </SectionGroup>
+
               <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="px-3 py-2.5 text-xs font-semibold text-slate-400" style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}>
                   Optionen
@@ -461,6 +544,9 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     )}
                     {loadedBackup.driverConfig && loadedBackup.driverConfig.customModbusLibrary.length > 0 && (
                       <> &nbsp;·&nbsp; {loadedBackup.driverConfig.customModbusLibrary.length} Bibliothek</>
+                    )}
+                    {loadedBackup.alarmConfig && loadedBackup.alarmConfig.alarmClasses.length > 0 && (
+                      <> &nbsp;·&nbsp; {loadedBackup.alarmConfig.alarmClasses.length} Alarmklassen</>
                     )}
                     {loadedBackup.images && loadedBackup.images.length > 0 && (
                       <> &nbsp;·&nbsp; {loadedBackup.images.length} Bilder</>
@@ -615,6 +701,47 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                       sublabel={`${l.category}, ${l.datapoints.length} Datenpunkte`}
                       checked={importSelection.customLibrary.includes(l.id)}
                       onChange={() => toggleImportItem('customLibrary', l.id)}
+                    />
+                  ))}
+                </SectionGroup>
+              )}
+
+              {loadedBackup.alarmConfig && (loadedBackup.alarmConfig.alarmClasses.length > 0 || loadedBackup.alarmConfig.alarmConsoles.length > 0) && (
+                <SectionGroup
+                  icon={<Bell className="w-3.5 h-3.5" />}
+                  label="Alarm-Konfiguration"
+                  color="#ef4444"
+                  isOpen={alarmsOpen}
+                  onToggle={() => setAlarmsOpen(v => !v)}
+                  allIds={[...(loadedBackup.alarmConfig.alarmClasses || []).map(c => c.id), ...(loadedBackup.alarmConfig.alarmConsoles || []).map(c => c.id)]}
+                  selectedIds={[...importSelection.alarmClasses, ...importSelection.alarmConsoles]}
+                  onToggleAll={() => {
+                    toggleAllImport('alarmClasses', loadedBackup.alarmConfig!.alarmClasses.map(c => c.id));
+                    toggleAllImport('alarmConsoles', loadedBackup.alarmConfig!.alarmConsoles.map(c => c.id));
+                  }}
+                >
+                  {loadedBackup.alarmConfig.alarmClasses.length > 0 && (
+                    <div className="px-3 py-1.5 text-[10px] text-slate-500 font-medium border-b border-white/[0.04]">Alarmklassen</div>
+                  )}
+                  {loadedBackup.alarmConfig.alarmClasses.map(c => (
+                    <CheckItem
+                      key={c.id}
+                      label={c.name}
+                      sublabel={`Prioritaet: ${c.priority}`}
+                      checked={importSelection.alarmClasses.includes(c.id)}
+                      onChange={() => toggleImportItem('alarmClasses', c.id)}
+                    />
+                  ))}
+                  {loadedBackup.alarmConfig.alarmConsoles.length > 0 && (
+                    <div className="px-3 py-1.5 text-[10px] text-slate-500 font-medium border-b border-white/[0.04]">Alarmkonsolen</div>
+                  )}
+                  {loadedBackup.alarmConfig.alarmConsoles.map(c => (
+                    <CheckItem
+                      key={c.id}
+                      label={c.name}
+                      sublabel={`${c.alarmClassIds?.length || 0} Klassen zugewiesen`}
+                      checked={importSelection.alarmConsoles.includes(c.id)}
+                      onChange={() => toggleImportItem('alarmConsoles', c.id)}
                     />
                   ))}
                 </SectionGroup>

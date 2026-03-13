@@ -1,8 +1,9 @@
 import { WiresheetPage, ModbusDevice, DriverBinding } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
+import { AlarmClass, AlarmConsole, ActiveAlarm, AlarmHistoryEntry } from '../types/alarm';
 
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export interface BackupImage {
   filename: string;
@@ -25,6 +26,13 @@ export interface DriverConfig {
   customModbusLibrary: CustomLibraryDevice[];
 }
 
+export interface AlarmConfig {
+  alarmClasses: AlarmClass[];
+  alarmConsoles: AlarmConsole[];
+  activeAlarms?: ActiveAlarm[];
+  alarmHistory?: AlarmHistoryEntry[];
+}
+
 export interface WiresheetBackup {
   version: number;
   exportedAt: string;
@@ -34,6 +42,7 @@ export interface WiresheetBackup {
   customBlocks: CustomBlockDefinition[];
   images?: BackupImage[];
   driverConfig?: DriverConfig;
+  alarmConfig?: AlarmConfig;
 }
 
 function getApiBase(): string {
@@ -99,8 +108,12 @@ export interface BackupImportSelection {
   customBlocks: string[];
   modbusDevices: string[];
   customLibrary: string[];
+  alarmClasses: string[];
+  alarmConsoles: string[];
   includeBindings: boolean;
   includeImages: boolean;
+  includeActiveAlarms: boolean;
+  includeAlarmHistory: boolean;
 }
 
 export interface BackupExportSelection {
@@ -109,8 +122,12 @@ export interface BackupExportSelection {
   customBlocks: string[];
   modbusDevices: string[];
   customLibrary: string[];
+  alarmClasses: string[];
+  alarmConsoles: string[];
   includeBindings: boolean;
   includeImages: boolean;
+  includeActiveAlarms: boolean;
+  includeAlarmHistory: boolean;
 }
 
 export function createBackup(
@@ -118,7 +135,8 @@ export function createBackup(
   visuPages: VisuPage[],
   customBlocks: CustomBlockDefinition[],
   images?: BackupImage[],
-  driverConfig?: DriverConfig
+  driverConfig?: DriverConfig,
+  alarmConfig?: AlarmConfig
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -128,7 +146,8 @@ export function createBackup(
     visuPages,
     customBlocks,
     images: images || [],
-    driverConfig
+    driverConfig,
+    alarmConfig
   };
 }
 
@@ -187,12 +206,14 @@ export function applyImport(
   currentVisuPages: VisuPage[],
   currentBlocks: CustomBlockDefinition[],
   mode: 'merge' | 'replace',
-  currentDriverConfig?: DriverConfig
+  currentDriverConfig?: DriverConfig,
+  currentAlarmConfig?: AlarmConfig
 ): {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
   driverConfig?: DriverConfig;
+  alarmConfig?: AlarmConfig;
 } {
   const now = Date.now();
 
@@ -217,7 +238,19 @@ export function applyImport(
       };
     }
 
-    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig };
+    let finalAlarmConfig: AlarmConfig | undefined = currentAlarmConfig;
+    if (backup.alarmConfig) {
+      const selectedClasses = backup.alarmConfig.alarmClasses.filter(c => selection.alarmClasses.includes(c.id));
+      const selectedConsoles = backup.alarmConfig.alarmConsoles.filter(c => selection.alarmConsoles.includes(c.id));
+      finalAlarmConfig = {
+        alarmClasses: selectedClasses.length > 0 ? selectedClasses : (currentAlarmConfig?.alarmClasses || []),
+        alarmConsoles: selectedConsoles.length > 0 ? selectedConsoles : (currentAlarmConfig?.alarmConsoles || []),
+        activeAlarms: selection.includeActiveAlarms ? (backup.alarmConfig.activeAlarms || []) : (currentAlarmConfig?.activeAlarms || []),
+        alarmHistory: selection.includeAlarmHistory ? (backup.alarmConfig.alarmHistory || []) : (currentAlarmConfig?.alarmHistory || [])
+      };
+    }
+
+    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig, alarmConfig: finalAlarmConfig };
   }
 
   const existingWiresheetIds = new Set(currentWiresheets.map(w => w.id));
@@ -299,5 +332,55 @@ export function applyImport(
     };
   }
 
-  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };
+  let finalAlarmConfig: AlarmConfig | undefined = currentAlarmConfig;
+  if (backup.alarmConfig && currentAlarmConfig) {
+    const selectedClasses = backup.alarmConfig.alarmClasses.filter(c => selection.alarmClasses.includes(c.id));
+    const selectedConsoles = backup.alarmConfig.alarmConsoles.filter(c => selection.alarmConsoles.includes(c.id));
+
+    const mergedClasses = [...currentAlarmConfig.alarmClasses];
+    for (const cls of selectedClasses) {
+      const exists = mergedClasses.some(c => c.id === cls.id);
+      if (exists) {
+        mergedClasses.push({ ...cls, id: `alarm-class-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${cls.name} (Import)` });
+      } else {
+        mergedClasses.push(cls);
+      }
+    }
+
+    const mergedConsoles = [...currentAlarmConfig.alarmConsoles];
+    for (const con of selectedConsoles) {
+      const exists = mergedConsoles.some(c => c.id === con.id);
+      if (exists) {
+        mergedConsoles.push({ ...con, id: `alarm-console-${now}-${Math.random().toString(36).substr(2, 9)}`, name: `${con.name} (Import)` });
+      } else {
+        mergedConsoles.push(con);
+      }
+    }
+
+    const mergedActiveAlarms = selection.includeActiveAlarms
+      ? [...(currentAlarmConfig.activeAlarms || []), ...(backup.alarmConfig.activeAlarms || [])]
+      : (currentAlarmConfig.activeAlarms || []);
+
+    const mergedHistory = selection.includeAlarmHistory
+      ? [...(currentAlarmConfig.alarmHistory || []), ...(backup.alarmConfig.alarmHistory || [])].slice(0, 1000)
+      : (currentAlarmConfig.alarmHistory || []);
+
+    finalAlarmConfig = {
+      alarmClasses: mergedClasses,
+      alarmConsoles: mergedConsoles,
+      activeAlarms: mergedActiveAlarms,
+      alarmHistory: mergedHistory
+    };
+  } else if (backup.alarmConfig) {
+    const selectedClasses = backup.alarmConfig.alarmClasses.filter(c => selection.alarmClasses.includes(c.id));
+    const selectedConsoles = backup.alarmConfig.alarmConsoles.filter(c => selection.alarmConsoles.includes(c.id));
+    finalAlarmConfig = {
+      alarmClasses: selectedClasses,
+      alarmConsoles: selectedConsoles,
+      activeAlarms: selection.includeActiveAlarms ? (backup.alarmConfig.activeAlarms || []) : [],
+      alarmHistory: selection.includeAlarmHistory ? (backup.alarmConfig.alarmHistory || []) : []
+    };
+  }
+
+  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig, alarmConfig: finalAlarmConfig };
 }
