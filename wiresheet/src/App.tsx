@@ -805,8 +805,21 @@ function App() {
     }
   }, [allNodeIdsStr, driverBindings, setDriverBindings]);
 
+  const alarmEvalRef = useRef<{
+    triggerAlarm: typeof triggerAlarm;
+    clearAlarmBySource: typeof clearAlarmBySource;
+  }>({ triggerAlarm, clearAlarmBySource });
+
+  useEffect(() => {
+    alarmEvalRef.current = { triggerAlarm, clearAlarmBySource };
+  }, [triggerAlarm, clearAlarmBySource]);
+
+  const liveValuesJson = JSON.stringify(liveValues);
+
   useEffect(() => {
     if (alarmClasses.length === 0) return;
+
+    const { triggerAlarm: trigger, clearAlarmBySource: clearBySource } = alarmEvalRef.current;
 
     allLogicNodes.forEach(node => {
       const config = node.data.config || {};
@@ -815,15 +828,17 @@ function App() {
       if (node.type === 'dp-boolean' && config.booleanAlarmConfig) {
         const alarmCfg = config.booleanAlarmConfig as BooleanAlarmConfig;
         if (alarmCfg.enabled && alarmCfg.alarmClassId) {
-          const liveKey = `${node.id}:out`;
-          const currentValue = liveValues[liveKey];
+          const currentValue = liveValues[node.id];
           const isAlarmValue = currentValue === alarmCfg.alarmValue;
+
+          console.log('[ALARM EVAL] Boolean DP:', nodeLabel, 'nodeId:', node.id, 'currentValue:', currentValue, 'alarmValue:', alarmCfg.alarmValue, 'isAlarm:', isAlarmValue);
 
           if (isAlarmValue) {
             const alarmText = alarmCfg.alarmText || `${nodeLabel}: Alarm`;
-            triggerAlarm(node.id, alarmCfg.alarmClassId, alarmText, 'boolean');
+            console.log('[ALARM EVAL] Triggering alarm:', alarmText);
+            trigger(node.id, alarmCfg.alarmClassId, alarmText, 'boolean');
           } else {
-            clearAlarmBySource(node.id, 'boolean');
+            clearBySource(node.id, 'boolean');
           }
         }
       }
@@ -831,33 +846,30 @@ function App() {
       if (node.type === 'dp-numeric' && config.numericAlarmConfig) {
         const alarmCfg = config.numericAlarmConfig as NumericAlarmConfig;
         if (alarmCfg.enabled && alarmCfg.alarmClassId) {
-          const liveKey = `${node.id}:out`;
-          const currentValue = liveValues[liveKey];
+          const currentValue = liveValues[node.id];
           if (typeof currentValue === 'number') {
-            const deadband = alarmCfg.deadband || 0;
-
             if (alarmCfg.highHighLimit !== undefined && currentValue >= alarmCfg.highHighLimit) {
-              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: HH-Grenze (${currentValue})`, 'highHigh');
+              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: HH-Grenze (${currentValue})`, 'highHigh');
             } else {
-              clearAlarmBySource(node.id, 'highHigh');
+              clearBySource(node.id, 'highHigh');
             }
 
             if (alarmCfg.highLimit !== undefined && currentValue >= alarmCfg.highLimit && (alarmCfg.highHighLimit === undefined || currentValue < alarmCfg.highHighLimit)) {
-              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: H-Grenze (${currentValue})`, 'high');
+              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: H-Grenze (${currentValue})`, 'high');
             } else {
-              clearAlarmBySource(node.id, 'high');
+              clearBySource(node.id, 'high');
             }
 
             if (alarmCfg.lowLimit !== undefined && currentValue <= alarmCfg.lowLimit && (alarmCfg.lowLowLimit === undefined || currentValue > alarmCfg.lowLowLimit)) {
-              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: L-Grenze (${currentValue})`, 'low');
+              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: L-Grenze (${currentValue})`, 'low');
             } else {
-              clearAlarmBySource(node.id, 'low');
+              clearBySource(node.id, 'low');
             }
 
             if (alarmCfg.lowLowLimit !== undefined && currentValue <= alarmCfg.lowLowLimit) {
-              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: LL-Grenze (${currentValue})`, 'lowLow');
+              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: LL-Grenze (${currentValue})`, 'lowLow');
             } else {
-              clearAlarmBySource(node.id, 'lowLow');
+              clearBySource(node.id, 'lowLow');
             }
           }
         }
@@ -866,14 +878,13 @@ function App() {
       if (node.type === 'dp-enum' && config.enumAlarmConfig) {
         const alarmCfg = config.enumAlarmConfig as EnumAlarmConfig;
         if (alarmCfg.enabled && alarmCfg.alarmClassId && alarmCfg.alarmValues.length > 0) {
-          const liveKey = `${node.id}:out`;
-          const currentValue = liveValues[liveKey];
+          const currentValue = liveValues[node.id];
           const isAlarmValue = alarmCfg.alarmValues.includes(currentValue as number | string);
 
           if (isAlarmValue) {
-            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Alarmwert ${currentValue}`, 'enum');
+            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Alarmwert ${currentValue}`, 'enum');
           } else {
-            clearAlarmBySource(node.id, 'enum');
+            clearBySource(node.id, 'enum');
           }
         }
       }
@@ -882,22 +893,20 @@ function App() {
         const alarmCfg = config.aggregateAlarmConfig as AggregateAlarmConfig;
 
         if (alarmCfg.faultAlarmClassId) {
-          const faultKey = `${node.id}:fault`;
-          const faultValue = liveValues[faultKey];
+          const faultValue = liveValues[`${node.id}:output-3`];
           if (faultValue === true) {
-            triggerAlarm(node.id, alarmCfg.faultAlarmClassId, `${nodeLabel}: Stoerung`, 'fault');
+            trigger(node.id, alarmCfg.faultAlarmClassId, `${nodeLabel}: Stoerung`, 'fault');
           } else {
-            clearAlarmBySource(node.id, 'fault');
+            clearBySource(node.id, 'fault');
           }
         }
 
         if (alarmCfg.maintenanceAlarmClassId) {
-          const alarmKey = `${node.id}:alarm`;
-          const alarmValue = liveValues[alarmKey];
+          const alarmValue = liveValues[`${node.id}:output-5`];
           if (alarmValue === true) {
-            triggerAlarm(node.id, alarmCfg.maintenanceAlarmClassId, `${nodeLabel}: Wartungsalarm`, 'maintenance');
+            trigger(node.id, alarmCfg.maintenanceAlarmClassId, `${nodeLabel}: Wartungsalarm`, 'maintenance');
           } else {
-            clearAlarmBySource(node.id, 'maintenance');
+            clearBySource(node.id, 'maintenance');
           }
         }
       }
@@ -905,12 +914,11 @@ function App() {
       if (node.type === 'valve-control' && config.valveAlarmConfig) {
         const alarmCfg = config.valveAlarmConfig as ValveAlarmConfig;
         if (alarmCfg.alarmClassId) {
-          const alarmKey = `${node.id}:alarm`;
-          const alarmValue = liveValues[alarmKey];
+          const alarmValue = liveValues[`${node.id}:output-2`];
           if (alarmValue === true) {
-            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Ventilstoerung`, 'valve');
+            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Ventilstoerung`, 'valve');
           } else {
-            clearAlarmBySource(node.id, 'valve');
+            clearBySource(node.id, 'valve');
           }
         }
       }
@@ -918,17 +926,16 @@ function App() {
       if (node.type === 'sensor-control' && config.sensorAlarmConfig) {
         const alarmCfg = config.sensorAlarmConfig as SensorAlarmConfig;
         if (alarmCfg.alarmClassId) {
-          const alarmKey = `${node.id}:alarm`;
-          const alarmValue = liveValues[alarmKey];
+          const alarmValue = liveValues[`${node.id}:output-2`];
           if (alarmValue === true) {
-            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Sensoralarm`, 'sensor');
+            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Sensoralarm`, 'sensor');
           } else {
-            clearAlarmBySource(node.id, 'sensor');
+            clearBySource(node.id, 'sensor');
           }
         }
       }
     });
-  }, [liveValues, allLogicNodes, alarmClasses, triggerAlarm, clearAlarmBySource]);
+  }, [liveValuesJson, allLogicNodes, alarmClasses]);
 
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,
