@@ -3510,7 +3510,11 @@ visuApp.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) =>
         broadcastSse();
       }
     } else if (portId) {
-      visuControlledDps.set(nodeId, { portId, value, timestamp: Date.now() });
+      visuControlledDps.set(nodeId, value);
+      const overrideKey = `${nodeId}:${portId}`;
+      if (overrideKey !== nodeId) {
+        visuControlledDps.set(overrideKey, value);
+      }
       persistentDpValues.set(nodeId, value);
       scheduleDpValuesSave();
       broadcastSse();
