@@ -938,6 +938,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (visuOverrides[portKey] !== undefined) {
         return visuOverrides[portKey];
       }
+      const visuControlledPortVal = visuControlledDps.get(portKey);
+      if (visuControlledPortVal !== undefined) {
+        return visuControlledPortVal;
+      }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
       if (conn) {
         return getInputValue(conn);
@@ -2487,7 +2491,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     console.log(`[WRITE-VALUE DEBUG] Overrides NACHHER:`, JSON.stringify(overrides));
 
     visuControlledDps.set(nodeId, value);
-    console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}`);
+    if (overrideKey !== nodeId) {
+      visuControlledDps.set(overrideKey, value);
+    }
+    console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}, overrideKey=${overrideKey}`);
     console.log(`[WRITE-VALUE DEBUG] visuControlledDps Map:`, JSON.stringify([...visuControlledDps.entries()]));
 
     setPersistentDpValue(nodeId, value);
