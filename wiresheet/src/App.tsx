@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';

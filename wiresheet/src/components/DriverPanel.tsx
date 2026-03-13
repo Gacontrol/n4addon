@@ -349,7 +349,9 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               {device.name}
                             </span>
                             {isDeviceDisabled && (
-                              <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" title={!modbusDriverEnabled ? 'Treiber deaktiviert' : 'Geraet deaktiviert'} />
+                              <span title={!modbusDriverEnabled ? 'Treiber deaktiviert' : 'Geraet deaktiviert'}>
+                                <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                              </span>
                             )}
                             {isExpanded ? (
                               <ChevronUp className="w-3 h-3 text-slate-400" />
