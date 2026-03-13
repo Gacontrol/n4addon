@@ -3388,21 +3388,7 @@ async function proxyToApi(req, res, apiPath) {
   }
 }
 
-visuApp.use((req, res, next) => {
-  const ingressMatch = req.path.match(/^\/api\/hassio_ingress\/[^/]+(\/api\/.*)$/);
-  if (ingressMatch) {
-    return proxyToApi(req, res, ingressMatch[1]);
-  }
-  const appMatch = req.path.match(/^\/app\/[^/]+(\/api\/.*)$/);
-  if (appMatch) {
-    return proxyToApi(req, res, appMatch[1]);
-  }
-  next();
-});
-
-visuApp.use('/api', async (req, res) => {
-  await proxyToApi(req, res, req.originalUrl);
-});
+visuApp.use(express.json());
 
 visuApp.use('/assets', express.static(path.join(distDir, 'assets'), {
   maxAge: '1y',
