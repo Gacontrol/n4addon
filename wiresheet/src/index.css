@@ -18,3 +18,12 @@
   pointer-events: auto !important;
   cursor: pointer !important;
 }
+
+@keyframes highlight-pulse {
+  0% {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.6), 0 0 40px rgba(236, 72, 153, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(236, 72, 153, 0.8), 0 0 60px rgba(236, 72, 153, 0.5);
+  }
+}

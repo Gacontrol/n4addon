@@ -75,14 +75,17 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   }, []);
 
   const processedHighlightRef = useRef<string | null>(null);
+  const [temporaryHighlightId, setTemporaryHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
     if (highlightWidgetId && highlightWidgetId !== processedHighlightRef.current) {
       processedHighlightRef.current = highlightWidgetId;
-      setSelectedWidgetId(highlightWidgetId);
-      setSelectedWidgetIds([highlightWidgetId]);
-      setShowProperties(true);
+      setTemporaryHighlightId(highlightWidgetId);
       setIsEditMode(true);
+      setTimeout(() => {
+        setTemporaryHighlightId(null);
+        processedHighlightRef.current = null;
+      }, 3000);
       onClearHighlight?.();
     }
   }, [highlightWidgetId, onClearHighlight]);
@@ -569,6 +572,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onSendToBack={handleSendToBack}
             onBringForward={handleBringForward}
             onSendBackward={handleSendBackward}
+            highlightWidgetId={temporaryHighlightId}
           />
         </div>
 
