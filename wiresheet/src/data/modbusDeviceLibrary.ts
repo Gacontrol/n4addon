@@ -68,8 +68,12 @@ const UI_RESOLUTION_OPTIONS: ModbusConfigOption[] = [
 ];
 
 const AO_MODE_OPTIONS: ModbusConfigOption[] = [
-  { value: 0, label: 'Analog 0-10V' },
-  { value: 1, label: 'Digital (On/Off)' },
+  { value: 0, label: '0-10V Spannung' },
+  { value: 1, label: 'PWM 1Hz' },
+  { value: 2, label: 'PWM 10Hz' },
+  { value: 3, label: 'PWM 100Hz' },
+  { value: 4, label: 'PWM 0.1Hz' },
+  { value: 5, label: 'PWM 0.01Hz' },
 ];
 
 const TRIAC_MODE_OPTIONS: ModbusConfigOption[] = [
@@ -99,12 +103,9 @@ function createUIConfigDatapoints(count: number) {
     configs.push(
       { name: `UI${i} Sensortyp`, address: 150 + i - 1, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i} (Register ${40151 + i - 1})`, currentValue: 1 },
       { name: `UI${i} Filterzeit`, address: 158 + i - 1, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: `Filterzeit fuer UI${i} in Sekunden (Register ${40159 + i - 1})`, unit: 's', currentValue: 2 },
-      { name: `UI${i} Offset`, address: 167 + i, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: `Offset-Korrektur fuer UI${i} (Register ${40168 + i})`, currentValue: 0 }
+      { name: `UI${i} Aufloesung`, address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: `Aufloesung fuer UI${i} (Register 40167, Bit ${i - 1})`, bitIndex: i - 1, currentValue: 0 }
     );
   }
-  configs.push(
-    { name: 'UI Aufloesung', address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Bit-Aufloesung aller Universal-Eingaenge (Register 40167) - Bit 0-7 fuer UI1-UI8', currentValue: 0 }
-  );
   return configs;
 }
 
@@ -127,7 +128,7 @@ function createDODatapoints(count: number, statusRegister: number) {
 function createAODatapoints(count: number, startAddress: number) {
   const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 1; i <= count; i++) {
-    outputs.push({ name: `AO${i}`, address: startAddress + i - 1, registerType: 'holding', dataType: 'uint16', scale: 0.1, unit: '%', writable: true });
+    outputs.push({ name: `AO${i}`, address: startAddress + i - 1, registerType: 'holding', dataType: 'uint16', scale: 0.001, unit: 'V', writable: true });
   }
   return outputs;
 }
@@ -136,11 +137,11 @@ function createAOConfigDatapoints(count: number) {
   const configs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 1; i <= count; i++) {
     configs.push(
-      { name: `AO${i} Modus`, address: 167 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: AO_MODE_OPTIONS, configDescription: `Betriebsmodus fuer AO${i}` },
-      { name: `AO${i} Default`, address: 144 + i, registerType: 'holding', dataType: 'uint16', scale: 0.1, writable: true, isConfig: true, unit: '%', configDescription: `Standardwert bei Watchdog fuer AO${i}` }
+      { name: `AO${i} Modus`, address: 166 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: AO_MODE_OPTIONS, configDescription: `Betriebsmodus fuer AO${i} (Register ${40167 + i})` },
+      { name: `AO${i} Default`, address: 143 + i, registerType: 'holding', dataType: 'uint16', scale: 0.01, writable: true, isConfig: true, unit: 'V', configDescription: `Standardwert bei Watchdog fuer AO${i} (Register ${40144 + i}) in mV` }
     );
   }
-  configs.push({ name: 'AO Default (Digital)', address: 143, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Digital-Default fuer alle AO' });
+  configs.push({ name: 'AO Default (Digital)', address: 143, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Digital-Status aller AO bei Watchdog (Register 40144)' });
   return configs;
 }
 
