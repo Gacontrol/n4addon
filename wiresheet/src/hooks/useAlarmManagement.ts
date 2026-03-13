@@ -41,10 +41,10 @@ export function useAlarmManagement() {
     const apiBase = getApiBase();
     let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let active = true;
+    let isActive = true;
 
     function connect() {
-      if (!active) return;
+      if (!isActive) return;
       es = new EventSource(`${apiBase}/sse`);
 
       es.addEventListener('alarms', (e: MessageEvent) => {
@@ -59,14 +59,14 @@ export function useAlarmManagement() {
 
       es.onerror = () => {
         es?.close();
-        if (active) reconnectTimer = setTimeout(connect, 3000);
+        if (isActive) reconnectTimer = setTimeout(connect, 3000);
       };
     }
 
     connect();
 
     return () => {
-      active = false;
+      isActive = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       es?.close();
     };

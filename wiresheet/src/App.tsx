@@ -76,7 +76,8 @@ function App() {
     addTextAnnotation,
     setLiveValue,
     executeAllPages,
-    setAllPages
+    setAllPages,
+    updateNodeConfigOnPage
   } = useWiresheetPages();
 
   const {
@@ -1014,25 +1015,6 @@ function App() {
       }
     });
   }, [liveValuesJson, allLogicNodes, alarmClasses, nodeToPageMap]);
-
-  const updateNodeConfigOnPage = useCallback((pageId: string, nodeId: string, configUpdates: Record<string, unknown>) => {
-    setPages(prev => prev.map(p => {
-      if (p.id !== pageId) return p;
-      return {
-        ...p,
-        nodes: p.nodes.map(n => {
-          if (n.id !== nodeId) return n;
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              config: { ...n.data.config, ...configUpdates }
-            }
-          };
-        })
-      };
-    }));
-  }, [setPages]);
 
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,

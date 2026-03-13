@@ -878,6 +878,29 @@ export const useWiresheetPages = () => {
       setSaveStatus('unsaved');
       savePages(safePages);
     },
+    updateNodeConfigOnPage: (pageId: string, nodeId: string, configUpdates: Record<string, unknown>) => {
+      setPages(prev => {
+        const updated = prev.map(p => {
+          if (p.id !== pageId) return p;
+          return {
+            ...p,
+            nodes: p.nodes.map(n => {
+              if (n.id !== nodeId) return n;
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  config: { ...n.data.config, ...configUpdates }
+                }
+              };
+            })
+          };
+        });
+        setSaveStatus('unsaved');
+        savePages(updated);
+        return updated;
+      });
+    },
     setLiveValue: (key: string, value: unknown) => {
       setLiveValues(prev => ({ ...prev, [key]: value }));
     },

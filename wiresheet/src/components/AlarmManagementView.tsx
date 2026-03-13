@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Bell, Plus, Trash2, CreditCard as Edit2, Check, X, AlertTriangle, AlertCircle, Info, ChevronDown, ChevronRight, Monitor, Settings, Cpu, FileText } from 'lucide-react';
+import { Bell, Plus, Trash2, CreditCard as Edit2, Check, X, AlertTriangle, AlertCircle, Info, ChevronDown, ChevronRight, Monitor, Settings, Cpu } from 'lucide-react';
 import { AlarmClass, AlarmConsole, AlarmPriority, ActiveAlarm } from '../types/alarm';
 import { FlowNode, WiresheetPage } from '../types/flow';
 
