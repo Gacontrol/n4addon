@@ -454,6 +454,94 @@ app.post(['/alarm-config', '/api/alarm-config'], async (req, res) => {
   }
 });
 
+app.post(['/alarm/acknowledge', '/api/alarm/acknowledge'], async (req, res) => {
+  try {
+    const { alarmId } = req.body;
+    const data = await fs.readFile(alarmConfigFile, 'utf8');
+    const config = JSON.parse(data);
+
+    const alarm = (config.activeAlarms || []).find(a => a.id === alarmId);
+    if (alarm) {
+      alarm.state = 'acknowledged';
+      alarm.acknowledgedAt = Date.now();
+      await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
+      broadcastSSE('alarms', { activeAlarms: config.activeAlarms });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Alarm acknowledge error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/alarm/acknowledge-all', '/api/alarm/acknowledge-all'], async (req, res) => {
+  try {
+    const data = await fs.readFile(alarmConfigFile, 'utf8');
+    const config = JSON.parse(data);
+
+    const now = Date.now();
+    (config.activeAlarms || []).forEach(a => {
+      if (a.state === 'active') {
+        a.state = 'acknowledged';
+        a.acknowledgedAt = now;
+      }
+    });
+
+    await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
+    broadcastSSE('alarms', { activeAlarms: config.activeAlarms });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Alarm acknowledge-all error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/alarm/clear', '/api/alarm/clear'], async (req, res) => {
+  try {
+    const { alarmId } = req.body;
+    const data = await fs.readFile(alarmConfigFile, 'utf8');
+    const config = JSON.parse(data);
+
+    const alarmIndex = (config.activeAlarms || []).findIndex(a => a.id === alarmId);
+    if (alarmIndex >= 0) {
+      const removedAlarm = config.activeAlarms.splice(alarmIndex, 1)[0];
+      removedAlarm.clearedAt = Date.now();
+      config.alarmHistory = config.alarmHistory || [];
+      config.alarmHistory.unshift(removedAlarm);
+      if (config.alarmHistory.length > 1000) {
+        config.alarmHistory = config.alarmHistory.slice(0, 1000);
+      }
+      await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
+      broadcastSSE('alarms', { activeAlarms: config.activeAlarms });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Alarm clear error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/alarm/shelve', '/api/alarm/shelve'], async (req, res) => {
+  try {
+    const { alarmId, durationMs, reason } = req.body;
+    const data = await fs.readFile(alarmConfigFile, 'utf8');
+    const config = JSON.parse(data);
+
+    const alarm = (config.activeAlarms || []).find(a => a.id === alarmId);
+    if (alarm) {
+      alarm.shelved = true;
+      alarm.shelvedUntil = Date.now() + durationMs;
+      alarm.shelveReason = reason;
+      await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
+      broadcastSSE('alarms', { activeAlarms: config.activeAlarms });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Alarm shelve error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
   try {
     const [states, registry] = await Promise.all([

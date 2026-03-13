@@ -192,7 +192,7 @@ export const VisuAlarmConsole: React.FC<VisuAlarmConsoleProps> = ({
     }
   };
 
-  if (!console && !isEditMode) {
+  if (!console && config.consoleId && !isEditMode) {
     return (
       <div
         className="flex flex-col items-center justify-center bg-slate-800 rounded-lg border border-slate-600 text-slate-400"

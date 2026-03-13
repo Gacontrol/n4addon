@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
+import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
 import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
 
 function getApiBase(): string {
@@ -18,6 +19,9 @@ export function VisuApp() {
   const [activePageId, setActivePageId] = useState<string>('');
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
   const [logicNodes, setLogicNodes] = useState<FlowNode[]>([]);
+  const [alarmClasses, setAlarmClasses] = useState<AlarmClass[]>([]);
+  const [alarmConsoles, setAlarmConsoles] = useState<AlarmConsole[]>([]);
+  const [activeAlarms, setActiveAlarms] = useState<ActiveAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const pageHistoryRef = useRef<string[]>([]);
@@ -39,9 +43,10 @@ export function VisuApp() {
 
   const loadData = useCallback(async () => {
     try {
-      const [visuRes, pagesRes] = await Promise.all([
+      const [visuRes, pagesRes, alarmRes] = await Promise.all([
         fetch(`${apiBase}/visu-pages`),
-        fetch(`${apiBase}/pages`)
+        fetch(`${apiBase}/pages`),
+        fetch(`${apiBase}/alarm-config`)
       ]);
 
       if (visuRes.ok) {
@@ -61,6 +66,13 @@ export function VisuApp() {
           const allNodes = data.flatMap((p: { nodes: FlowNode[] }) => p.nodes || []);
           setLogicNodes(allNodes);
         }
+      }
+
+      if (alarmRes.ok) {
+        const data = await alarmRes.json();
+        setAlarmClasses(data.alarmClasses || []);
+        setAlarmConsoles(data.alarmConsoles || []);
+        setActiveAlarms(data.activeAlarms || []);
       }
     } catch (err) {
       console.error('loadData error:', err);
@@ -87,6 +99,15 @@ export function VisuApp() {
           const data = JSON.parse(e.data);
           if (data.liveValues) setLiveValues(data.liveValues);
           if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
+        } catch {}
+      });
+
+      es.addEventListener('alarms', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
+          if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
+          if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
         } catch {}
       });
 
@@ -180,6 +201,71 @@ export function VisuApp() {
       setActivePageId(pages[0].id);
     }
   }, []);
+
+  const handleAcknowledgeAlarm = useCallback(async (alarmId: string) => {
+    try {
+      const resp = await fetch(`${apiBase}/alarm/acknowledge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alarmId })
+      });
+      if (resp.ok) {
+        setActiveAlarms(prev => prev.map(a =>
+          a.id === alarmId ? { ...a, state: 'acknowledged', acknowledgedAt: Date.now() } : a
+        ));
+      }
+    } catch (err) {
+      console.error('Acknowledge alarm error:', err);
+    }
+  }, [apiBase]);
+
+  const handleAcknowledgeAll = useCallback(async () => {
+    try {
+      const resp = await fetch(`${apiBase}/alarm/acknowledge-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (resp.ok) {
+        setActiveAlarms(prev => prev.map(a =>
+          a.state === 'active' ? { ...a, state: 'acknowledged', acknowledgedAt: Date.now() } : a
+        ));
+      }
+    } catch (err) {
+      console.error('Acknowledge all alarms error:', err);
+    }
+  }, [apiBase]);
+
+  const handleClearAlarm = useCallback(async (alarmId: string) => {
+    try {
+      const resp = await fetch(`${apiBase}/alarm/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alarmId })
+      });
+      if (resp.ok) {
+        setActiveAlarms(prev => prev.filter(a => a.id !== alarmId));
+      }
+    } catch (err) {
+      console.error('Clear alarm error:', err);
+    }
+  }, [apiBase]);
+
+  const handleShelveAlarm = useCallback(async (alarmId: string, durationMs: number, reason?: string) => {
+    try {
+      const resp = await fetch(`${apiBase}/alarm/shelve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alarmId, durationMs, reason })
+      });
+      if (resp.ok) {
+        setActiveAlarms(prev => prev.map(a =>
+          a.id === alarmId ? { ...a, shelved: true, shelvedUntil: Date.now() + durationMs } : a
+        ));
+      }
+    } catch (err) {
+      console.error('Shelve alarm error:', err);
+    }
+  }, [apiBase]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -296,6 +382,13 @@ export function VisuApp() {
           onBringForward={() => {}}
           onSendBackward={() => {}}
           onSendToBack={() => {}}
+          alarmClasses={alarmClasses}
+          alarmConsoles={alarmConsoles}
+          activeAlarms={activeAlarms}
+          onAcknowledgeAlarm={handleAcknowledgeAlarm}
+          onAcknowledgeAll={handleAcknowledgeAll}
+          onClearAlarm={handleClearAlarm}
+          onShelveAlarm={handleShelveAlarm}
         />
       </div>
     </div>
