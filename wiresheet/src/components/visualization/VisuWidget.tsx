@@ -169,7 +169,6 @@ interface VisuWidgetProps {
   isEditMode: boolean;
   isSelected: boolean;
   isMultiSelected?: boolean;
-  isHighlighted?: boolean;
   onSelect: () => void;
   onDoubleClick: () => void;
   onMouseDown?: (e: React.MouseEvent) => void;
@@ -241,7 +240,6 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   isEditMode,
   isSelected,
   isMultiSelected = false,
-  isHighlighted = false,
   onSelect,
   onDoubleClick,
   onMouseDown,
@@ -1355,22 +1353,15 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
-        border: isHighlighted
-          ? '3px solid #ec4899'
-          : showSelectionBorder
-            ? '2px solid #3b82f6'
-            : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none'),
-        outline: isHighlighted
-          ? '3px solid rgba(236, 72, 153, 0.4)'
-          : (isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined),
-        outlineOffset: isHighlighted ? 3 : (isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined),
-        boxShadow: isHighlighted
-          ? '0 0 20px rgba(236, 72, 153, 0.6), 0 0 40px rgba(236, 72, 153, 0.3)'
-          : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),
+        border: showSelectionBorder
+          ? '2px solid #3b82f6'
+          : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none'),
+        outline: isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined,
+        outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined,
+        boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8,
-        animation: isHighlighted ? 'highlight-pulse 0.5s ease-in-out infinite alternate' : undefined
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8
       } as React.CSSProperties}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}

@@ -9,9 +9,7 @@ interface ContextMenuState {
 }
 
 export interface VisuBindingInfo {
-  widgetId: string;
   widgetLabel: string;
-  pageId: string;
   pageName: string;
   portId?: string;
   paramKey?: string;
@@ -36,7 +34,6 @@ interface FlowNodeProps {
   onRenameNode?: (nodeId: string, newLabel: string) => void;
   onDriverBindingClick?: (binding: DriverBinding) => void;
   onDriverBindingDelete?: (binding: DriverBinding) => void;
-  onVisuBindingClick?: (binding: VisuBindingInfo) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -66,7 +63,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onRenameNode,
   onDriverBindingClick,
   onDriverBindingDelete,
-  onVisuBindingClick,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -130,8 +126,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (target.closest('.node-port')) return;
     if (target.closest('[data-action="delete"]')) return;
     if (target.closest('[data-action="context"]')) return;
-    if (target.closest('[data-visu-binding]')) return;
-    if (target.closest('[data-driver-binding]')) return;
 
     e.stopPropagation();
 
@@ -901,12 +895,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                             ? (String(vb.value).length > 6 ? String(vb.value).slice(0, 6) + '..' : String(vb.value))
                             : null;
                           return (
-                            <div key={vbi} className="flex items-center" data-visu-binding>
+                            <div key={vbi} className="flex items-center">
                               <span
-                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-pointer"
-                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Oeffnen`}
-                                onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
-                                onPointerDown={(e) => e.stopPropagation()}
+                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-default"
+                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
                               >
                                 <span className="inline-flex items-center gap-1">
                                   <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
@@ -930,7 +922,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       <div
                         className="flex items-center group/binding absolute right-full mr-1"
                         style={{ pointerEvents: 'auto' }}
-                        data-driver-binding
                       >
                         <button
                           className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/binding:opacity-100 transition-opacity mr-0.5"
@@ -1058,7 +1049,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                       <div
                         className="flex items-center group/binding absolute left-full ml-1"
                         style={{ pointerEvents: 'auto' }}
-                        data-driver-binding
                       >
                         <svg width="20" height="20" className="flex-shrink-0">
                           <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
@@ -1102,12 +1092,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 ? (String(vb.value).length > 8 ? String(vb.value).slice(0, 8) + '..' : String(vb.value))
                 : null;
               return (
-                <div key={vbi} className="flex items-center" data-visu-binding>
+                <div key={vbi} className="flex items-center">
                   <div
-                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-pointer hover:bg-pink-900/80 transition-colors"
-                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Oeffnen`}
-                    onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
-                    onPointerDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
+                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
                   >
                     <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
                     <span className="truncate max-w-[120px]">
