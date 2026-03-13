@@ -169,7 +169,6 @@ interface VisuWidgetProps {
   isEditMode: boolean;
   isSelected: boolean;
   isMultiSelected?: boolean;
-  isTemporaryHighlight?: boolean;
   onSelect: () => void;
   onDoubleClick: () => void;
   onMouseDown?: (e: React.MouseEvent) => void;
@@ -241,7 +240,6 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   isEditMode,
   isSelected,
   isMultiSelected = false,
-  isTemporaryHighlight = false,
   onSelect,
   onDoubleClick,
   onMouseDown,
@@ -1341,32 +1339,26 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isSensorWidget = widget.type === 'visu-sensor';
   const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget;
 
-  const highlightBoxShadow = isTemporaryHighlight
-    ? '0 0 0 3px #ec4899, 0 0 20px 5px rgba(236, 72, 153, 0.5)'
-    : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined);
-
   return (
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'} ${isTemporaryHighlight ? 'animate-pulse' : ''}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
         width: widget.size.width,
         height: widget.size.height,
-        zIndex: isTemporaryHighlight ? 9999 : (widget.zIndex || 1),
+        zIndex: widget.zIndex || 1,
         pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
-        border: isTemporaryHighlight
-          ? '3px solid #ec4899'
-          : (showSelectionBorder
-            ? '2px solid #3b82f6'
-            : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none')),
+        border: showSelectionBorder
+          ? '2px solid #3b82f6'
+          : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none'),
         outline: isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined,
         outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined,
-        boxShadow: highlightBoxShadow,
+        boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8

@@ -44,7 +44,6 @@ interface VisuCanvasProps {
   onSendToBack: (widgetId: string) => void;
   onBringForward: (widgetId: string) => void;
   onSendBackward: (widgetId: string) => void;
-  temporaryHighlightWidgetId?: string | null;
 }
 
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
@@ -73,8 +72,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onBringToFront,
   onSendToBack,
   onBringForward,
-  onSendBackward,
-  temporaryHighlightWidgetId
+  onSendBackward
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -953,7 +951,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           sensorParams={getSensorWidgetParams(widget)}
           pidParams={getPIDWidgetParams(widget)}
           heatingCurveParams={getHeatingCurveWidgetParams(widget)}
-          isTemporaryHighlight={temporaryHighlightWidgetId === widget.id}
         />
       ))}
 

@@ -63,7 +63,6 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [multiClipboard, setMultiClipboard] = useState<VisuWidget[] | null>(readMultiClipboard);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
-  const [temporaryHighlightWidgetId, setTemporaryHighlightWidgetId] = useState<string | null>(null);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
 
   useEffect(() => {
@@ -80,14 +79,11 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   useEffect(() => {
     if (highlightWidgetId && highlightWidgetId !== processedHighlightRef.current) {
       processedHighlightRef.current = highlightWidgetId;
-      setTemporaryHighlightWidgetId(highlightWidgetId);
+      setSelectedWidgetId(highlightWidgetId);
+      setSelectedWidgetIds([highlightWidgetId]);
+      setShowProperties(true);
       setIsEditMode(true);
-      const timer = setTimeout(() => {
-        setTemporaryHighlightWidgetId(null);
-        processedHighlightRef.current = null;
-      }, 3000);
       onClearHighlight?.();
-      return () => clearTimeout(timer);
     }
   }, [highlightWidgetId, onClearHighlight]);
 
@@ -573,7 +569,6 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onSendToBack={handleSendToBack}
             onBringForward={handleBringForward}
             onSendBackward={handleSendBackward}
-            temporaryHighlightWidgetId={temporaryHighlightWidgetId}
           />
         </div>
 
