@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen } from 'lucide-react';
+import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
@@ -13,6 +13,11 @@ function getApiBase(): string {
   const p = window.location.pathname;
   const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
   return m ? m[1] : '';
+}
+
+function getVisuUrl(): string {
+  const hostname = window.location.hostname;
+  return `http://${hostname}:8098`;
 }
 
 interface VisualizationViewProps {
@@ -409,29 +414,41 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
-          <div className="flex items-center bg-slate-800 rounded-lg p-1">
-            <button
-              onClick={() => setIsEditMode(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
-                isEditMode ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Edit3 className="w-4 h-4" />
-              Bearbeiten
-            </button>
-            <button
-              onClick={() => {
-                setIsEditMode(false);
-                setSelectedWidgetId(null);
-                setShowProperties(false);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
-                !isEditMode ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              Ansicht
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-slate-800 rounded-lg p-1">
+              <button
+                onClick={() => setIsEditMode(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
+                  isEditMode ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Edit3 className="w-4 h-4" />
+                Bearbeiten
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditMode(false);
+                  setSelectedWidgetId(null);
+                  setShowProperties(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
+                  !isEditMode ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Eye className="w-4 h-4" />
+                Ansicht
+              </button>
+            </div>
+            {!isEditMode && (
+              <button
+                onClick={() => window.open(getVisuUrl(), '_blank')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white"
+                title="Visualisierung in neuem Fenster oeffnen"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Neues Fenster
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -513,72 +530,81 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {isEditMode && (
-          <WidgetPalette onDragStart={() => {}} />
+        {isEditMode ? (
+          <>
+            <WidgetPalette onDragStart={() => {}} />
+            <div
+              className="flex-1 relative overflow-auto"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+            >
+              <VisuCanvas
+                page={activePage}
+                liveValues={liveValues}
+                logicNodes={logicNodes}
+                isEditMode={isEditMode}
+                selectedWidgetId={selectedWidgetId}
+                selectedWidgetIds={selectedWidgetIds}
+                clipboard={multiClipboard ? multiClipboard[0] : clipboard}
+                onSelectWidget={(id) => {
+                  setSelectedWidgetId(id);
+                  if (id) {
+                    setSelectedWidgetIds([id]);
+                    setShowProperties(true);
+                  } else {
+                    setSelectedWidgetIds([]);
+                  }
+                }}
+                onSelectWidgets={(ids) => {
+                  setSelectedWidgetIds(ids);
+                  if (ids.length > 0) {
+                    setSelectedWidgetId(ids[ids.length - 1]);
+                    setShowProperties(ids.length === 1);
+                  } else {
+                    setSelectedWidgetId(null);
+                    setShowProperties(false);
+                  }
+                }}
+                onUpdateWidget={handleUpdateWidget}
+                onUpdateWidgets={handleUpdateWidgets}
+                onDeleteWidget={handleDeleteWidget}
+                onDeleteWidgets={handleDeleteWidgets}
+                onDuplicateWidget={handleDuplicateWidget}
+                onCopyWidget={handleCopyWidget}
+                onCopyWidgets={handleCopyWidgets}
+                onPasteWidget={handlePasteWidget}
+                onWidgetValueChange={handleWidgetValueChange}
+                onEditWidgetProperties={(id) => {
+                  setSelectedWidgetId(id);
+                  setShowProperties(true);
+                }}
+                onNavigateToPage={handleNavigateToPage}
+                onNavigateBack={handleNavigateBack}
+                onNavigateHome={handleNavigateHome}
+                onBringToFront={handleBringToFront}
+                onSendToBack={handleSendToBack}
+                onBringForward={handleBringForward}
+                onSendBackward={handleSendBackward}
+                highlightedWidgetId={highlightedWidgetId}
+                alarmClasses={alarmClasses}
+                alarmConsoles={alarmConsoles}
+                activeAlarms={activeAlarms}
+                onAcknowledgeAlarm={onAcknowledgeAlarm}
+                onAcknowledgeAll={onAcknowledgeAll}
+                onClearAlarm={onClearAlarm}
+                onShelveAlarm={onShelveAlarm}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 relative">
+            <iframe
+              src={getVisuUrl()}
+              className="w-full h-full border-0"
+              title="Visualisierung"
+            />
+          </div>
         )}
-
-        <div
-          className="flex-1 relative overflow-auto"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-        >
-          <VisuCanvas
-            page={activePage}
-            liveValues={liveValues}
-            logicNodes={logicNodes}
-            isEditMode={isEditMode}
-            selectedWidgetId={selectedWidgetId}
-            selectedWidgetIds={selectedWidgetIds}
-            clipboard={multiClipboard ? multiClipboard[0] : clipboard}
-            onSelectWidget={(id) => {
-              setSelectedWidgetId(id);
-              if (id) {
-                setSelectedWidgetIds([id]);
-                setShowProperties(true);
-              } else {
-                setSelectedWidgetIds([]);
-              }
-            }}
-            onSelectWidgets={(ids) => {
-              setSelectedWidgetIds(ids);
-              if (ids.length > 0) {
-                setSelectedWidgetId(ids[ids.length - 1]);
-                setShowProperties(ids.length === 1);
-              } else {
-                setSelectedWidgetId(null);
-                setShowProperties(false);
-              }
-            }}
-            onUpdateWidget={handleUpdateWidget}
-            onUpdateWidgets={handleUpdateWidgets}
-            onDeleteWidget={handleDeleteWidget}
-            onDeleteWidgets={handleDeleteWidgets}
-            onDuplicateWidget={handleDuplicateWidget}
-            onCopyWidget={handleCopyWidget}
-            onCopyWidgets={handleCopyWidgets}
-            onPasteWidget={handlePasteWidget}
-            onWidgetValueChange={handleWidgetValueChange}
-            onEditWidgetProperties={(id) => {
-              setSelectedWidgetId(id);
-              setShowProperties(true);
-            }}
-            onNavigateToPage={handleNavigateToPage}
-            onNavigateBack={handleNavigateBack}
-            onNavigateHome={handleNavigateHome}
-            onBringToFront={handleBringToFront}
-            onSendToBack={handleSendToBack}
-            onBringForward={handleBringForward}
-            onSendBackward={handleSendBackward}
-            highlightedWidgetId={highlightedWidgetId}
-            alarmClasses={alarmClasses}
-            alarmConsoles={alarmConsoles}
-            activeAlarms={activeAlarms}
-            onAcknowledgeAlarm={onAcknowledgeAlarm}
-            onAcknowledgeAll={onAcknowledgeAll}
-            onClearAlarm={onClearAlarm}
-            onShelveAlarm={onShelveAlarm}
-          />
-        </div>
 
         {isEditMode && showProperties && selectedWidget && (
           <WidgetPropertiesPanel
