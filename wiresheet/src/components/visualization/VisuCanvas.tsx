@@ -50,7 +50,9 @@ interface VisuCanvasProps {
   alarmConsoles?: AlarmConsole[];
   activeAlarms?: ActiveAlarm[];
   onAcknowledgeAlarm?: (alarmId: string) => void;
+  onAcknowledgeAll?: () => void;
   onClearAlarm?: (alarmId: string) => void;
+  onShelveAlarm?: (alarmId: string, durationMs: number, reason?: string) => void;
 }
 
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
@@ -85,7 +87,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   alarmConsoles = [],
   activeAlarms = [],
   onAcknowledgeAlarm,
-  onClearAlarm
+  onAcknowledgeAll,
+  onClearAlarm,
+  onShelveAlarm
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -969,7 +973,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           alarmConsoles={alarmConsoles}
           activeAlarms={activeAlarms}
           onAcknowledgeAlarm={onAcknowledgeAlarm}
+          onAcknowledgeAll={onAcknowledgeAll}
           onClearAlarm={onClearAlarm}
+          onShelveAlarm={onShelveAlarm}
         />
       ))}
 

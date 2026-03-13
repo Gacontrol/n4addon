@@ -190,7 +190,9 @@ interface VisuWidgetProps {
   alarmConsoles?: AlarmConsole[];
   activeAlarms?: ActiveAlarm[];
   onAcknowledgeAlarm?: (alarmId: string) => void;
+  onAcknowledgeAll?: () => void;
   onClearAlarm?: (alarmId: string) => void;
+  onShelveAlarm?: (alarmId: string, durationMs: number, reason?: string) => void;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -267,7 +269,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   alarmConsoles = [],
   activeAlarms = [],
   onAcknowledgeAlarm,
-  onClearAlarm
+  onAcknowledgeAll,
+  onClearAlarm,
+  onShelveAlarm
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1340,7 +1344,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             alarmConsoles={alarmConsoles}
             activeAlarms={activeAlarms}
             onAcknowledge={onAcknowledgeAlarm}
+            onAcknowledgeAll={onAcknowledgeAll}
             onClear={onClearAlarm}
+            onShelve={onShelveAlarm}
             isEditMode={isEditMode}
             width={widget.size.width}
             height={widget.size.height}

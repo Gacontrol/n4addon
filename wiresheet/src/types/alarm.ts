@@ -82,6 +82,8 @@ export interface ActiveAlarm {
   alarmClassId: string;
   sourceNodeId: string;
   sourceNodeName?: string;
+  sourcePageId?: string;
+  sourcePageName?: string;
   sourceKey?: string;
   sourceType?: 'boolean' | 'numeric' | 'enum' | 'aggregate' | 'valve' | 'sensor';
   alarmType?: string;
@@ -93,7 +95,15 @@ export interface ActiveAlarm {
   acknowledgedBy?: string;
   clearedAt?: number;
   value?: unknown;
+  unit?: string;
+  limitValue?: number;
   limitType?: 'highHigh' | 'high' | 'low' | 'lowLow' | 'boolean' | 'enum' | 'fault' | 'maintenance';
+  shelved?: boolean;
+  shelvedUntil?: number;
+  shelvedBy?: string;
+  shelvedReason?: string;
+  occurrenceCount?: number;
+  lastOccurrence?: number;
 }
 
 export interface AlarmHistoryEntry extends ActiveAlarm {
@@ -106,7 +116,21 @@ export interface AlarmConsoleWidgetConfig {
   showClearButton?: boolean;
   showTimestamp?: boolean;
   showSource?: boolean;
+  showValue?: boolean;
+  showPriority?: boolean;
+  showAlarmClass?: boolean;
+  showDuration?: boolean;
+  showOccurrenceCount?: boolean;
   compactMode?: boolean;
   maxVisibleAlarms?: number;
   fontSize?: number;
+  enableFiltering?: boolean;
+  enableSorting?: boolean;
+  enableShelving?: boolean;
+  enableAcknowledgeAll?: boolean;
+  defaultSortBy?: 'time' | 'priority' | 'state' | 'source';
+  defaultSortDirection?: 'asc' | 'desc';
+  showStatistics?: boolean;
+  blinkUnacknowledged?: boolean;
+  groupBySource?: boolean;
 }

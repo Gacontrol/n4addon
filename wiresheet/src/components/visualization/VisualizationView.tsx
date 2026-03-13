@@ -31,7 +31,9 @@ interface VisualizationViewProps {
   alarmConsoles?: AlarmConsole[];
   activeAlarms?: ActiveAlarm[];
   onAcknowledgeAlarm?: (alarmId: string) => void;
+  onAcknowledgeAll?: () => void;
   onClearAlarm?: (alarmId: string) => void;
+  onShelveAlarm?: (alarmId: string, durationMs: number, reason?: string) => void;
 }
 
 export const VisualizationView: React.FC<VisualizationViewProps> = ({
@@ -50,7 +52,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   alarmConsoles = [],
   activeAlarms = [],
   onAcknowledgeAlarm,
-  onClearAlarm
+  onAcknowledgeAll,
+  onClearAlarm,
+  onShelveAlarm
 }) => {
   const CLIPBOARD_KEY = 'visu-clipboard';
   const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
@@ -570,7 +574,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             alarmConsoles={alarmConsoles}
             activeAlarms={activeAlarms}
             onAcknowledgeAlarm={onAcknowledgeAlarm}
+            onAcknowledgeAll={onAcknowledgeAll}
             onClearAlarm={onClearAlarm}
+            onShelveAlarm={onShelveAlarm}
           />
         </div>
 

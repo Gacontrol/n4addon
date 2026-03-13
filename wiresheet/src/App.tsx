@@ -111,12 +111,22 @@ function App() {
     updateAlarmConsole,
     deleteAlarmConsole,
     acknowledgeAlarm,
+    acknowledgeAll,
     clearAlarm,
     triggerAlarm,
     clearAlarmBySource,
     setAllAlarmClasses,
-    setAllAlarmConsoles
+    setAllAlarmConsoles,
+    shelveAlarm,
+    unshelveExpiredAlarms
   } = useAlarmManagement();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      unshelveExpiredAlarms();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [unshelveExpiredAlarms]);
 
   const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
@@ -816,6 +826,16 @@ function App() {
 
   const liveValuesJson = JSON.stringify(liveValues);
 
+  const nodeToPageMap = useMemo(() => {
+    const map = new Map<string, { pageId: string; pageName: string }>();
+    pages.forEach(page => {
+      page.nodes.forEach(node => {
+        map.set(node.id, { pageId: page.id, pageName: page.name });
+      });
+    });
+    return map;
+  }, [pages]);
+
   useEffect(() => {
     if (alarmClasses.length === 0) return;
 
@@ -824,6 +844,8 @@ function App() {
     allLogicNodes.forEach(node => {
       const config = node.data.config || {};
       const nodeLabel = node.data.label || node.id;
+      const pageInfo = nodeToPageMap.get(node.id);
+      const unit = config.dpUnit as string | undefined;
 
       if (node.type === 'dp-boolean' && config.booleanAlarmConfig) {
         const alarmCfg = config.booleanAlarmConfig as BooleanAlarmConfig;
@@ -831,12 +853,15 @@ function App() {
           const currentValue = liveValues[node.id];
           const isAlarmValue = currentValue === alarmCfg.alarmValue;
 
-          console.log('[ALARM EVAL] Boolean DP:', nodeLabel, 'nodeId:', node.id, 'currentValue:', currentValue, 'alarmValue:', alarmCfg.alarmValue, 'isAlarm:', isAlarmValue);
-
           if (isAlarmValue) {
             const alarmText = alarmCfg.alarmText || `${nodeLabel}: Alarm`;
-            console.log('[ALARM EVAL] Triggering alarm:', alarmText);
-            trigger(node.id, alarmCfg.alarmClassId, alarmText, 'boolean');
+            trigger(node.id, alarmCfg.alarmClassId, alarmText, 'boolean', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: currentValue,
+              limitType: 'boolean'
+            });
           } else {
             clearBySource(node.id, 'boolean');
           }
@@ -848,26 +873,50 @@ function App() {
         if (alarmCfg.enabled && alarmCfg.alarmClassId) {
           const currentValue = liveValues[node.id];
           if (typeof currentValue === 'number') {
+            const baseOpts = {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: currentValue,
+              unit
+            };
+
             if (alarmCfg.highHighLimit !== undefined && currentValue >= alarmCfg.highHighLimit) {
-              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: HH-Grenze (${currentValue})`, 'highHigh');
+              trigger(node.id, alarmCfg.alarmClassId, alarmCfg.highHighText || `${nodeLabel}: HH-Grenze ueberschritten`, 'highHigh', {
+                ...baseOpts,
+                limitValue: alarmCfg.highHighLimit,
+                limitType: 'highHigh'
+              });
             } else {
               clearBySource(node.id, 'highHigh');
             }
 
             if (alarmCfg.highLimit !== undefined && currentValue >= alarmCfg.highLimit && (alarmCfg.highHighLimit === undefined || currentValue < alarmCfg.highHighLimit)) {
-              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: H-Grenze (${currentValue})`, 'high');
+              trigger(node.id, alarmCfg.alarmClassId, alarmCfg.highText || `${nodeLabel}: H-Grenze ueberschritten`, 'high', {
+                ...baseOpts,
+                limitValue: alarmCfg.highLimit,
+                limitType: 'high'
+              });
             } else {
               clearBySource(node.id, 'high');
             }
 
             if (alarmCfg.lowLimit !== undefined && currentValue <= alarmCfg.lowLimit && (alarmCfg.lowLowLimit === undefined || currentValue > alarmCfg.lowLowLimit)) {
-              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: L-Grenze (${currentValue})`, 'low');
+              trigger(node.id, alarmCfg.alarmClassId, alarmCfg.lowText || `${nodeLabel}: L-Grenze unterschritten`, 'low', {
+                ...baseOpts,
+                limitValue: alarmCfg.lowLimit,
+                limitType: 'low'
+              });
             } else {
               clearBySource(node.id, 'low');
             }
 
             if (alarmCfg.lowLowLimit !== undefined && currentValue <= alarmCfg.lowLowLimit) {
-              trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: LL-Grenze (${currentValue})`, 'lowLow');
+              trigger(node.id, alarmCfg.alarmClassId, alarmCfg.lowLowText || `${nodeLabel}: LL-Grenze unterschritten`, 'lowLow', {
+                ...baseOpts,
+                limitValue: alarmCfg.lowLowLimit,
+                limitType: 'lowLow'
+              });
             } else {
               clearBySource(node.id, 'lowLow');
             }
@@ -882,7 +931,14 @@ function App() {
           const isAlarmValue = alarmCfg.alarmValues.includes(currentValue as number | string);
 
           if (isAlarmValue) {
-            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Alarmwert ${currentValue}`, 'enum');
+            const customText = alarmCfg.alarmTexts?.[currentValue as string | number];
+            trigger(node.id, alarmCfg.alarmClassId, customText || `${nodeLabel}: Alarmwert ${currentValue}`, 'enum', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: currentValue,
+              limitType: 'enum'
+            });
           } else {
             clearBySource(node.id, 'enum');
           }
@@ -895,7 +951,13 @@ function App() {
         if (alarmCfg.faultAlarmClassId) {
           const faultValue = liveValues[`${node.id}:output-3`];
           if (faultValue === true) {
-            trigger(node.id, alarmCfg.faultAlarmClassId, `${nodeLabel}: Stoerung`, 'fault');
+            trigger(node.id, alarmCfg.faultAlarmClassId, `${nodeLabel}: Stoerung`, 'fault', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: true,
+              limitType: 'fault'
+            });
           } else {
             clearBySource(node.id, 'fault');
           }
@@ -904,7 +966,13 @@ function App() {
         if (alarmCfg.maintenanceAlarmClassId) {
           const alarmValue = liveValues[`${node.id}:output-5`];
           if (alarmValue === true) {
-            trigger(node.id, alarmCfg.maintenanceAlarmClassId, `${nodeLabel}: Wartungsalarm`, 'maintenance');
+            trigger(node.id, alarmCfg.maintenanceAlarmClassId, `${nodeLabel}: Wartungsalarm`, 'maintenance', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: true,
+              limitType: 'maintenance'
+            });
           } else {
             clearBySource(node.id, 'maintenance');
           }
@@ -916,7 +984,12 @@ function App() {
         if (alarmCfg.alarmClassId) {
           const alarmValue = liveValues[`${node.id}:output-2`];
           if (alarmValue === true) {
-            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Ventilstoerung`, 'valve');
+            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Ventilstoerung`, 'valve', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: true
+            });
           } else {
             clearBySource(node.id, 'valve');
           }
@@ -928,14 +1001,19 @@ function App() {
         if (alarmCfg.alarmClassId) {
           const alarmValue = liveValues[`${node.id}:output-2`];
           if (alarmValue === true) {
-            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Sensoralarm`, 'sensor');
+            trigger(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Sensoralarm`, 'sensor', {
+              sourceNodeName: nodeLabel,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: true
+            });
           } else {
             clearBySource(node.id, 'sensor');
           }
         }
       }
     });
-  }, [liveValuesJson, allLogicNodes, alarmClasses]);
+  }, [liveValuesJson, allLogicNodes, alarmClasses, nodeToPageMap]);
 
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,
@@ -1450,7 +1528,9 @@ function App() {
           alarmConsoles={alarmConsoles}
           activeAlarms={activeAlarms}
           onAcknowledgeAlarm={acknowledgeAlarm}
+          onAcknowledgeAll={acknowledgeAll}
           onClearAlarm={clearAlarm}
+          onShelveAlarm={shelveAlarm}
         />
       )}
 

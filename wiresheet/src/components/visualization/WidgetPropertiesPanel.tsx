@@ -2168,52 +2168,184 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               />
             </div>
+
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
-              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={acCfg.showAcknowledgeButton !== false}
-                  onChange={(e) => onUpdate({ config: { ...config, showAcknowledgeButton: e.target.checked } })}
-                  className="rounded"
-                />
-                <label className="text-xs text-slate-400">Quittieren-Button</label>
+              <label className="block text-xs text-slate-500 font-medium">Anzeige-Optionen</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showAcknowledgeButton !== false}
+                    onChange={(e) => onUpdate({ config: { ...config, showAcknowledgeButton: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Quittieren
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showClearButton !== false}
+                    onChange={(e) => onUpdate({ config: { ...config, showClearButton: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Loeschen
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showTimestamp !== false}
+                    onChange={(e) => onUpdate({ config: { ...config, showTimestamp: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Zeitstempel
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showSource !== false}
+                    onChange={(e) => onUpdate({ config: { ...config, showSource: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Quelle
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showValue === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showValue: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Wert
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showPriority === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showPriority: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Prioritaet
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showAlarmClass === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showAlarmClass: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Alarmklasse
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showDuration === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showDuration: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Dauer
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showOccurrenceCount === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showOccurrenceCount: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Anzahl
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.showStatistics === true}
+                    onChange={(e) => onUpdate({ config: { ...config, showStatistics: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Statistik
+                </label>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={acCfg.showClearButton !== false}
-                  onChange={(e) => onUpdate({ config: { ...config, showClearButton: e.target.checked } })}
-                  className="rounded"
-                />
-                <label className="text-xs text-slate-400">Loeschen-Button</label>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500 font-medium">Funktionen</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.enableFiltering === true}
+                    onChange={(e) => onUpdate({ config: { ...config, enableFiltering: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Filterung
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.enableSorting === true}
+                    onChange={(e) => onUpdate({ config: { ...config, enableSorting: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Sortierung
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.enableAcknowledgeAll === true}
+                    onChange={(e) => onUpdate({ config: { ...config, enableAcknowledgeAll: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Alle quittieren
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.enableShelving === true}
+                    onChange={(e) => onUpdate({ config: { ...config, enableShelving: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Unterdruecken
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.blinkUnacknowledged === true}
+                    onChange={(e) => onUpdate({ config: { ...config, blinkUnacknowledged: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Blinken
+                </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acCfg.compactMode === true}
+                    onChange={(e) => onUpdate({ config: { ...config, compactMode: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Kompakt
+                </label>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={acCfg.showTimestamp !== false}
-                  onChange={(e) => onUpdate({ config: { ...config, showTimestamp: e.target.checked } })}
-                  className="rounded"
-                />
-                <label className="text-xs text-slate-400">Zeitstempel</label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={acCfg.showSource !== false}
-                  onChange={(e) => onUpdate({ config: { ...config, showSource: e.target.checked } })}
-                  className="rounded"
-                />
-                <label className="text-xs text-slate-400">Quelle</label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={acCfg.compactMode === true}
-                  onChange={(e) => onUpdate({ config: { ...config, compactMode: e.target.checked } })}
-                  className="rounded"
-                />
-                <label className="text-xs text-slate-400">Kompakte Ansicht</label>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500 font-medium">Standard-Sortierung</label>
+              <div className="flex gap-2">
+                <select
+                  value={acCfg.defaultSortBy || 'priority'}
+                  onChange={(e) => onUpdate({ config: { ...config, defaultSortBy: e.target.value as 'time' | 'priority' | 'state' | 'source' } })}
+                  className="flex-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-200"
+                >
+                  <option value="priority">Prioritaet</option>
+                  <option value="time">Zeit</option>
+                  <option value="state">Status</option>
+                  <option value="source">Quelle</option>
+                </select>
+                <select
+                  value={acCfg.defaultSortDirection || 'asc'}
+                  onChange={(e) => onUpdate({ config: { ...config, defaultSortDirection: e.target.value as 'asc' | 'desc' } })}
+                  className="w-20 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-200"
+                >
+                  <option value="asc">Aufst.</option>
+                  <option value="desc">Abst.</option>
+                </select>
               </div>
             </div>
           </>

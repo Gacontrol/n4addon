@@ -165,27 +165,64 @@ export function useAlarmManagement() {
     });
   }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
 
+  interface TriggerAlarmOptions {
+    sourceNodeName?: string;
+    sourcePageId?: string;
+    sourcePageName?: string;
+    value?: unknown;
+    unit?: string;
+    limitValue?: number;
+    limitType?: ActiveAlarm['limitType'];
+  }
+
   const triggerAlarm = useCallback((
     sourceNodeId: string,
     alarmClassId: string,
     message: string,
-    alarmType?: string
+    alarmType?: string,
+    options?: TriggerAlarmOptions
   ) => {
     const sourceKey = `${sourceNodeId}:${alarmType || 'default'}`;
 
     setActiveAlarms(prev => {
       const existing = prev.find(a => a.sourceNodeId === sourceNodeId && a.alarmType === (alarmType || 'default'));
-      if (existing) return prev;
+
+      if (existing) {
+        if (options?.value !== undefined && existing.value !== options.value) {
+          const updated = prev.map(a =>
+            a.id === existing.id
+              ? {
+                  ...a,
+                  value: options.value,
+                  message,
+                  occurrenceCount: (a.occurrenceCount || 1) + 1,
+                  lastOccurrence: Date.now()
+                }
+              : a
+          );
+          saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
+          return updated;
+        }
+        return prev;
+      }
 
       const newAlarm: ActiveAlarm = {
         id: `alarm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         alarmClassId,
         sourceNodeId,
+        sourceNodeName: options?.sourceNodeName,
+        sourcePageId: options?.sourcePageId,
+        sourcePageName: options?.sourcePageName,
         sourceKey,
         alarmType: alarmType || 'default',
         message,
         triggeredAt: Date.now(),
-        state: 'active'
+        state: 'active',
+        value: options?.value,
+        unit: options?.unit,
+        limitValue: options?.limitValue,
+        limitType: options?.limitType,
+        occurrenceCount: 1
       };
 
       const alarmClass = alarmClasses.find(ac => ac.id === alarmClassId);
@@ -196,6 +233,52 @@ export function useAlarmManagement() {
       }
 
       const updated = [...prev, newAlarm];
+      saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
+      return updated;
+    });
+  }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
+
+  const acknowledgeAll = useCallback((acknowledgedBy?: string) => {
+    setActiveAlarms(prev => {
+      const updated = prev.map(a =>
+        a.state === 'active'
+          ? { ...a, state: 'acknowledged' as const, acknowledgedAt: Date.now(), acknowledgedBy }
+          : a
+      );
+      saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
+      return updated;
+    });
+  }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
+
+  const shelveAlarm = useCallback((alarmId: string, durationMs: number, shelvedBy?: string, reason?: string) => {
+    setActiveAlarms(prev => {
+      const updated = prev.map(a =>
+        a.id === alarmId
+          ? {
+              ...a,
+              shelved: true,
+              shelvedUntil: Date.now() + durationMs,
+              shelvedBy,
+              shelvedReason: reason
+            }
+          : a
+      );
+      saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
+      return updated;
+    });
+  }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
+
+  const unshelveExpiredAlarms = useCallback(() => {
+    const now = Date.now();
+    setActiveAlarms(prev => {
+      const hasExpired = prev.some(a => a.shelved && a.shelvedUntil && a.shelvedUntil <= now);
+      if (!hasExpired) return prev;
+
+      const updated = prev.map(a =>
+        a.shelved && a.shelvedUntil && a.shelvedUntil <= now
+          ? { ...a, shelved: false, shelvedUntil: undefined, shelvedBy: undefined, shelvedReason: undefined }
+          : a
+      );
       saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
       return updated;
     });
@@ -268,12 +351,15 @@ export function useAlarmManagement() {
     updateAlarmConsole,
     deleteAlarmConsole,
     acknowledgeAlarm,
+    acknowledgeAll,
     clearAlarm,
     triggerAlarm,
     clearAlarmBySource,
     acknowledgeAllInConsole,
     getAlarmsForConsole,
     setAllAlarmClasses,
-    setAllAlarmConsoles
+    setAllAlarmConsoles,
+    shelveAlarm,
+    unshelveExpiredAlarms
   };
 }
