@@ -25,6 +25,7 @@ interface VisualizationViewProps {
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
   onWidgetValueChange: (widgetId: string, binding: { nodeId: string; portId?: string }, value: unknown) => void;
+  highlightedWidgetId?: string | null;
 }
 
 export const VisualizationView: React.FC<VisualizationViewProps> = ({
@@ -37,7 +38,8 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   onUpdateVisuPage,
   liveValues,
   logicNodes,
-  onWidgetValueChange
+  onWidgetValueChange,
+  highlightedWidgetId
 }) => {
   const CLIPBOARD_KEY = 'visu-clipboard';
   const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
@@ -552,6 +554,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onSendToBack={handleSendToBack}
             onBringForward={handleBringForward}
             onSendBackward={handleSendBackward}
+            highlightedWidgetId={highlightedWidgetId}
           />
         </div>
 

@@ -182,6 +182,7 @@ interface VisuWidgetProps {
   sensorParams?: SensorParams;
   pidParams?: PIDParams;
   heatingCurveParams?: HeatingCurveParams;
+  isHighlighted?: boolean;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -252,7 +253,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   valveParams,
   sensorParams,
   pidParams,
-  heatingCurveParams
+  heatingCurveParams,
+  isHighlighted = false
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1339,29 +1341,39 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isSensorWidget = widget.type === 'visu-sensor';
   const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget;
 
+  const highlightStyle = isHighlighted ? {
+    boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',
+    animation: 'highlight-pulse 0.5s ease-in-out 3'
+  } : {};
+
   return (
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
         width: widget.size.width,
         height: widget.size.height,
-        zIndex: widget.zIndex || 1,
+        zIndex: isHighlighted ? 9999 : (widget.zIndex || 1),
         pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
-        border: showSelectionBorder
-          ? '2px solid #3b82f6'
-          : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none'),
+        border: isHighlighted
+          ? '3px solid #ec4899'
+          : (showSelectionBorder
+            ? '2px solid #3b82f6'
+            : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none')),
         outline: isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined,
         outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined,
-        boxShadow: (!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined,
+        boxShadow: isHighlighted
+          ? highlightStyle.boxShadow
+          : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8,
+        transition: isHighlighted ? 'box-shadow 0.3s ease-in-out, border 0.3s ease-in-out' : undefined
       } as React.CSSProperties}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}

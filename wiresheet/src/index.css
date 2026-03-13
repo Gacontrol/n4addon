@@ -18,3 +18,16 @@
   pointer-events: auto !important;
   cursor: pointer !important;
 }
+
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px #ec4899, 0 0 30px 12px rgba(236, 72, 153, 0.7);
+  }
+}
+
+.widget-highlighted {
+  animation: highlight-pulse 0.5s ease-in-out 3;
+}

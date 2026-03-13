@@ -11,6 +11,8 @@ interface ContextMenuState {
 export interface VisuBindingInfo {
   widgetLabel: string;
   pageName: string;
+  pageId: string;
+  widgetId: string;
   portId?: string;
   paramKey?: string;
   isWrite: boolean;
@@ -34,6 +36,7 @@ interface FlowNodeProps {
   onRenameNode?: (nodeId: string, newLabel: string) => void;
   onDriverBindingClick?: (binding: DriverBinding) => void;
   onDriverBindingDelete?: (binding: DriverBinding) => void;
+  onVisuBindingClick?: (binding: VisuBindingInfo) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -63,6 +66,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onRenameNode,
   onDriverBindingClick,
   onDriverBindingDelete,
+  onVisuBindingClick,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -897,8 +901,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           return (
                             <div key={vbi} className="flex items-center">
                               <span
-                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-default"
-                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
+                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-pointer"
+                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
+                                onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
+                                onPointerDown={(e) => e.stopPropagation()}
                               >
                                 <span className="inline-flex items-center gap-1">
                                   <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
@@ -1094,8 +1100,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               return (
                 <div key={vbi} className="flex items-center">
                   <div
-                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-default hover:bg-pink-900/80 transition-colors"
-                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''}`}
+                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-pointer hover:bg-pink-900/80 transition-colors"
+                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
+                    onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
+                    onPointerDown={(e) => e.stopPropagation()}
                   >
                     <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
                     <span className="truncate max-w-[120px]">

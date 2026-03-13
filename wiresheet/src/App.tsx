@@ -12,6 +12,7 @@ import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity } from './types/flow';
+import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
@@ -113,6 +114,7 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
+  const [highlightedWidgetId, setHighlightedWidgetId] = useState<string | null>(null);
   const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>([]);
   const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(true);
   const [driverConfigLoaded, setDriverConfigLoaded] = useState(false);
@@ -611,6 +613,13 @@ function App() {
     modbusDatapointDragRef.current = { device, datapoint, isOutput };
   }, []);
 
+  const handleVisuBindingClick = useCallback((binding: VisuBindingInfo) => {
+    setActiveVisuPageId(binding.pageId);
+    setMainView('visu');
+    setHighlightedWidgetId(binding.widgetId);
+    setTimeout(() => setHighlightedWidgetId(null), 3000);
+  }, [setActiveVisuPageId]);
+
   const handlePingModbusDevice = useCallback(async (deviceId: string) => {
     const device = modbusDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -1089,6 +1098,7 @@ function App() {
               onDriverBindingDelete={(binding) => {
                 updateDriverBindings(prev => prev.filter(b => b.id !== binding.id));
               }}
+              onVisuBindingClick={handleVisuBindingClick}
             />
 
             <DriverPanel
@@ -1203,6 +1213,7 @@ function App() {
           liveValues={liveValues}
           logicNodes={allLogicNodes}
           onWidgetValueChange={handleVisuWidgetValueChange}
+          highlightedWidgetId={highlightedWidgetId}
         />
       )}
 
