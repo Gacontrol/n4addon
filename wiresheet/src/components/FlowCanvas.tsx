@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode, VisuBindingInfo } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
-import { FlowNode as FlowNodeType, Connection, DatapointOverride, DriverBinding } from '../types/flow';
+import { FlowNode as FlowNodeType, Connection, DatapointOverride, DriverBinding, BindingStatus } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -50,6 +50,7 @@ interface FlowCanvasProps {
   visuPages?: VisuPage[];
   onUpdateNodeData?: (nodeId: string, updates: Partial<FlowNodeType['data']>) => void;
   driverBindings?: DriverBinding[];
+  bindingStatuses?: BindingStatus[];
   onDriverBindingClick?: (binding: DriverBinding) => void;
   onDriverBindingDelete?: (binding: DriverBinding) => void;
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
@@ -93,6 +94,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   visuPages = [],
   onUpdateNodeData,
   driverBindings = [],
+  bindingStatuses = [],
   onDriverBindingClick,
   onDriverBindingDelete,
   onVisuBindingClick
@@ -120,9 +122,16 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     return result;
   }, [visuPages, liveValues]);
 
-  const getDriverBindingsForNode = useCallback((nodeId: string): DriverBinding[] => {
-    return driverBindings.filter(b => b.nodeId === nodeId);
-  }, [driverBindings]);
+  const getDriverBindingsForNode = useCallback((nodeId: string): (DriverBinding & { isAvailable?: boolean; errorReason?: string })[] => {
+    return driverBindings.filter(b => b.nodeId === nodeId).map(binding => {
+      const status = bindingStatuses.find(s => s.bindingId === binding.id);
+      return {
+        ...binding,
+        isAvailable: status?.isAvailable ?? true,
+        errorReason: status?.errorReason
+      };
+    });
+  }, [driverBindings, bindingStatuses]);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });

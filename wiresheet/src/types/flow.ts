@@ -205,6 +205,12 @@ export interface DriverBinding {
   haDomain?: string;
 }
 
+export interface BindingStatus {
+  bindingId: string;
+  isAvailable: boolean;
+  errorReason?: string;
+}
+
 export interface HaEntity {
   entity_id: string;
   state: string;

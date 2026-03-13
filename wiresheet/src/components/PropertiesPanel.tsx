@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevice } from '../types/flow';
-import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevice, DriverBinding, HaDevice } from '../types/flow';
+import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical, AlertTriangle, Network, Circle } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
 import { ModbusDeviceBlockConfig } from './ModbusConfig';
@@ -32,6 +32,9 @@ interface PropertiesPanelProps {
   allNodes?: FlowNode[];
   onReadConfigValue?: (deviceId: string, datapointId: string) => void;
   onWriteConfigValue?: (deviceId: string, datapointId: string, value: number | string | boolean) => void;
+  driverBindings?: DriverBinding[];
+  haDevices?: HaDevice[];
+  haDriverEnabled?: boolean;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -53,7 +56,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selectedModbusDatapointPath,
   allNodes = [],
   onReadConfigValue,
-  onWriteConfigValue
+  onWriteConfigValue,
+  driverBindings = [],
+  haDevices = [],
+  haDriverEnabled = true
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -98,6 +104,54 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isDPNode = node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum';
   const liveValue = liveValues[node.id];
   const hasLive = liveValue !== undefined && liveValue !== null;
+
+  const nodeBindings = useMemo(() => {
+    return driverBindings.filter(b => b.nodeId === node.id).map(binding => {
+      let isAvailable = true;
+      let errorReason: string | undefined;
+
+      if (binding.driverType === 'modbus') {
+        const device = modbusDevices.find(d => d.id === binding.deviceId);
+        const datapoint = device?.datapoints.find(dp => dp.id === binding.datapointId);
+
+        if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!device.enabled) {
+          isAvailable = false;
+          errorReason = 'Treiber deaktiviert';
+        } else if (!modbusDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'Modbus deaktiviert';
+        } else if (!datapoint) {
+          isAvailable = false;
+          errorReason = 'Datenpunkt nicht gefunden';
+        }
+
+        return { binding, isAvailable, errorReason };
+      } else if (binding.driverType === 'homeassistant') {
+        const device = haDevices.find(d => d.id === binding.deviceId);
+        const entity = device?.entities.find(e => e.entity_id === binding.haEntityId);
+
+        if (!haDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'HA deaktiviert';
+        } else if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!entity) {
+          isAvailable = false;
+          errorReason = 'Entity nicht gefunden';
+        }
+
+        return { binding, isAvailable, errorReason };
+      }
+
+      return { binding, isAvailable: false, errorReason: 'Unbekannter Treiber' };
+    });
+  }, [driverBindings, node.id, modbusDevices, modbusDriverEnabled, haDevices, haDriverEnabled]);
+
+  const hasBindings = nodeBindings.length > 0;
 
   const updateConfig = (key: keyof NodeConfig, value: unknown) => {
     const next = { ...config, [key]: value };
@@ -269,6 +323,57 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <div>
               <p className="text-xs text-emerald-400 font-semibold leading-tight">Live-Wert</p>
               <p className="text-sm text-emerald-300 font-mono leading-tight">{String(liveValue)}</p>
+            </div>
+          </div>
+        )}
+
+        {hasBindings && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Network className="w-3.5 h-3.5 text-amber-400" />
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Treiber-Verknuepfungen
+              </label>
+            </div>
+            <div className="space-y-1">
+              {nodeBindings.map(({ binding, isAvailable, errorReason }) => (
+                <div
+                  key={binding.id}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border ${
+                    isAvailable
+                      ? 'bg-amber-950/30 border-amber-700/40'
+                      : 'bg-red-950/40 border-red-700/50'
+                  }`}
+                  title={errorReason || undefined}
+                >
+                  <Circle
+                    className={`w-2 h-2 flex-shrink-0 ${
+                      isAvailable ? 'text-emerald-400 fill-emerald-400' : 'text-red-500 fill-red-500'
+                    }`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] uppercase ${binding.direction === 'input' ? 'text-cyan-400' : 'text-amber-400'}`}>
+                        {binding.direction === 'input' ? 'IN' : 'OUT'}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        binding.driverType === 'modbus' ? 'bg-amber-900/50 text-amber-300' : 'bg-cyan-900/50 text-cyan-300'
+                      }`}>
+                        {binding.driverType === 'modbus' ? 'Modbus' : 'HA'}
+                      </span>
+                    </div>
+                    <p className={`text-xs truncate ${isAvailable ? 'text-slate-300' : 'text-red-300'}`}>
+                      {binding.deviceName} - {binding.datapointName}
+                    </p>
+                    {!isAvailable && errorReason && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <AlertTriangle className="w-2.5 h-2.5 text-red-400" />
+                        <span className="text-[9px] text-red-400">{errorReason}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -1,6 +1,11 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition, DriverBinding } from '../types/flow';
+import { FlowNode as FlowNodeType, DatapointOverride, CaseDefinition, DriverBinding, BindingStatus } from '../types/flow';
+
+interface ExtendedDriverBinding extends DriverBinding {
+  isAvailable?: boolean;
+  errorReason?: string;
+}
 import * as Icons from 'lucide-react';
 
 interface ContextMenuState {
@@ -46,7 +51,7 @@ interface FlowNodeProps {
   parentContainer?: FlowNodeType | null;
   zoom?: number;
   visuBindings?: VisuBindingInfo[];
-  driverBindings?: DriverBinding[];
+  driverBindings?: ExtendedDriverBinding[];
 }
 
 export const FlowNode: React.FC<FlowNodeProps> = ({
@@ -270,7 +275,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
       ? getBooleanLabel(liveValue)
       : String(liveValue);
 
-  const getDriverBindingForPort = (portId: string) => {
+  const getDriverBindingForPort = (portId: string): ExtendedDriverBinding | undefined => {
     return driverBindings.find(b => b.nodeId === node.id && b.portId === portId);
   };
 
@@ -937,13 +942,20 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         >
                           <Icons.X className="w-3 h-3 text-red-400" />
                         </button>
+                        {driverBinding.isAvailable === false && (
+                          <Icons.AlertTriangle className="w-3 h-3 text-red-400 mr-0.5 flex-shrink-0" title={driverBinding.errorReason || 'Nicht erreichbar'} />
+                        )}
                         <span
                           className={`text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-colors ${
-                            driverBinding.driverType === 'homeassistant'
-                              ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
-                              : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
+                            driverBinding.isAvailable === false
+                              ? 'text-red-400 bg-red-950/60 hover:bg-red-900/80'
+                              : driverBinding.driverType === 'homeassistant'
+                                ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
+                                : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
                           }`}
-                          title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          title={driverBinding.isAvailable === false
+                            ? `FEHLER: ${driverBinding.errorReason} - ${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName}`
+                            : `${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBindingContextMenu({ x: e.clientX, y: e.clientY, binding: driverBinding }); }}
@@ -951,7 +963,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           {driverBinding.driverType === 'homeassistant' ? 'HA' : 'Modbus'} / {driverBinding.deviceName} / {driverBinding.datapointName}
                         </span>
                         <svg width="20" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
+                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.isAvailable === false ? '#ef4444' : (driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b')} strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
                       </div>
                     )}
@@ -977,9 +989,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{
                           width: '12px',
                           height: '12px',
-                          borderColor: portVisuBindings.length > 0 ? '#ec4899' : (driverBinding ? '#f59e0b' : (isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569'))),
-                          backgroundColor: portVisuBindings.length > 0 ? '#831843' : (driverBinding ? '#78350f' : (isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b'))),
-                          boxShadow: portVisuBindings.length > 0 ? '0 0 6px #ec489960' : (driverBinding ? '0 0 6px #f59e0b60' : (isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none'))),
+                          borderColor: driverBinding?.isAvailable === false ? '#ef4444' : (portVisuBindings.length > 0 ? '#ec4899' : (driverBinding ? '#f59e0b' : (isHighlighted ? '#60a5fa' : (hasPortVal ? '#10b981' : '#475569')))),
+                          backgroundColor: driverBinding?.isAvailable === false ? '#7f1d1d' : (portVisuBindings.length > 0 ? '#831843' : (driverBinding ? '#78350f' : (isHighlighted ? '#1d4ed8' : (hasPortVal ? '#064e3b' : '#1e293b')))),
+                          boxShadow: driverBinding?.isAvailable === false ? '0 0 8px #ef444490' : (portVisuBindings.length > 0 ? '0 0 6px #ec489960' : (driverBinding ? '0 0 6px #f59e0b60' : (isHighlighted ? '0 0 8px #60a5fa' : (hasPortVal ? '0 0 3px #10b98160' : 'none')))),
                           transform: isHighlighted ? 'scale(1.15)' : 'scale(1)'
                         }}
                       />
@@ -1045,9 +1057,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{
                           width: '12px',
                           height: '12px',
-                          borderColor: driverBinding ? '#f59e0b' : (hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569'),
-                          backgroundColor: driverBinding ? '#78350f' : (hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b'),
-                          boxShadow: driverBinding ? '0 0 6px #f59e0b60' : (hasOutVal ? `0 0 3px ${isManual ? '#dc262660' : '#10b98160'}` : 'none')
+                          borderColor: driverBinding?.isAvailable === false ? '#ef4444' : (driverBinding ? '#f59e0b' : (hasOutVal ? (isManual ? '#dc2626' : '#10b981') : '#475569')),
+                          backgroundColor: driverBinding?.isAvailable === false ? '#7f1d1d' : (driverBinding ? '#78350f' : (hasOutVal ? (isManual ? '#450a0a' : '#064e3b') : '#1e293b')),
+                          boxShadow: driverBinding?.isAvailable === false ? '0 0 8px #ef444490' : (driverBinding ? '0 0 6px #f59e0b60' : (hasOutVal ? `0 0 3px ${isManual ? '#dc262660' : '#10b98160'}` : 'none'))
                         }}
                       />
                     </div>
@@ -1057,15 +1069,22 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         style={{ pointerEvents: 'auto' }}
                       >
                         <svg width="20" height="20" className="flex-shrink-0">
-                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b'} strokeWidth="2" strokeDasharray="4 2" />
+                          <line x1="0" y1="10" x2="20" y2="10" stroke={driverBinding.isAvailable === false ? '#ef4444' : (driverBinding.driverType === 'homeassistant' ? '#22d3ee' : '#f59e0b')} strokeWidth="2" strokeDasharray="4 2" />
                         </svg>
+                        {driverBinding.isAvailable === false && (
+                          <Icons.AlertTriangle className="w-3 h-3 text-red-400 mr-0.5 flex-shrink-0" title={driverBinding.errorReason || 'Nicht erreichbar'} />
+                        )}
                         <span
                           className={`text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap cursor-pointer transition-colors ${
-                            driverBinding.driverType === 'homeassistant'
-                              ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
-                              : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
+                            driverBinding.isAvailable === false
+                              ? 'text-red-400 bg-red-950/60 hover:bg-red-900/80'
+                              : driverBinding.driverType === 'homeassistant'
+                                ? 'text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900/80'
+                                : 'text-amber-400 bg-amber-950/60 hover:bg-amber-900/80'
                           }`}
-                          title={`${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
+                          title={driverBinding.isAvailable === false
+                            ? `FEHLER: ${driverBinding.errorReason} - ${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName}`
+                            : `${driverBinding.driverType === 'homeassistant' ? 'Home Assistant' : 'Modbus TCP'} / ${driverBinding.deviceName} / ${driverBinding.datapointName} - Klicken zum Oeffnen`}
                           onClick={(e) => { e.stopPropagation(); onDriverBindingClick?.(driverBinding); }}
                           onPointerDown={(e) => e.stopPropagation()}
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBindingContextMenu({ x: e.clientX, y: e.clientY, binding: driverBinding }); }}

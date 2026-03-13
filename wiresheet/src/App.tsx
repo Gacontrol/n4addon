@@ -11,7 +11,7 @@ import { DriverPanel } from './components/DriverPanel';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage } from './types/visualization';
 import {
@@ -194,6 +194,48 @@ function App() {
     deleteNode(nodeId);
     updateDriverBindings(prev => prev.filter(b => b.nodeId !== nodeId));
   }, [deleteNode, updateDriverBindings]);
+
+  const bindingStatuses = useMemo((): BindingStatus[] => {
+    return driverBindings.map(binding => {
+      let isAvailable = true;
+      let errorReason: string | undefined;
+
+      if (binding.driverType === 'modbus') {
+        const device = modbusDevices.find(d => d.id === binding.deviceId);
+        const datapoint = device?.datapoints.find(dp => dp.id === binding.datapointId);
+
+        if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!device.enabled) {
+          isAvailable = false;
+          errorReason = 'Treiber deaktiviert';
+        } else if (!modbusDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'Modbus deaktiviert';
+        } else if (!datapoint) {
+          isAvailable = false;
+          errorReason = 'Datenpunkt nicht gefunden';
+        }
+      } else if (binding.driverType === 'homeassistant') {
+        const device = haDevices.find(d => d.id === binding.deviceId);
+        const entity = device?.entities.find(e => e.entity_id === binding.haEntityId);
+
+        if (!haDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'HA deaktiviert';
+        } else if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!entity) {
+          isAvailable = false;
+          errorReason = 'Entity nicht gefunden';
+        }
+      }
+
+      return { bindingId: binding.id, isAvailable, errorReason };
+    });
+  }, [driverBindings, modbusDevices, modbusDriverEnabled, haDevices, haDriverEnabled]);
 
   useEffect(() => {
     setCycleInput(String(activePage.cycleMs));
@@ -999,6 +1041,7 @@ function App() {
               onDatapointDragStart={handleDriverPanelDragStart}
               haDevices={haDevices}
               haDriverEnabled={haDriverEnabled}
+              modbusDriverEnabled={modbusDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
               highlightedBinding={highlightedBinding}
             />
@@ -1091,6 +1134,7 @@ function App() {
               visuPages={visuPages}
               onUpdateNodeData={updateNodeData}
               driverBindings={driverBindings}
+              bindingStatuses={bindingStatuses}
               onDriverBindingClick={(binding) => {
                 setHighlightedBinding(binding);
                 setTimeout(() => setHighlightedBinding(null), 3000);
@@ -1111,6 +1155,7 @@ function App() {
               onDatapointDragStart={handleDriverPanelDragStart}
               haDevices={haDevices}
               haDriverEnabled={haDriverEnabled}
+              modbusDriverEnabled={modbusDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
               highlightedBinding={highlightedBinding}
             />
@@ -1136,6 +1181,9 @@ function App() {
                 allNodes={nodes}
                 onReadConfigValue={handleReadConfigValue}
                 onWriteConfigValue={handleWriteConfigValue}
+                driverBindings={driverBindings}
+                haDevices={haDevices}
+                haDriverEnabled={haDriverEnabled}
               />
             )}
           </div>

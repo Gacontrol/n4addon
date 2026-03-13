@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer, AlertTriangle } from 'lucide-react';
 import { ModbusDevice, DriverBinding, HaDevice, HaEntity } from '../types/flow';
 
 const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
@@ -23,6 +23,16 @@ function getHaEntityIcon(entityId: string): React.ReactNode {
   }
 }
 
+interface BoundDatapointInfo {
+  binding: DriverBinding;
+  device?: ModbusDevice;
+  datapoint?: ModbusDevice['datapoints'][0];
+  haDevice?: HaDevice;
+  haEntity?: HaEntity;
+  isAvailable: boolean;
+  errorReason?: string;
+}
+
 interface DriverPanelProps {
   side: 'left' | 'right';
   modbusDevices: ModbusDevice[];
@@ -33,6 +43,7 @@ interface DriverPanelProps {
   onDatapointDragStart: (device: ModbusDevice, datapoint: ModbusDevice['datapoints'][0], isOutput: boolean) => void;
   haDevices?: HaDevice[];
   haDriverEnabled?: boolean;
+  modbusDriverEnabled?: boolean;
   onHaEntityClick?: (device: HaDevice, entity: HaEntity, isOutput: boolean) => void;
   highlightedBinding?: DriverBinding | null;
 }
@@ -49,6 +60,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   onDatapointDragStart,
   haDevices = [],
   haDriverEnabled = false,
+  modbusDriverEnabled = true,
   onHaEntityClick,
   highlightedBinding
 }) => {
@@ -156,8 +168,63 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     }
   };
 
+  const boundDatapointsInfo = useMemo((): BoundDatapointInfo[] => {
+    return driverBindings.map(binding => {
+      if (binding.driverType === 'modbus') {
+        const device = modbusDevices.find(d => d.id === binding.deviceId);
+        const datapoint = device?.datapoints.find(dp => dp.id === binding.datapointId);
+
+        let isAvailable = true;
+        let errorReason: string | undefined;
+
+        if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!device.enabled) {
+          isAvailable = false;
+          errorReason = 'Treiber deaktiviert';
+        } else if (!modbusDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'Modbus deaktiviert';
+        } else if (!datapoint) {
+          isAvailable = false;
+          errorReason = 'Datenpunkt nicht gefunden';
+        }
+
+        return { binding, device, datapoint, isAvailable, errorReason };
+      } else if (binding.driverType === 'homeassistant') {
+        const device = haDevices.find(d => d.id === binding.deviceId);
+        const entity = device?.entities.find(e => e.entity_id === binding.haEntityId);
+
+        let isAvailable = true;
+        let errorReason: string | undefined;
+
+        if (!haDriverEnabled) {
+          isAvailable = false;
+          errorReason = 'HA deaktiviert';
+        } else if (!device) {
+          isAvailable = false;
+          errorReason = 'Geraet nicht gefunden';
+        } else if (!entity) {
+          isAvailable = false;
+          errorReason = 'Entity nicht gefunden';
+        }
+
+        return { binding, haDevice: device, haEntity: entity, isAvailable, errorReason };
+      }
+      return { binding, isAvailable: false, errorReason: 'Unbekannter Treiber' };
+    });
+  }, [driverBindings, modbusDevices, modbusDriverEnabled, haDevices, haDriverEnabled]);
+
+  const unavailableModbusBindings = boundDatapointsInfo.filter(
+    info => info.binding.driverType === 'modbus' && !info.isAvailable
+  );
+  const unavailableHaBindings = boundDatapointsInfo.filter(
+    info => info.binding.driverType === 'homeassistant' && !info.isAvailable
+  );
+
   const modbusDevicesWithData = modbusDevices.filter(d => d.enabled && getDatapointsForPanel(d).length > 0);
-  const hasModbusDatapoints = modbusDevicesWithData.length > 0;
+  const hasModbusDatapoints = modbusDevicesWithData.length > 0 || unavailableModbusBindings.length > 0;
 
   const getHaEntitiesForPanel = (device: HaDevice) => {
     if (isOutputPanel) {
@@ -168,7 +235,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   };
 
   const haDevicesWithEntities = haDevices.filter(d => getHaEntitiesForPanel(d).length > 0);
-  const hasHaEntities = haDriverEnabled && haDevicesWithEntities.length > 0;
+  const hasHaEntities = (haDriverEnabled && haDevicesWithEntities.length > 0) || unavailableHaBindings.length > 0;
   const hasDatapoints = hasModbusDatapoints || hasHaEntities;
 
   const getBindingForDatapoint = (deviceId: string, datapointId: string) => {
@@ -327,6 +394,34 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         </div>
                       );
                     })}
+
+                    {unavailableModbusBindings.length > 0 && (
+                      <div className="border-t border-red-900/50 bg-red-950/20">
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-red-950/40">
+                          <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                          <span className="text-[10px] font-medium text-red-300">Nicht erreichbar</span>
+                        </div>
+                        {unavailableModbusBindings.map(info => {
+                          const isHighlighted = shouldHighlight && highlightedBinding?.id === info.binding.id;
+                          return (
+                            <div
+                              key={info.binding.id}
+                              className={`group flex items-center gap-2 px-5 py-1.5 bg-red-950/30 border-b border-red-900/30 ${isHighlighted ? 'ring-2 ring-red-400 animate-pulse' : ''}`}
+                              title={info.errorReason}
+                            >
+                              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[10px] text-red-300 truncate block">
+                                  {info.binding.deviceName} - {info.binding.datapointName}
+                                </span>
+                                <span className="text-[9px] text-red-500/80">{info.errorReason}</span>
+                              </div>
+                              <span className="text-[8px] text-red-500 bg-red-900/40 px-1 py-0.5 rounded">verb.</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -429,6 +524,34 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         </div>
                       );
                     })}
+
+                    {unavailableHaBindings.length > 0 && (
+                      <div className="border-t border-red-900/50 bg-red-950/20">
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-red-950/40">
+                          <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                          <span className="text-[10px] font-medium text-red-300">Nicht erreichbar</span>
+                        </div>
+                        {unavailableHaBindings.map(info => {
+                          const isHighlighted = shouldHighlight && highlightedBinding?.id === info.binding.id;
+                          return (
+                            <div
+                              key={info.binding.id}
+                              className={`group flex items-center gap-2 px-5 py-1.5 bg-red-950/30 border-b border-red-900/30 ${isHighlighted ? 'ring-2 ring-red-400 animate-pulse' : ''}`}
+                              title={info.errorReason}
+                            >
+                              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[10px] text-red-300 truncate block">
+                                  {info.binding.deviceName} - {info.binding.datapointName}
+                                </span>
+                                <span className="text-[9px] text-red-500/80">{info.errorReason}</span>
+                              </div>
+                              <span className="text-[8px] text-red-500 bg-red-900/40 px-1 py-0.5 rounded">verb.</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
