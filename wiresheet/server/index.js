@@ -23,6 +23,7 @@ let blocksFile = path.join(dataDir, 'custom-blocks.json');
 let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 let dpValuesFile = path.join(dataDir, 'dp-values.json');
 let driverConfigFile = path.join(dataDir, 'driver-config.json');
+let alarmConfigFile = path.join(dataDir, 'alarm-config.json');
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -428,6 +429,29 @@ app.get(['/driver-live-values', '/api/driver-live-values'], (req, res) => {
     modbus: Object.fromEntries(modbusLiveValues),
     ha: Object.fromEntries(haLiveValues)
   });
+});
+
+app.get(['/alarm-config', '/api/alarm-config'], async (req, res) => {
+  try {
+    const data = await fs.readFile(alarmConfigFile, 'utf8');
+    res.json(JSON.parse(data));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      res.json({ alarmClasses: [], alarmConsoles: [], activeAlarms: [], alarmHistory: [] });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+app.post(['/alarm-config', '/api/alarm-config'], async (req, res) => {
+  try {
+    await fs.writeFile(alarmConfigFile, JSON.stringify(req.body, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Alarm-Konfiguration:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
@@ -3364,6 +3388,8 @@ async function start() {
     blocksFile = path.join(dataDir, 'custom-blocks.json');
     visuPagesFile = path.join(dataDir, 'visu-pages.json');
     dpValuesFile = path.join(dataDir, 'dp-values.json');
+    driverConfigFile = path.join(dataDir, 'driver-config.json');
+    alarmConfigFile = path.join(dataDir, 'alarm-config.json');
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);

@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { VisuWidget, VisuPage, PolygonConfig, LineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
+import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuWidgetRenderer } from './VisuWidget';
 
 interface ContextMenuState {
@@ -45,6 +46,11 @@ interface VisuCanvasProps {
   onBringForward: (widgetId: string) => void;
   onSendBackward: (widgetId: string) => void;
   highlightedWidgetId?: string | null;
+  alarmClasses?: AlarmClass[];
+  alarmConsoles?: AlarmConsole[];
+  activeAlarms?: ActiveAlarm[];
+  onAcknowledgeAlarm?: (alarmId: string) => void;
+  onClearAlarm?: (alarmId: string) => void;
 }
 
 export const VisuCanvas: React.FC<VisuCanvasProps> = ({
@@ -74,7 +80,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onSendToBack,
   onBringForward,
   onSendBackward,
-  highlightedWidgetId
+  highlightedWidgetId,
+  alarmClasses = [],
+  alarmConsoles = [],
+  activeAlarms = [],
+  onAcknowledgeAlarm,
+  onClearAlarm
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -954,6 +965,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           pidParams={getPIDWidgetParams(widget)}
           heatingCurveParams={getHeatingCurveWidgetParams(widget)}
           isHighlighted={highlightedWidgetId === widget.id}
+          alarmClasses={alarmClasses}
+          alarmConsoles={alarmConsoles}
+          activeAlarms={activeAlarms}
+          onAcknowledgeAlarm={onAcknowledgeAlarm}
+          onClearAlarm={onClearAlarm}
         />
       ))}
 

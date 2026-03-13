@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
+import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
 import { WidgetPalette } from './WidgetPalette';
 import { WidgetPropertiesPanel } from './WidgetPropertiesPanel';
@@ -26,6 +27,11 @@ interface VisualizationViewProps {
   logicNodes: FlowNode[];
   onWidgetValueChange: (widgetId: string, binding: { nodeId: string; portId?: string }, value: unknown) => void;
   highlightedWidgetId?: string | null;
+  alarmClasses?: AlarmClass[];
+  alarmConsoles?: AlarmConsole[];
+  activeAlarms?: ActiveAlarm[];
+  onAcknowledgeAlarm?: (alarmId: string) => void;
+  onClearAlarm?: (alarmId: string) => void;
 }
 
 export const VisualizationView: React.FC<VisualizationViewProps> = ({
@@ -39,7 +45,12 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   liveValues,
   logicNodes,
   onWidgetValueChange,
-  highlightedWidgetId
+  highlightedWidgetId,
+  alarmClasses = [],
+  alarmConsoles = [],
+  activeAlarms = [],
+  onAcknowledgeAlarm,
+  onClearAlarm
 }) => {
   const CLIPBOARD_KEY = 'visu-clipboard';
   const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
@@ -555,6 +566,11 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             onBringForward={handleBringForward}
             onSendBackward={handleSendBackward}
             highlightedWidgetId={highlightedWidgetId}
+            alarmClasses={alarmClasses}
+            alarmConsoles={alarmConsoles}
+            activeAlarms={activeAlarms}
+            onAcknowledgeAlarm={onAcknowledgeAlarm}
+            onClearAlarm={onClearAlarm}
           />
         </div>
 
@@ -563,6 +579,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             widget={selectedWidget}
             availableNodes={logicNodes}
             visuPages={visuPages.map(p => ({ id: p.id, name: p.name }))}
+            alarmConsoles={alarmConsoles}
             onUpdate={(updates) => handleUpdateWidget(selectedWidget.id, updates)}
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}

@@ -55,14 +55,17 @@ import {
   PumpWidgetConfig,
   ValveWidgetConfig,
   SensorWidgetConfig,
-  PIDWidgetConfig
+  PIDWidgetConfig,
+  AlarmConsoleWidgetConfig
 } from '../../types/visualization';
+import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
 import { VisuSensor } from './VisuSensor';
 import { VisuPID } from './VisuPID';
 import { VisuHeatingCurve } from './VisuHeatingCurve';
+import { VisuAlarmConsole } from './VisuAlarmConsole';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -183,6 +186,11 @@ interface VisuWidgetProps {
   pidParams?: PIDParams;
   heatingCurveParams?: HeatingCurveParams;
   isHighlighted?: boolean;
+  alarmClasses?: AlarmClass[];
+  alarmConsoles?: AlarmConsole[];
+  activeAlarms?: ActiveAlarm[];
+  onAcknowledgeAlarm?: (alarmId: string) => void;
+  onClearAlarm?: (alarmId: string) => void;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -254,7 +262,12 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   sensorParams,
   pidParams,
   heatingCurveParams,
-  isHighlighted = false
+  isHighlighted = false,
+  alarmClasses = [],
+  alarmConsoles = [],
+  activeAlarms = [],
+  onAcknowledgeAlarm,
+  onClearAlarm
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1314,6 +1327,23 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={heatingCurveParams}
+          />
+        );
+      }
+
+      case 'visu-alarm-console': {
+        const acCfg = widget.config as AlarmConsoleWidgetConfig;
+        return (
+          <VisuAlarmConsole
+            config={acCfg}
+            alarmClasses={alarmClasses}
+            alarmConsoles={alarmConsoles}
+            activeAlarms={activeAlarms}
+            onAcknowledge={onAcknowledgeAlarm}
+            onClear={onClearAlarm}
+            isEditMode={isEditMode}
+            width={widget.size.width}
+            height={widget.size.height}
           />
         );
       }

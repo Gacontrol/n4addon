@@ -63,7 +63,8 @@ export type WidgetType =
   | 'visu-valve'
   | 'visu-sensor'
   | 'visu-pid'
-  | 'visu-heating-curve';
+  | 'visu-heating-curve'
+  | 'visu-alarm-console';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -400,7 +401,8 @@ export type WidgetConfig =
   | ValveWidgetConfig
   | SensorWidgetConfig
   | PIDWidgetConfig
-  | HeatingCurveWidgetConfig;
+  | HeatingCurveWidgetConfig
+  | AlarmConsoleWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -702,6 +704,17 @@ export interface HeatingCurveWidgetConfig {
   labelPosition?: LabelPosition;
   fontSize?: number;
   fontFamily?: FontFamily;
+}
+
+export interface AlarmConsoleWidgetConfig {
+  consoleId?: string;
+  showAcknowledgeButton?: boolean;
+  showClearButton?: boolean;
+  showTimestamp?: boolean;
+  showSource?: boolean;
+  compactMode?: boolean;
+  maxVisibleAlarms?: number;
+  fontSize?: number;
 }
 
 export interface WidgetTemplate {

@@ -950,6 +950,27 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Heizkurven-Widget mit grafischer Kennlinie',
     supportsBinding: true,
     bindingDirection: 'readwrite'
+  },
+  {
+    type: 'visu-alarm-console',
+    label: 'Alarmkonsole',
+    icon: 'Bell',
+    category: 'display',
+    defaultSize: { width: 300, height: 200 },
+    defaultConfig: {
+      consoleId: undefined,
+      showAcknowledgeButton: true,
+      showClearButton: true,
+      showTimestamp: true,
+      showSource: true,
+      compactMode: false,
+      maxVisibleAlarms: 10,
+      fontSize: 12
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'top' },
+    description: 'Zeigt Alarme aus einer Alarmkonsole an',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

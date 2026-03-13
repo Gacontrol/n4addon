@@ -8,16 +8,18 @@ import { VisualizationView } from './components/visualization/VisualizationView'
 import { BackupModal } from './components/BackupModal';
 import { DriversView } from './components/DriversView';
 import { DriverPanel } from './components/DriverPanel';
+import { AlarmManagementView } from './components/AlarmManagementView';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
+import { useAlarmManagement } from './hooks/useAlarmManagement';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage } from './types/visualization';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup, Network
+  Monitor, Cpu, DatabaseBackup, Network, Bell
 } from 'lucide-react';
 
 function App() {
@@ -97,7 +99,23 @@ function App() {
     setAllVisuPages
   } = useVisualization();
 
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers'>('logic');
+  const {
+    alarmClasses,
+    alarmConsoles,
+    activeAlarms,
+    addAlarmClass,
+    updateAlarmClass,
+    deleteAlarmClass,
+    addAlarmConsole,
+    updateAlarmConsole,
+    deleteAlarmConsole,
+    acknowledgeAlarm,
+    clearAlarm,
+    setAllAlarmClasses,
+    setAllAlarmConsoles
+  } = useAlarmManagement();
+
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -871,6 +889,22 @@ function App() {
               <Monitor className="w-3.5 h-3.5" />
               Visu
             </button>
+            <button
+              onClick={() => setMainView('alarms')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'alarms'
+                  ? 'bg-red-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5" />
+              Alarme
+              {activeAlarms.length > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                  {activeAlarms.length}
+                </span>
+              )}
+            </button>
           </div>
 
           {mainView === 'logic' && (
@@ -1249,6 +1283,20 @@ function App() {
           onRefreshHaEntities={loadHaEntities}
           driverLiveValues={driverLiveValues}
         />
+      ) : mainView === 'alarms' ? (
+        <AlarmManagementView
+          alarmClasses={alarmClasses}
+          alarmConsoles={alarmConsoles}
+          activeAlarms={activeAlarms}
+          onAddAlarmClass={addAlarmClass}
+          onUpdateAlarmClass={updateAlarmClass}
+          onDeleteAlarmClass={deleteAlarmClass}
+          onAddAlarmConsole={addAlarmConsole}
+          onUpdateAlarmConsole={updateAlarmConsole}
+          onDeleteAlarmConsole={deleteAlarmConsole}
+          onAcknowledgeAlarm={acknowledgeAlarm}
+          onClearAlarm={clearAlarm}
+        />
       ) : (
         <VisualizationView
           visuPages={visuPages}
@@ -1262,6 +1310,11 @@ function App() {
           logicNodes={allLogicNodes}
           onWidgetValueChange={handleVisuWidgetValueChange}
           highlightedWidgetId={highlightedWidgetId}
+          alarmClasses={alarmClasses}
+          alarmConsoles={alarmConsoles}
+          activeAlarms={activeAlarms}
+          onAcknowledgeAlarm={acknowledgeAlarm}
+          onClearAlarm={clearAlarm}
         />
       )}
 

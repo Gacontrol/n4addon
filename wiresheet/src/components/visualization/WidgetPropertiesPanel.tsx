@@ -40,8 +40,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
+import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
 
 function getApiBase(): string {
@@ -54,6 +55,7 @@ interface WidgetPropertiesPanelProps {
   widget: VisuWidget;
   availableNodes: FlowNode[];
   visuPages?: { id: string; name: string }[];
+  alarmConsoles?: AlarmConsole[];
   onUpdate: (updates: Partial<VisuWidget>) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -230,6 +232,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   widget,
   availableNodes,
   visuPages = [],
+  alarmConsoles = [],
   onUpdate,
   onDelete,
   onClose
@@ -2120,6 +2123,97 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   className="rounded"
                 />
                 <label className="text-xs text-slate-400">Ausgang anzeigen</label>
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-alarm-console': {
+        const acCfg = config as AlarmConsoleWidgetConfig;
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Alarmkonsole</label>
+              <select
+                value={acCfg.consoleId || ''}
+                onChange={(e) => onUpdate({ config: { ...config, consoleId: e.target.value || undefined } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                <option value="">-- Auswahl --</option>
+                {alarmConsoles.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Max. sichtbare Alarme</label>
+              <input
+                type="number"
+                value={acCfg.maxVisibleAlarms ?? 10}
+                onChange={(e) => onUpdate({ config: { ...config, maxVisibleAlarms: Number(e.target.value) || 10 } })}
+                min={1}
+                max={100}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                value={acCfg.fontSize ?? 12}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: Number(e.target.value) || 12 } })}
+                min={8}
+                max={24}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={acCfg.showAcknowledgeButton !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showAcknowledgeButton: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Quittieren-Button</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={acCfg.showClearButton !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showClearButton: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Loeschen-Button</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={acCfg.showTimestamp !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showTimestamp: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Zeitstempel</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={acCfg.showSource !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showSource: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Quelle</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={acCfg.compactMode === true}
+                  onChange={(e) => onUpdate({ config: { ...config, compactMode: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Kompakte Ansicht</label>
               </div>
             </div>
           </>
