@@ -938,6 +938,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (visuOverrides[portKey] !== undefined) {
         return visuOverrides[portKey];
       }
+      const visuPortVal = visuControlledDps.get(portKey);
+      if (visuPortVal !== undefined) {
+        return visuPortVal;
+      }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
       if (conn) {
         return getInputValue(conn);
@@ -2482,18 +2486,24 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
 
     overrides[overrideKey] = value;
-    overrides[nodeId] = value;
+    if (!portId) {
+      overrides[nodeId] = value;
+    }
 
     console.log(`[WRITE-VALUE DEBUG] Overrides NACHHER:`, JSON.stringify(overrides));
 
-    visuControlledDps.set(nodeId, value);
-    console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}`);
+    if (portId) {
+      visuControlledDps.set(overrideKey, value);
+      console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt (mit Port): ${overrideKey} = ${value}`);
+    } else {
+      visuControlledDps.set(nodeId, value);
+      console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}`);
+      setPersistentDpValue(nodeId, value);
+    }
     console.log(`[WRITE-VALUE DEBUG] visuControlledDps Map:`, JSON.stringify([...visuControlledDps.entries()]));
 
-    setPersistentDpValue(nodeId, value);
-
     for (const [pageId, nodeValues] of lastNodeValues) {
-      if (nodeId in nodeValues) {
+      if (nodeId in nodeValues || overrideKey in nodeValues) {
         const updated = { ...nodeValues, [nodeId]: value };
         if (overrideKey !== nodeId) updated[overrideKey] = value;
         lastNodeValues.set(pageId, updated);
