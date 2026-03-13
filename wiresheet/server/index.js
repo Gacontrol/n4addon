@@ -2613,6 +2613,12 @@ function getLiveSnapshot() {
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }
+  for (const [nodeId, value] of persistentDpValues) {
+    merged[nodeId] = value;
+  }
+  for (const [nodeId, dpInfo] of visuControlledDps) {
+    merged[nodeId] = dpInfo.value;
+  }
   return merged;
 }
 
