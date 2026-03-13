@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Bell, Plus, Trash2, CreditCard as Edit2, Check, X, AlertTriangle, AlertCircle, Info, ChevronDown, ChevronRight, Monitor, Settings } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Bell, Plus, Trash2, CreditCard as Edit2, Check, X, AlertTriangle, AlertCircle, Info, ChevronDown, ChevronRight, Monitor, Settings, Cpu, FileText } from 'lucide-react';
 import { AlarmClass, AlarmConsole, AlarmPriority, ActiveAlarm } from '../types/alarm';
+import { FlowNode, WiresheetPage } from '../types/flow';
 
 interface AlarmManagementViewProps {
   alarmClasses: AlarmClass[];
@@ -14,6 +15,8 @@ interface AlarmManagementViewProps {
   onDeleteAlarmConsole: (id: string) => void;
   onAcknowledgeAlarm: (alarmId: string) => void;
   onClearAlarm: (alarmId: string) => void;
+  pages?: WiresheetPage[];
+  onUpdateNodeConfig?: (pageId: string, nodeId: string, config: Record<string, unknown>) => void;
 }
 
 const PRIORITY_CONFIG: Record<AlarmPriority, { label: string; color: string; icon: React.ReactNode }> = {
@@ -26,6 +29,16 @@ const PRIORITY_CONFIG: Record<AlarmPriority, { label: string; color: string; ico
 
 const DEFAULT_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
+interface AlarmSourceNode {
+  node: FlowNode;
+  pageId: string;
+  pageName: string;
+  alarmEnabled: boolean;
+  alarmClassId?: string;
+  hasActiveAlarm: boolean;
+  activeAlarmCount: number;
+}
+
 export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
   alarmClasses,
   alarmConsoles,
@@ -37,9 +50,11 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
   onUpdateAlarmConsole,
   onDeleteAlarmConsole,
   onAcknowledgeAlarm,
-  onClearAlarm
+  onClearAlarm,
+  pages = [],
+  onUpdateNodeConfig
 }) => {
-  const [activeTab, setActiveTab] = useState<'classes' | 'consoles' | 'active'>('classes');
+  const [activeTab, setActiveTab] = useState<'classes' | 'consoles' | 'active' | 'sources'>('classes');
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   const [editingConsoleId, setEditingConsoleId] = useState<string | null>(null);
   const [showNewClassForm, setShowNewClassForm] = useState(false);
@@ -114,6 +129,62 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
     return activeAlarms.filter(a => console.alarmClassIds.includes(a.alarmClassId)).length;
   };
 
+  const alarmSourceNodes = useMemo<AlarmSourceNode[]>(() => {
+    const sources: AlarmSourceNode[] = [];
+    const nodeTypesWithAlarms = [
+      'sensor-control', 'pump-control', 'aggregate-control', 'valve-control',
+      'threshold', 'compare', 'dp-boolean', 'dp-numeric', 'pid-controller'
+    ];
+
+    for (const page of pages) {
+      for (const node of page.nodes || []) {
+        const cfg = node.data?.config || {};
+        const hasAlarmEnabled =
+          cfg.alarmEnabled === true ||
+          cfg.sensorAlarmEnabled === true ||
+          cfg.pumpAlarmEnabled === true ||
+          cfg.aggregateAlarmEnabled === true ||
+          cfg.valveAlarmEnabled === true ||
+          cfg.thresholdAlarmEnabled === true ||
+          cfg.pidAlarmEnabled === true;
+
+        const alarmClassId =
+          cfg.alarmClassId as string | undefined ||
+          cfg.sensorAlarmClassId as string | undefined ||
+          cfg.pumpAlarmClassId as string | undefined ||
+          cfg.aggregateAlarmClassId as string | undefined ||
+          cfg.valveAlarmClassId as string | undefined ||
+          cfg.thresholdAlarmClassId as string | undefined ||
+          cfg.pidAlarmClassId as string | undefined;
+
+        const nodeAlarms = activeAlarms.filter(a => a.sourceNodeId === node.id);
+
+        if (hasAlarmEnabled || nodeAlarms.length > 0 || nodeTypesWithAlarms.includes(node.type)) {
+          sources.push({
+            node,
+            pageId: page.id,
+            pageName: page.name,
+            alarmEnabled: hasAlarmEnabled,
+            alarmClassId,
+            hasActiveAlarm: nodeAlarms.length > 0,
+            activeAlarmCount: nodeAlarms.length
+          });
+        }
+      }
+    }
+
+    return sources.sort((a, b) => {
+      if (a.hasActiveAlarm && !b.hasActiveAlarm) return -1;
+      if (!a.hasActiveAlarm && b.hasActiveAlarm) return 1;
+      if (a.alarmEnabled && !b.alarmEnabled) return -1;
+      if (!a.alarmEnabled && b.alarmEnabled) return 1;
+      return a.node.data.label.localeCompare(b.node.data.label);
+    });
+  }, [pages, activeAlarms]);
+
+  const enabledSourcesCount = alarmSourceNodes.filter(s => s.alarmEnabled).length;
+  const activeSourcesCount = alarmSourceNodes.filter(s => s.hasActiveAlarm).length;
+
   return (
     <div className="flex flex-col h-full bg-slate-900">
       <div className="flex items-center gap-1 bg-slate-800 border-b border-slate-700 px-4">
@@ -162,6 +233,27 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
           {activeAlarms.length > 0 && (
             <span className="bg-red-600 text-white text-xs px-1.5 py-0.5 rounded animate-pulse">
               {activeAlarms.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('sources')}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'sources'
+              ? 'border-green-500 text-green-400'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          <Cpu className="w-4 h-4" />
+          Alarm-Quellen
+          {activeSourcesCount > 0 && (
+            <span className="bg-red-600 text-white text-xs px-1.5 py-0.5 rounded animate-pulse">
+              {activeSourcesCount}
+            </span>
+          )}
+          {enabledSourcesCount > 0 && activeSourcesCount === 0 && (
+            <span className="bg-slate-600 text-slate-300 text-xs px-1.5 py-0.5 rounded">
+              {enabledSourcesCount}
             </span>
           )}
         </button>
@@ -531,7 +623,277 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
             )}
           </div>
         )}
+
+        {activeTab === 'sources' && (
+          <div className="max-w-5xl mx-auto space-y-4">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Alarm-Quellen</h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  Alle Logik-Bausteine mit Alarm-Konfiguration. Hier koennen Sie Alarme direkt aktivieren und konfigurieren.
+                </p>
+              </div>
+            </div>
+
+            {alarmSourceNodes.length === 0 ? (
+              <div className="text-center py-12 bg-slate-800/50 rounded-xl border border-dashed border-slate-600">
+                <Cpu className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <p className="text-slate-400">Keine Alarm-faehigen Bausteine gefunden.</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Fuegen Sie Bausteine wie Sensor, Pumpe, Ventil oder Schwellwert zur Logik hinzu.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {alarmSourceNodes.map(source => (
+                  <AlarmSourceItem
+                    key={`${source.pageId}-${source.node.id}`}
+                    source={source}
+                    alarmClasses={alarmClasses}
+                    activeAlarms={activeAlarms.filter(a => a.sourceNodeId === source.node.id)}
+                    onUpdateConfig={(config) => {
+                      if (onUpdateNodeConfig) {
+                        onUpdateNodeConfig(source.pageId, source.node.id, config);
+                      }
+                    }}
+                    onAcknowledgeAlarm={onAcknowledgeAlarm}
+                    onClearAlarm={onClearAlarm}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  );
+};
+
+interface AlarmSourceItemProps {
+  source: AlarmSourceNode;
+  alarmClasses: AlarmClass[];
+  activeAlarms: ActiveAlarm[];
+  onUpdateConfig: (config: Record<string, unknown>) => void;
+  onAcknowledgeAlarm: (alarmId: string) => void;
+  onClearAlarm: (alarmId: string) => void;
+}
+
+const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
+  source,
+  alarmClasses,
+  activeAlarms,
+  onUpdateConfig,
+  onAcknowledgeAlarm,
+  onClearAlarm
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const cfg = source.node.data?.config || {};
+
+  const getAlarmConfigKeys = () => {
+    switch (source.node.type) {
+      case 'sensor-control':
+        return {
+          enabled: 'sensorAlarmEnabled',
+          classId: 'sensorAlarmClassId',
+          text: 'sensorAlarmText',
+          labelPrefix: 'Sensor'
+        };
+      case 'pump-control':
+        return {
+          enabled: 'pumpAlarmEnabled',
+          classId: 'pumpAlarmClassId',
+          text: 'pumpAlarmText',
+          labelPrefix: 'Pumpe'
+        };
+      case 'aggregate-control':
+        return {
+          enabled: 'aggregateAlarmEnabled',
+          classId: 'aggregateAlarmClassId',
+          text: 'aggregateAlarmText',
+          labelPrefix: 'Aggregat'
+        };
+      case 'valve-control':
+        return {
+          enabled: 'valveAlarmEnabled',
+          classId: 'valveAlarmClassId',
+          text: 'valveAlarmText',
+          labelPrefix: 'Ventil'
+        };
+      case 'threshold':
+        return {
+          enabled: 'thresholdAlarmEnabled',
+          classId: 'thresholdAlarmClassId',
+          text: 'thresholdAlarmText',
+          labelPrefix: 'Schwellwert'
+        };
+      case 'pid-controller':
+        return {
+          enabled: 'pidAlarmEnabled',
+          classId: 'pidAlarmClassId',
+          text: 'pidAlarmText',
+          labelPrefix: 'PID'
+        };
+      default:
+        return {
+          enabled: 'alarmEnabled',
+          classId: 'alarmClassId',
+          text: 'alarmText',
+          labelPrefix: ''
+        };
+    }
+  };
+
+  const keys = getAlarmConfigKeys();
+  const isEnabled = cfg[keys.enabled] === true;
+  const currentClassId = cfg[keys.classId] as string | undefined;
+  const currentText = cfg[keys.text] as string | undefined;
+  const currentClass = alarmClasses.find(ac => ac.id === currentClassId);
+
+  const handleToggleEnabled = () => {
+    onUpdateConfig({ [keys.enabled]: !isEnabled });
+  };
+
+  const handleClassChange = (classId: string) => {
+    onUpdateConfig({ [keys.classId]: classId || undefined });
+  };
+
+  const handleTextChange = (text: string) => {
+    onUpdateConfig({ [keys.text]: text || undefined });
+  };
+
+  const nodeLabel = cfg.customLabel as string || source.node.data.label || source.node.type;
+
+  return (
+    <div className={`bg-slate-800 rounded-xl overflow-hidden ${source.hasActiveAlarm ? 'ring-2 ring-red-500/50' : ''}`}>
+      <div
+        className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-750 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${source.hasActiveAlarm ? 'bg-red-900/30' : isEnabled ? 'bg-green-900/30' : 'bg-slate-700'}`}>
+            {source.hasActiveAlarm ? (
+              <Bell className="w-5 h-5 text-red-400 animate-pulse" />
+            ) : (
+              <Cpu className={`w-5 h-5 ${isEnabled ? 'text-green-400' : 'text-slate-400'}`} />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-white font-medium">{nodeLabel}</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">
+                {keys.labelPrefix || source.node.type}
+              </span>
+              {isEnabled && currentClass && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded"
+                  style={{ backgroundColor: `${currentClass.color}20`, color: currentClass.color }}
+                >
+                  {currentClass.name}
+                </span>
+              )}
+              {source.hasActiveAlarm && (
+                <span className="text-xs px-2 py-0.5 rounded bg-red-600 text-white animate-pulse">
+                  {source.activeAlarmCount} Alarm{source.activeAlarmCount > 1 ? 'e' : ''}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Seite: {source.pageName}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleToggleEnabled(); }}
+            className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+              isEnabled
+                ? 'bg-green-600 hover:bg-green-500 text-white'
+                : 'bg-slate-600 hover:bg-slate-500 text-slate-300'
+            }`}
+          >
+            {isEnabled ? 'Aktiv' : 'Inaktiv'}
+          </button>
+          {isExpanded ? (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-slate-700 pt-3 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Alarmklasse</label>
+              <select
+                value={currentClassId || ''}
+                onChange={(e) => handleClassChange(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-green-500 focus:outline-none"
+              >
+                <option value="">-- Keine Klasse --</option>
+                {alarmClasses.map(ac => (
+                  <option key={ac.id} value={ac.id}>{ac.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Alarmtext</label>
+              <input
+                type="text"
+                value={currentText || ''}
+                onChange={(e) => handleTextChange(e.target.value)}
+                placeholder="z.B. Stoerung {label}"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-green-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {activeAlarms.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-400">Aktive Alarme dieses Bausteins:</p>
+              {activeAlarms.map(alarm => {
+                const alarmClass = alarmClasses.find(ac => ac.id === alarm.alarmClassId);
+                return (
+                  <div
+                    key={alarm.id}
+                    className="flex items-center justify-between p-2 bg-slate-900 rounded-lg border-l-2"
+                    style={{ borderLeftColor: alarmClass?.color || '#ef4444' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {alarm.state === 'active' ? (
+                        <Bell className="w-4 h-4 text-red-400 animate-pulse" />
+                      ) : (
+                        <Check className="w-4 h-4 text-amber-400" />
+                      )}
+                      <span className="text-sm text-white">{alarm.alarmText || alarm.message}</span>
+                      <span className="text-xs text-slate-500">
+                        {new Date(alarm.triggeredAt).toLocaleString('de-DE')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {alarm.state === 'active' && (
+                        <button
+                          onClick={() => onAcknowledgeAlarm(alarm.id)}
+                          className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
+                        >
+                          Quittieren
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onClearAlarm(alarm.id)}
+                        className="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded transition-colors"
+                      >
+                        Loeschen
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

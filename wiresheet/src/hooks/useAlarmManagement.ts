@@ -37,6 +37,41 @@ export function useAlarmManagement() {
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    const apiBase = getApiBase();
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let active = true;
+
+    function connect() {
+      if (!active) return;
+      es = new EventSource(`${apiBase}/sse`);
+
+      es.addEventListener('alarms', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
+          if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
+          if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
+          if (data.alarmHistory) setAlarmHistory(data.alarmHistory);
+        } catch {}
+      });
+
+      es.onerror = () => {
+        es?.close();
+        if (active) reconnectTimer = setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      active = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      es?.close();
+    };
+  }, []);
+
   const saveConfig = useCallback(async (
     classes: AlarmClass[],
     consoles: AlarmConsole[],
