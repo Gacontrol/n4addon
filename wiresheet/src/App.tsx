@@ -16,6 +16,7 @@ import { useAlarmManagement } from './hooks/useAlarmManagement';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage } from './types/visualization';
+import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from './types/alarm';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
@@ -111,6 +112,8 @@ function App() {
     deleteAlarmConsole,
     acknowledgeAlarm,
     clearAlarm,
+    triggerAlarm,
+    clearAlarmBySource,
     setAllAlarmClasses,
     setAllAlarmConsoles
   } = useAlarmManagement();
@@ -801,6 +804,131 @@ function App() {
       setDriverBindings(validBindings);
     }
   }, [allNodeIdsStr, driverBindings, setDriverBindings]);
+
+  useEffect(() => {
+    if (alarmClasses.length === 0) return;
+
+    allLogicNodes.forEach(node => {
+      const config = node.data.config || {};
+      const nodeLabel = node.data.label || node.id;
+
+      if (node.type === 'dp-boolean' && config.booleanAlarmConfig) {
+        const alarmCfg = config.booleanAlarmConfig as BooleanAlarmConfig;
+        if (alarmCfg.enabled && alarmCfg.alarmClassId) {
+          const liveKey = `${node.id}:out`;
+          const currentValue = liveValues[liveKey];
+          const isAlarmValue = currentValue === alarmCfg.alarmValue;
+
+          if (isAlarmValue) {
+            const alarmText = alarmCfg.alarmText || `${nodeLabel}: Alarm`;
+            triggerAlarm(node.id, alarmCfg.alarmClassId, alarmText, 'boolean');
+          } else {
+            clearAlarmBySource(node.id, 'boolean');
+          }
+        }
+      }
+
+      if (node.type === 'dp-numeric' && config.numericAlarmConfig) {
+        const alarmCfg = config.numericAlarmConfig as NumericAlarmConfig;
+        if (alarmCfg.enabled && alarmCfg.alarmClassId) {
+          const liveKey = `${node.id}:out`;
+          const currentValue = liveValues[liveKey];
+          if (typeof currentValue === 'number') {
+            const deadband = alarmCfg.deadband || 0;
+
+            if (alarmCfg.highHighLimit !== undefined && currentValue >= alarmCfg.highHighLimit) {
+              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: HH-Grenze (${currentValue})`, 'highHigh');
+            } else {
+              clearAlarmBySource(node.id, 'highHigh');
+            }
+
+            if (alarmCfg.highLimit !== undefined && currentValue >= alarmCfg.highLimit && (alarmCfg.highHighLimit === undefined || currentValue < alarmCfg.highHighLimit)) {
+              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: H-Grenze (${currentValue})`, 'high');
+            } else {
+              clearAlarmBySource(node.id, 'high');
+            }
+
+            if (alarmCfg.lowLimit !== undefined && currentValue <= alarmCfg.lowLimit && (alarmCfg.lowLowLimit === undefined || currentValue > alarmCfg.lowLowLimit)) {
+              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: L-Grenze (${currentValue})`, 'low');
+            } else {
+              clearAlarmBySource(node.id, 'low');
+            }
+
+            if (alarmCfg.lowLowLimit !== undefined && currentValue <= alarmCfg.lowLowLimit) {
+              triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: LL-Grenze (${currentValue})`, 'lowLow');
+            } else {
+              clearAlarmBySource(node.id, 'lowLow');
+            }
+          }
+        }
+      }
+
+      if (node.type === 'dp-enum' && config.enumAlarmConfig) {
+        const alarmCfg = config.enumAlarmConfig as EnumAlarmConfig;
+        if (alarmCfg.enabled && alarmCfg.alarmClassId && alarmCfg.alarmValues.length > 0) {
+          const liveKey = `${node.id}:out`;
+          const currentValue = liveValues[liveKey];
+          const isAlarmValue = alarmCfg.alarmValues.includes(currentValue as number | string);
+
+          if (isAlarmValue) {
+            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Alarmwert ${currentValue}`, 'enum');
+          } else {
+            clearAlarmBySource(node.id, 'enum');
+          }
+        }
+      }
+
+      if ((node.type === 'pump-control' || node.type === 'aggregate-control') && config.aggregateAlarmConfig) {
+        const alarmCfg = config.aggregateAlarmConfig as AggregateAlarmConfig;
+
+        if (alarmCfg.faultAlarmClassId) {
+          const faultKey = `${node.id}:fault`;
+          const faultValue = liveValues[faultKey];
+          if (faultValue === true) {
+            triggerAlarm(node.id, alarmCfg.faultAlarmClassId, `${nodeLabel}: Stoerung`, 'fault');
+          } else {
+            clearAlarmBySource(node.id, 'fault');
+          }
+        }
+
+        if (alarmCfg.maintenanceAlarmClassId) {
+          const alarmKey = `${node.id}:alarm`;
+          const alarmValue = liveValues[alarmKey];
+          if (alarmValue === true) {
+            triggerAlarm(node.id, alarmCfg.maintenanceAlarmClassId, `${nodeLabel}: Wartungsalarm`, 'maintenance');
+          } else {
+            clearAlarmBySource(node.id, 'maintenance');
+          }
+        }
+      }
+
+      if (node.type === 'valve-control' && config.valveAlarmConfig) {
+        const alarmCfg = config.valveAlarmConfig as ValveAlarmConfig;
+        if (alarmCfg.alarmClassId) {
+          const alarmKey = `${node.id}:alarm`;
+          const alarmValue = liveValues[alarmKey];
+          if (alarmValue === true) {
+            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Ventilstoerung`, 'valve');
+          } else {
+            clearAlarmBySource(node.id, 'valve');
+          }
+        }
+      }
+
+      if (node.type === 'sensor-control' && config.sensorAlarmConfig) {
+        const alarmCfg = config.sensorAlarmConfig as SensorAlarmConfig;
+        if (alarmCfg.alarmClassId) {
+          const alarmKey = `${node.id}:alarm`;
+          const alarmValue = liveValues[alarmKey];
+          if (alarmValue === true) {
+            triggerAlarm(node.id, alarmCfg.alarmClassId, `${nodeLabel}: Sensoralarm`, 'sensor');
+          } else {
+            clearAlarmBySource(node.id, 'sensor');
+          }
+        }
+      }
+    });
+  }, [liveValues, allLogicNodes, alarmClasses, triggerAlarm, clearAlarmBySource]);
 
   const handleVisuWidgetValueChange = useCallback(async (
     _widgetId: string,

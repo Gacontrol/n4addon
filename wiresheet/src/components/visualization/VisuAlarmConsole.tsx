@@ -123,7 +123,7 @@ export const VisuAlarmConsole: React.FC<VisuAlarmConsoleProps> = ({
                     className={`truncate ${isAcknowledged ? 'text-slate-400' : 'text-white'}`}
                     style={{ fontSize }}
                   >
-                    {alarm.alarmText}
+                    {alarm.message || alarm.alarmText || 'Alarm'}
                   </span>
                 </div>
                 {!isCompact && config.showSource && (

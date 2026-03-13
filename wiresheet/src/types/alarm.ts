@@ -81,9 +81,12 @@ export interface ActiveAlarm {
   id: string;
   alarmClassId: string;
   sourceNodeId: string;
-  sourceNodeName: string;
-  sourceType: 'boolean' | 'numeric' | 'enum' | 'aggregate' | 'valve' | 'sensor';
-  alarmText: string;
+  sourceNodeName?: string;
+  sourceKey?: string;
+  sourceType?: 'boolean' | 'numeric' | 'enum' | 'aggregate' | 'valve' | 'sensor';
+  alarmType?: string;
+  alarmText?: string;
+  message?: string;
   state: AlarmState;
   triggeredAt: number;
   acknowledgedAt?: number;

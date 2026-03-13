@@ -165,6 +165,66 @@ export function useAlarmManagement() {
     });
   }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
 
+  const triggerAlarm = useCallback((
+    sourceNodeId: string,
+    alarmClassId: string,
+    message: string,
+    alarmType?: string
+  ) => {
+    const sourceKey = `${sourceNodeId}:${alarmType || 'default'}`;
+
+    setActiveAlarms(prev => {
+      const existing = prev.find(a => a.sourceNodeId === sourceNodeId && a.alarmType === (alarmType || 'default'));
+      if (existing) return prev;
+
+      const newAlarm: ActiveAlarm = {
+        id: `alarm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        alarmClassId,
+        sourceNodeId,
+        sourceKey,
+        alarmType: alarmType || 'default',
+        message,
+        triggeredAt: Date.now(),
+        state: 'active'
+      };
+
+      const alarmClass = alarmClasses.find(ac => ac.id === alarmClassId);
+      if (alarmClass?.autoAcknowledge) {
+        newAlarm.state = 'acknowledged';
+        newAlarm.acknowledgedAt = Date.now();
+        newAlarm.acknowledgedBy = 'auto';
+      }
+
+      const updated = [...prev, newAlarm];
+      saveConfig(alarmClasses, alarmConsoles, updated, alarmHistory);
+      return updated;
+    });
+  }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
+
+  const clearAlarmBySource = useCallback((sourceNodeId: string, alarmType?: string) => {
+    setActiveAlarms(prev => {
+      const alarm = prev.find(a =>
+        a.sourceNodeId === sourceNodeId &&
+        a.alarmType === (alarmType || 'default')
+      );
+      if (!alarm) return prev;
+
+      const historyEntry: AlarmHistoryEntry = {
+        ...alarm,
+        state: 'cleared',
+        clearedAt: Date.now(),
+        archivedAt: Date.now()
+      };
+
+      const updatedActive = prev.filter(a => a.id !== alarm.id);
+      const updatedHistory = [historyEntry, ...alarmHistory].slice(0, 1000);
+
+      setAlarmHistory(updatedHistory);
+      saveConfig(alarmClasses, alarmConsoles, updatedActive, updatedHistory);
+      return updatedActive;
+    });
+  }, [alarmClasses, alarmConsoles, alarmHistory, saveConfig]);
+
   const acknowledgeAllInConsole = useCallback((consoleId: string, acknowledgedBy?: string) => {
     const console = alarmConsoles.find(c => c.id === consoleId);
     if (!console) return;
@@ -209,6 +269,8 @@ export function useAlarmManagement() {
     deleteAlarmConsole,
     acknowledgeAlarm,
     clearAlarm,
+    triggerAlarm,
+    clearAlarmBySource,
     acknowledgeAllInConsole,
     getAlarmsForConsole,
     setAllAlarmClasses,
