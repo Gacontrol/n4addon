@@ -1741,14 +1741,23 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         }
       }
 
-      if (allowWrite) {
+      console.log(`[MODBUS-OUT DEBUG] Node: ${nodeId}, inputVals: ${JSON.stringify(inputVals)}, inputs: ${JSON.stringify(node.data.inputs)}`);
+
+      if (!driverConfig.modbusDriverEnabled) {
+        console.log(`Modbus Output ${nodeId}: Modbus-Treiber deaktiviert`);
+        nodeValues[nodeId] = inputVals[0] ?? null;
+      } else if (allowWrite) {
         const deviceId = cfg.modbusDeviceId;
         const datapoints = cfg.modbusDatapoints || [];
         const device = modbusDeviceMap.get(deviceId);
+        console.log(`[MODBUS-OUT DEBUG] deviceId: ${deviceId}, found: ${!!device}, modbusDriverEnabled: ${driverConfig.modbusDriverEnabled}`);
 
         if (!device) {
           console.log(`Modbus Output ${nodeId}: Geraet ${deviceId} nicht gefunden`);
           nodeValues[nodeId] = null;
+        } else if (!device.enabled) {
+          console.log(`Modbus Output ${nodeId}: Geraet ${device.name} deaktiviert`);
+          nodeValues[nodeId] = inputVals[0] ?? null;
         } else {
           for (let i = 0; i < datapoints.length; i++) {
             const dp = datapoints[i];

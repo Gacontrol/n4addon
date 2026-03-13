@@ -223,7 +223,19 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     info => info.binding.driverType === 'homeassistant' && !info.isAvailable
   );
 
-  const modbusDevicesWithData = modbusDevices.filter(d => d.enabled && getDatapointsForPanel(d).length > 0);
+  const boundModbusDatapointIds = new Set(
+    driverBindings
+      .filter(b => b.driverType === 'modbus')
+      .map(b => `${b.deviceId}:${b.datapointId}`)
+  );
+
+  const modbusDevicesWithData = modbusDevices.filter(d => {
+    const datapoints = getDatapointsForPanel(d);
+    if (d.enabled) {
+      return datapoints.length > 0;
+    }
+    return datapoints.some(dp => boundModbusDatapointIds.has(`${d.id}:${dp.id}`));
+  });
   const hasModbusDatapoints = modbusDevicesWithData.length > 0 || unavailableModbusBindings.length > 0;
 
   const getHaEntitiesForPanel = (device: HaDevice) => {
@@ -313,7 +325,11 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                 {expandedDriverTypes.has('modbus') && (
                   <div className="bg-slate-900/20">
                     {modbusDevicesWithData.map(device => {
-                      const datapoints = getDatapointsForPanel(device);
+                      const allDatapoints = getDatapointsForPanel(device);
+                      const isDeviceDisabled = !device.enabled || !modbusDriverEnabled;
+                      const datapoints = isDeviceDisabled
+                        ? allDatapoints.filter(dp => boundModbusDatapointIds.has(`${device.id}:${dp.id}`))
+                        : allDatapoints;
                       const isExpanded = expandedDevices.has(device.id);
                       const status = modbusDeviceStatus[device.id];
 
@@ -321,16 +337,20 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         <div key={device.id} className="border-b border-slate-700/30">
                           <button
                             onClick={() => toggleDevice(device.id)}
-                            className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700/50 transition-colors"
+                            className={`w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700/50 transition-colors ${isDeviceDisabled ? 'opacity-60' : ''}`}
                           >
                             <Circle
                               className={`w-2 h-2 flex-shrink-0 ${
+                                isDeviceDisabled ? 'text-red-400' :
                                 status?.online ? 'text-emerald-400 fill-emerald-400' : 'text-slate-500'
                               }`}
                             />
                             <span className="flex-1 text-[11px] font-medium text-slate-200 truncate text-left">
                               {device.name}
                             </span>
+                            {isDeviceDisabled && (
+                              <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" title={!modbusDriverEnabled ? 'Treiber deaktiviert' : 'Geraet deaktiviert'} />
+                            )}
                             {isExpanded ? (
                               <ChevronUp className="w-3 h-3 text-slate-400" />
                             ) : (
@@ -343,7 +363,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               {datapoints.map(dp => {
                                 const binding = getBindingForDatapoint(device.id, dp.id);
                                 const isConnecting = !!connectingFrom;
-                                const canConnect = isConnecting && (
+                                const canConnect = isConnecting && !isDeviceDisabled && (
                                   (isOutputPanel && dp.writable) ||
                                   (!isOutputPanel)
                                 );
@@ -353,12 +373,18 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                   <div
                                     key={dp.id}
                                     className={`group flex items-center gap-2 px-5 py-1 cursor-pointer transition-colors ${
-                                      canConnect
-                                        ? 'hover:bg-blue-600/30 bg-blue-900/20'
-                                        : 'hover:bg-slate-700/30'
-                                    } ${binding ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
-                                    onClick={() => onDatapointClick(device, dp, isOutputPanel)}
+                                      isDeviceDisabled && binding
+                                        ? 'bg-red-950/30 hover:bg-red-950/50'
+                                        : canConnect
+                                          ? 'hover:bg-blue-600/30 bg-blue-900/20'
+                                          : 'hover:bg-slate-700/30'
+                                    } ${binding && !isDeviceDisabled ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
+                                    onClick={() => !isDeviceDisabled && onDatapointClick(device, dp, isOutputPanel)}
                                     onDragStart={(e) => {
+                                      if (isDeviceDisabled) {
+                                        e.preventDefault();
+                                        return;
+                                      }
                                       e.dataTransfer.setData('application/json', JSON.stringify({
                                         type: 'driver-datapoint',
                                         driverType: 'modbus',
@@ -368,19 +394,27 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                       }));
                                       onDatapointDragStart(device, dp, isOutputPanel);
                                     }}
-                                    draggable
+                                    draggable={!isDeviceDisabled}
                                   >
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                      binding
-                                        ? 'bg-amber-400'
-                                        : canConnect
-                                          ? 'bg-blue-400 animate-pulse'
-                                          : 'bg-slate-500'
+                                      isDeviceDisabled && binding
+                                        ? 'bg-red-500'
+                                        : binding
+                                          ? 'bg-amber-400'
+                                          : canConnect
+                                            ? 'bg-blue-400 animate-pulse'
+                                            : 'bg-slate-500'
                                     }`} />
-                                    <span className={`flex-1 text-[10px] truncate ${binding ? 'text-amber-300' : 'text-slate-300'}`}>
+                                    <span className={`flex-1 text-[10px] truncate ${
+                                      isDeviceDisabled && binding ? 'text-red-300' :
+                                      binding ? 'text-amber-300' : 'text-slate-300'
+                                    }`}>
                                       {dp.name}
                                     </span>
-                                    {binding && (
+                                    {binding && isDeviceDisabled && (
+                                      <span className="text-[8px] text-red-500 bg-red-900/40 px-1 py-0.5 rounded">Fehler</span>
+                                    )}
+                                    {binding && !isDeviceDisabled && (
                                       <span className="text-[8px] text-amber-500 bg-amber-900/40 px-1 py-0.5 rounded">verb.</span>
                                     )}
                                     {dp.unit && !binding && (
