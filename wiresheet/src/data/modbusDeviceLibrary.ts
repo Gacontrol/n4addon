@@ -13,23 +13,29 @@ export interface ModbusDeviceTemplate {
 }
 
 const UI_SENSOR_TYPES: ModbusConfigOption[] = [
-  { value: 0, label: 'Kein Sensor (deaktiviert)' },
-  { value: 1, label: 'NTC 10k (Siemens QAC)' },
-  { value: 2, label: 'NTC 10k (Type 2)' },
-  { value: 3, label: 'NTC 10k (Type 3)' },
-  { value: 4, label: 'NTC 20k' },
-  { value: 5, label: 'PT100' },
-  { value: 6, label: 'PT500' },
-  { value: 7, label: 'PT1000' },
-  { value: 8, label: 'NI1000' },
-  { value: 9, label: 'NI1000 LG' },
-  { value: 10, label: '0-10V Analog' },
-  { value: 11, label: '0-5V Analog' },
-  { value: 12, label: '2-10V Analog' },
-  { value: 13, label: '0-20mA Analog' },
-  { value: 14, label: '4-20mA Analog' },
-  { value: 15, label: 'Digital (Kontakt)' },
-  { value: 16, label: 'Zaehler (Counter)' },
+  { value: 0, label: 'Aus (Widerstandsmessung/Spannungsmessung)' },
+  { value: 1, label: '10K3A1 NTC B=3975K (Standard)' },
+  { value: 2, label: '10K4A1 NTC B=3695K' },
+  { value: 3, label: '10K NTC B=3435K Carel' },
+  { value: 4, label: '20K6A1 NTC B=4262K' },
+  { value: 5, label: '2,2K3A1 NTC B=3975K' },
+  { value: 6, label: '3K3A1 NTC B=3975K' },
+  { value: 7, label: '30K6A1 NTC B=4262K' },
+  { value: 8, label: 'SIE1 (Siemens)' },
+  { value: 9, label: 'TAC1' },
+  { value: 10, label: 'SAT1' },
+  { value: 16, label: 'Pt1000' },
+  { value: 17, label: 'Ni1000' },
+  { value: 18, label: 'Ni1000 21C' },
+  { value: 19, label: 'Ni1000 LG' },
+  { value: 20, label: '10K Type2 NTC B=3975K (US, Fahrenheit)' },
+  { value: 21, label: '10K Type3 NTC B=3695K (US, Fahrenheit)' },
+  { value: 22, label: '20K NTC B=4262K (US, Fahrenheit)' },
+  { value: 23, label: '3K NTC B=3975K (US, Fahrenheit)' },
+  { value: 24, label: 'PT1000 (Fahrenheit)' },
+  { value: 25, label: 'Ni1000 32F (Fahrenheit)' },
+  { value: 26, label: 'Ni1000 70F (Fahrenheit)' },
+  { value: 128, label: 'Aus (nur Spannungsmessung, Bit 7 gesetzt)' },
 ];
 
 const DI_DEBOUNCE_OPTIONS: ModbusConfigOption[] = [
@@ -54,10 +60,8 @@ const UI_FILTER_OPTIONS: ModbusConfigOption[] = [
 ];
 
 const UI_RESOLUTION_OPTIONS: ModbusConfigOption[] = [
-  { value: 0, label: '16 Bit (0.1)' },
-  { value: 1, label: '16 Bit (1)' },
-  { value: 2, label: '32 Bit (0.1)' },
-  { value: 3, label: '32 Bit (1)' },
+  { value: 0, label: '12-Bit Aufloesung' },
+  { value: 1, label: '16-Bit Aufloesung' },
 ];
 
 const AO_MODE_OPTIONS: ModbusConfigOption[] = [
@@ -90,12 +94,13 @@ function createUIConfigDatapoints(count: number) {
   const configs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 1; i <= count; i++) {
     configs.push(
-      { name: `UI${i} Sensortyp`, address: 149 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i}`, currentValue: 7 },
-      { name: `UI${i} Filterzeit`, address: 157 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_FILTER_OPTIONS, configDescription: `Filterzeit fuer UI${i} in Sekunden`, currentValue: 0 },
-      { name: `UI${i} Offset`, address: 169 + i, registerType: 'holding', dataType: 'int16', scale: 0.1, writable: true, isConfig: true, unit: '°C', configDescription: `Offset-Korrektur fuer UI${i}`, currentValue: 0 },
-      { name: `UI${i} Aufloesung`, address: 199 + i, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_RESOLUTION_OPTIONS, configDescription: `Aufloesung fuer UI${i}`, currentValue: 0 }
+      { name: `UI${i} Sensortyp`, address: 150 + (i - 1), registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: UI_SENSOR_TYPES, configDescription: `Sensortyp fuer UI${i}`, currentValue: 1 },
+      { name: `UI${i} Filterzeit`, address: 158 + (i - 1), registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 's', configDescription: `Filterzeit fuer UI${i} (0-60 Sekunden, 0=deaktiviert)`, currentValue: 2 }
     );
   }
+  configs.push(
+    { name: 'UI Aufloesung', address: 166, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configDescription: 'Aufloesung fuer alle UI (Bit 0-7 fuer UI1-8: 0=12-Bit, 1=16-Bit)', currentValue: 0 }
+  );
   return configs;
 }
 
