@@ -1218,6 +1218,7 @@ function App() {
                 driverBindings={driverBindings}
                 haDevices={haDevices}
                 haDriverEnabled={haDriverEnabled}
+                alarmClasses={alarmClasses}
               />
             )}
           </div>

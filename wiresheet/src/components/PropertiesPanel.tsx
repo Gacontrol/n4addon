@@ -5,6 +5,8 @@ import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
 import { ModbusDeviceBlockConfig } from './ModbusConfig';
 import { ModbusDriverPanel } from './ModbusDriverPanel';
+import { AlarmSettings } from './AlarmSettings';
+import { AlarmClass, BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from '../types/alarm';
 
 interface HAEntity {
   entity_id: string;
@@ -35,6 +37,7 @@ interface PropertiesPanelProps {
   driverBindings?: DriverBinding[];
   haDevices?: HaDevice[];
   haDriverEnabled?: boolean;
+  alarmClasses?: AlarmClass[];
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -59,7 +62,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onWriteConfigValue,
   driverBindings = [],
   haDevices = [],
-  haDriverEnabled = true
+  haDriverEnabled = true,
+  alarmClasses = []
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -449,6 +453,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <p className="text-[10px] text-slate-600">false / 0 / off</p>
               </div>
             </div>
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              booleanAlarmConfig={config.booleanAlarmConfig as BooleanAlarmConfig}
+              onBooleanAlarmConfigChange={(cfg) => updateConfig('booleanAlarmConfig', cfg)}
+            />
           </div>
         )}
 
@@ -467,6 +477,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-cyan-500 transition-colors placeholder-slate-500"
               />
             </div>
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              numericAlarmConfig={config.numericAlarmConfig as NumericAlarmConfig}
+              onNumericAlarmConfigChange={(cfg) => updateConfig('numericAlarmConfig', cfg)}
+            />
           </div>
         )}
 
@@ -512,6 +528,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <p className="text-xs text-slate-500 text-center py-2">Keine Stufen definiert</p>
               )}
             </div>
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              enumAlarmConfig={config.enumAlarmConfig as EnumAlarmConfig}
+              onEnumAlarmConfigChange={(cfg) => updateConfig('enumAlarmConfig', cfg)}
+              enumStages={config.dpEnumStages as { value: number; label: string }[]}
+            />
           </div>
         )}
 
@@ -1538,6 +1561,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             </div>
 
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              aggregateAlarmConfig={config.aggregateAlarmConfig as AggregateAlarmConfig}
+              onAggregateAlarmConfigChange={(cfg) => updateConfig('aggregateAlarmConfig', cfg)}
+            />
+
             <p className="text-[10px] text-slate-500">
               Kompletter Pumpenbaustein mit Verzoegerungen, Rueckmeldungsueberwachung, Drehzahlregelung und Blockierschutz.
             </p>
@@ -1708,6 +1738,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             </div>
 
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              aggregateAlarmConfig={config.aggregateAlarmConfig as AggregateAlarmConfig}
+              onAggregateAlarmConfigChange={(cfg) => updateConfig('aggregateAlarmConfig', cfg)}
+            />
+
             <p className="text-[10px] text-slate-500">
               Aggregatebaustein fuer allgemeine Aggregate wie Ventilatoren, Motoren, Kompressoren etc.
             </p>
@@ -1812,6 +1849,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
               </div>
             </div>
+
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              valveAlarmConfig={config.valveAlarmConfig as ValveAlarmConfig}
+              onValveAlarmConfigChange={(cfg) => updateConfig('valveAlarmConfig', cfg)}
+            />
 
             <p className="text-[10px] text-slate-500">
               Ventilbaustein mit Sollwertbegrenzung und Rueckmeldungsueberwachung.
@@ -1938,6 +1982,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
               </div>
             </div>
+
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              sensorAlarmConfig={config.sensorAlarmConfig as SensorAlarmConfig}
+              onSensorAlarmConfigChange={(cfg) => updateConfig('sensorAlarmConfig', cfg)}
+            />
 
             <p className="text-[10px] text-slate-500">
               Sensorbaustein mit Grenzwertueberwachung und Hand/Auto Umschaltung.
