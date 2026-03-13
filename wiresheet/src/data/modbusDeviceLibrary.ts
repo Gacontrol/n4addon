@@ -112,7 +112,7 @@ function createUIConfigDatapoints(count: number) {
 function createDIDatapoints(count: number, statusRegister: number) {
   const inputs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 0; i < count; i++) {
-    inputs.push({ name: `DI${i + 1}`, address: statusRegister, registerType: 'input', dataType: 'bool', scale: 1, unit: '', writable: false, bitIndex: i });
+    inputs.push({ name: `DI${i + 1}`, address: statusRegister, registerType: 'input', dataType: 'uint16', scale: 1, unit: '', writable: false, bitIndex: i });
   }
   return inputs;
 }
@@ -120,7 +120,7 @@ function createDIDatapoints(count: number, statusRegister: number) {
 function createDODatapoints(count: number, statusRegister: number) {
   const outputs: Omit<ModbusDatapoint, 'id'>[] = [];
   for (let i = 0; i < count; i++) {
-    outputs.push({ name: `DO${i + 1}`, address: statusRegister, registerType: 'holding', dataType: 'bool', scale: 1, unit: '', writable: true, bitIndex: i });
+    outputs.push({ name: `DO${i + 1}`, address: statusRegister, registerType: 'holding', dataType: 'uint16', scale: 1, unit: '', writable: true, bitIndex: i });
   }
   return outputs;
 }
@@ -175,26 +175,26 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     id: 'isma-mix38-ip',
     manufacturer: 'iSMA / Global Control 5',
     model: 'ISMA-B-MIX38-IP',
-    description: '8 UI, 12 DI, 6 AO, 4 DO - Grosses Kombimodul TCP/IP',
+    description: '8 UI, 12 DI, 6 AO, 12 DO - Grosses Kombimodul TCP/IP',
     category: 'iSMA MIX Module',
     inputDatapoints: [
       ...createUIDatapoints(8, 70, 71),
-      ...createDIDatapoints(12, 16),
+      ...createDIDatapoints(12, 15),
     ],
     outputDatapoints: [
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(12, 17),
       ...createAODatapoints(6, 120),
     ],
     configDatapoints: [
       ...createUIConfigDatapoints(8),
-      ...createDOConfigDatapoints(4),
+      ...createDOConfigDatapoints(12),
       ...createAOConfigDatapoints(6),
       { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
     ],
     datapoints: [
       ...createUIDatapoints(8, 70, 71),
-      ...createDIDatapoints(12, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(12, 15),
+      ...createDODatapoints(12, 17),
       ...createAODatapoints(6, 120),
     ]
   },
@@ -206,10 +206,10 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     category: 'iSMA MIX Module',
     inputDatapoints: [
       ...createUIDatapoints(5, 70, 71),
-      ...createDIDatapoints(5, 16),
+      ...createDIDatapoints(5, 15),
     ],
     outputDatapoints: [
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(4, 17),
       ...createAODatapoints(4, 120),
     ],
     configDatapoints: [
@@ -220,8 +220,8 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     ],
     datapoints: [
       ...createUIDatapoints(5, 70, 71),
-      ...createDIDatapoints(5, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(5, 15),
+      ...createDODatapoints(4, 17),
       ...createAODatapoints(4, 120),
     ]
   },
@@ -245,12 +245,12 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'ISMA-B-24I-IP',
     description: '24 Digital-Eingaenge TCP/IP',
     category: 'iSMA Eingaenge',
-    inputDatapoints: createDIDatapoints(24, 16),
+    inputDatapoints: createDIDatapoints(24, 15),
     outputDatapoints: [],
     configDatapoints: [
       { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
     ],
-    datapoints: createDIDatapoints(24, 16)
+    datapoints: createDIDatapoints(24, 15)
   },
   {
     id: 'isma-4o-h-ip',
@@ -259,12 +259,12 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '4 Relais-Ausgaenge TCP/IP',
     category: 'iSMA Ausgaenge',
     inputDatapoints: [],
-    outputDatapoints: createDODatapoints(4, 18),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: [
       ...createDOConfigDatapoints(4),
       { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
     ],
-    datapoints: createDODatapoints(4, 18)
+    datapoints: createDODatapoints(4, 17)
   },
   {
     id: 'isma-12o-h-ip',
@@ -273,12 +273,12 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '12 Relais-Ausgaenge TCP/IP',
     category: 'iSMA Ausgaenge',
     inputDatapoints: [],
-    outputDatapoints: createDODatapoints(12, 18),
+    outputDatapoints: createDODatapoints(12, 17),
     configDatapoints: [
       ...createDOConfigDatapoints(12),
       { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
     ],
-    datapoints: createDODatapoints(12, 18)
+    datapoints: createDODatapoints(12, 17)
   },
   {
     id: 'isma-4u4a-h-ip',
@@ -304,16 +304,16 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'ISMA-B-4I4O-H-IP',
     description: '4 DI, 4 DO - Digital I/O Modul TCP/IP',
     category: 'iSMA Kombination',
-    inputDatapoints: createDIDatapoints(4, 16),
-    outputDatapoints: createDODatapoints(4, 18),
+    inputDatapoints: createDIDatapoints(4, 15),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: [
       ...createDOConfigDatapoints(4),
       { name: 'Watchdog Zeit', address: 140, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, unit: 'ms', configDescription: 'Watchdog-Timeout (0=deaktiviert)' },
       { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
     ],
     datapoints: [
-      ...createDIDatapoints(4, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(4, 15),
+      ...createDODatapoints(4, 17),
     ]
   },
   {
@@ -323,7 +323,7 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '4 UI, 4 DO - Universal/Digital I/O TCP/IP',
     category: 'iSMA Kombination',
     inputDatapoints: createUIDatapoints(4, 70, 71),
-    outputDatapoints: createDODatapoints(4, 18),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: [
       ...createUIConfigDatapoints(4),
       ...createDOConfigDatapoints(4),
@@ -332,7 +332,7 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     ],
     datapoints: [
       ...createUIDatapoints(4, 70, 71),
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(4, 17),
     ]
   },
   {
@@ -353,25 +353,25 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     id: 'isma-mix38',
     manufacturer: 'iSMA / Global Control 5',
     model: 'ISMA-B-MIX38',
-    description: '8 UI, 12 DI, 6 AO, 4 DO - Grosses Kombimodul RTU',
+    description: '8 UI, 12 DI, 6 AO, 12 DO - Grosses Kombimodul RTU',
     category: 'iSMA MIX Module',
     inputDatapoints: [
       ...createUIDatapoints(8, 70, 71),
-      ...createDIDatapoints(12, 16),
+      ...createDIDatapoints(12, 15),
     ],
     outputDatapoints: [
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(12, 17),
       ...createAODatapoints(6, 120),
     ],
     configDatapoints: [
       ...createUIConfigDatapoints(8),
-      ...createDOConfigDatapoints(4),
+      ...createDOConfigDatapoints(12),
       ...createAOConfigDatapoints(6),
     ],
     datapoints: [
       ...createUIDatapoints(8, 70, 71),
-      ...createDIDatapoints(12, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(12, 15),
+      ...createDODatapoints(12, 17),
       ...createAODatapoints(6, 120),
     ]
   },
@@ -383,10 +383,10 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     category: 'iSMA MIX Module',
     inputDatapoints: [
       ...createUIDatapoints(5, 70, 71),
-      ...createDIDatapoints(5, 16),
+      ...createDIDatapoints(5, 15),
     ],
     outputDatapoints: [
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(4, 17),
       ...createAODatapoints(4, 120),
     ],
     configDatapoints: [
@@ -396,8 +396,8 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     ],
     datapoints: [
       ...createUIDatapoints(5, 70, 71),
-      ...createDIDatapoints(5, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(5, 15),
+      ...createDODatapoints(4, 17),
       ...createAODatapoints(4, 120),
     ]
   },
@@ -418,10 +418,10 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'ISMA-B-24I',
     description: '24 Digital-Eingaenge RTU',
     category: 'iSMA Eingaenge',
-    inputDatapoints: createDIDatapoints(24, 16),
+    inputDatapoints: createDIDatapoints(24, 15),
     outputDatapoints: [],
     configDatapoints: [],
-    datapoints: createDIDatapoints(24, 16)
+    datapoints: createDIDatapoints(24, 15)
   },
   {
     id: 'isma-4o-h',
@@ -430,9 +430,9 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '4 Relais-Ausgaenge RTU',
     category: 'iSMA Ausgaenge',
     inputDatapoints: [],
-    outputDatapoints: createDODatapoints(4, 18),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: createDOConfigDatapoints(4),
-    datapoints: createDODatapoints(4, 18)
+    datapoints: createDODatapoints(4, 17)
   },
   {
     id: 'isma-12o-h',
@@ -441,9 +441,9 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '12 Relais-Ausgaenge RTU',
     category: 'iSMA Ausgaenge',
     inputDatapoints: [],
-    outputDatapoints: createDODatapoints(12, 18),
+    outputDatapoints: createDODatapoints(12, 17),
     configDatapoints: createDOConfigDatapoints(12),
-    datapoints: createDODatapoints(12, 18)
+    datapoints: createDODatapoints(12, 17)
   },
   {
     id: 'isma-4u4a-h',
@@ -468,15 +468,15 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     model: 'ISMA-B-4I4O-H',
     description: '4 DI, 4 DO - Digital I/O Modul RTU',
     category: 'iSMA Kombination',
-    inputDatapoints: createDIDatapoints(4, 16),
-    outputDatapoints: createDODatapoints(4, 18),
+    inputDatapoints: createDIDatapoints(4, 15),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: [
       ...createDOConfigDatapoints(4),
       { name: 'Betriebsmodus', address: 175, registerType: 'holding', dataType: 'uint16', writable: true, isConfig: true, configOptions: OPERATION_MODE_OPTIONS, configDescription: 'Spezial-Betriebsmodus fuer Heizen/Kuehlen' },
     ],
     datapoints: [
-      ...createDIDatapoints(4, 16),
-      ...createDODatapoints(4, 18),
+      ...createDIDatapoints(4, 15),
+      ...createDODatapoints(4, 17),
     ]
   },
   {
@@ -486,7 +486,7 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     description: '4 UI, 4 DO - Universal/Digital I/O RTU',
     category: 'iSMA Kombination',
     inputDatapoints: createUIDatapoints(4, 70, 71),
-    outputDatapoints: createDODatapoints(4, 18),
+    outputDatapoints: createDODatapoints(4, 17),
     configDatapoints: [
       ...createUIConfigDatapoints(4),
       ...createDOConfigDatapoints(4),
@@ -494,7 +494,7 @@ export const modbusDeviceLibrary: ModbusDeviceTemplate[] = [
     ],
     datapoints: [
       ...createUIDatapoints(4, 70, 71),
-      ...createDODatapoints(4, 18),
+      ...createDODatapoints(4, 17),
     ]
   },
   {
