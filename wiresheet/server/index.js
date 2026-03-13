@@ -454,52 +454,6 @@ app.post(['/alarm-config', '/api/alarm-config'], async (req, res) => {
   }
 });
 
-app.post(['/alarm/acknowledge', '/api/alarm/acknowledge'], async (req, res) => {
-  try {
-    const { alarmId, acknowledgedBy } = req.body;
-    const data = await fs.readFile(alarmConfigFile, 'utf8');
-    const config = JSON.parse(data);
-
-    config.activeAlarms = (config.activeAlarms || []).map(a =>
-      a.id === alarmId && a.state === 'active'
-        ? { ...a, state: 'acknowledged', acknowledgedAt: Date.now(), acknowledgedBy: acknowledgedBy || 'visu' }
-        : a
-    );
-
-    await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Fehler beim Quittieren des Alarms:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post(['/alarm/clear', '/api/alarm/clear'], async (req, res) => {
-  try {
-    const { alarmId } = req.body;
-    const data = await fs.readFile(alarmConfigFile, 'utf8');
-    const config = JSON.parse(data);
-
-    const alarm = (config.activeAlarms || []).find(a => a.id === alarmId);
-    if (alarm) {
-      const historyEntry = {
-        ...alarm,
-        state: 'cleared',
-        clearedAt: Date.now(),
-        archivedAt: Date.now()
-      };
-      config.alarmHistory = [historyEntry, ...(config.alarmHistory || [])].slice(0, 1000);
-      config.activeAlarms = config.activeAlarms.filter(a => a.id !== alarmId);
-    }
-
-    await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Fehler beim Loeschen des Alarms:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.get(['/ha/states', '/api/ha/states'], async (req, res) => {
   try {
     const [states, registry] = await Promise.all([
@@ -2613,12 +2567,6 @@ function getLiveSnapshot() {
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }
-  for (const [nodeId, value] of persistentDpValues) {
-    merged[nodeId] = value;
-  }
-  for (const [nodeId, dpInfo] of visuControlledDps) {
-    merged[nodeId] = dpInfo.value;
-  }
   return merged;
 }
 
@@ -3394,137 +3342,26 @@ async function proxyToApi(req, res, apiPath) {
   }
 }
 
-visuApp.use(express.json());
+visuApp.use((req, res, next) => {
+  const ingressMatch = req.path.match(/^\/api\/hassio_ingress\/[^/]+(\/api\/.*)$/);
+  if (ingressMatch) {
+    return proxyToApi(req, res, ingressMatch[1]);
+  }
+  const appMatch = req.path.match(/^\/app\/[^/]+(\/api\/.*)$/);
+  if (appMatch) {
+    return proxyToApi(req, res, appMatch[1]);
+  }
+  next();
+});
+
+visuApp.use('/api', async (req, res) => {
+  await proxyToApi(req, res, req.originalUrl);
+});
 
 visuApp.use('/assets', express.static(path.join(distDir, 'assets'), {
   maxAge: '1y',
   immutable: true
 }));
-
-visuApp.get(['/visu-pages', '/api/visu-pages'], async (req, res) => {
-  try {
-    const data = await fs.readFile(visuPagesFile, 'utf8');
-    res.json(JSON.parse(data));
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      res.json([]);
-    } else {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
-
-visuApp.get(['/pages', '/api/pages'], async (req, res) => {
-  try {
-    const data = await fs.readFile(pagesFile, 'utf8');
-    res.json(JSON.parse(data));
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      res.json([]);
-    } else {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
-
-visuApp.get(['/alarm-config', '/api/alarm-config'], async (req, res) => {
-  try {
-    const data = await fs.readFile(alarmConfigFile, 'utf8');
-    res.json(JSON.parse(data));
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      res.json({ alarmClasses: [], alarmConsoles: [], activeAlarms: [], alarmHistory: [] });
-    } else {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
-
-visuApp.post(['/alarm/acknowledge', '/api/alarm/acknowledge'], async (req, res) => {
-  try {
-    const { alarmId, acknowledgedBy } = req.body;
-    const data = await fs.readFile(alarmConfigFile, 'utf8');
-    const config = JSON.parse(data);
-
-    config.activeAlarms = (config.activeAlarms || []).map(a =>
-      a.id === alarmId && a.state === 'active'
-        ? { ...a, state: 'acknowledged', acknowledgedAt: Date.now(), acknowledgedBy: acknowledgedBy || 'visu' }
-        : a
-    );
-
-    await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Fehler beim Quittieren des Alarms (visuApp):', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-visuApp.post(['/alarm/clear', '/api/alarm/clear'], async (req, res) => {
-  try {
-    const { alarmId } = req.body;
-    const data = await fs.readFile(alarmConfigFile, 'utf8');
-    const config = JSON.parse(data);
-
-    const alarm = (config.activeAlarms || []).find(a => a.id === alarmId);
-    if (alarm) {
-      const historyEntry = {
-        ...alarm,
-        state: 'cleared',
-        clearedAt: Date.now(),
-        archivedAt: Date.now()
-      };
-      config.alarmHistory = [historyEntry, ...(config.alarmHistory || [])].slice(0, 1000);
-      config.activeAlarms = config.activeAlarms.filter(a => a.id !== alarmId);
-    }
-
-    await fs.writeFile(alarmConfigFile, JSON.stringify(config, null, 2));
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Fehler beim Loeschen des Alarms (visuApp):', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-visuApp.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, portId, paramKey, value } = req.body;
-  console.log('[VISU_8098 DEBUG] Schreibwert empfangen:', { nodeId, portId, paramKey, value });
-
-  try {
-    if (paramKey) {
-      const pagesData = await fs.readFile(pagesFile, 'utf8');
-      const pages = JSON.parse(pagesData);
-      let found = false;
-      for (const page of pages) {
-        const node = (page.nodes || []).find(n => n.id === nodeId);
-        if (node) {
-          node.data = node.data || {};
-          node.data.config = node.data.config || {};
-          node.data.config[paramKey] = value;
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        broadcastSse();
-      }
-    } else if (portId) {
-      visuControlledDps.set(nodeId, value);
-      const overrideKey = `${nodeId}:${portId}`;
-      if (overrideKey !== nodeId) {
-        visuControlledDps.set(overrideKey, value);
-      }
-      persistentDpValues.set(nodeId, value);
-      scheduleDpValuesSave();
-      broadcastSse();
-    }
-    res.json({ success: true });
-  } catch (err) {
-    console.error('[VISU_8098] Schreibfehler:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 visuApp.get('/', (req, res) => {
   const visuHtmlPath = path.join(distDir, 'visu.html');

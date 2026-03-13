@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
-import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
 import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
 
 function getApiBase(): string {
@@ -19,9 +18,6 @@ export function VisuApp() {
   const [activePageId, setActivePageId] = useState<string>('');
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
   const [logicNodes, setLogicNodes] = useState<FlowNode[]>([]);
-  const [alarmClasses, setAlarmClasses] = useState<AlarmClass[]>([]);
-  const [alarmConsoles, setAlarmConsoles] = useState<AlarmConsole[]>([]);
-  const [activeAlarms, setActiveAlarms] = useState<ActiveAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const pageHistoryRef = useRef<string[]>([]);
@@ -43,10 +39,9 @@ export function VisuApp() {
 
   const loadData = useCallback(async () => {
     try {
-      const [visuRes, pagesRes, alarmRes] = await Promise.all([
+      const [visuRes, pagesRes] = await Promise.all([
         fetch(`${apiBase}/visu-pages`),
-        fetch(`${apiBase}/pages`),
-        fetch(`${apiBase}/alarm-config`)
+        fetch(`${apiBase}/pages`)
       ]);
 
       if (visuRes.ok) {
@@ -67,64 +62,12 @@ export function VisuApp() {
           setLogicNodes(allNodes);
         }
       }
-
-      if (alarmRes.ok) {
-        const data = await alarmRes.json();
-        setAlarmClasses(data.alarmClasses || []);
-        setAlarmConsoles(data.alarmConsoles || []);
-        setActiveAlarms(data.activeAlarms || []);
-      }
     } catch (err) {
       console.error('loadData error:', err);
     } finally {
       setLoading(false);
     }
   }, [apiBase]);
-
-  const loadAlarmData = useCallback(async () => {
-    try {
-      const alarmRes = await fetch(`${apiBase}/alarm-config`);
-      if (alarmRes.ok) {
-        const data = await alarmRes.json();
-        setAlarmClasses(data.alarmClasses || []);
-        setAlarmConsoles(data.alarmConsoles || []);
-        setActiveAlarms(data.activeAlarms || []);
-      }
-    } catch (err) {
-      console.error('loadAlarmData error:', err);
-    }
-  }, [apiBase]);
-
-  useEffect(() => {
-    const interval = setInterval(loadAlarmData, 2000);
-    return () => clearInterval(interval);
-  }, [loadAlarmData]);
-
-  const handleAcknowledgeAlarm = useCallback(async (alarmId: string) => {
-    try {
-      await fetch(`${apiBase}/alarm/acknowledge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alarmId })
-      });
-      loadAlarmData();
-    } catch (err) {
-      console.error('acknowledge alarm error:', err);
-    }
-  }, [apiBase, loadAlarmData]);
-
-  const handleClearAlarm = useCallback(async (alarmId: string) => {
-    try {
-      await fetch(`${apiBase}/alarm/clear`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alarmId })
-      });
-      loadAlarmData();
-    } catch (err) {
-      console.error('clear alarm error:', err);
-    }
-  }, [apiBase, loadAlarmData]);
 
   useEffect(() => {
     loadData();
@@ -353,11 +296,6 @@ export function VisuApp() {
           onBringForward={() => {}}
           onSendBackward={() => {}}
           onSendToBack={() => {}}
-          alarmClasses={alarmClasses}
-          alarmConsoles={alarmConsoles}
-          activeAlarms={activeAlarms}
-          onAcknowledgeAlarm={handleAcknowledgeAlarm}
-          onClearAlarm={handleClearAlarm}
         />
       </div>
     </div>

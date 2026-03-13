@@ -1542,9 +1542,7 @@ function App() {
           modbusDevices={modbusDevices}
           modbusDriverEnabled={modbusDriverEnabled}
           driverBindings={driverBindings}
-          alarmClasses={alarmClasses}
-          alarmConsoles={alarmConsoles}
-          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig, importedAlarmConfig) => {
+          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);
             importBlocks(newBlocks as CustomBlockDefinition[]);
@@ -1553,10 +1551,6 @@ function App() {
               setModbusDriverEnabledState(importedDriverConfig.modbusDriverEnabled);
               setDriverBindings(importedDriverConfig.driverBindings);
               saveDriverConfig(importedDriverConfig.modbusDevices, importedDriverConfig.modbusDriverEnabled, importedDriverConfig.driverBindings, haDriverEnabled);
-            }
-            if (importedAlarmConfig) {
-              setAllAlarmClasses(importedAlarmConfig.alarmClasses);
-              setAllAlarmConsoles(importedAlarmConfig.alarmConsoles);
             }
           }}
           onClose={() => setShowBackupModal(false)}
