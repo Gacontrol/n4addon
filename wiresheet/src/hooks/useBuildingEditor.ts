@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Building, Floor, Room, BuildingTool } from '../types/building';
+import { Building, Floor, Room, Wall, BackgroundImage, BuildingTool } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -33,6 +33,8 @@ function createDefaultBuilding(): Building {
         level: 0,
         height: 3.0,
         rooms: [],
+        walls: [],
+        backgroundImage: null,
       },
     ],
     createdAt: now,
@@ -45,6 +47,7 @@ export function useBuildingEditor() {
   const [activeBuildingId, setActiveBuildingId] = useState<string>('');
   const [activeFloorId, setActiveFloorId] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [tool, setTool] = useState<BuildingTool>('select');
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -56,9 +59,17 @@ export function useBuildingEditor() {
         if (resp.ok) {
           const data = await resp.json();
           if (data.buildings?.length > 0) {
-            setBuildings(data.buildings);
-            setActiveBuildingId(data.buildings[0].id);
-            setActiveFloorId(data.buildings[0].floors[0]?.id || '');
+            const migrated = data.buildings.map((b: Building) => ({
+              ...b,
+              floors: b.floors.map((f: Floor) => ({
+                ...f,
+                walls: f.walls ?? [],
+                backgroundImage: f.backgroundImage ?? null,
+              })),
+            }));
+            setBuildings(migrated);
+            setActiveBuildingId(migrated[0].id);
+            setActiveFloorId(migrated[0].floors[0]?.id || '');
           } else {
             const def = createDefaultBuilding();
             setBuildings([def]);
@@ -148,6 +159,8 @@ export function useBuildingEditor() {
       level: maxLevel + 1,
       height: 3.0,
       rooms: [],
+      walls: [],
+      backgroundImage: null,
     };
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -168,6 +181,8 @@ export function useBuildingEditor() {
       level: minLevel - 1,
       height: 3.0,
       rooms: [],
+      walls: [],
+      backgroundImage: null,
     };
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -209,13 +224,82 @@ export function useBuildingEditor() {
     setActiveFloorId(remaining[0]?.id || '');
   }, [buildings, updateBuildings]);
 
+  const setFloorBackground = useCallback((buildingId: string, floorId: string, bg: BackgroundImage | null) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? { ...b, floors: b.floors.map(f => f.id === floorId ? { ...f, backgroundImage: bg } : f), updatedAt: Date.now() }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const addWall = useCallback((
+    buildingId: string,
+    floorId: string,
+    x1: number, y1: number, x2: number, y2: number,
+    thickness = 0.25
+  ) => {
+    const wall: Wall = {
+      id: `wall-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      x1, y1, x2, y2,
+      thickness,
+      height: 0,
+      color: '#94a3b8',
+      materialType: 'concrete',
+    };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, walls: [...f.walls, wall] } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedWallId(wall.id);
+    return wall.id;
+  }, [buildings, updateBuildings]);
+
+  const updateWall = useCallback((buildingId: string, floorId: string, wallId: string, changes: Partial<Wall>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, walls: f.walls.map(w => w.id === wallId ? { ...w, ...changes } : w) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const deleteWall = useCallback((buildingId: string, floorId: string, wallId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, walls: f.walls.filter(w => w.id !== wallId) } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedWallId(null);
+  }, [buildings, updateBuildings]);
+
   const addRoom = useCallback((
     buildingId: string,
     floorId: string,
-    x: number,
-    y: number,
-    width: number,
-    depth: number,
+    x: number, y: number, width: number, depth: number,
     type: Room['type'],
     name?: string
   ) => {
@@ -223,10 +307,7 @@ export function useBuildingEditor() {
       id: `room-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       name: name || `Raum ${Math.floor(Math.random() * 900 + 100)}`,
       type,
-      x,
-      y,
-      width,
-      depth,
+      x, y, width, depth,
       color: ROOM_COLORS[type] || '#94a3b8',
       doors: [],
       windows: [],
@@ -287,11 +368,13 @@ export function useBuildingEditor() {
     activeBuilding,
     activeFloor,
     selectedRoomId,
+    selectedWallId,
     tool,
     isLoaded,
     setActiveBuildingId,
     setActiveFloorId,
     setSelectedRoomId,
+    setSelectedWallId,
     setTool,
     addBuilding,
     renameBuilding,
@@ -301,6 +384,10 @@ export function useBuildingEditor() {
     renameFloor,
     updateFloorHeight,
     deleteFloor,
+    setFloorBackground,
+    addWall,
+    updateWall,
+    deleteWall,
     addRoom,
     updateRoom,
     deleteRoom,

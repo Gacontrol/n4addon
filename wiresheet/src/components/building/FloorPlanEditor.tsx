@@ -1,22 +1,48 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Floor, Room, BuildingTool } from '../../types/building';
+import { Floor, Wall, Room, BuildingTool, BackgroundImage } from '../../types/building';
 
 interface Props {
   floor: Floor;
   selectedRoomId: string | null;
+  selectedWallId: string | null;
   tool: BuildingTool;
+  wallThickness: number;
+  onAddWall: (x1: number, y1: number, x2: number, y2: number, thickness: number) => void;
+  onSelectWall: (id: string | null) => void;
+  onMoveWallPoint: (wallId: string, point: 'start' | 'end', x: number, y: number) => void;
   onAddRoom: (x: number, y: number, width: number, depth: number) => void;
   onSelectRoom: (id: string | null) => void;
   onMoveRoom: (roomId: string, x: number, y: number) => void;
-  onResizeRoom: (roomId: string, width: number, depth: number) => void;
+  onDeleteWall: (wallId: string) => void;
   onDeleteRoom: (roomId: string) => void;
+  onSetBackground: (bg: BackgroundImage | null) => void;
 }
 
 const CELL = 40;
-const SNAP = 1;
+const SNAP = 0.25;
+const SNAP_DIST = 0.4;
 
 function snapTo(v: number): number {
   return Math.round(v / SNAP) * SNAP;
+}
+
+function dist(x1: number, y1: number, x2: number, y2: number): number {
+  return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
+
+function pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return dist(px, py, ax, ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return dist(px, py, ax + t * dx, ay + t * dy);
+}
+
+interface DrawingWall {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 interface DrawRect {
@@ -26,21 +52,53 @@ interface DrawRect {
   endY: number;
 }
 
+const bgImageCache = new Map<string, HTMLImageElement>();
+
+function loadBgImage(dataUrl: string): Promise<HTMLImageElement> {
+  if (bgImageCache.has(dataUrl)) return Promise.resolve(bgImageCache.get(dataUrl)!);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => { bgImageCache.set(dataUrl, img); resolve(img); };
+    img.src = dataUrl;
+  });
+}
+
 export function FloorPlanEditor({
-  floor, selectedRoomId, tool, onAddRoom, onSelectRoom, onMoveRoom, onDeleteRoom,
+  floor, selectedRoomId, selectedWallId, tool, wallThickness,
+  onAddWall, onSelectWall, onMoveWallPoint,
+  onAddRoom, onSelectRoom, onMoveRoom,
+  onDeleteWall, onDeleteRoom, onSetBackground,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [offset, setOffset] = useState({ x: 40, y: 40 });
+  const [offset, setOffset] = useState({ x: 80, y: 80 });
   const [zoom, setZoom] = useState(1.0);
+  const [drawingWall, setDrawingWall] = useState<DrawingWall | null>(null);
   const [drawRect, setDrawRect] = useState<DrawRect | null>(null);
+  const [bgImg, setBgImg] = useState<HTMLImageElement | null>(null);
+  const [bgDragging, setBgDragging] = useState(false);
+  const [snapPoint, setSnapPoint] = useState<{ x: number; y: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const dragState = useRef<{
-    type: 'pan' | 'draw' | 'move';
+    type: 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-bg';
     startX: number;
     startY: number;
     roomId?: string;
     origX?: number;
     origY?: number;
+    wallId?: string;
+    point?: 'start' | 'end';
+    bgOrigX?: number;
+    bgOrigY?: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (floor.backgroundImage?.dataUrl) {
+      loadBgImage(floor.backgroundImage.dataUrl).then(img => setBgImg(img));
+    } else {
+      setBgImg(null);
+    }
+  }, [floor.backgroundImage?.dataUrl]);
 
   const toWorld = useCallback((px: number, py: number) => ({
     x: (px - offset.x) / (CELL * zoom),
@@ -51,6 +109,18 @@ export function FloorPlanEditor({
     x: wx * CELL * zoom + offset.x,
     y: wy * CELL * zoom + offset.y,
   }), [offset, zoom]);
+
+  const getSnapPoint = useCallback((wx: number, wy: number): { x: number; y: number } => {
+    let best = { x: snapTo(wx), y: snapTo(wy) };
+    let bestDist = SNAP_DIST;
+    for (const wall of floor.walls) {
+      for (const pt of [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]) {
+        const d = dist(wx, wy, pt.x, pt.y);
+        if (d < bestDist) { bestDist = d; best = pt; }
+      }
+    }
+    return best;
+  }, [floor.walls]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -66,125 +136,192 @@ export function FloorPlanEditor({
 
     const cellPx = CELL * zoom;
 
+    if (floor.backgroundImage && bgImg) {
+      const bg = floor.backgroundImage;
+      ctx.save();
+      ctx.globalAlpha = bg.opacity;
+      const imgW = bgImg.width * bg.scale * zoom;
+      const imgH = bgImg.height * bg.scale * zoom;
+      const sx = bg.x * CELL * zoom + offset.x;
+      const sy = bg.y * CELL * zoom + offset.y;
+      ctx.translate(sx + imgW / 2, sy + imgH / 2);
+      ctx.rotate((bg.rotation * Math.PI) / 180);
+      ctx.drawImage(bgImg, -imgW / 2, -imgH / 2, imgW, imgH);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+
+      if (bgDragging) {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 3]);
+        ctx.strokeRect(sx, sy, imgW, imgH);
+        ctx.setLineDash([]);
+      }
+    }
+
     const startGX = Math.floor(-offset.x / cellPx) - 1;
     const startGY = Math.floor(-offset.y / cellPx) - 1;
     const endGX = Math.ceil((W - offset.x) / cellPx) + 1;
     const endGY = Math.ceil((H - offset.y) / cellPx) + 1;
 
-    ctx.strokeStyle = 'rgba(148,163,184,0.1)';
+    ctx.strokeStyle = 'rgba(148,163,184,0.07)';
     ctx.lineWidth = 0.5;
     for (let gx = startGX; gx <= endGX; gx++) {
       const sx = gx * cellPx + offset.x;
-      ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, H);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
     }
     for (let gy = startGY; gy <= endGY; gy++) {
       const sy = gy * cellPx + offset.y;
-      ctx.beginPath();
-      ctx.moveTo(0, sy);
-      ctx.lineTo(W, sy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
     }
-
-    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+    ctx.strokeStyle = 'rgba(148,163,184,0.18)';
     ctx.lineWidth = 1;
     for (let gx = Math.floor(startGX / 5) * 5; gx <= endGX; gx += 5) {
       const sx = gx * cellPx + offset.x;
-      ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, H);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
     }
     for (let gy = Math.floor(startGY / 5) * 5; gy <= endGY; gy += 5) {
       const sy = gy * cellPx + offset.y;
-      ctx.beginPath();
-      ctx.moveTo(0, sy);
-      ctx.lineTo(W, sy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
     }
 
     ctx.font = '10px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(148,163,184,0.4)';
+    ctx.fillStyle = 'rgba(148,163,184,0.35)';
     for (let gx = Math.floor(startGX / 5) * 5; gx <= endGX; gx += 5) {
       if (gx === 0) continue;
       const sx = gx * cellPx + offset.x;
-      ctx.fillText(`${gx}m`, sx + 2, offset.y - 2);
+      ctx.fillText(`${gx}m`, sx + 2, offset.y - 3);
     }
     for (let gy = Math.floor(startGY / 5) * 5; gy <= endGY; gy += 5) {
       if (gy === 0) continue;
       const sy = gy * cellPx + offset.y;
-      ctx.fillText(`${gy}m`, offset.x + 2, sy - 2);
+      ctx.fillText(`${gy}m`, offset.x + 2, sy - 3);
     }
 
-    ctx.strokeStyle = 'rgba(59,130,246,0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(offset.x, 0);
-    ctx.lineTo(offset.x, H);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, offset.y);
-    ctx.lineTo(W, offset.y);
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(59,130,246,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(offset.x, 0); ctx.lineTo(offset.x, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, offset.y); ctx.lineTo(W, offset.y); ctx.stroke();
 
     for (const room of floor.rooms) {
       const isSelected = room.id === selectedRoomId;
-      const sx = toScreen(room.x, room.y);
+      const s = toScreen(room.x, room.y);
       const rw = room.width * cellPx;
       const rd = room.depth * cellPx;
+      ctx.fillStyle = room.color + '22';
+      ctx.fillRect(s.x, s.y, rw, rd);
+      ctx.strokeStyle = isSelected ? '#60a5fa' : room.color + 'aa';
+      ctx.lineWidth = isSelected ? 2 : 1;
+      if (isSelected) { ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 5; }
+      ctx.strokeRect(s.x, s.y, rw, rd);
+      ctx.shadowBlur = 0;
+      const fs = Math.max(9, Math.min(12, 10 * zoom));
+      ctx.font = `${fs}px Inter, sans-serif`;
+      ctx.fillStyle = 'rgba(226,232,240,0.7)';
+      ctx.textAlign = 'center';
+      ctx.fillText(room.name, s.x + rw / 2, s.y + rd / 2 + fs * 0.35);
+      ctx.textAlign = 'left';
+    }
 
-      const wallThickness = Math.max(2, 3 * zoom);
+    for (const wall of floor.walls) {
+      const isSelected = wall.id === selectedWallId;
+      const s1 = toScreen(wall.x1, wall.y1);
+      const s2 = toScreen(wall.x2, wall.y2);
+      const thickness = wall.thickness * CELL * zoom;
 
-      ctx.fillStyle = room.color + '33';
-      ctx.fillRect(sx.x, sx.y, rw, rd);
+      const dx = s2.x - s1.x;
+      const dy = s2.y - s1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.5) continue;
+      const nx = (-dy / len) * thickness / 2;
+      const ny = (dx / len) * thickness / 2;
 
-      ctx.fillStyle = room.color + '88';
-      ctx.fillRect(sx.x, sx.y, rw, wallThickness);
-      ctx.fillRect(sx.x, sx.y + rd - wallThickness, rw, wallThickness);
-      ctx.fillRect(sx.x, sx.y, wallThickness, rd);
-      ctx.fillRect(sx.x + rw - wallThickness, sx.y, wallThickness, rd);
-
-      ctx.strokeStyle = isSelected ? '#60a5fa' : room.color;
-      ctx.lineWidth = isSelected ? 2 : 1.5;
-      if (isSelected) {
-        ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 6;
-      }
-      ctx.strokeRect(sx.x, sx.y, rw, rd);
+      ctx.beginPath();
+      ctx.moveTo(s1.x + nx, s1.y + ny);
+      ctx.lineTo(s2.x + nx, s2.y + ny);
+      ctx.lineTo(s2.x - nx, s2.y - ny);
+      ctx.lineTo(s1.x - nx, s1.y - ny);
+      ctx.closePath();
+      ctx.fillStyle = isSelected ? '#93c5fd' : '#e2e8f0';
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? '#60a5fa' : '#334155';
+      ctx.lineWidth = isSelected ? 2 : 1;
+      if (isSelected) { ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 6; }
+      ctx.stroke();
       ctx.shadowBlur = 0;
 
       if (isSelected) {
-        ctx.strokeStyle = 'rgba(96,165,250,0.4)';
-        ctx.lineWidth = 6;
-        ctx.strokeRect(sx.x - 3, sx.y - 3, rw + 6, rd + 6);
-
-        const handleSize = Math.max(6, 8 * zoom);
-        ctx.fillStyle = '#60a5fa';
-        const corners = [
-          [sx.x, sx.y],
-          [sx.x + rw, sx.y],
-          [sx.x, sx.y + rd],
-          [sx.x + rw, sx.y + rd],
-        ];
-        for (const [hx, hy] of corners) {
-          ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+        for (const pt of [{ x: s1.x, y: s1.y }, { x: s2.x, y: s2.y }]) {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
         }
       }
 
-      const fontSize = Math.max(9, Math.min(13, 11 * zoom));
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      ctx.fillStyle = '#e2e8f0';
-      ctx.textAlign = 'center';
-      ctx.fillText(room.name, sx.x + rw / 2, sx.y + rd / 2 - fontSize * 0.6);
+      const wlen = dist(wall.x1, wall.y1, wall.x2, wall.y2);
+      if (wlen > 0.5 && zoom > 0.6) {
+        const mx = (s1.x + s2.x) / 2;
+        const my = (s1.y + s2.y) / 2;
+        ctx.save();
+        ctx.translate(mx, my);
+        let angle = Math.atan2(dy, dx);
+        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+        ctx.rotate(angle);
+        ctx.font = `${Math.max(9, 9 * zoom)}px Inter, sans-serif`;
+        ctx.fillStyle = isSelected ? '#60a5fa' : 'rgba(148,163,184,0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${wlen.toFixed(2)}m`, 0, -thickness / 2 - 4);
+        ctx.restore();
+      }
+    }
 
-      const dimFont = Math.max(8, Math.min(11, 9 * zoom));
-      ctx.font = `${dimFont}px Inter, sans-serif`;
-      ctx.fillStyle = 'rgba(148,163,184,0.8)';
-      ctx.fillText(`${room.width}m × ${room.depth}m`, sx.x + rw / 2, sx.y + rd / 2 + dimFont);
+    if (drawingWall) {
+      const s1 = toScreen(drawingWall.x1, drawingWall.y1);
+      const s2 = toScreen(drawingWall.x2, drawingWall.y2);
+      const thickness = wallThickness * CELL * zoom;
+      const dx = s2.x - s1.x;
+      const dy = s2.y - s1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 0.5) {
+        const nx = (-dy / len) * thickness / 2;
+        const ny = (dx / len) * thickness / 2;
+        ctx.beginPath();
+        ctx.moveTo(s1.x + nx, s1.y + ny);
+        ctx.lineTo(s2.x + nx, s2.y + ny);
+        ctx.lineTo(s2.x - nx, s2.y - ny);
+        ctx.lineTo(s1.x - nx, s1.y - ny);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(59,130,246,0.35)';
+        ctx.fill();
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
-      ctx.strokeStyle = 'rgba(0,0,0,0.0)';
+        const wlen = dist(drawingWall.x1, drawingWall.y1, drawingWall.x2, drawingWall.y2);
+        const mx = (s1.x + s2.x) / 2;
+        const my = (s1.y + s2.y) / 2;
+        ctx.save();
+        ctx.translate(mx, my);
+        let angle = Math.atan2(dy, dx);
+        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
+        ctx.rotate(angle);
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.fillStyle = '#60a5fa';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${wlen.toFixed(2)}m`, 0, -thickness / 2 - 6);
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(s1.x, s1.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3b82f6';
+      ctx.fill();
     }
 
     if (drawRect) {
@@ -194,29 +331,42 @@ export function FloorPlanEditor({
       const y2 = Math.max(drawRect.startY, drawRect.endY);
       const s1 = toScreen(x1, y1);
       const s2 = toScreen(x2, y2);
-      const w = s2.x - s1.x;
-      const h = s2.y - s1.y;
-
-      ctx.fillStyle = 'rgba(59,130,246,0.15)';
-      ctx.fillRect(s1.x, s1.y, w, h);
+      ctx.fillStyle = 'rgba(59,130,246,0.12)';
+      ctx.fillRect(s1.x, s1.y, s2.x - s1.x, s2.y - s1.y);
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 3]);
-      ctx.strokeRect(s1.x, s1.y, w, h);
+      ctx.strokeRect(s1.x, s1.y, s2.x - s1.x, s2.y - s1.y);
       ctx.setLineDash([]);
-
-      if (w > 20 && h > 20) {
-        const rw2 = snapTo(x2 - x1);
-        const rd2 = snapTo(y2 - y1);
+      if ((s2.x - s1.x) > 30 && (s2.y - s1.y) > 20) {
         ctx.font = 'bold 11px Inter, sans-serif';
         ctx.fillStyle = '#60a5fa';
         ctx.textAlign = 'center';
-        ctx.fillText(`${rw2}m × ${rd2}m`, s1.x + w / 2, s1.y + h / 2);
+        ctx.fillText(`${snapTo(x2 - x1)}m × ${snapTo(y2 - y1)}m`, (s1.x + s2.x) / 2, (s1.y + s2.y) / 2);
+        ctx.textAlign = 'left';
       }
     }
 
+    if (snapPoint && (tool === 'wall' || tool === 'room')) {
+      const sp = toScreen(snapPoint.x, snapPoint.y);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+    }
+
     ctx.textAlign = 'left';
-  }, [floor.rooms, selectedRoomId, offset, zoom, toScreen, drawRect]);
+  }, [
+    floor.walls, floor.rooms, floor.backgroundImage,
+    selectedRoomId, selectedWallId,
+    offset, zoom, toScreen, drawingWall, drawRect, snapPoint,
+    tool, wallThickness, bgImg, bgDragging,
+  ]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -237,7 +387,7 @@ export function FloorPlanEditor({
     return () => ro.disconnect();
   }, [draw]);
 
-  const getCanvasPos = (e: React.MouseEvent) => {
+  const getCanvasPos = (e: React.MouseEvent | MouseEvent) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     return {
@@ -247,58 +397,98 @@ export function FloorPlanEditor({
   };
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    const { px, py } = getCanvasPos(e);
-    const world = toWorld(px, py);
-
     if (e.button === 1 || e.altKey || e.button === 2) {
       dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
       return;
     }
+    const { px, py } = getCanvasPos(e);
+    const world = toWorld(px, py);
+    const snapped = getSnapPoint(world.x, world.y);
 
-    if (tool === 'select' || tool === 'delete') {
-      let hit: Room | null = null;
-      for (let i = floor.rooms.length - 1; i >= 0; i--) {
-        const room = floor.rooms[i];
-        if (
-          world.x >= room.x && world.x <= room.x + room.width &&
-          world.y >= room.y && world.y <= room.y + room.depth
-        ) {
-          hit = room;
-          break;
-        }
-      }
-      if (hit) {
-        if (tool === 'delete') {
-          onDeleteRoom(hit.id);
-        } else {
-          onSelectRoom(hit.id);
-          dragState.current = {
-            type: 'move',
-            startX: e.clientX,
-            startY: e.clientY,
-            roomId: hit.id,
-            origX: hit.x,
-            origY: hit.y,
-          };
-        }
-      } else {
-        onSelectRoom(null);
-      }
+    if (tool === 'wall') {
+      setDrawingWall({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y });
+      dragState.current = { type: 'draw-wall', startX: e.clientX, startY: e.clientY };
       return;
     }
 
     if (tool === 'room') {
-      const snappedX = snapTo(world.x);
-      const snappedY = snapTo(world.y);
-      dragState.current = { type: 'draw', startX: e.clientX, startY: e.clientY };
-      setDrawRect({ startX: snappedX, startY: snappedY, endX: snappedX + 4, endY: snappedY + 3 });
+      dragState.current = { type: 'draw-room', startX: e.clientX, startY: e.clientY };
+      setDrawRect({ startX: snapped.x, startY: snapped.y, endX: snapped.x + 4, endY: snapped.y + 3 });
+      return;
     }
-  }, [tool, floor.rooms, toWorld, onSelectRoom, onDeleteRoom]);
+
+    if (tool === 'select' || tool === 'delete') {
+      if (floor.backgroundImage && tool === 'select') {
+        const bg = floor.backgroundImage;
+        const bgImg2 = bgImageCache.get(bg.dataUrl);
+        if (bgImg2) {
+          const imgW = bgImg2.width * bg.scale;
+          const imgH = bgImg2.height * bg.scale;
+          if (
+            world.x >= bg.x && world.x <= bg.x + imgW &&
+            world.y >= bg.y && world.y <= bg.y + imgH &&
+            e.ctrlKey
+          ) {
+            setBgDragging(true);
+            dragState.current = {
+              type: 'move-bg',
+              startX: e.clientX,
+              startY: e.clientY,
+              bgOrigX: bg.x,
+              bgOrigY: bg.y,
+            };
+            return;
+          }
+        }
+      }
+
+      for (const wall of [...floor.walls].reverse()) {
+        const d = pointToSegmentDist(world.x, world.y, wall.x1, wall.y1, wall.x2, wall.y2);
+        if (d < wall.thickness * 0.8 + 0.15) {
+          if (tool === 'delete') { onDeleteWall(wall.id); return; }
+          onSelectWall(wall.id);
+          onSelectRoom(null);
+
+          const distStart = dist(world.x, world.y, wall.x1, wall.y1);
+          const distEnd = dist(world.x, world.y, wall.x2, wall.y2);
+          if (distStart < 0.5) {
+            dragState.current = { type: 'move-wall-point', startX: e.clientX, startY: e.clientY, wallId: wall.id, point: 'start' };
+          } else if (distEnd < 0.5) {
+            dragState.current = { type: 'move-wall-point', startX: e.clientX, startY: e.clientY, wallId: wall.id, point: 'end' };
+          } else {
+            dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
+          }
+          return;
+        }
+      }
+
+      for (const room of [...floor.rooms].reverse()) {
+        if (world.x >= room.x && world.x <= room.x + room.width && world.y >= room.y && world.y <= room.y + room.depth) {
+          if (tool === 'delete') { onDeleteRoom(room.id); return; }
+          onSelectRoom(room.id);
+          onSelectWall(null);
+          dragState.current = { type: 'move-room', startX: e.clientX, startY: e.clientY, roomId: room.id, origX: room.x, origY: room.y };
+          return;
+        }
+      }
+
+      onSelectWall(null);
+      onSelectRoom(null);
+    }
+  }, [tool, floor.walls, floor.rooms, floor.backgroundImage, toWorld, getSnapPoint, onSelectWall, onSelectRoom, onDeleteWall, onDeleteRoom]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragState.current) return;
     const { px, py } = getCanvasPos(e);
     const world = toWorld(px, py);
+    const snapped = getSnapPoint(world.x, world.y);
+
+    if (tool === 'wall' || tool === 'room') {
+      setSnapPoint(snapped);
+    } else {
+      setSnapPoint(null);
+    }
+
+    if (!dragState.current) return;
 
     if (dragState.current.type === 'pan') {
       const dx = e.clientX - dragState.current.startX;
@@ -306,56 +496,163 @@ export function FloorPlanEditor({
       dragState.current.startX = e.clientX;
       dragState.current.startY = e.clientY;
       setOffset(o => ({ x: o.x + dx, y: o.y + dy }));
-    } else if (dragState.current.type === 'draw' && drawRect) {
-      setDrawRect(r => r ? { ...r, endX: snapTo(world.x), endY: snapTo(world.y) } : r);
-    } else if (dragState.current.type === 'move' && dragState.current.roomId !== undefined) {
+    } else if (dragState.current.type === 'draw-wall' && drawingWall) {
+      setDrawingWall(w => w ? { ...w, x2: snapped.x, y2: snapped.y } : w);
+    } else if (dragState.current.type === 'draw-room' && drawRect) {
+      setDrawRect(r => r ? { ...r, endX: snapped.x, endY: snapped.y } : r);
+    } else if (dragState.current.type === 'move-room' && dragState.current.roomId) {
       const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      const newX = snapTo((dragState.current.origX ?? 0) + dx);
-      const newY = snapTo((dragState.current.origY ?? 0) + dy);
-      onMoveRoom(dragState.current.roomId, newX, newY);
+      onMoveRoom(dragState.current.roomId, snapTo((dragState.current.origX ?? 0) + dx), snapTo((dragState.current.origY ?? 0) + dy));
+    } else if (dragState.current.type === 'move-wall-point' && dragState.current.wallId) {
+      onMoveWallPoint(dragState.current.wallId, dragState.current.point!, snapped.x, snapped.y);
+    } else if (dragState.current.type === 'move-bg') {
+      if (!floor.backgroundImage) return;
+      const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
+      const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
+      const newX = (dragState.current.bgOrigX ?? 0) + dx;
+      const newY = (dragState.current.bgOrigY ?? 0) + dy;
+      onSetBackground({ ...floor.backgroundImage, x: newX, y: newY });
     }
-  }, [drawRect, toWorld, zoom, onMoveRoom]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onSetBackground, floor.backgroundImage, tool]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
-    if (dragState.current?.type === 'draw' && drawRect) {
+    const { px, py } = getCanvasPos(e);
+    const world = toWorld(px, py);
+    const snapped = getSnapPoint(world.x, world.y);
+
+    if (dragState.current?.type === 'draw-wall' && drawingWall) {
+      const wlen = dist(drawingWall.x1, drawingWall.y1, snapped.x, snapped.y);
+      if (wlen > 0.1) {
+        onAddWall(drawingWall.x1, drawingWall.y1, snapped.x, snapped.y, wallThickness);
+      }
+      setDrawingWall(null);
+    } else if (dragState.current?.type === 'draw-room' && drawRect) {
       const x1 = snapTo(Math.min(drawRect.startX, drawRect.endX));
       const y1 = snapTo(Math.min(drawRect.startY, drawRect.endY));
       const x2 = snapTo(Math.max(drawRect.startX, drawRect.endX));
       const y2 = snapTo(Math.max(drawRect.startY, drawRect.endY));
-      const rw = x2 - x1;
-      const rd = y2 - y1;
-      if (rw >= 1 && rd >= 1) {
-        onAddRoom(x1, y1, rw, rd);
-      }
+      if (x2 - x1 >= 1 && y2 - y1 >= 1) onAddRoom(x1, y1, x2 - x1, y2 - y1);
       setDrawRect(null);
+    } else if (dragState.current?.type === 'move-bg') {
+      setBgDragging(false);
     }
     dragState.current = null;
-    void e;
-  }, [drawRect, onAddRoom]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, onAddWall, onAddRoom, wallThickness]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const { px, py } = getCanvasPos(e);
     const factor = e.deltaY < 0 ? 1.15 : 0.87;
     setZoom(z => {
-      const newZoom = Math.max(0.2, Math.min(5, z * factor));
+      const nz = Math.max(0.15, Math.min(8, z * factor));
       setOffset(o => ({
-        x: px - (px - o.x) * (newZoom / z),
-        y: py - (py - o.y) * (newZoom / z),
+        x: px - (px - o.x) * (nz / z),
+        y: py - (py - o.y) * (nz / z),
       }));
-      return newZoom;
+      return nz;
     });
   }, []);
 
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        bgImageCache.set(dataUrl, img);
+        setBgImg(img);
+        const scale = Math.min(20 / img.width, 20 / img.height, 0.1);
+        onSetBackground({ dataUrl, x: 0, y: 0, scale, opacity: 0.5, rotation: 0 });
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [onSetBackground]);
+
   const getCursor = () => {
+    if (tool === 'wall') return 'crosshair';
     if (tool === 'room') return 'crosshair';
     if (tool === 'delete') return 'not-allowed';
     return 'default';
   };
 
+  const bg = floor.backgroundImage;
+
   return (
     <div className="relative w-full h-full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white border border-slate-600 rounded text-xs font-medium shadow-lg"
+          title="Grundriss-Bild hochladen"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          Bild laden
+        </button>
+        {bg && (
+          <>
+            <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
+              <span className="text-slate-500">Deckkraft</span>
+              <input
+                type="range" min="0.05" max="1" step="0.05"
+                value={bg.opacity}
+                onChange={e => onSetBackground({ ...bg, opacity: parseFloat(e.target.value) })}
+                className="w-20 h-1 accent-blue-500"
+              />
+              <span className="text-slate-400 w-7">{Math.round(bg.opacity * 100)}%</span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
+              <span className="text-slate-500">Skalierung</span>
+              <input
+                type="range" min="0.005" max="0.5" step="0.001"
+                value={bg.scale}
+                onChange={e => onSetBackground({ ...bg, scale: parseFloat(e.target.value) })}
+                className="w-20 h-1 accent-blue-500"
+              />
+              <span className="text-slate-400 w-10">{bg.scale.toFixed(3)}</span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
+              <span className="text-slate-500">Rotation</span>
+              <input
+                type="range" min="-180" max="180" step="1"
+                value={bg.rotation}
+                onChange={e => onSetBackground({ ...bg, rotation: parseInt(e.target.value) })}
+                className="w-16 h-1 accent-blue-500"
+              />
+              <span className="text-slate-400 w-8">{bg.rotation}°</span>
+            </div>
+            <button
+              onClick={() => onSetBackground(null)}
+              className="px-2 py-1 bg-red-900/40 hover:bg-red-900/70 text-red-400 border border-red-800 rounded text-xs"
+              title="Hintergrundbild entfernen"
+            >
+              ✕
+            </button>
+          </>
+        )}
+        {bg && (
+          <span className="text-[10px] text-amber-500/70 bg-slate-800 border border-slate-600 rounded px-1.5 py-1">
+            Strg+Ziehen: Bild verschieben
+          </span>
+        )}
+      </div>
+
       <canvas
         ref={canvasRef}
         className="w-full h-full"
@@ -363,19 +660,33 @@ export function FloorPlanEditor({
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={() => { if (dragState.current?.type === 'draw') { setDrawRect(null); } dragState.current = null; }}
+        onMouseLeave={() => {
+          setSnapPoint(null);
+          if (dragState.current?.type === 'draw-wall') setDrawingWall(null);
+          if (dragState.current?.type === 'draw-room') setDrawRect(null);
+          dragState.current = null;
+          setBgDragging(false);
+        }}
         onWheel={onWheel}
-        onContextMenu={e => e.preventDefault()}
+        onContextMenu={e => { e.preventDefault(); if (drawingWall) setDrawingWall(null); }}
       />
+
       <div className="absolute bottom-3 right-3 flex flex-col gap-1">
-        <button onClick={() => setZoom(z => Math.min(5, z * 1.2))} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center text-sm font-bold border border-slate-600">+</button>
-        <button onClick={() => setZoom(z => Math.max(0.2, z * 0.8))} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center text-sm font-bold border border-slate-600">−</button>
-        <button onClick={() => { setZoom(1); setOffset({ x: 40, y: 40 }); }} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center border border-slate-600" title="Zurücksetzen">
+        <button onClick={() => setZoom(z => Math.min(8, z * 1.2))} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center text-sm font-bold border border-slate-600">+</button>
+        <button onClick={() => setZoom(z => Math.max(0.15, z * 0.8))} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center text-sm font-bold border border-slate-600">−</button>
+        <button onClick={() => { setZoom(1); setOffset({ x: 80, y: 80 }); }} className="w-7 h-7 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded flex items-center justify-center border border-slate-600" title="Zurücksetzen">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
         </button>
       </div>
-      <div className="absolute bottom-3 left-3 text-slate-500 text-[10px]">
-        {tool === 'room' ? 'Klicken + Ziehen: Raum zeichnen' : tool === 'delete' ? 'Raum anklicken zum Löschen' : 'Klicken: auswählen · Ziehen: verschieben · Alt+Ziehen: verschieben'}
+
+      <div className="absolute bottom-3 left-3 text-slate-500 text-[10px] bg-slate-900/70 px-2 py-1 rounded">
+        {tool === 'wall'
+          ? 'Klicken + Ziehen: Wand zeichnen · Rechtsklick: abbrechen · Gelb = Fangpunkt'
+          : tool === 'room'
+          ? 'Klicken + Ziehen: Raum zeichnen'
+          : tool === 'delete'
+          ? 'Element anklicken zum Löschen'
+          : 'Klicken: auswählen · Alt+Ziehen: verschieben · Strg+Ziehen auf Bild: Bild verschieben'}
       </div>
     </div>
   );

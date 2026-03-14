@@ -12,6 +12,23 @@ export type RoomType =
 
 export type WallSide = 'north' | 'east' | 'south' | 'west';
 
+export interface WallPoint {
+  x: number;
+  y: number;
+}
+
+export interface Wall {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  thickness: number;
+  height: number;
+  color: string;
+  materialType: 'concrete' | 'brick' | 'wood' | 'glass' | 'drywall';
+}
+
 export interface Door {
   id: string;
   wall: WallSide;
@@ -19,7 +36,7 @@ export interface Door {
   width: number;
 }
 
-export interface Window {
+export interface Window2D {
   id: string;
   wall: WallSide;
   position: number;
@@ -38,7 +55,16 @@ export interface Room {
   depth: number;
   color: string;
   doors: Door[];
-  windows: Window[];
+  windows: Window2D[];
+}
+
+export interface BackgroundImage {
+  dataUrl: string;
+  x: number;
+  y: number;
+  scale: number;
+  opacity: number;
+  rotation: number;
 }
 
 export interface Floor {
@@ -47,6 +73,8 @@ export interface Floor {
   level: number;
   height: number;
   rooms: Room[];
+  walls: Wall[];
+  backgroundImage: BackgroundImage | null;
 }
 
 export interface Building {
@@ -57,12 +85,13 @@ export interface Building {
   updatedAt: number;
 }
 
-export type BuildingTool = 'select' | 'room' | 'door' | 'window' | 'delete';
+export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;
   selectedFloorId: string | null;
   selectedRoomId: string | null;
+  selectedWallId: string | null;
   tool: BuildingTool;
   viewMode: '3d' | 'floor';
   camera: {
