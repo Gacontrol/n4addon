@@ -730,14 +730,16 @@ const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
           configKey: 'booleanAlarmConfig',
           labelPrefix: 'Boolean',
           hasEnabled: true,
-          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string; alarmValue: boolean }
+          nodeType: 'dp-boolean' as const,
+          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string; alarmValue?: boolean }
         };
       case 'dp-numeric':
         return {
           configKey: 'numericAlarmConfig',
           labelPrefix: 'Numerisch',
           hasEnabled: true,
-          config: (cfg.numericAlarmConfig || { enabled: false }) as { enabled: boolean; alarmClassId?: string }
+          nodeType: 'dp-numeric' as const,
+          config: (cfg.numericAlarmConfig || { enabled: false }) as { enabled: boolean; alarmClassId?: string; highHighLimit?: number; highLimit?: number; lowLimit?: number; lowLowLimit?: number; deadband?: number }
         };
       case 'dp-enum':
         return {
@@ -903,48 +905,93 @@ const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
             </div>
           </div>
 
-          {activeAlarms.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-slate-400">Aktive Alarme dieses Bausteins:</p>
-              {activeAlarms.map(alarm => {
-                const alarmClass = alarmClasses.find(ac => ac.id === alarm.alarmClassId);
-                return (
-                  <div
-                    key={alarm.id}
-                    className="flex items-center justify-between p-2 bg-slate-900 rounded-lg border-l-2"
-                    style={{ borderLeftColor: alarmClass?.color || '#ef4444' }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {alarm.state === 'active' ? (
-                        <Bell className="w-4 h-4 text-red-400 animate-pulse" />
-                      ) : (
-                        <Check className="w-4 h-4 text-amber-400" />
-                      )}
-                      <span className="text-sm text-white">{alarm.alarmText || alarm.message}</span>
-                      <span className="text-xs text-slate-500">
-                        {new Date(alarm.triggeredAt).toLocaleString('de-DE')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {alarm.state === 'active' && (
-                        <button
-                          onClick={() => onAcknowledgeAlarm(alarm.id)}
-                          className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded transition-colors"
-                        >
-                          Quittieren
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onClearAlarm(alarm.id)}
-                        className="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded transition-colors"
-                      >
-                        Loeschen
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+          {source.node.type === 'dp-boolean' && (
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Alarmwert</label>
+              <select
+                value={(alarmCfg.config as { alarmValue?: boolean }).alarmValue === false ? 'false' : 'true'}
+                onChange={(e) => {
+                  const newCfg = { ...alarmCfg.config, alarmValue: e.target.value === 'true' };
+                  onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                }}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-green-500 focus:outline-none"
+              >
+                <option value="true">TRUE = Alarm</option>
+                <option value="false">FALSE = Alarm</option>
+              </select>
             </div>
+          )}
+
+          {source.node.type === 'dp-numeric' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">HH-Grenze (Kritisch hoch)</label>
+                  <input
+                    type="number"
+                    value={(alarmCfg.config as { highHighLimit?: number }).highHighLimit ?? ''}
+                    onChange={(e) => {
+                      const newCfg = { ...alarmCfg.config, highHighLimit: e.target.value ? Number(e.target.value) : undefined };
+                      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                    }}
+                    placeholder="--"
+                    className="w-full px-3 py-2 bg-slate-700 border border-red-600/50 rounded-lg text-sm text-white focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">H-Grenze (Warnung hoch)</label>
+                  <input
+                    type="number"
+                    value={(alarmCfg.config as { highLimit?: number }).highLimit ?? ''}
+                    onChange={(e) => {
+                      const newCfg = { ...alarmCfg.config, highLimit: e.target.value ? Number(e.target.value) : undefined };
+                      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                    }}
+                    placeholder="--"
+                    className="w-full px-3 py-2 bg-slate-700 border border-orange-600/50 rounded-lg text-sm text-white focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">L-Grenze (Warnung niedrig)</label>
+                  <input
+                    type="number"
+                    value={(alarmCfg.config as { lowLimit?: number }).lowLimit ?? ''}
+                    onChange={(e) => {
+                      const newCfg = { ...alarmCfg.config, lowLimit: e.target.value ? Number(e.target.value) : undefined };
+                      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                    }}
+                    placeholder="--"
+                    className="w-full px-3 py-2 bg-slate-700 border border-blue-600/50 rounded-lg text-sm text-white focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">LL-Grenze (Kritisch niedrig)</label>
+                  <input
+                    type="number"
+                    value={(alarmCfg.config as { lowLowLimit?: number }).lowLowLimit ?? ''}
+                    onChange={(e) => {
+                      const newCfg = { ...alarmCfg.config, lowLowLimit: e.target.value ? Number(e.target.value) : undefined };
+                      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                    }}
+                    placeholder="--"
+                    className="w-full px-3 py-2 bg-slate-700 border border-cyan-600/50 rounded-lg text-sm text-white focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Hysterese (Deadband)</label>
+                <input
+                  type="number"
+                  value={(alarmCfg.config as { deadband?: number }).deadband ?? ''}
+                  onChange={(e) => {
+                    const newCfg = { ...alarmCfg.config, deadband: e.target.value ? Number(e.target.value) : undefined };
+                    onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+                  }}
+                  placeholder="0"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-green-500 focus:outline-none"
+                />
+              </div>
+            </>
           )}
         </div>
       )}
