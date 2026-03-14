@@ -58,6 +58,37 @@ export interface Room {
   windows: Window2D[];
 }
 
+export interface ObjFace {
+  vertices: number[];
+  normals: number[];
+  uvs: number[];
+}
+
+export interface ObjMaterial {
+  name: string;
+  color: string;
+  opacity: number;
+}
+
+export interface ObjModel {
+  id: string;
+  name: string;
+  fileName: string;
+  vertices: [number, number, number][];
+  normals: [number, number, number][];
+  uvs: [number, number][];
+  faces: { vertexIndices: number[]; normalIndices: number[]; uvIndices: number[]; materialName?: string }[];
+  materials: ObjMaterial[];
+  x: number;
+  y: number;
+  z: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  scale: number;
+  visible: boolean;
+}
+
 export interface BackgroundImage {
   dataUrl: string;
   x: number;
@@ -81,6 +112,7 @@ export interface Building {
   id: string;
   name: string;
   floors: Floor[];
+  objModels: ObjModel[];
   createdAt: number;
   updatedAt: number;
 }

@@ -1,13 +1,16 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Building, Floor, Wall } from '../../types/building';
+import { Building, Floor, Wall, ObjModel } from '../../types/building';
 
 interface Props {
   buildings: Building[];
   activeFloorId: string | null;
   selectedRoomId: string | null;
   selectedWallId: string | null;
+  selectedObjModelId?: string | null;
+  objModels?: ObjModel[];
   onSelectRoom: (roomId: string | null) => void;
   onSelectWall: (wallId: string | null) => void;
+  onSelectObjModel?: (modelId: string | null) => void;
   highlightFloor: boolean;
 }
 
@@ -115,13 +118,14 @@ function renderFaces(ctx: CanvasRenderingContext2D, faces: Face[]) {
 
 interface DrawnElement {
   id: string;
-  type: 'room' | 'wall';
+  type: 'room' | 'wall' | 'obj';
   minX: number; minY: number; maxX: number; maxY: number;
 }
 
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
-  onSelectRoom, onSelectWall, highlightFloor,
+  selectedObjModelId, objModels = [],
+  onSelectRoom, onSelectWall, onSelectObjModel, highlightFloor,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cam, setCam] = useState<Camera>({ rotX: 0.48, rotY: 0.55, zoom: 1.0, panX: 0, panY: 30 });
@@ -285,6 +289,11 @@ export function BuildingCanvas3D({
       buildingOffsetX += maxW + 5;
     }
 
+    for (const model of objModels) {
+      if (!model.visible) continue;
+      renderObjModel3D(model, model.id === selectedObjModelId, allFaces, p, drawn);
+    }
+
     ctx.globalAlpha = 1;
     renderFaces(ctx, allFaces);
 
@@ -335,7 +344,7 @@ export function BuildingCanvas3D({
 
     ctx.textAlign = 'left';
     drawnRef.current = drawn;
-  }, [buildings, activeFloorId, selectedRoomId, selectedWallId, cam, highlightFloor]);
+  }, [buildings, activeFloorId, selectedRoomId, selectedWallId, selectedObjModelId, objModels, cam, highlightFloor]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -388,12 +397,13 @@ export function BuildingCanvas3D({
         const d = drawnRef.current[i];
         if (mx >= d.minX && mx <= d.maxX && my >= d.minY && my <= d.maxY) { hit = d; break; }
       }
-      if (hit?.type === 'room') { onSelectRoom(hit.id); onSelectWall(null); }
-      else if (hit?.type === 'wall') { onSelectWall(hit.id); onSelectRoom(null); }
-      else { onSelectRoom(null); onSelectWall(null); }
+      if (hit?.type === 'room') { onSelectRoom(hit.id); onSelectWall(null); onSelectObjModel?.(null); }
+      else if (hit?.type === 'wall') { onSelectWall(hit.id); onSelectRoom(null); onSelectObjModel?.(null); }
+      else if (hit?.type === 'obj') { onSelectObjModel?.(hit.id); onSelectRoom(null); onSelectWall(null); }
+      else { onSelectRoom(null); onSelectWall(null); onSelectObjModel?.(null); }
     }
     dragRef.current = null;
-  }, [onSelectRoom, onSelectWall]);
+  }, [onSelectRoom, onSelectWall, onSelectObjModel]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -533,4 +543,107 @@ function renderWall3D(
     maxX: Math.max(...allPts.map(([x]) => x)),
     maxY: Math.max(...allPts.map(([, y]) => y)),
   });
+}
+
+function transformVertex(
+  v: [number, number, number],
+  model: ObjModel
+): [number, number, number] {
+  let [x, y, z] = v;
+
+  x *= model.scale;
+  y *= model.scale;
+  z *= model.scale;
+
+  const cosX = Math.cos(model.rotX);
+  const sinX = Math.sin(model.rotX);
+  const cosY = Math.cos(model.rotY);
+  const sinY = Math.sin(model.rotY);
+  const cosZ = Math.cos(model.rotZ);
+  const sinZ = Math.sin(model.rotZ);
+
+  let tx = x, ty = y, tz = z;
+
+  ty = y * cosX - z * sinX;
+  tz = y * sinX + z * cosX;
+  y = ty; z = tz;
+
+  tx = x * cosY + z * sinY;
+  tz = -x * sinY + z * cosY;
+  x = tx; z = tz;
+
+  tx = x * cosZ - y * sinZ;
+  ty = x * sinZ + y * cosZ;
+  x = tx; y = ty;
+
+  return [x + model.x, y + model.z, z + model.y];
+}
+
+function renderObjModel3D(
+  model: ObjModel,
+  isSel: boolean,
+  allFaces: Face[],
+  p: (x: number, y: number, z: number) => [number, number, number],
+  drawn: DrawnElement[]
+) {
+  if (model.vertices.length === 0 || model.faces.length === 0) return;
+
+  const materialMap = new Map(model.materials.map(m => [m.name, m]));
+
+  let minPx = Infinity, maxPx = -Infinity;
+  let minPy = Infinity, maxPy = -Infinity;
+
+  for (const face of model.faces) {
+    const { vertexIndices, normalIndices, materialName } = face;
+    if (vertexIndices.length < 3) continue;
+
+    const mat = materialName ? (materialMap.get(materialName) ?? model.materials[0]) : model.materials[0];
+    const color = mat?.color ?? '#cccccc';
+    const baseColor = isSel ? '#60a5fa' : color;
+
+    const tv0 = transformVertex(model.vertices[vertexIndices[0]], model);
+    const tv1 = transformVertex(model.vertices[vertexIndices[1]], model);
+    const tv2 = transformVertex(model.vertices[vertexIndices[2]], model);
+
+    let lightFactor = 0.7;
+    if (normalIndices[0] >= 0 && normalIndices[0] < model.normals.length) {
+      const [nx, ny, nz] = model.normals[normalIndices[0]];
+      lightFactor = faceLight(nx, ny, nz);
+    } else {
+      const ax = tv1[0] - tv0[0], ay = tv1[1] - tv0[1], az = tv1[2] - tv0[2];
+      const bx = tv2[0] - tv0[0], by = tv2[1] - tv0[1], bz = tv2[2] - tv0[2];
+      const nx = ay * bz - az * by;
+      const ny = az * bx - ax * bz;
+      const nz = ax * by - ay * bx;
+      const nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (nl > 0.001) lightFactor = faceLight(nx / nl, ny / nl, nz / nl);
+    }
+
+    const p0 = p(tv0[0], tv0[1], tv0[2]);
+    const p1 = p(tv1[0], tv1[1], tv1[2]);
+    const p2 = p(tv2[0], tv2[1], tv2[2]);
+
+    const avgDepth = (p0[2] + p1[2] + p2[2]) / 3;
+    const fill = applyLight(baseColor, lightFactor, false);
+    const stroke = isSel ? 'rgba(96,165,250,0.6)' : 'rgba(0,0,0,0.2)';
+
+    const pts2D: [number, number][] = [
+      [p0[0], p0[1]],
+      [p1[0], p1[1]],
+      [p2[0], p2[1]],
+    ];
+
+    allFaces.push({ pts: pts2D, fill, stroke, lineWidth: isSel ? 0.8 : 0.3, avgDepth });
+
+    for (const [px, py] of pts2D) {
+      if (px < minPx) minPx = px;
+      if (px > maxPx) maxPx = px;
+      if (py < minPy) minPy = py;
+      if (py > maxPy) maxPy = py;
+    }
+  }
+
+  if (minPx < Infinity) {
+    drawn.push({ id: model.id, type: 'obj', minX: minPx, minY: minPy, maxX: maxPx, maxY: maxPy });
+  }
 }

@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
-  Layers, Box, MousePointer, Square, Settings2, X, Minus
+  Layers, Box, MousePointer, Square, Settings2, X, Minus, Upload, Eye, EyeOff, Package
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
-import { Room, RoomType, Wall, BackgroundImage } from '../../types/building';
+import { Room, RoomType, Wall, BackgroundImage, ObjModel } from '../../types/building';
+import { parseObjFile, getModelBounds } from '../../utils/objParser';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer',
@@ -66,8 +67,16 @@ export function BuildingView() {
     addRoom,
     updateRoom,
     deleteRoom,
+    selectedObjModelId,
+    setSelectedObjModelId,
+    addObjModel,
+    updateObjModel,
+    deleteObjModel,
     ROOM_COLORS,
   } = useBuildingEditor();
+
+  const objUploadRef = useRef<HTMLInputElement>(null);
+  const [objUploading, setObjUploading] = useState(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
@@ -125,6 +134,29 @@ export function BuildingView() {
   const handleSetBackground = (bg: BackgroundImage | null) => {
     if (!activeBuilding || !activeFloor) return;
     setFloorBackground(activeBuilding.id, activeFloor.id, bg);
+  };
+
+  const selectedObjModel = activeBuilding?.objModels?.find(m => m.id === selectedObjModelId) ?? null;
+
+  const handleObjUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeBuilding) return;
+    setObjUploading(true);
+    try {
+      const objText = await file.text();
+      const model = await parseObjFile(objText, null, file.name);
+      const bounds = getModelBounds(model);
+      const autoScale = bounds.sizeX > 0
+        ? Math.min(10 / Math.max(bounds.sizeX, bounds.sizeY, bounds.sizeZ), 1)
+        : 1;
+      model.scale = autoScale;
+      model.x = -bounds.centerX * autoScale;
+      model.z = -bounds.centerZ * autoScale;
+      addObjModel(activeBuilding.id, model);
+    } finally {
+      setObjUploading(false);
+      if (objUploadRef.current) objUploadRef.current.value = '';
+    }
   };
 
   return (
@@ -306,6 +338,27 @@ export function BuildingView() {
               </select>
             )}
 
+            {viewMode === '3d' && (
+              <>
+                <input
+                  ref={objUploadRef}
+                  type="file"
+                  accept=".obj"
+                  className="hidden"
+                  onChange={handleObjUpload}
+                />
+                <button
+                  onClick={() => objUploadRef.current?.click()}
+                  disabled={objUploading}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border transition-colors bg-slate-700 text-slate-300 hover:text-white border-slate-600 hover:bg-slate-600 disabled:opacity-50"
+                  title="OBJ-Datei hochladen"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {objUploading ? 'Laden...' : 'OBJ laden'}
+                </button>
+              </>
+            )}
+
             <button
               onClick={() => setShowRoomPanel(p => !p)}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showRoomPanel ? 'bg-slate-600 text-white border-slate-500' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
@@ -324,8 +377,11 @@ export function BuildingView() {
                 activeFloorId={activeFloorId}
                 selectedRoomId={selectedRoomId}
                 selectedWallId={selectedWallId}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
+                selectedObjModelId={selectedObjModelId}
+                objModels={activeBuilding?.objModels ?? []}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedObjModelId(null); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedObjModelId(null); }}
+                onSelectObjModel={id => { setSelectedObjModelId(id); setSelectedRoomId(null); setSelectedWallId(null); }}
                 highlightFloor={true}
               />
             ) : activeFloor ? (
@@ -356,7 +412,7 @@ export function BuildingView() {
             <div className="w-60 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
                 <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  {selectedWall ? 'Wand' : selectedRoom ? 'Raum' : 'Eigenschaften'}
+                  {selectedObjModel ? 'OBJ Modell' : selectedWall ? 'Wand' : selectedRoom ? 'Raum' : 'Eigenschaften'}
                 </span>
                 <button onClick={() => setShowRoomPanel(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
                   <X className="w-3.5 h-3.5" />
@@ -364,7 +420,73 @@ export function BuildingView() {
               </div>
 
               <div className="overflow-y-auto flex-1 p-3 space-y-3">
-                {selectedWall ? (
+                {selectedObjModel ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Name</label>
+                      <div className="flex items-center gap-2">
+                        <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="text-xs text-slate-300 truncate">{selectedObjModel.name}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">{selectedObjModel.faces.length} Flächen · {selectedObjModel.vertices.length} Punkte</div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Sichtbar</label>
+                      <button
+                        onClick={() => activeBuilding && updateObjModel(activeBuilding.id, selectedObjModel.id, { visible: !selectedObjModel.visible })}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded text-xs border transition-colors w-full ${selectedObjModel.visible ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-slate-800 border-slate-700 text-slate-500'}`}
+                      >
+                        {selectedObjModel.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        {selectedObjModel.visible ? 'Sichtbar' : 'Ausgeblendet'}
+                      </button>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Skalierung</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range" min="0.01" max="10" step="0.01"
+                          value={selectedObjModel.scale}
+                          onChange={e => activeBuilding && updateObjModel(activeBuilding.id, selectedObjModel.id, { scale: parseFloat(e.target.value) })}
+                          className="flex-1 h-1 accent-blue-500"
+                        />
+                        <span className="text-xs text-slate-400 w-12 text-right">{selectedObjModel.scale.toFixed(2)}×</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['x', 'y', 'z'] as const).map(axis => (
+                        <div key={axis}>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Pos {axis.toUpperCase()}</label>
+                          <input
+                            type="number" step="0.5"
+                            className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                            value={selectedObjModel[axis]}
+                            onChange={e => activeBuilding && updateObjModel(activeBuilding.id, selectedObjModel.id, { [axis]: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['rotX', 'rotY', 'rotZ'] as const).map(axis => (
+                        <div key={axis}>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Rot {axis.replace('rot', '')}</label>
+                          <input
+                            type="number" step="0.1"
+                            className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                            value={selectedObjModel[axis].toFixed(2)}
+                            onChange={e => activeBuilding && updateObjModel(activeBuilding.id, selectedObjModel.id, { [axis]: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => activeBuilding && deleteObjModel(activeBuilding.id, selectedObjModel.id)}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Modell löschen
+                    </button>
+                  </>
+                ) : selectedWall ? (
                   <>
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Material</label>
@@ -499,6 +621,29 @@ export function BuildingView() {
                         ))}
                       </div>
                     </div>
+                    {activeBuilding && (activeBuilding.objModels?.length ?? 0) > 0 && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-[10px] text-slate-500 mb-2">OBJ Modelle ({activeBuilding.objModels.length})</div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {activeBuilding.objModels.map(m => (
+                            <div
+                              key={m.id}
+                              className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer ${m.id === selectedObjModelId ? 'bg-blue-900/50 border border-blue-700' : 'bg-slate-700 hover:bg-slate-600'}`}
+                              onClick={() => { setSelectedObjModelId(m.id); setSelectedRoomId(null); setSelectedWallId(null); }}
+                            >
+                              <Package className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="flex-1 text-xs text-slate-300 truncate">{m.name}</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); updateObjModel(activeBuilding.id, m.id, { visible: !m.visible }); }}
+                                className="text-slate-500 hover:text-slate-300"
+                              >
+                                {m.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-xs text-slate-500 text-center py-8">Stockwerk auswählen</div>

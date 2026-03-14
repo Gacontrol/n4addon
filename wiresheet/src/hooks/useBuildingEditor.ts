@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Building, Floor, Room, Wall, BackgroundImage, BuildingTool } from '../types/building';
+import { Building, Floor, Room, Wall, BackgroundImage, BuildingTool, ObjModel } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -37,6 +37,7 @@ function createDefaultBuilding(): Building {
         backgroundImage: null,
       },
     ],
+    objModels: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -61,6 +62,7 @@ export function useBuildingEditor() {
           if (data.buildings?.length > 0) {
             const migrated = data.buildings.map((b: Building) => ({
               ...b,
+              objModels: b.objModels ?? [],
               floors: b.floors.map((f: Floor) => ({
                 ...f,
                 walls: f.walls ?? [],
@@ -361,6 +363,45 @@ export function useBuildingEditor() {
     setSelectedRoomId(null);
   }, [buildings, updateBuildings]);
 
+  const [selectedObjModelId, setSelectedObjModelId] = useState<string | null>(null);
+
+  const addObjModel = useCallback((buildingId: string, model: ObjModel) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? { ...b, objModels: [...(b.objModels ?? []), model], updatedAt: Date.now() }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedObjModelId(model.id);
+  }, [buildings, updateBuildings]);
+
+  const updateObjModel = useCallback((buildingId: string, modelId: string, changes: Partial<ObjModel>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            objModels: (b.objModels ?? []).map(m => m.id === modelId ? { ...m, ...changes } : m),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const deleteObjModel = useCallback((buildingId: string, modelId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            objModels: (b.objModels ?? []).filter(m => m.id !== modelId),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedObjModelId(null);
+  }, [buildings, updateBuildings]);
+
   return {
     buildings,
     activeBuildingId,
@@ -391,6 +432,11 @@ export function useBuildingEditor() {
     addRoom,
     updateRoom,
     deleteRoom,
+    selectedObjModelId,
+    setSelectedObjModelId,
+    addObjModel,
+    updateObjModel,
+    deleteObjModel,
     ROOM_COLORS,
   };
 }
