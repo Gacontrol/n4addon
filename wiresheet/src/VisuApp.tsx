@@ -91,6 +91,7 @@ export function VisuApp() {
     let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
+    let retryDelay = 2000;
 
     function connect() {
       if (!active) return;
@@ -113,9 +114,16 @@ export function VisuApp() {
         } catch {}
       });
 
+      es.onopen = () => {
+        retryDelay = 2000;
+      };
+
       es.onerror = () => {
         es?.close();
-        if (active) reconnectTimer = setTimeout(connect, 2000);
+        if (active) {
+          reconnectTimer = setTimeout(connect, retryDelay);
+          retryDelay = Math.min(retryDelay * 1.5, 30000);
+        }
       };
     }
 

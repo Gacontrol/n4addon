@@ -2985,7 +2985,7 @@ async function getNodeConfigSnapshot() {
   } catch { return {}; }
 }
 
-app.get(['/sse', '/api/sse'], (req, res) => {
+function setupSSEClient(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -3003,29 +3003,19 @@ app.get(['/sse', '/api/sse'], (req, res) => {
     res.write(`event: modbus-device-status\ndata: ${JSON.stringify(Object.fromEntries(modbusDeviceOnlineStatus))}\n\n`);
   })();
 
-  req.on('close', () => sseClients.delete(res));
-});
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); }
+  }, 15000);
 
-visuApp.get(['/sse', '/api/sse'], (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+}
 
-  sseClients.add(res);
-  res.write(':ok\n\n');
+app.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
 
-  (async () => {
-    const liveValues = getLiveSnapshot();
-    const nodeConfigs = await getNodeConfigSnapshot();
-    res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
-    res.write(`event: driver-values\ndata: ${JSON.stringify({ modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) })}\n\n`);
-    res.write(`event: modbus-device-status\ndata: ${JSON.stringify(Object.fromEntries(modbusDeviceOnlineStatus))}\n\n`);
-  })();
-
-  req.on('close', () => sseClients.delete(res));
-});
+visuApp.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
 
 const net = require('net');
 
