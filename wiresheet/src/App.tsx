@@ -773,6 +773,36 @@ function App() {
     updateVisuPage(binding.pageId, { widgets: updatedWidgets });
   }, [visuPages, updateVisuPage]);
 
+  const handleUpdateVisuPage = useCallback((pageId: string, updates: Partial<typeof visuPages[0]>) => {
+    if (updates.widgets) {
+      const prevPage = visuPages.find(p => p.id === pageId);
+      if (prevPage) {
+        for (const widget of updates.widgets) {
+          const prev = prevPage.widgets.find(w => w.id === widget.id);
+          const newPortId = widget.binding?.portId;
+          const prevPortId = prev?.binding?.portId;
+          const nodeId = widget.binding?.nodeId;
+          if (newPortId && newPortId !== prevPortId && nodeId) {
+            const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
+            if (targetNode) {
+              const isInputPort = targetNode.data.inputs.some(inp => inp.id === newPortId);
+              if (isInputPort) {
+                const portDefaultValues = { ...(targetNode.data.config?.portDefaultValues as Record<string, string> | undefined || {}) };
+                delete portDefaultValues[newPortId];
+                updateNodeConfigOnPage(
+                  pages.find(p => p.nodes.some(n => n.id === nodeId))?.id || '',
+                  nodeId,
+                  { portDefaultValues }
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+    updateVisuPage(pageId, updates);
+  }, [visuPages, pages, updateVisuPage, updateNodeConfigOnPage]);
+
   const handlePingModbusDevice = useCallback(async (deviceId: string) => {
     const device = modbusDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -1632,7 +1662,7 @@ function App() {
           onAddVisuPage={addVisuPage}
           onDeleteVisuPage={deleteVisuPage}
           onRenameVisuPage={renameVisuPage}
-          onUpdateVisuPage={updateVisuPage}
+          onUpdateVisuPage={handleUpdateVisuPage}
           liveValues={liveValues}
           logicNodes={allLogicNodes}
           onWidgetValueChange={handleVisuWidgetValueChange}

@@ -608,6 +608,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                   portValues[input.id] = liveStore[storeKey]?.[driverKey];
                 }
               }
+              const visuPortKey = `${node.id}:${input.id}`;
+              const visuPortVal = liveValues[visuPortKey];
+              if (visuPortVal !== undefined && visuPortVal !== null) {
+                portValues[input.id] = visuPortVal;
+              }
             }
             return (
               <FlowNode
@@ -665,6 +670,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 if (driverKey && liveStore[storeKey]?.[driverKey] !== undefined) {
                   portValues[input.id] = liveStore[storeKey]?.[driverKey];
                 }
+              }
+              const visuPortKey = `${node.id}:${input.id}`;
+              const visuPortVal = liveValues[visuPortKey];
+              if (visuPortVal !== undefined && visuPortVal !== null) {
+                portValues[input.id] = visuPortVal;
               }
             }
 
