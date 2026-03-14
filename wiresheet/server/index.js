@@ -41,6 +41,7 @@ let driverConfig = {
 };
 const modbusLiveValues = new Map();
 const haLiveValues = new Map();
+const haLastWrittenValues = new Map();
 let driverPollingInterval = null;
 const DRIVER_POLL_INTERVAL = 2000;
 let isPollingRunning = false;
@@ -1908,23 +1909,32 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
           const entityId = node.data.entityId;
           const [domain] = entityId.split('.');
           const boolVal = toBool(val);
-          try {
-            if (domain === 'light') {
-              await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'switch') {
-              await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'input_boolean') {
-              await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-            } else if (domain === 'input_number') {
-              const numVal = parseFloat(val);
-              if (!isNaN(numVal)) {
-                await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
+          const writeKey = `node:${nodeId}:${entityId}`;
+          const lastWritten = haLastWrittenValues.get(writeKey);
+          const valueChanged = lastWritten === undefined || lastWritten !== boolVal;
+          if (valueChanged) {
+            try {
+              if (domain === 'light') {
+                await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              } else if (domain === 'switch') {
+                await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              } else if (domain === 'input_boolean') {
+                await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+              } else if (domain === 'input_number') {
+                const numVal = parseFloat(val);
+                if (!isNaN(numVal)) {
+                  await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
+                }
               }
+              haLastWrittenValues.set(writeKey, boolVal);
+              console.log(`HA Output ${entityId}: ${boolVal} (geaendert)`);
+              nodeValues[nodeId] = boolVal;
+            } catch (e) {
+              console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
+              nodeValues[nodeId] = null;
             }
+          } else {
             nodeValues[nodeId] = boolVal;
-          } catch (e) {
-            console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
-            nodeValues[nodeId] = null;
           }
         }
       }
@@ -2138,15 +2148,24 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         if (!driverConfig.haDriverEnabled) {
           return;
         }
+        const bindingWriteKey = `binding:${binding.id}:${binding.haEntityId}`;
+        const lastBindingWritten = haLastWrittenValues.get(bindingWriteKey);
         const domain = binding.haDomain || binding.haEntityId.split('.')[0];
+        const isBoolDomain = ['light', 'switch', 'input_boolean'].includes(domain) || (!['input_number', 'number', 'climate', 'cover'].includes(domain));
+        let normalizedValue = valueToWrite;
+        if (isBoolDomain) normalizedValue = toBool(valueToWrite);
+        const bindingValueChanged = lastBindingWritten === undefined || String(lastBindingWritten) !== String(normalizedValue);
+        if (!bindingValueChanged) {
+          return;
+        }
         let service = 'turn_on';
         let serviceData = {};
 
         if (domain === 'light') {
-          service = valueToWrite ? 'turn_on' : 'turn_off';
+          service = normalizedValue ? 'turn_on' : 'turn_off';
           serviceData = { entity_id: binding.haEntityId };
         } else if (domain === 'switch' || domain === 'input_boolean') {
-          service = valueToWrite ? 'turn_on' : 'turn_off';
+          service = normalizedValue ? 'turn_on' : 'turn_off';
           serviceData = { entity_id: binding.haEntityId };
         } else if (domain === 'input_number' || domain === 'number') {
           service = 'set_value';
@@ -2158,12 +2177,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
           service = 'set_cover_position';
           serviceData = { entity_id: binding.haEntityId, position: Number(valueToWrite) };
         } else {
-          service = valueToWrite ? 'turn_on' : 'turn_off';
+          service = normalizedValue ? 'turn_on' : 'turn_off';
           serviceData = { entity_id: binding.haEntityId };
         }
 
         await haPost(`/services/${domain}/${service}`, serviceData);
-        console.log(`Output Binding HA ${domain}.${service} ${binding.haEntityId}: ${valueToWrite}`);
+        haLastWrittenValues.set(bindingWriteKey, normalizedValue);
+        console.log(`Output Binding HA ${domain}.${service} ${binding.haEntityId}: ${normalizedValue} (geaendert)`);
       }
     } catch (err) {
       console.error(`Output Binding ${bindingKey} Write Fehler:`, err.message);
