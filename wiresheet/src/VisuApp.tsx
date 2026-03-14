@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget } from './types/visualization';
 import { FlowNode } from './types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
-import { Monitor, ChevronLeft, Home, Maximize2 } from 'lucide-react';
+import { Monitor, ChevronLeft, Home, Maximize2, Menu, X } from 'lucide-react';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -24,6 +24,8 @@ export function VisuApp() {
   const [activeAlarms, setActiveAlarms] = useState<ActiveAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const pageHistoryRef = useRef<string[]>([]);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const lastWriteRef = useRef<Map<string, number>>(new Map());
@@ -283,6 +285,17 @@ export function VisuApp() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowSize.width < 768;
+  const isTablet = windowSize.width >= 768 && windowSize.width < 1024;
+
   const activePage = visuPages.find(p => p.id === activePageId) || visuPages[0];
   const canGoBack = pageHistoryRef.current.length > 1;
 
@@ -312,54 +325,101 @@ export function VisuApp() {
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden">
       <div
-        className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800 bg-slate-900"
-        style={{ minHeight: 40, flexShrink: 0 }}
+        className={`flex items-center justify-between border-b border-slate-800 bg-slate-900 ${
+          isMobile ? 'px-2 py-1' : 'px-3 py-1.5'
+        }`}
+        style={{ minHeight: isMobile ? 36 : 40, flexShrink: 0 }}
       >
         <div className="flex items-center gap-1">
           <button
             onClick={handleNavigateHome}
-            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className={`rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ${
+              isMobile ? 'p-1' : 'p-1.5'
+            }`}
             title="Startseite"
           >
-            <Home className="w-3.5 h-3.5" />
+            <Home className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
           </button>
           {canGoBack && (
             <button
               onClick={handleNavigateBack}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className={`rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ${
+                isMobile ? 'p-1' : 'p-1.5'
+              }`}
               title="Zurueck"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {visuPages.map(page => (
+        {isMobile ? (
+          <>
             <button
-              key={page.id}
-              onClick={() => handleNavigateTo(page.id)}
-              className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
-                activePageId === page.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="flex items-center gap-2 px-2 py-1 rounded text-xs font-medium bg-slate-800 text-white"
             >
-              {page.name}
+              <span className="max-w-24 truncate">{activePage?.name || 'Seite'}</span>
+              {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
-          ))}
-        </div>
+            {isMobileMenuOpen && (
+              <div className="absolute top-full left-0 right-0 bg-slate-900 border-b border-slate-700 z-50 max-h-64 overflow-y-auto">
+                {visuPages.map(page => (
+                  <button
+                    key={page.id}
+                    onClick={() => {
+                      handleNavigateTo(page.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
+                      activePageId === page.id
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    {page.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center gap-1 overflow-x-auto flex-1 justify-center mx-2">
+            {visuPages.map(page => (
+              <button
+                key={page.id}
+                onClick={() => handleNavigateTo(page.id)}
+                className={`px-3 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+                  activePageId === page.id
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {page.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={toggleFullscreen}
-          className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          className={`rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors ${
+            isMobile ? 'p-1' : 'p-1.5'
+          }`}
           title={isFullscreen ? 'Vollbild beenden' : 'Vollbild'}
         >
-          <Maximize2 className="w-3.5 h-3.5" />
+          <Maximize2 className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      <div className="flex-1 overflow-hidden relative">
         <VisuCanvas
           page={activePage}
           liveValues={liveValues}

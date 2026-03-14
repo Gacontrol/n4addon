@@ -917,7 +917,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
-    if (isEditMode || !hasFixedSize) return;
+    if (isEditMode) return;
 
     const container = containerRef.current;
     if (!container) return;
@@ -931,20 +931,38 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const observer = new ResizeObserver(updateSize);
     observer.observe(container);
     return () => observer.disconnect();
-  }, [isEditMode, hasFixedSize]);
+  }, [isEditMode]);
+
+  const widgetsBounds = useMemo(() => {
+    if (page.widgets.length === 0) return { maxX: 800, maxY: 600 };
+    let maxX = 0;
+    let maxY = 0;
+    for (const widget of page.widgets) {
+      const right = widget.position.x + widget.size.width;
+      const bottom = widget.position.y + widget.size.height;
+      if (right > maxX) maxX = right;
+      if (bottom > maxY) maxY = bottom;
+    }
+    return { maxX: maxX + 20, maxY: maxY + 20 };
+  }, [page.widgets]);
 
   const responsiveScale = useMemo(() => {
-    if (isEditMode || !hasFixedSize || !containerSize) return 1;
-    const canvasW = page.canvasWidth!;
-    const canvasH = page.canvasHeight!;
+    if (isEditMode || !containerSize) return 1;
+
+    const canvasW = hasFixedSize ? page.canvasWidth! : widgetsBounds.maxX;
+    const canvasH = hasFixedSize ? page.canvasHeight! : widgetsBounds.maxY;
+
     const scaleX = containerSize.width / canvasW;
     const scaleY = containerSize.height / canvasH;
     return Math.min(scaleX, scaleY, 1);
-  }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight]);
+  }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight, widgetsBounds]);
 
-  const shouldScale = !isEditMode && hasFixedSize && responsiveScale < 1;
+  const shouldScale = !isEditMode && responsiveScale < 1;
 
-  if (!isEditMode && hasFixedSize) {
+  if (!isEditMode) {
+    const canvasW = hasFixedSize ? page.canvasWidth! : widgetsBounds.maxX;
+    const canvasH = hasFixedSize ? page.canvasHeight! : widgetsBounds.maxY;
+
     return (
       <div
         ref={containerRef}
@@ -955,8 +973,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           ref={canvasRef}
           className="relative"
           style={{
-            width: page.canvasWidth,
-            height: page.canvasHeight,
+            width: canvasW,
+            height: canvasH,
             transform: shouldScale ? `scale(${responsiveScale})` : undefined,
             transformOrigin: 'center center',
             backgroundColor: page.backgroundColor || '#0f172a',
