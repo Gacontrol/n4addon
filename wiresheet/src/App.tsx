@@ -9,6 +9,7 @@ import { BackupModal } from './components/BackupModal';
 import { DriversView } from './components/DriversView';
 import { DriverPanel } from './components/DriverPanel';
 import { AlarmManagementView } from './components/AlarmManagementView';
+import { TrendView } from './components/TrendView';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
@@ -20,7 +21,7 @@ import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarm
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup, Network, Bell
+  Monitor, Cpu, DatabaseBackup, Network, Bell, TrendingUp
 } from 'lucide-react';
 
 function App() {
@@ -130,7 +131,7 @@ function App() {
     return () => clearInterval(interval);
   }, [unshelveExpiredAlarms]);
 
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms'>('logic');
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -1229,6 +1230,17 @@ function App() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setMainView('trends')}
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'trends'
+                  ? 'bg-cyan-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Trends</span>
+            </button>
           </div>
 
           {mainView === 'logic' && (
@@ -1654,6 +1666,11 @@ function App() {
           onClearAlarm={clearAlarm}
           pages={pages}
           onUpdateNodeConfig={updateNodeConfigOnPage}
+        />
+      ) : mainView === 'trends' ? (
+        <TrendView
+          pages={pages}
+          liveValues={liveValues}
         />
       ) : (
         <VisualizationView

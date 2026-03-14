@@ -24,6 +24,15 @@ let visuPagesFile = path.join(dataDir, 'visu-pages.json');
 let dpValuesFile = path.join(dataDir, 'dp-values.json');
 let driverConfigFile = path.join(dataDir, 'driver-config.json');
 let alarmConfigFile = path.join(dataDir, 'alarm-config.json');
+let trendConfigFile = path.join(dataDir, 'trend-config.json');
+let trendDataDir = path.join(dataDir, 'trends');
+
+const trendConfig = { trackedNodes: [] };
+const trendBuffers = new Map();
+const TREND_FLUSH_INTERVAL = 30000;
+const TREND_MAX_BUFFER = 500;
+const TREND_MAX_POINTS_PER_FILE = 86400;
+let trendFlushTimer = null;
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -580,6 +589,172 @@ app.post(['/alarm/shelve', '/api/alarm/shelve'], async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Alarm shelve error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function loadTrendConfig() {
+  try {
+    const data = await fs.readFile(trendConfigFile, 'utf8');
+    const cfg = JSON.parse(data);
+    trendConfig.trackedNodes = cfg.trackedNodes || [];
+    console.log(`Trend-Konfiguration geladen: ${trendConfig.trackedNodes.length} getrackte Knoten`);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('Fehler beim Laden der Trend-Konfiguration:', err.message);
+    }
+  }
+}
+
+async function saveTrendConfig() {
+  try {
+    await fs.writeFile(trendConfigFile, JSON.stringify(trendConfig, null, 2));
+  } catch (err) {
+    console.error('Fehler beim Speichern der Trend-Konfiguration:', err.message);
+  }
+}
+
+function getTrendFilePath(nodeId, date) {
+  const d = date || new Date();
+  const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const safeId = nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+  return path.join(trendDataDir, `${safeId}_${dateStr}.jsonl`);
+}
+
+function recordTrendValue(nodeId, value, timestamp) {
+  const tracked = trendConfig.trackedNodes.find(n => n.nodeId === nodeId);
+  if (!tracked || !tracked.enabled) return;
+
+  if (!trendBuffers.has(nodeId)) {
+    trendBuffers.set(nodeId, []);
+  }
+  const buf = trendBuffers.get(nodeId);
+  buf.push({ ts: timestamp || Date.now(), v: value });
+
+  if (buf.length >= TREND_MAX_BUFFER) {
+    flushTrendBuffer(nodeId);
+  }
+}
+
+async function flushTrendBuffer(nodeId) {
+  const buf = trendBuffers.get(nodeId);
+  if (!buf || buf.length === 0) return;
+  trendBuffers.set(nodeId, []);
+
+  const grouped = new Map();
+  for (const entry of buf) {
+    const d = new Date(entry.ts);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!grouped.has(dateStr)) grouped.set(dateStr, []);
+    grouped.get(dateStr).push(entry);
+  }
+
+  for (const [dateStr, entries] of grouped) {
+    const safeId = nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+    const filePath = path.join(trendDataDir, `${safeId}_${dateStr}.jsonl`);
+    try {
+      const lines = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+      await fs.appendFile(filePath, lines);
+    } catch (err) {
+      console.error(`Fehler beim Schreiben von Trend-Daten fuer ${nodeId}:`, err.message);
+    }
+  }
+}
+
+async function flushAllTrendBuffers() {
+  for (const nodeId of trendBuffers.keys()) {
+    await flushTrendBuffer(nodeId);
+  }
+}
+
+function startTrendFlush() {
+  if (trendFlushTimer) clearInterval(trendFlushTimer);
+  trendFlushTimer = setInterval(flushAllTrendBuffers, TREND_FLUSH_INTERVAL);
+}
+
+async function readTrendData(nodeId, fromTs, toTs) {
+  const safeId = nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+  const from = new Date(fromTs);
+  const to = new Date(toTs);
+  const results = [];
+
+  const current = new Date(from);
+  while (current <= to) {
+    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+    const filePath = path.join(trendDataDir, `${safeId}_${dateStr}.jsonl`);
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const lines = content.split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          if (entry.ts >= fromTs && entry.ts <= toTs) {
+            results.push(entry);
+          }
+        } catch {}
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        console.error(`Fehler beim Lesen von Trend-Daten:`, err.message);
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  const bufEntries = (trendBuffers.get(nodeId) || []).filter(e => e.ts >= fromTs && e.ts <= toTs);
+  for (const e of bufEntries) {
+    if (!results.find(r => r.ts === e.ts)) results.push(e);
+  }
+
+  results.sort((a, b) => a.ts - b.ts);
+  return results;
+}
+
+app.get(['/trend-config', '/api/trend-config'], (req, res) => {
+  res.json(trendConfig);
+});
+
+app.post(['/trend-config', '/api/trend-config'], async (req, res) => {
+  try {
+    const { trackedNodes } = req.body;
+    trendConfig.trackedNodes = trackedNodes || [];
+    await saveTrendConfig();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get(['/trend-data', '/api/trend-data'], async (req, res) => {
+  try {
+    const { nodeId, from, to } = req.query;
+    if (!nodeId || !from || !to) {
+      return res.status(400).json({ error: 'nodeId, from und to sind erforderlich' });
+    }
+    await flushTrendBuffer(nodeId);
+    const data = await readTrendData(nodeId, parseInt(from), parseInt(to));
+    res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete(['/trend-data', '/api/trend-data'], async (req, res) => {
+  try {
+    const { nodeId } = req.query;
+    if (!nodeId) return res.status(400).json({ error: 'nodeId erforderlich' });
+    const safeId = nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+    try {
+      const files = await fs.readdir(trendDataDir);
+      for (const file of files) {
+        if (file.startsWith(safeId + '_')) {
+          await fs.unlink(path.join(trendDataDir, file));
+        }
+      }
+    } catch {}
+    trendBuffers.delete(nodeId);
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -2250,6 +2425,14 @@ async function runPageCycle(pageId) {
       console.log(`[CYCLE DEBUG] Page ${pageId} - visuControlledDps:`, JSON.stringify([...visuControlledDps.entries()]));
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
+      const trendNow = Date.now();
+      for (const trackedNode of trendConfig.trackedNodes) {
+        if (!trackedNode.enabled) continue;
+        const val = nodeValues[trackedNode.nodeId];
+        if (val !== undefined && val !== null) {
+          recordTrendValue(trackedNode.nodeId, val, trendNow);
+        }
+      }
       broadcastSSE('state', { liveValues: getLiveSnapshot() });
     }
 
@@ -3605,13 +3788,18 @@ async function start() {
     dpValuesFile = path.join(dataDir, 'dp-values.json');
     driverConfigFile = path.join(dataDir, 'driver-config.json');
     alarmConfigFile = path.join(dataDir, 'alarm-config.json');
+    trendConfigFile = path.join(dataDir, 'trend-config.json');
+    trendDataDir = path.join(dataDir, 'trends');
     imagesDir = path.join(dataDir, 'images');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
 
+    await fs.mkdir(trendDataDir, { recursive: true });
     await loadPersistentDpValues();
     await loadDriverConfig();
+    await loadTrendConfig();
+    startTrendFlush();
 
     console.log(`--- Umgebungsvariablen ---`);
     console.log(`SUPERVISOR_TOKEN: ${process.env.SUPERVISOR_TOKEN ? 'ja (' + process.env.SUPERVISOR_TOKEN.substring(0,10) + '...)' : 'NEIN'}`);
