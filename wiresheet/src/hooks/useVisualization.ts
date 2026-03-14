@@ -16,13 +16,15 @@ function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
-const defaultVisuPage = (): VisuPage => ({
+const defaultVisuPage = (canvasWidth = 1900, canvasHeight = 900): VisuPage => ({
   id: `visu-page-${Date.now()}`,
   name: 'Visu 1',
   widgets: [],
   backgroundColor: '#0f172a',
   gridSize: 10,
-  showGrid: true
+  showGrid: true,
+  canvasWidth,
+  canvasHeight
 });
 
 export const useVisualization = () => {
@@ -86,11 +88,15 @@ export const useVisualization = () => {
   }, [saveVisuPages]);
 
   const addVisuPage = useCallback(() => {
-    const newPage = defaultVisuPage();
+    const activePage = visuPages.find(p => p.id === activeVisuPageId);
+    const newPage = defaultVisuPage(
+      activePage?.canvasWidth ?? 1900,
+      activePage?.canvasHeight ?? 900
+    );
     newPage.name = `Visu ${visuPages.length + 1}`;
     updateVisuPages(prev => [...prev, newPage]);
     setActiveVisuPageId(newPage.id);
-  }, [visuPages.length, updateVisuPages]);
+  }, [visuPages, activeVisuPageId, updateVisuPages]);
 
   const deleteVisuPage = useCallback((pageId: string) => {
     if (visuPages.length <= 1) return;
