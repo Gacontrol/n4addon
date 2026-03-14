@@ -10,6 +10,7 @@ import { DriversView } from './components/DriversView';
 import { DriverPanel } from './components/DriverPanel';
 import { AlarmManagementView } from './components/AlarmManagementView';
 import { TrendView } from './components/TrendView';
+import { BuildingView } from './components/building/BuildingView';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
@@ -21,7 +22,7 @@ import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarm
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup, Network, Bell, TrendingUp
+  Monitor, Cpu, DatabaseBackup, Network, Bell, TrendingUp, Building2
 } from 'lucide-react';
 
 function App() {
@@ -131,7 +132,7 @@ function App() {
     return () => clearInterval(interval);
   }, [unshelveExpiredAlarms]);
 
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends'>('logic');
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -1241,6 +1242,17 @@ function App() {
               <TrendingUp className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Trends</span>
             </button>
+            <button
+              onClick={() => setMainView('building')}
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                mainView === 'building'
+                  ? 'bg-teal-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Gebäude</span>
+            </button>
           </div>
 
           {mainView === 'logic' && (
@@ -1672,6 +1684,8 @@ function App() {
           pages={pages}
           liveValues={liveValues}
         />
+      ) : mainView === 'building' ? (
+        <BuildingView />
       ) : (
         <VisualizationView
           visuPages={visuPages}
