@@ -88,51 +88,30 @@ export function VisuApp() {
   }, [loadData]);
 
   useEffect(() => {
-    let es: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
-    let retryDelay = 2000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    function connect() {
+    async function poll() {
       if (!active) return;
-      es = new EventSource(`${apiBase}/sse`);
-
-      es.addEventListener('state', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
+      try {
+        const res = await fetch(`${apiBase}/visu-poll`);
+        if (res.ok) {
+          const data = await res.json();
           if (data.liveValues) setLiveValues(data.liveValues);
           if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
-        } catch {}
-      });
-
-      es.addEventListener('alarms', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
           if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
           if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
           if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
-        } catch {}
-      });
-
-      es.onopen = () => {
-        retryDelay = 2000;
-      };
-
-      es.onerror = () => {
-        es?.close();
-        if (active) {
-          reconnectTimer = setTimeout(connect, retryDelay);
-          retryDelay = Math.min(retryDelay * 1.5, 30000);
         }
-      };
+      } catch {}
+      if (active) timer = setTimeout(poll, 2000);
     }
 
-    connect();
+    poll();
 
     return () => {
       active = false;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      es?.close();
+      if (timer) clearTimeout(timer);
     };
   }, [apiBase, applyNodeConfigs]);
 

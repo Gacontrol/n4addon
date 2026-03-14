@@ -2954,6 +2954,22 @@ app.get(['/live-values', '/api/live-values'], (req, res) => {
   res.json({ values: merged });
 });
 
+app.get(['/visu-poll', '/api/visu-poll'], async (req, res) => {
+  try {
+    const liveValues = getLiveSnapshot();
+    const nodeConfigs = await getNodeConfigSnapshot();
+    let alarmData = { activeAlarms: [], alarmClasses: [], alarmConsoles: [] };
+    try {
+      const alarmRaw = await fs.readFile(alarmConfigFile, 'utf-8');
+      const ac = JSON.parse(alarmRaw);
+      alarmData = { activeAlarms: ac.activeAlarms || [], alarmClasses: ac.alarmClasses || [], alarmConsoles: ac.alarmConsoles || [] };
+    } catch {}
+    res.json({ liveValues, nodeConfigs, ...alarmData });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const sseClients = new Set();
 
 function broadcastSSE(event, data) {
