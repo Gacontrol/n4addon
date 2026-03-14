@@ -1042,6 +1042,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     };
 
     const nodeInputs = node.data.inputs || [];
+    const cfg = node.data.config || {};
+    const inputDefaults = cfg.inputDefaults || {};
     const inputVals = nodeInputs.map((inputPort, idx) => {
       const portKey = `${nodeId}:${inputPort.id}`;
       if (bindingValues[portKey] !== undefined) {
@@ -1058,10 +1060,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (conn) {
         return getInputValue(conn);
       }
+      const defaultVal = inputDefaults[inputPort.id];
+      if (defaultVal !== undefined && defaultVal !== null && defaultVal !== '') {
+        return defaultVal;
+      }
       return undefined;
     });
-
-    const cfg = node.data.config || {};
 
     if (manualOverrides[nodeId] !== undefined) {
       nodeValues[nodeId] = manualOverrides[nodeId];
@@ -1140,9 +1144,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'not-gate') {
       nodeValues[nodeId] = !toBool(inputVals[0]);
     } else if (node.type === 'switch') {
-      const val = inputVals[0];
-      const sw = toBool(inputVals[1]);
-      nodeValues[nodeId] = sw ? val : null;
+      const sw = toBool(inputVals[0]);
+      const valTrue = inputVals[1];
+      const valFalse = inputVals[2];
+      nodeValues[nodeId] = sw ? valTrue : valFalse;
     } else if (node.type === 'select') {
       const a = inputVals[0];
       const b = inputVals[1];

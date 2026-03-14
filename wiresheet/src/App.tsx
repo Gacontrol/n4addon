@@ -1057,62 +1057,62 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-2.5 flex-shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="bg-blue-600 p-1.5 rounded-lg">
+      <header className="bg-slate-800 border-b border-slate-700 px-2 sm:px-4 py-2 sm:py-2.5 flex-shrink-0">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="bg-blue-600 p-1 sm:p-1.5 rounded-lg">
               <Workflow className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-white leading-tight">GA-Control</h1>
               <p className="text-xs text-slate-500 leading-tight">keep it simple - by Dr. Muff</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0 overflow-x-auto">
             <button
               onClick={() => setMainView('logic')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'logic'
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Cpu className="w-3.5 h-3.5" />
-              Logik
+              <span className="hidden sm:inline">Logik</span>
             </button>
             <button
               onClick={() => setMainView('drivers')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'drivers'
                   ? 'bg-amber-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Network className="w-3.5 h-3.5" />
-              Treiber
+              <span className="hidden sm:inline">Treiber</span>
             </button>
             <button
               onClick={() => { setMainView('visu'); executeAllPages(); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'visu'
                   ? 'bg-green-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Monitor className="w-3.5 h-3.5" />
-              Visu
+              <span className="hidden sm:inline">Visu</span>
             </button>
             <button
               onClick={() => setMainView('alarms')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'alarms'
                   ? 'bg-red-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Bell className="w-3.5 h-3.5" />
-              Alarme
+              <span className="hidden sm:inline">Alarme</span>
               {activeAlarms.length > 0 && (
                 <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
                   {activeAlarms.length}
@@ -1294,7 +1294,7 @@ function App() {
               highlightedBinding={highlightedBinding}
             />
 
-            <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
+            <div className="hidden md:flex w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col">
               <div className="flex border-b border-slate-700">
                 <button
                   onClick={() => setSidebarTab('nodes')}

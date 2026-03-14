@@ -2026,23 +2026,58 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && !node.type.startsWith('modbus-') && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Ports
+              Eingaenge mit Standardwerten
             </label>
-            <div className="space-y-1">
-              {node.data.inputs.map(port => (
-                <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
-                  <span className="text-xs text-slate-300 flex-1">{port.label}</span>
-                  <span className="text-xs text-slate-500">Eingang</span>
+            <p className="text-[10px] text-slate-500 mb-2">Werte werden verwendet wenn kein Eingang verbunden ist. Leer = kein Standardwert.</p>
+            <div className="space-y-1.5">
+              {node.data.inputs.map(port => {
+                const inputDefaults = config.inputDefaults || {};
+                const currentDefault = inputDefaults[port.id];
+                return (
+                  <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
+                    <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-300 flex-1 min-w-0 truncate">{port.label}</span>
+                    <input
+                      type="text"
+                      value={currentDefault !== undefined && currentDefault !== null ? String(currentDefault) : ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        let parsedVal: string | number | boolean | null = val;
+                        if (val === '') {
+                          parsedVal = null;
+                        } else if (val === 'true') {
+                          parsedVal = true;
+                        } else if (val === 'false') {
+                          parsedVal = false;
+                        } else if (val === 'null') {
+                          parsedVal = null;
+                        } else if (!isNaN(Number(val)) && val.trim() !== '') {
+                          parsedVal = Number(val);
+                        }
+                        const newDefaults = { ...inputDefaults, [port.id]: parsedVal };
+                        if (parsedVal === null) {
+                          delete newDefaults[port.id];
+                        }
+                        setConfig(prev => ({ ...prev, inputDefaults: newDefaults }));
+                        onUpdateNode(node.id, { config: { ...config, inputDefaults: newDefaults } });
+                      }}
+                      placeholder="--"
+                      className="w-20 px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-xs text-white text-right placeholder-slate-500"
+                    />
+                  </div>
+                );
+              })}
+              {node.data.outputs.length > 0 && (
+                <div className="border-t border-slate-600 pt-1.5 mt-1.5">
+                  <span className="text-[10px] text-slate-500 mb-1 block">Ausgaenge:</span>
+                  {node.data.outputs.map(port => (
+                    <div key={port.id} className="flex items-center gap-2 px-2 py-1 bg-slate-700/40 rounded mb-1">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                      <span className="text-xs text-slate-300 flex-1">{port.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {node.data.outputs.map(port => (
-                <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <span className="text-xs text-slate-300 flex-1">{port.label}</span>
-                  <span className="text-xs text-slate-500">Ausgang</span>
-                </div>
-              ))}
+              )}
             </div>
           </div>
         )}
