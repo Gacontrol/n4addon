@@ -498,6 +498,12 @@ app.get(['/alarm-config', '/api/alarm-config'], async (req, res) => {
 app.post(['/alarm-config', '/api/alarm-config'], async (req, res) => {
   try {
     await fs.writeFile(alarmConfigFile, JSON.stringify(req.body, null, 2));
+    broadcastSSE('alarms', {
+      activeAlarms: req.body.activeAlarms || [],
+      alarmClasses: req.body.alarmClasses,
+      alarmConsoles: req.body.alarmConsoles,
+      alarmHistory: req.body.alarmHistory
+    });
     res.json({ success: true });
   } catch (err) {
     console.error('Fehler beim Speichern der Alarm-Konfiguration:', err);
