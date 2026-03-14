@@ -434,10 +434,19 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <input
                 type="checkbox"
                 checked={btnCfg.holdMode || false}
-                onChange={(e) => onUpdate({ config: { ...config, holdMode: e.target.checked } })}
+                onChange={(e) => onUpdate({ config: { ...config, holdMode: e.target.checked, impulseMode: false } })}
                 className="rounded"
               />
               <label className="text-xs text-slate-400">Haltemodus (Wert bleibt nach Loslassen)</label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={btnCfg.impulseMode || false}
+                onChange={(e) => onUpdate({ config: { ...config, impulseMode: e.target.checked, holdMode: false } })}
+                className="rounded"
+              />
+              <label className="text-xs text-slate-400">Impulsmodus (True-Impuls bei jedem Klick)</label>
             </div>
           </>
         );

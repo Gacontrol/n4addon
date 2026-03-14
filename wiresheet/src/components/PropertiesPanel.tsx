@@ -7,6 +7,7 @@ import { ModbusDeviceBlockConfig } from './ModbusConfig';
 import { ModbusDriverPanel } from './ModbusDriverPanel';
 import { AlarmSettings } from './AlarmSettings';
 import { AlarmClass, BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from '../types/alarm';
+import { VisuPage } from '../types/visualization';
 
 interface HAEntity {
   entity_id: string;
@@ -39,6 +40,7 @@ interface PropertiesPanelProps {
   haDriverEnabled?: boolean;
   alarmClasses?: AlarmClass[];
   connections?: Connection[];
+  visuPages?: VisuPage[];
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -65,7 +67,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   haDevices = [],
   haDriverEnabled = true,
   alarmClasses = [],
-  connections = []
+  connections = [],
+  visuPages = []
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -2065,7 +2068,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 const defaultVal = (config.portDefaultValues || {})[port.id] ?? '';
                 const hasConnection = connections.some(c => c.target === node.id && c.targetPort === port.id);
                 const hasBinding = driverBindings.some(b => b.nodeId === node.id && b.portId === port.id && b.direction === 'input');
-                const isBlocked = hasConnection || hasBinding;
+                const hasVisuBinding = visuPages.some(pg => pg.widgets.some(w => w.binding?.nodeId === node.id && w.binding?.portId === port.id));
+                const isBlocked = hasConnection || hasBinding || hasVisuBinding;
                 return (
                   <div key={port.id} className={`flex items-center gap-2 px-2 py-1.5 rounded ${isBlocked ? 'bg-slate-700/20 opacity-60' : 'bg-slate-700/40'}`}>
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isBlocked ? 'bg-slate-500' : 'bg-blue-400'}`} />

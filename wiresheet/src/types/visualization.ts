@@ -210,6 +210,7 @@ export interface ButtonConfig {
   pressValue?: unknown;
   releaseValue?: unknown;
   holdMode?: boolean;
+  impulseMode?: boolean;
   color?: string;
   defaultPressValue?: unknown;
   defaultReleaseValue?: unknown;

@@ -20,19 +20,28 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
 }) => {
   const [pressed, setPressed] = useState(false);
   const [toggleState, setToggleState] = useState(false);
+  const [impulseActive, setImpulseActive] = useState(false);
   const buttonColor = config.color || '#3b82f6';
   const pressVal = config.pressValue ?? config.defaultPressValue ?? true;
   const releaseVal = config.releaseValue ?? config.defaultReleaseValue ?? false;
   const isHoldMode = config.holdMode === true;
+  const isImpulseMode = config.impulseMode === true;
   const pressedRef = useRef(false);
-
-  const isActive = statusValue !== undefined && statusValue !== null && statusValue !== false && statusValue !== 0;
+  const impulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!isHoldMode && statusValue !== undefined) {
+    return () => {
+      if (impulseTimerRef.current) clearTimeout(impulseTimerRef.current);
+    };
+  }, []);
+
+  const isActive = impulseActive || (statusValue !== undefined && statusValue !== null && statusValue !== false && statusValue !== 0);
+
+  useEffect(() => {
+    if (!isHoldMode && !isImpulseMode && statusValue !== undefined) {
       setToggleState(isActive);
     }
-  }, [statusValue, isActive, isHoldMode]);
+  }, [statusValue, isActive, isHoldMode, isImpulseMode]);
 
   const handleMouseDown = useCallback(() => {
     if (disabled) return;
@@ -50,14 +59,22 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
     pressedRef.current = false;
     setPressed(false);
 
-    if (isHoldMode) {
+    if (isImpulseMode) {
+      if (impulseTimerRef.current) clearTimeout(impulseTimerRef.current);
+      setImpulseActive(true);
+      onValueChange(pressVal);
+      impulseTimerRef.current = setTimeout(() => {
+        setImpulseActive(false);
+        onValueChange(releaseVal);
+      }, 200);
+    } else if (isHoldMode) {
       onValueChange(releaseVal);
     } else {
       const newState = !toggleState;
       setToggleState(newState);
       onValueChange(newState ? pressVal : releaseVal);
     }
-  }, [disabled, onValueChange, releaseVal, pressVal, isHoldMode, toggleState]);
+  }, [disabled, onValueChange, releaseVal, pressVal, isHoldMode, isImpulseMode, toggleState]);
 
   const handleMouseLeave = useCallback(() => {
     if (pressed && isHoldMode) {

@@ -1573,6 +1573,7 @@ function App() {
                 haDriverEnabled={haDriverEnabled}
                 alarmClasses={alarmClasses}
                 connections={connections}
+                visuPages={visuPages}
               />
             )}
           </div>
