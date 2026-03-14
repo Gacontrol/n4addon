@@ -1058,6 +1058,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (conn) {
         return getInputValue(conn);
       }
+      const portDefaultValues = (node.data.config || {}).portDefaultValues || {};
+      const defaultStr = portDefaultValues[inputPort.id];
+      if (defaultStr !== undefined && defaultStr !== '') {
+        if (defaultStr === 'true') return true;
+        if (defaultStr === 'false') return false;
+        if (defaultStr === 'null') return null;
+        const num = Number(defaultStr);
+        if (!isNaN(num) && defaultStr.trim() !== '') return num;
+        return defaultStr;
+      }
       return undefined;
     });
 
@@ -1142,7 +1152,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'switch') {
       const val = inputVals[0];
       const sw = toBool(inputVals[1]);
-      nodeValues[nodeId] = sw ? val : null;
+      const valTrue = inputVals[2];
+      const valFalse = inputVals[3];
+      if (sw) {
+        nodeValues[nodeId] = valTrue !== undefined ? valTrue : val;
+      } else {
+        nodeValues[nodeId] = valFalse !== undefined ? valFalse : null;
+      }
     } else if (node.type === 'select') {
       const a = inputVals[0];
       const b = inputVals[1];
