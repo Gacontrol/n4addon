@@ -32,6 +32,7 @@ export const widgetTemplates: WidgetTemplate[] = [
       pressValue: true,
       releaseValue: false,
       holdMode: false,
+      impulseMode: true,
       color: '#3b82f6'
     },
     defaultStyle: {
