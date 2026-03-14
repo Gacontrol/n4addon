@@ -11,6 +11,8 @@ interface VisuSliderProps {
   width: number;
 }
 
+const FREEZE_MS = 2000;
+
 export const VisuSlider: React.FC<VisuSliderProps> = ({
   value,
   onChange,
@@ -23,12 +25,20 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
   const effectiveDefault = config.defaultValue !== undefined ? config.defaultValue : config.min;
   const [localValue, setLocalValue] = useState(value !== null && value !== undefined ? value : effectiveDefault);
   const [isDragging, setIsDragging] = useState(false);
+  const frozenUntilRef = useRef<number>(0);
   const sliderRef = useRef<HTMLDivElement>(null);
   const accentColor = style.accentColor || '#3b82f6';
 
   useEffect(() => {
-    if (!isDragging) {
+    if (isDragging) return;
+    const remaining = frozenUntilRef.current - Date.now();
+    if (remaining <= 0) {
       setLocalValue(value !== null && value !== undefined ? value : effectiveDefault);
+    } else {
+      const timer = setTimeout(() => {
+        setLocalValue(value !== null && value !== undefined ? value : effectiveDefault);
+      }, remaining);
+      return () => clearTimeout(timer);
     }
   }, [value, isDragging, effectiveDefault]);
 
@@ -59,6 +69,7 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
+      frozenUntilRef.current = Date.now() + FREEZE_MS;
       onChange(localValue);
     }
   }, [isDragging, localValue, onChange]);
@@ -83,6 +94,7 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
   const handleTouchEnd = useCallback(() => {
     if (isDragging) {
       setIsDragging(false);
+      frozenUntilRef.current = Date.now() + FREEZE_MS;
       onChange(localValue);
     }
   }, [isDragging, localValue, onChange]);

@@ -423,7 +423,7 @@ app.get(['/pages', '/api/pages'], async (req, res) => {
     if (err.code === 'ENOENT') {
       console.log('Keine Seiten-Datei gefunden, verwende Standard');
       const defaultPages = [
-        { id: 'page-1', name: 'Seite 1', cycleMs: 1000, running: false, nodes: [], connections: [] }
+        { id: 'page-1', name: 'Seite 1', cycleMs: 1000, running: true, nodes: [], connections: [] }
       ];
       res.json(defaultPages);
     } else {
@@ -488,7 +488,16 @@ app.get(['/alarm-config', '/api/alarm-config'], async (req, res) => {
     res.json(JSON.parse(data));
   } catch (err) {
     if (err.code === 'ENOENT') {
-      res.json({ alarmClasses: [], alarmConsoles: [], activeAlarms: [], alarmHistory: [] });
+      const now = Date.now();
+      const defaultClasses = [
+        { id: 'ac-prio1', name: 'Priorität 1', description: 'Kritische Alarme', priority: 'critical', color: '#ef4444', soundEnabled: false, autoAcknowledge: false, createdAt: now, updatedAt: now },
+        { id: 'ac-prio2', name: 'Priorität 2', description: 'Wichtige Alarme', priority: 'high', color: '#f97316', soundEnabled: false, autoAcknowledge: false, createdAt: now, updatedAt: now },
+        { id: 'ac-prio3', name: 'Priorität 3', description: 'Warnungen', priority: 'medium', color: '#eab308', soundEnabled: false, autoAcknowledge: false, createdAt: now, updatedAt: now },
+      ];
+      const defaultConsoles = [
+        { id: 'cons-default', name: 'Alarmkonsole', description: 'Alle Alarme', alarmClassIds: ['ac-prio1', 'ac-prio2', 'ac-prio3'], showHistory: true, historyLimit: 500, sortBy: 'time', sortDirection: 'desc', createdAt: now, updatedAt: now }
+      ];
+      res.json({ alarmClasses: defaultClasses, alarmConsoles: defaultConsoles, activeAlarms: [], alarmHistory: [] });
     } else {
       res.status(500).json({ error: err.message });
     }
@@ -3573,7 +3582,10 @@ async function restoreRunningPages() {
       console.log(`${restoredCount} Seite(n) nach Neustart wiederhergestellt`);
     }
   } catch (err) {
-    if (err.code !== 'ENOENT') {
+    if (err.code === 'ENOENT') {
+      startPage('page-1', 1000);
+      console.log('Neue Installation: Seite 1 automatisch gestartet');
+    } else {
       console.error('Fehler beim Wiederherstellen:', err.message);
     }
   }
