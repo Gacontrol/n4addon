@@ -164,7 +164,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
     if (isOutputPanel) {
       return device.datapoints.filter(dp => dp.writable && !dp.isConfig);
     } else {
-      return device.datapoints.filter(dp => !dp.writable && !dp.isConfig);
+      return device.datapoints.filter(dp => !dp.isConfig);
     }
   };
 
@@ -365,6 +365,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               {datapoints.map(dp => {
                                 const binding = getBindingForDatapoint(device.id, dp.id);
                                 const isConnecting = !!connectingFrom;
+                                const isWritable = dp.writable;
+                                const effectiveIsOutput = isOutputPanel ? true : isWritable;
                                 const canConnect = isConnecting && !isDeviceDisabled && (
                                   (isOutputPanel && dp.writable) ||
                                   (!isOutputPanel)
@@ -381,7 +383,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                           ? 'hover:bg-blue-600/30 bg-blue-900/20'
                                           : 'hover:bg-slate-700/30'
                                     } ${binding && !isDeviceDisabled ? 'bg-amber-900/20' : ''} ${isHighlighted ? 'ring-2 ring-amber-400 bg-amber-800/40 animate-pulse' : ''}`}
-                                    onClick={() => !isDeviceDisabled && onDatapointClick(device, dp, isOutputPanel)}
+                                    onClick={() => !isDeviceDisabled && onDatapointClick(device, dp, effectiveIsOutput)}
                                     onDragStart={(e) => {
                                       if (isDeviceDisabled) {
                                         e.preventDefault();
@@ -392,9 +394,9 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                         driverType: 'modbus',
                                         device,
                                         datapoint: dp,
-                                        isOutput: isOutputPanel
+                                        isOutput: effectiveIsOutput
                                       }));
-                                      onDatapointDragStart(device, dp, isOutputPanel);
+                                      onDatapointDragStart(device, dp, effectiveIsOutput);
                                     }}
                                     draggable={!isDeviceDisabled}
                                   >
@@ -405,11 +407,14 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                           ? 'bg-amber-400'
                                           : canConnect
                                             ? 'bg-blue-400 animate-pulse'
-                                            : 'bg-slate-500'
+                                            : isWritable && !isOutputPanel
+                                              ? 'bg-emerald-500'
+                                              : 'bg-slate-500'
                                     }`} />
                                     <span className={`flex-1 text-[10px] truncate ${
                                       isDeviceDisabled && binding ? 'text-red-300' :
-                                      binding ? 'text-amber-300' : 'text-slate-300'
+                                      binding ? 'text-amber-300' :
+                                      isWritable && !isOutputPanel ? 'text-emerald-300/80' : 'text-slate-300'
                                     }`}>
                                       {dp.name}
                                     </span>
@@ -419,7 +424,10 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                     {binding && !isDeviceDisabled && (
                                       <span className="text-[8px] text-amber-500 bg-amber-900/40 px-1 py-0.5 rounded">verb.</span>
                                     )}
-                                    {dp.unit && !binding && (
+                                    {!binding && isWritable && !isOutputPanel && (
+                                      <span className="text-[8px] text-emerald-600 bg-emerald-950/60 px-1 py-0.5 rounded">Ausg.</span>
+                                    )}
+                                    {dp.unit && !binding && (!isWritable || isOutputPanel) && (
                                       <span className="text-[9px] text-slate-500">{dp.unit}</span>
                                     )}
                                   </div>
