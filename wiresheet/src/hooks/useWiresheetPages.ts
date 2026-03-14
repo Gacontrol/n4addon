@@ -134,17 +134,27 @@ export const useWiresheetPages = () => {
     }, 400);
   }, []);
 
-  const loadHaEntities = useCallback(async () => {
+  const loadHaEntities = useCallback(async (retryCount = 0) => {
     setHaLoading(true);
-    setHaError(null);
+    if (retryCount === 0) {
+      setHaError(null);
+    }
     try {
       const res = await fetch(`${API_BASE}/ha/states`);
       const text = await res.text();
+      if (res.status === 502 && retryCount < 5) {
+        console.log(`HA API nicht bereit, Wiederholung in ${(retryCount + 1) * 2}s... (${retryCount + 1}/5)`);
+        setHaError(`Server startet... (${retryCount + 1}/5)`);
+        setHaLoading(false);
+        setTimeout(() => loadHaEntities(retryCount + 1), (retryCount + 1) * 2000);
+        return;
+      }
       if (res.ok) {
         try {
           const data = JSON.parse(text);
           if (Array.isArray(data)) {
             setHaEntities(data.sort((a, b) => a.entity_id.localeCompare(b.entity_id)));
+            setHaError(null);
           } else {
             setHaError('Ungueltige Antwort vom Server');
           }
@@ -166,6 +176,13 @@ export const useWiresheetPages = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('loadHaEntities error:', msg);
+      if (retryCount < 5) {
+        console.log(`HA Verbindungsfehler, Wiederholung in ${(retryCount + 1) * 2}s... (${retryCount + 1}/5)`);
+        setHaError(`Verbindung wird hergestellt... (${retryCount + 1}/5)`);
+        setHaLoading(false);
+        setTimeout(() => loadHaEntities(retryCount + 1), (retryCount + 1) * 2000);
+        return;
+      }
       setHaError(`Verbindung fehlgeschlagen: ${msg}`);
     } finally {
       setHaLoading(false);
