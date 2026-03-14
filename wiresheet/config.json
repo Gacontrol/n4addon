@@ -1,6 +1,6 @@
 {
   "name": "GA-Control",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "slug": "ga-control",
   "description": "keep it simple - by Dr. Muff",
   "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
