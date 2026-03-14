@@ -2688,9 +2688,6 @@ function getLiveSnapshot() {
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }
-  for (const [key, value] of visuControlledDps) {
-    merged[key] = value;
-  }
   return merged;
 }
 
