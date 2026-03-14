@@ -253,6 +253,25 @@ export const useWiresheetPages = () => {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    async function fetchDriverValues() {
+      try {
+        const res = await fetch(`${API_BASE}/driver-live-values`);
+        if (res.ok && active) {
+          const data = await res.json();
+          setDriverLiveValues(data);
+        }
+      } catch {}
+    }
+    fetchDriverValues();
+    const interval = setInterval(fetchDriverValues, 2000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     pagesRef.current = pages;
   }, [pages]);
 

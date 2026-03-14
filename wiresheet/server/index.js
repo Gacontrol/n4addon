@@ -2809,6 +2809,8 @@ app.get(['/sse', '/api/sse'], (req, res) => {
     const liveValues = getLiveSnapshot();
     const nodeConfigs = await getNodeConfigSnapshot();
     res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
+    res.write(`event: driver-values\ndata: ${JSON.stringify({ modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) })}\n\n`);
+    res.write(`event: modbus-device-status\ndata: ${JSON.stringify(Object.fromEntries(modbusDeviceOnlineStatus))}\n\n`);
   })();
 
   req.on('close', () => sseClients.delete(res));
@@ -2828,6 +2830,8 @@ visuApp.get(['/sse', '/api/sse'], (req, res) => {
     const liveValues = getLiveSnapshot();
     const nodeConfigs = await getNodeConfigSnapshot();
     res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
+    res.write(`event: driver-values\ndata: ${JSON.stringify({ modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) })}\n\n`);
+    res.write(`event: modbus-device-status\ndata: ${JSON.stringify(Object.fromEntries(modbusDeviceOnlineStatus))}\n\n`);
   })();
 
   req.on('close', () => sseClients.delete(res));
