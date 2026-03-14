@@ -725,6 +725,26 @@ async function readTrendData(nodeId, fromTs, toTs) {
   return results;
 }
 
+app.get(['/trend', '/api/trend'], async (req, res) => {
+  try {
+    const { nodeIds, from, to } = req.query;
+    if (!nodeIds || !from || !to) {
+      return res.status(400).json({ error: 'nodeIds, from und to sind erforderlich' });
+    }
+    const ids = String(nodeIds).split(',').filter(Boolean);
+    const fromTs = parseInt(from);
+    const toTs = parseInt(to);
+    const result = {};
+    await Promise.all(ids.map(async (nodeId) => {
+      await flushTrendBuffer(nodeId);
+      result[nodeId] = await readTrendData(nodeId, fromTs, toTs);
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get(['/trend-config', '/api/trend-config'], (req, res) => {
   res.json(trendConfig);
 });

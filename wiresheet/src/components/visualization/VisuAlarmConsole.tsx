@@ -192,17 +192,6 @@ export const VisuAlarmConsole: React.FC<VisuAlarmConsoleProps> = ({
     }
   };
 
-  if (!console && config.consoleId && !isEditMode) {
-    return (
-      <div
-        className="flex flex-col items-center justify-center bg-slate-800 rounded-lg border border-slate-600 text-slate-400"
-        style={{ width, height }}
-      >
-        <Bell className="w-8 h-8 mb-2 opacity-50" />
-        <p className="text-xs">Keine Konsole verknuepft</p>
-      </div>
-    );
-  }
 
   if (visibleAlarms.length === 0 && !showStats) {
     return (
