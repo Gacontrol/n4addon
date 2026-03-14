@@ -888,9 +888,6 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
               {data.inputs.map((input, inputIndex) => {
                 const portVal = portValues[input.id];
                 const hasPortVal = portVal !== undefined && portVal !== null;
-                const inputDefaults = data.config?.inputDefaults || {};
-                const defaultVal = inputDefaults[input.id];
-                const hasDefaultVal = defaultVal !== undefined && defaultVal !== null;
                 const isHighlighted = isConnecting && connectingFromNodeId !== node.id;
                 const driverBinding = getDriverBindingForPort(input.id);
                 const portVisuBindings = getVisuBindingsForPort(input.id);
@@ -1001,13 +998,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                     </div>
                     <div className="flex items-center gap-1 min-w-0">
                       <span className="text-[10px] text-slate-400 leading-none whitespace-nowrap">{input.label}</span>
-                      {hasPortVal ? (
+                      {hasPortVal && (
                         <span className="text-[8px] font-mono text-emerald-400 bg-emerald-950/60 px-0.5 rounded leading-none max-w-12 truncate">
                           {String(portVal).length > 6 ? String(portVal).slice(0, 6) + '..' : String(portVal)}
-                        </span>
-                      ) : hasDefaultVal && (
-                        <span className="text-[8px] font-mono text-slate-500 bg-slate-800/60 px-0.5 rounded leading-none max-w-12 truncate" title={`Standard: ${defaultVal}`}>
-                          {String(defaultVal).length > 6 ? String(defaultVal).slice(0, 6) + '..' : String(defaultVal)}
                         </span>
                       )}
                     </div>

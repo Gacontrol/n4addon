@@ -586,7 +586,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   }, {} as Record<string, typeof allLibraryDevices>);
 
   return (
-    <div className="flex flex-col md:flex-row h-full">
+    <div className="flex h-full">
       <input
         ref={fileInputRef}
         type="file"
@@ -595,40 +595,40 @@ export const DriversView: React.FC<DriversViewProps> = ({
         onChange={handleImportLibrary}
       />
 
-      <div className="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-700 flex flex-col flex-shrink-0">
-        <div className="p-2 sm:p-3 border-b border-slate-700">
-          <h2 className="text-sm font-semibold text-white mb-1 sm:mb-2">Treiber</h2>
-          <p className="text-xs text-slate-500 hidden sm:block">Externe Schnittstellen konfigurieren</p>
+      <div className="w-64 bg-slate-900 border-r border-slate-700 flex flex-col">
+        <div className="p-3 border-b border-slate-700">
+          <h2 className="text-sm font-semibold text-white mb-2">Treiber</h2>
+          <p className="text-xs text-slate-500">Externe Schnittstellen konfigurieren</p>
         </div>
-        <div className="flex md:flex-col p-2 sm:p-3 gap-2 overflow-x-auto md:overflow-x-visible">
+        <div className="flex-1 p-3 space-y-2">
           <button
             onClick={() => setSelectedDriverType('modbus-tcp')}
-            className={`flex-shrink-0 md:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
               selectedDriverType === 'modbus-tcp'
                 ? 'bg-blue-600 text-white'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Network className="w-4 sm:w-5 h-4 sm:h-5" />
+            <Network className="w-5 h-5" />
             <div className="text-left">
-              <div className="font-medium text-xs sm:text-sm">Modbus TCP</div>
-              <div className={`text-[10px] sm:text-xs ${selectedDriverType === 'modbus-tcp' ? 'text-blue-200' : 'text-slate-500'}`}>
+              <div className="font-medium text-sm">Modbus TCP</div>
+              <div className={`text-xs ${selectedDriverType === 'modbus-tcp' ? 'text-blue-200' : 'text-slate-500'}`}>
                 {modbusDevices.length} Geraete
               </div>
             </div>
           </button>
           <button
             onClick={() => setSelectedDriverType('homeassistant')}
-            className={`flex-shrink-0 md:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
               selectedDriverType === 'homeassistant'
                 ? 'bg-cyan-600 text-white'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Home className="w-4 sm:w-5 h-4 sm:h-5" />
+            <Home className="w-5 h-5" />
             <div className="text-left">
-              <div className="font-medium text-xs sm:text-sm">Home Assistant</div>
-              <div className={`text-[10px] sm:text-xs ${selectedDriverType === 'homeassistant' ? 'text-cyan-200' : 'text-slate-500'}`}>
+              <div className="font-medium text-sm">Home Assistant</div>
+              <div className={`text-xs ${selectedDriverType === 'homeassistant' ? 'text-cyan-200' : 'text-slate-500'}`}>
                 {haDevices.length} Geraete, {haEntities.length} Entities
               </div>
             </div>
@@ -636,21 +636,21 @@ export const DriversView: React.FC<DriversViewProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {selectedDriverType === 'modbus-tcp' && (
           <>
-            <div className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-slate-800">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Network className="w-4 sm:w-5 h-4 sm:h-5 text-blue-400" />
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
+              <div className="flex items-center gap-3">
+                <Network className="w-5 h-5 text-blue-400" />
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-white">Modbus TCP</h2>
-                  <p className="text-[10px] sm:text-xs text-slate-500 hidden sm:block">Industriestandard fuer Geraetekommunikation</p>
+                  <h2 className="text-lg font-semibold text-white">Modbus TCP</h2>
+                  <p className="text-xs text-slate-500">Industriestandard fuer Geraetekommunikation</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => onModbusDriverEnabledChange(!modbusDriverEnabled)}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     modbusDriverEnabled
                       ? 'bg-green-600 text-white'
                       : 'bg-slate-700 text-slate-400'
@@ -662,20 +662,20 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-2 sm:p-4">
-              <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
+            <div className="flex-1 overflow-auto p-4">
+              <div className="flex items-center gap-2 mb-4">
                 <button
                   onClick={() => setShowAddDevice(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-                  <span className="hidden sm:inline">Geraet</span> hinzufuegen
+                  <Plus className="w-4 h-4" />
+                  Geraet hinzufuegen
                 </button>
                 <button
                   onClick={() => setShowLibrary(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  <Database className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+                  <Database className="w-4 h-4" />
                   Aus Bibliothek
                 </button>
               </div>
@@ -883,30 +883,30 @@ export const DriversView: React.FC<DriversViewProps> = ({
 
         {selectedDriverType === 'homeassistant' && (
           <>
-            <div className="p-2 sm:p-4 border-b border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-slate-800">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Home className="w-4 sm:w-5 h-4 sm:h-5 text-cyan-400" />
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
+              <div className="flex items-center gap-3">
+                <Home className="w-5 h-5 text-cyan-400" />
                 <div>
-                  <h2 className="text-base sm:text-lg font-semibold text-white">Home Assistant</h2>
-                  <p className="text-[10px] sm:text-xs text-slate-500 hidden sm:block">Integration mit Home Assistant Entities</p>
+                  <h2 className="text-lg font-semibold text-white">Home Assistant</h2>
+                  <p className="text-xs text-slate-500">Integration mit Home Assistant Entities</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={onRefreshHaEntities}
                   disabled={haLoading}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {haLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <RefreshCw className="w-4 h-4" />
                   )}
-                  <span className="hidden sm:inline">Aktualisieren</span>
+                  Aktualisieren
                 </button>
                 <button
                   onClick={() => onHaDriverEnabledChange(!haDriverEnabled)}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     haDriverEnabled
                       ? 'bg-green-600 text-white'
                       : 'bg-slate-700 text-slate-400'
@@ -918,21 +918,21 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-2 sm:p-4">
+            <div className="flex-1 overflow-auto p-4">
               {haError && (
-                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-red-900/30 border border-red-700/50 rounded-lg flex items-center gap-2">
+                <div className="mb-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm text-red-300">{haError}</span>
+                  <span className="text-sm text-red-300">{haError}</span>
                 </div>
               )}
 
-              <div className="mb-3 sm:mb-4">
+              <div className="mb-4">
                 <input
                   type="text"
                   value={haSearchQuery}
                   onChange={(e) => setHaSearchQuery(e.target.value)}
                   placeholder="Geraete oder Entities suchen..."
-                  className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
 

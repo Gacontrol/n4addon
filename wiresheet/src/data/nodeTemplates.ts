@@ -147,14 +147,13 @@ export const nodeTemplates: NodeTemplate[] = [
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Schalter', type: 'input' },
-      { label: 'WertTrue', type: 'input' },
-      { label: 'WertFalse', type: 'input' }
+      { label: 'Wert', type: 'input' },
+      { label: 'Schalter', type: 'input' }
     ],
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Gibt WertTrue oder WertFalse aus je nach Schalter'
+    description: 'Schaltet Wert durch wenn Schalter true'
   },
   {
     type: 'select',
