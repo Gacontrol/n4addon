@@ -64,7 +64,8 @@ export type WidgetType =
   | 'visu-sensor'
   | 'visu-pid'
   | 'visu-heating-curve'
-  | 'visu-alarm-console';
+  | 'visu-alarm-console'
+  | 'visu-trend-chart';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -403,7 +404,8 @@ export type WidgetConfig =
   | SensorWidgetConfig
   | PIDWidgetConfig
   | HeatingCurveWidgetConfig
-  | AlarmConsoleWidgetConfig;
+  | AlarmConsoleWidgetConfig
+  | TrendChartConfig;
 
 export interface VisuWidget {
   id: string;
@@ -705,6 +707,46 @@ export interface HeatingCurveWidgetConfig {
   labelPosition?: LabelPosition;
   fontSize?: number;
   fontFamily?: FontFamily;
+}
+
+export type TrendChartType = 'line' | 'stepped' | 'bar' | 'area' | 'scatter' | 'candlestick';
+export type TrendTimeRange = '5min' | '15min' | '30min' | '1h' | '6h' | '12h' | '24h' | '7d' | '30d' | 'custom';
+
+export interface TrendSeries {
+  nodeId: string;
+  label: string;
+  color: string;
+  unit?: string;
+  decimals?: number;
+  visible: boolean;
+  chartType?: TrendChartType;
+  lineWidth?: number;
+  fillOpacity?: number;
+  yAxisSide?: 'left' | 'right';
+}
+
+export interface TrendChartConfig {
+  series: TrendSeries[];
+  timeRange: TrendTimeRange;
+  customFromMs?: number;
+  customToMs?: number;
+  chartType: TrendChartType;
+  showLegend?: boolean;
+  showGrid?: boolean;
+  showTooltip?: boolean;
+  showZoom?: boolean;
+  backgroundColor?: string;
+  gridColor?: string;
+  separateAxes?: boolean;
+  yMin?: number;
+  yMax?: number;
+  autoScale?: boolean;
+  showMinMaxAvg?: boolean;
+  refreshIntervalMs?: number;
+  title?: string;
+  xAxisFormat?: 'auto' | 'time' | 'date' | 'datetime';
+  smoothing?: boolean;
+  fillArea?: boolean;
 }
 
 export interface AlarmConsoleWidgetConfig {

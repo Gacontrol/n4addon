@@ -972,6 +972,32 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Zeigt Alarme aus einer Alarmkonsole an',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-trend-chart',
+    label: 'Trend-Diagramm',
+    icon: 'TrendingUp',
+    category: 'display',
+    defaultSize: { width: 400, height: 250 },
+    defaultConfig: {
+      series: [],
+      timeRange: '1h',
+      chartType: 'line',
+      showLegend: true,
+      showGrid: true,
+      showTooltip: true,
+      showZoom: false,
+      separateAxes: false,
+      autoScale: true,
+      showMinMaxAvg: true,
+      refreshIntervalMs: 10000,
+      smoothing: false,
+      fillArea: true
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'top' },
+    description: 'Trend-Diagramm mit Zeitachse, Zoom und mehreren Datenpunkten',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

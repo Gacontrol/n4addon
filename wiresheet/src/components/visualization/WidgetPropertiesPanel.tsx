@@ -40,7 +40,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
@@ -2355,6 +2355,272 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option value="asc">Aufst.</option>
                   <option value="desc">Abst.</option>
                 </select>
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-trend-chart': {
+        const tcCfg = config as TrendChartConfig;
+        const TREND_COLORS = ['#38bdf8','#34d399','#fb923c','#f472b6','#facc15','#f87171','#4ade80','#60a5fa','#c084fc','#fbbf24'];
+        const CHART_TYPES: { value: TrendChartType; label: string }[] = [
+          { value: 'line', label: 'Linie' },
+          { value: 'area', label: 'Flache (Area)' },
+          { value: 'stepped', label: 'Stufen' },
+          { value: 'bar', label: 'Balken' },
+          { value: 'scatter', label: 'Punkte (Scatter)' },
+        ];
+        const TIME_RANGES = [
+          { value: '5min', label: '5 Minuten' },
+          { value: '15min', label: '15 Minuten' },
+          { value: '30min', label: '30 Minuten' },
+          { value: '1h', label: '1 Stunde' },
+          { value: '6h', label: '6 Stunden' },
+          { value: '12h', label: '12 Stunden' },
+          { value: '24h', label: '24 Stunden' },
+          { value: '7d', label: '7 Tage' },
+          { value: '30d', label: '30 Tage' },
+          { value: 'custom', label: 'Benutzerdefiniert' },
+        ];
+
+        const addSeries = () => {
+          const color = TREND_COLORS[tcCfg.series.length % TREND_COLORS.length];
+          const newSeries: TrendSeries = { nodeId: '', label: 'Neu', color, visible: true, chartType: tcCfg.chartType };
+          onUpdate({ config: { ...tcCfg, series: [...tcCfg.series, newSeries] } });
+        };
+
+        const updateSeries = (idx: number, updates: Partial<TrendSeries>) => {
+          const updated = tcCfg.series.map((s, i) => i === idx ? { ...s, ...updates } : s);
+          onUpdate({ config: { ...tcCfg, series: updated } });
+        };
+
+        const removeSeries = (idx: number) => {
+          onUpdate({ config: { ...tcCfg, series: tcCfg.series.filter((_, i) => i !== idx) } });
+        };
+
+        const groupedNodes: Record<string, FlowNode[]> = {};
+        for (const n of availableNodes) {
+          const cat = getNodeCategory(n.type);
+          if (!groupedNodes[cat]) groupedNodes[cat] = [];
+          groupedNodes[cat].push(n);
+        }
+
+        return (
+          <>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-400">Datenpunkte</label>
+                <button
+                  onClick={addSeries}
+                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-[10px] text-white transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Hinzufügen
+                </button>
+              </div>
+              {tcCfg.series.length === 0 && (
+                <p className="text-[10px] text-slate-500 italic">Noch keine Datenpunkte. Klicke auf "Hinzufügen".</p>
+              )}
+              {tcCfg.series.map((s, idx) => (
+                <div key={idx} className="border border-slate-700 rounded-lg p-2 space-y-1.5 bg-slate-800/40">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={s.color}
+                      onChange={(e) => updateSeries(idx, { color: e.target.value })}
+                      className="w-6 h-6 rounded cursor-pointer flex-shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={s.label}
+                      onChange={(e) => updateSeries(idx, { label: e.target.value })}
+                      placeholder="Bezeichnung"
+                      className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 min-w-0"
+                    />
+                    <button
+                      onClick={() => removeSeries(idx)}
+                      className="flex-shrink-0 p-1 hover:bg-red-900/40 rounded text-red-400"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <select
+                    value={s.nodeId}
+                    onChange={(e) => {
+                      const node = availableNodes.find(n => n.id === e.target.value);
+                      updateSeries(idx, { nodeId: e.target.value, label: node ? getNodeLabel(node) : s.label });
+                    }}
+                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+                  >
+                    <option value="">-- Baustein wählen --</option>
+                    {Object.entries(groupedNodes).map(([cat, nodes]) => (
+                      <optgroup key={cat} label={cat}>
+                        {nodes.map(n => (
+                          <option key={n.id} value={n.id}>{getNodeLabel(n)}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="text-[10px] text-slate-500">Diagrammtyp</label>
+                      <select
+                        value={s.chartType || tcCfg.chartType}
+                        onChange={(e) => updateSeries(idx, { chartType: e.target.value as TrendChartType })}
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      >
+                        {CHART_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Y-Achse</label>
+                      <select
+                        value={s.yAxisSide || 'left'}
+                        onChange={(e) => updateSeries(idx, { yAxisSide: e.target.value as 'left' | 'right' })}
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      >
+                        <option value="left">Links</option>
+                        <option value="right">Rechts</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Einheit</label>
+                      <input
+                        type="text"
+                        value={s.unit || ''}
+                        onChange={(e) => updateSeries(idx, { unit: e.target.value || undefined })}
+                        placeholder="z.B. °C"
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Dezimalstellen</label>
+                      <input
+                        type="number"
+                        value={s.decimals ?? 2}
+                        onChange={(e) => updateSeries(idx, { decimals: Number(e.target.value) })}
+                        min={0} max={6}
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Linienstärke</label>
+                      <input
+                        type="number"
+                        value={s.lineWidth ?? 2}
+                        onChange={(e) => updateSeries(idx, { lineWidth: Number(e.target.value) })}
+                        min={1} max={8}
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Füllung (0–1)</label>
+                      <input
+                        type="number"
+                        value={s.fillOpacity ?? 0.1}
+                        onChange={(e) => updateSeries(idx, { fillOpacity: Number(e.target.value) })}
+                        min={0} max={1} step={0.05}
+                        className="w-full px-1.5 py-1 bg-slate-700 border border-slate-600 rounded text-[10px] text-slate-200"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Zeitraum</label>
+              <select
+                value={tcCfg.timeRange}
+                onChange={(e) => onUpdate({ config: { ...tcCfg, timeRange: e.target.value as TrendChartConfig['timeRange'] } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {TIME_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Standard-Diagrammtyp</label>
+              <select
+                value={tcCfg.chartType}
+                onChange={(e) => onUpdate({ config: { ...tcCfg, chartType: e.target.value as TrendChartType } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {CHART_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Titel</label>
+              <input
+                type="text"
+                value={tcCfg.title || ''}
+                onChange={(e) => onUpdate({ config: { ...tcCfg, title: e.target.value || undefined } })}
+                placeholder="Optional"
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Aktualisierung (ms)</label>
+              <input
+                type="number"
+                value={tcCfg.refreshIntervalMs ?? 10000}
+                onChange={(e) => onUpdate({ config: { ...tcCfg, refreshIntervalMs: Number(e.target.value) } })}
+                min={1000} step={1000}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Y-Achse Skalierung</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <label className="text-[10px] text-slate-500">Y-Min</label>
+                  <input
+                    type="number"
+                    value={tcCfg.yMin ?? ''}
+                    onChange={(e) => onUpdate({ config: { ...tcCfg, yMin: e.target.value !== '' ? Number(e.target.value) : undefined } })}
+                    placeholder="Auto"
+                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-500">Y-Max</label>
+                  <input
+                    type="number"
+                    value={tcCfg.yMax ?? ''}
+                    onChange={(e) => onUpdate({ config: { ...tcCfg, yMax: e.target.value !== '' ? Number(e.target.value) : undefined } })}
+                    placeholder="Auto"
+                    className="w-full px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Anzeigeoptionen</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ['showGrid', 'Gitternetz'],
+                  ['showLegend', 'Legende'],
+                  ['showTooltip', 'Tooltip'],
+                  ['showMinMaxAvg', 'Min/Max/Avg'],
+                  ['autoScale', 'Auto-Skalierung'],
+                  ['separateAxes', 'Getrennte Achsen'],
+                  ['smoothing', 'Glättung'],
+                  ['fillArea', 'Fläche füllen'],
+                ] as [keyof TrendChartConfig, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tcCfg[key] !== false && !!tcCfg[key]}
+                      onChange={(e) => onUpdate({ config: { ...tcCfg, [key]: e.target.checked } })}
+                      className="rounded w-3 h-3"
+                    />
+                    {label}
+                  </label>
+                ))}
               </div>
             </div>
           </>

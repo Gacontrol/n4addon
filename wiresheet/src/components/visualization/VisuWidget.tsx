@@ -56,7 +56,8 @@ import {
   ValveWidgetConfig,
   SensorWidgetConfig,
   PIDWidgetConfig,
-  AlarmConsoleWidgetConfig
+  AlarmConsoleWidgetConfig,
+  TrendChartConfig
 } from '../../types/visualization';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuFrame } from './VisuFrame';
@@ -66,6 +67,7 @@ import { VisuSensor } from './VisuSensor';
 import { VisuPID } from './VisuPID';
 import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuAlarmConsole } from './VisuAlarmConsole';
+import { VisuTrendChart } from './VisuTrendChart';
 import { VisuImage } from './VisuImage';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
@@ -1354,6 +1356,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-trend-chart': {
+        const tcCfg = widget.config as TrendChartConfig;
+        return (
+          <VisuTrendChart
+            config={tcCfg}
+            isEditMode={isEditMode}
+            width={widget.size.width}
+            height={widget.size.height}
+          />
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
@@ -1375,7 +1389,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isPumpWidget = widget.type === 'visu-pump';
   const isValveWidget = widget.type === 'visu-valve';
   const isSensorWidget = widget.type === 'visu-sensor';
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget;
+  const isTrendWidget = widget.type === 'visu-trend-chart';
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',
