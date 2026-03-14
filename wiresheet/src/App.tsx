@@ -147,6 +147,8 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const errorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [highlightedWidgetId, setHighlightedWidgetId] = useState<string | null>(null);
   const [modbusDevicesState, setModbusDevicesState] = useState<ModbusDevice[]>([]);
   const [modbusDriverEnabledState, setModbusDriverEnabledState] = useState(true);
@@ -174,7 +176,12 @@ function App() {
           const cfg = await resp.json();
           setModbusDevicesState(cfg.modbusDevices || []);
           setModbusDriverEnabledState(cfg.modbusDriverEnabled !== false);
-          setDriverBindings(cfg.driverBindings || []);
+          const normalizedBindings = (cfg.driverBindings || []).map((b: DriverBinding) =>
+            b.direction === 'output' && b.portId?.startsWith('input-')
+              ? { ...b, direction: 'input' as const }
+              : b
+          );
+          setDriverBindings(normalizedBindings);
           setHaDriverEnabled(cfg.haDriverEnabled !== false);
           console.log('Treiber-Konfiguration geladen');
         }
@@ -622,6 +629,12 @@ function App() {
     }
   }, [handlePlaceModbusDatapoint]);
 
+  const showErrorToast = useCallback((msg: string) => {
+    if (errorToastTimeoutRef.current) clearTimeout(errorToastTimeoutRef.current);
+    setErrorToast(msg);
+    errorToastTimeoutRef.current = setTimeout(() => setErrorToast(null), 3000);
+  }, []);
+
   const clearPortDefaultValue = useCallback((nodeId: string, portId: string) => {
     updateNodeConfigOnPage(activePageId, nodeId, {
       portDefaultValues: Object.fromEntries(
@@ -643,6 +656,16 @@ function App() {
     isOutput: boolean
   ) => {
     if (connectingFrom) {
+      if (!isOutput) {
+        const hasWireConnection = connections.some(
+          c => c.target === connectingFrom.nodeId && c.targetPort === connectingFrom.portId
+        );
+        if (hasWireConnection) {
+          showErrorToast('Verbindung nicht möglich: Eingang bereits verbunden');
+          cancelConnection();
+          return;
+        }
+      }
       const newBinding: DriverBinding = {
         id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nodeId: connectingFrom.nodeId,
@@ -666,7 +689,7 @@ function App() {
       }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort]);
+  }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
 
   const handleHaEntityClick = useCallback((
     device: HaDevice,
@@ -674,7 +697,20 @@ function App() {
     isOutput: boolean
   ) => {
     if (connectingFrom) {
-      const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+      if (!isOutput) {
+        const hasWireConnection = connections.some(
+          c => c.target === connectingFrom.nodeId && c.targetPort === connectingFrom.portId
+        );
+        if (hasWireConnection) {
+          showErrorToast('Verbindung nicht möglich: Eingang bereits verbunden');
+          cancelConnection();
+          return;
+        }
+      }
+      const rawFriendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+      const friendlyName = rawFriendlyName.startsWith(device.name + ' ')
+        ? rawFriendlyName.slice(device.name.length + 1).trim() || rawFriendlyName
+        : rawFriendlyName;
       const newBinding: DriverBinding = {
         id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         nodeId: connectingFrom.nodeId,
@@ -700,7 +736,7 @@ function App() {
       }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort]);
+  }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
 
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
@@ -1410,10 +1446,18 @@ function App() {
               onNodeDelete={handleNodeDelete}
               onConnectionStart={startConnection}
               onConnectionEnd={(targetNodeId, targetPortId, sourceNodeId, sourcePortId) => {
-                updateDriverBindings(prev => prev.filter(b =>
-                  !(b.nodeId === targetNodeId && b.portId === targetPortId && b.direction === 'input')
-                ));
-                endConnection(targetNodeId, targetPortId, sourceNodeId, sourcePortId);
+                const hasDriverBinding = driverBindings.some(
+                  b => b.nodeId === targetNodeId && b.portId === targetPortId && b.direction === 'input'
+                );
+                if (hasDriverBinding) {
+                  showErrorToast('Verbindung nicht moeglich: Eingang bereits gebunden');
+                  cancelConnection();
+                  return;
+                }
+                const success = endConnection(targetNodeId, targetPortId, sourceNodeId, sourcePortId);
+                if (!success) {
+                  showErrorToast('Verbindung nicht moeglich: Eingang bereits verbunden');
+                }
               }}
               onConnectionCancel={cancelConnection}
               onConnectionSelect={selectConnection}
@@ -1490,6 +1534,7 @@ function App() {
                 haDevices={haDevices}
                 haDriverEnabled={haDriverEnabled}
                 alarmClasses={alarmClasses}
+                connections={connections}
               />
             )}
           </div>
@@ -1615,6 +1660,13 @@ function App() {
           }}
           onClose={() => setShowBackupModal(false)}
         />
+      )}
+
+      {errorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 pointer-events-none">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {errorToast}
+        </div>
       )}
     </div>
   );

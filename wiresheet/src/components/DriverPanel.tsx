@@ -519,7 +519,10 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                               {entities.map(entity => {
                                 const binding = getBindingForHaEntity(entity.entity_id);
                                 const isConnecting = !!connectingFrom;
-                                const friendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+                                const rawFriendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+                                const friendlyName = rawFriendlyName.startsWith(device.name + ' ')
+                                  ? rawFriendlyName.slice(device.name.length + 1).trim() || rawFriendlyName
+                                  : rawFriendlyName;
                                 const unit = entity.attributes.unit_of_measurement as string || '';
                                 const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
 

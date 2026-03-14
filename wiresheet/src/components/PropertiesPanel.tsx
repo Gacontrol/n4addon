@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevice, DriverBinding, HaDevice } from '../types/flow';
+import { FlowNode, NodeConfig, EnumStage, PythonPort, CaseDefinition, ModbusDevice, DriverBinding, HaDevice, Connection } from '../types/flow';
 import { X, Plus, Trash2, RefreshCw, Activity, Code, Layers, GripVertical, AlertTriangle, Network, Circle } from 'lucide-react';
 import { EntityBrowser } from './EntityBrowser';
 import { PythonEditor } from './PythonEditor';
@@ -38,6 +38,7 @@ interface PropertiesPanelProps {
   haDevices?: HaDevice[];
   haDriverEnabled?: boolean;
   alarmClasses?: AlarmClass[];
+  connections?: Connection[];
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
@@ -63,7 +64,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   driverBindings = [],
   haDevices = [],
   haDriverEnabled = true,
-  alarmClasses = []
+  alarmClasses = [],
+  connections = []
 }) => {
   const [config, setConfig] = useState<NodeConfig>(node.data.config || {});
   const [panelWidth, setPanelWidth] = useState(320);
@@ -2034,21 +2036,30 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <div className="space-y-1">
               {node.data.inputs.map(port => {
                 const defaultVal = (config.portDefaultValues || {})[port.id] ?? '';
+                const hasConnection = connections.some(c => c.target === node.id && c.targetPort === port.id);
+                const hasBinding = driverBindings.some(b => b.nodeId === node.id && b.portId === port.id && b.direction === 'input');
+                const isBlocked = hasConnection || hasBinding;
                 return (
-                  <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
-                    <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                  <div key={port.id} className={`flex items-center gap-2 px-2 py-1.5 rounded ${isBlocked ? 'bg-slate-700/20 opacity-60' : 'bg-slate-700/40'}`}>
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isBlocked ? 'bg-slate-500' : 'bg-blue-400'}`} />
                     <span className="text-xs text-slate-300 min-w-0 flex-1 truncate">{port.label}</span>
-                    <input
-                      type="text"
-                      value={defaultVal}
-                      placeholder="null"
-                      title="Festwert wenn kein Eingang verbunden"
-                      onChange={e => {
-                        const vals = { ...(config.portDefaultValues || {}), [port.id]: e.target.value };
-                        updateConfig('portDefaultValues', vals);
-                      }}
-                      className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono placeholder-slate-600 text-right"
-                    />
+                    {isBlocked ? (
+                      <span className="text-[10px] text-slate-500 italic">
+                        {hasConnection ? 'verbunden' : 'gebunden'}
+                      </span>
+                    ) : (
+                      <input
+                        type="text"
+                        value={defaultVal}
+                        placeholder="null"
+                        title="Festwert wenn kein Eingang verbunden"
+                        onChange={e => {
+                          const vals = { ...(config.portDefaultValues || {}), [port.id]: e.target.value };
+                          updateConfig('portDefaultValues', vals);
+                        }}
+                        className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono placeholder-slate-600 text-right"
+                      />
+                    )}
                   </div>
                 );
               })}

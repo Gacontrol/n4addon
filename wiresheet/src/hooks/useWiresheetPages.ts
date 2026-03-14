@@ -466,18 +466,24 @@ export const useWiresheetPages = () => {
     setSelectedNodes(new Set());
   }, [updateActivePage]);
 
-  const addConnection = useCallback((connection: Connection) => {
+  const addConnection = useCallback((connection: Connection): boolean => {
+    let blocked = false;
     updateActivePage(p => {
-      const filtered = p.connections.filter(
-        c => !(c.target === connection.target && c.targetPort === connection.targetPort)
+      const alreadyOccupied = p.connections.some(
+        c => c.target === connection.target && c.targetPort === connection.targetPort
       );
-      const exists = filtered.some(
+      if (alreadyOccupied) {
+        blocked = true;
+        return p;
+      }
+      const exists = p.connections.some(
         c => c.source === connection.source && c.sourcePort === connection.sourcePort &&
              c.target === connection.target && c.targetPort === connection.targetPort
       );
       if (exists) return p;
-      return { ...p, connections: [...filtered, connection] };
+      return { ...p, connections: [...p.connections, connection] };
     });
+    return !blocked;
   }, [updateActivePage]);
 
   const addConnections = useCallback((newConns: Connection[]) => {
@@ -645,8 +651,9 @@ export const useWiresheetPages = () => {
     setConnectingFrom(newValue);
   }, []);
 
-  const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => {
+  const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string): boolean => {
     console.log('[useWiresheetPages] endConnection:', { targetNodeId, targetPortId, sourceNodeId, sourcePortId });
+    let success = false;
     if (sourceNodeId !== targetNodeId) {
       const connection: Connection = {
         id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
@@ -656,21 +663,24 @@ export const useWiresheetPages = () => {
         targetPort: targetPortId
       };
       console.log('[useWiresheetPages] Creating connection:', connection);
-      addConnection(connection);
-      updateActivePage(p => ({
-        ...p,
-        nodes: p.nodes.map(n => {
-          if (n.id !== targetNodeId) return n;
-          const portDefaultValues = { ...(n.data.config?.portDefaultValues as Record<string, string> | undefined || {}) };
-          delete portDefaultValues[targetPortId];
-          return { ...n, data: { ...n.data, config: { ...n.data.config, portDefaultValues } } };
-        })
-      }));
+      success = addConnection(connection);
+      if (success) {
+        updateActivePage(p => ({
+          ...p,
+          nodes: p.nodes.map(n => {
+            if (n.id !== targetNodeId) return n;
+            const portDefaultValues = { ...(n.data.config?.portDefaultValues as Record<string, string> | undefined || {}) };
+            delete portDefaultValues[targetPortId];
+            return { ...n, data: { ...n.data, config: { ...n.data.config, portDefaultValues } } };
+          })
+        }));
+      }
     } else {
       console.log('[useWiresheetPages] Same node - not creating connection');
     }
     connectingFromRef.current = null;
     setConnectingFrom(null);
+    return success;
   }, [addConnection, updateActivePage]);
 
   const cancelConnection = useCallback(() => {
