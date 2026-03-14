@@ -2052,13 +2052,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   </div>
                 );
               })}
-              {node.data.outputs.map(port => (
-                <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <span className="text-xs text-slate-300 flex-1">{port.label}</span>
-                  <span className="text-xs text-slate-500">Ausgang</span>
-                </div>
-              ))}
+              {node.data.outputs.map((port, idx) => {
+                const portLiveKey = `${node.id}:output-${idx}`;
+                const portLiveVal = liveValues[portLiveKey] !== undefined
+                  ? liveValues[portLiveKey]
+                  : (node.data.outputs.length === 1 ? liveValues[node.id] : undefined);
+                const hasVal = portLiveVal !== undefined && portLiveVal !== null;
+                return (
+                  <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-300 flex-1">{port.label}</span>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${hasVal ? 'bg-emerald-900/60 text-emerald-300' : 'text-slate-500'}`}>
+                      {hasVal ? String(portLiveVal) : 'Ausgang'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
