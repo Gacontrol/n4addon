@@ -8,7 +8,7 @@ const { spawn } = require('child_process');
 const app = express();
 const visuApp = express();
 const PORT = 8100;
-const VISU_PORT = 8098;
+const VISU_PORT = 8101;
 
 const DATA_PATHS = [
   '/data/wiresheet',
