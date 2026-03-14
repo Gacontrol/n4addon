@@ -104,7 +104,7 @@ export function VisuApp() {
           if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
         }
       } catch {}
-      if (active) timer = setTimeout(poll, 500);
+      if (active) timer = setTimeout(poll, 200);
     }
 
     poll();

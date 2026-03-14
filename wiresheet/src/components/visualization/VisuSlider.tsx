@@ -44,6 +44,7 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (disabled) return;
+    e.preventDefault();
     setIsDragging(true);
     const newValue = calculateValue(e.clientX);
     setLocalValue(newValue);
@@ -62,16 +63,44 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
     }
   }, [isDragging, localValue, onChange]);
 
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (disabled) return;
+    e.preventDefault();
+    setIsDragging(true);
+    const touch = e.touches[0];
+    const newValue = calculateValue(touch.clientX);
+    setLocalValue(newValue);
+  }, [disabled, calculateValue]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isDragging || disabled) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const newValue = calculateValue(touch.clientX);
+    setLocalValue(newValue);
+  }, [isDragging, disabled, calculateValue]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+      onChange(localValue);
+    }
+  }, [isDragging, localValue, onChange]);
+
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   const percent = ((localValue - config.min) / (config.max - config.min)) * 100;
 
@@ -89,19 +118,21 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
       )}
       <div
         ref={sliderRef}
-        className={`relative h-6 bg-slate-700 rounded-full ${disabled ? 'opacity-50' : 'cursor-pointer'}`}
+        className={`relative h-8 bg-slate-700 rounded-full select-none ${disabled ? 'opacity-50' : 'cursor-pointer'}`}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        style={{ touchAction: 'none' }}
       >
         <div
-          className="absolute top-0 left-0 h-full rounded-full transition-all"
+          className="absolute top-0 left-0 h-full rounded-full"
           style={{
             width: `${percent}%`,
             backgroundColor: accentColor
           }}
         />
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-white rounded-full shadow-lg transition-all"
-          style={{ left: `calc(${percent}% - 10px)` }}
+          className="absolute top-1/2 -translate-y-1/2 w-7 h-7 bg-white rounded-full shadow-lg"
+          style={{ left: `calc(${percent}% - 14px)` }}
         />
       </div>
       <div className="flex justify-between text-[10px] text-slate-500">
