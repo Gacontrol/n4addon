@@ -5,7 +5,7 @@ import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
 import { WidgetPalette } from './WidgetPalette';
-import { WidgetPropertiesPanel } from './WidgetPropertiesPanel';
+import { WidgetPropertiesPanel, TrackedTrend } from './WidgetPropertiesPanel';
 import { FileManager } from './FileManager';
 import { getWidgetTemplate } from '../../data/widgetTemplates';
 
@@ -86,7 +86,20 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   const [multiClipboard, setMultiClipboard] = useState<VisuWidget[] | null>(readMultiClipboard);
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const [showFileManager, setShowFileManager] = useState(false);
+  const [trackedTrends, setTrackedTrends] = useState<TrackedTrend[]>([]);
   const pageHistoryRef = useRef<string[]>([activeVisuPageId]);
+
+  useEffect(() => {
+    const apiBase = getApiBase();
+    fetch(`${apiBase}/api/trend-config`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.trackedNodes) {
+          setTrackedTrends(data.trackedNodes.filter((n: TrackedTrend & { enabled?: boolean }) => n.enabled !== false));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -617,6 +630,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             availableNodes={logicNodes}
             visuPages={visuPages.map(p => ({ id: p.id, name: p.name }))}
             alarmConsoles={alarmConsoles}
+            trackedTrends={trackedTrends}
             onUpdate={(updates) => handleUpdateWidget(selectedWidget.id, updates)}
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}

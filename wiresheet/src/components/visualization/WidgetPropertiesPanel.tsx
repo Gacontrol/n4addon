@@ -51,11 +51,19 @@ function getApiBase(): string {
   return m ? m[1] : '';
 }
 
+export interface TrackedTrend {
+  nodeId: string;
+  label: string;
+  color: string;
+  unit?: string;
+}
+
 interface WidgetPropertiesPanelProps {
   widget: VisuWidget;
   availableNodes: FlowNode[];
   visuPages?: { id: string; name: string }[];
   alarmConsoles?: AlarmConsole[];
+  trackedTrends?: TrackedTrend[];
   onUpdate: (updates: Partial<VisuWidget>) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -233,6 +241,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   availableNodes,
   visuPages = [],
   alarmConsoles = [],
+  trackedTrends = [],
   onUpdate,
   onDelete,
   onClose
@@ -2384,12 +2393,6 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           { value: 'custom', label: 'Benutzerdefiniert' },
         ];
 
-        const addSeries = () => {
-          const color = TREND_COLORS[tcCfg.series.length % TREND_COLORS.length];
-          const newSeries: TrendSeries = { nodeId: '', label: 'Neu', color, visible: true, chartType: tcCfg.chartType };
-          onUpdate({ config: { ...tcCfg, series: [...tcCfg.series, newSeries] } });
-        };
-
         const updateSeries = (idx: number, updates: Partial<TrendSeries>) => {
           const updated = tcCfg.series.map((s, i) => i === idx ? { ...s, ...updates } : s);
           onUpdate({ config: { ...tcCfg, series: updated } });
@@ -2399,28 +2402,48 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
           onUpdate({ config: { ...tcCfg, series: tcCfg.series.filter((_, i) => i !== idx) } });
         };
 
-        const groupedNodes: Record<string, FlowNode[]> = {};
-        for (const n of availableNodes) {
-          const cat = getNodeCategory(n.type);
-          if (!groupedNodes[cat]) groupedNodes[cat] = [];
-          groupedNodes[cat].push(n);
-        }
+        const alreadyAdded = new Set(tcCfg.series.map(s => s.nodeId));
+        const availableTrends = trackedTrends.filter(t => !alreadyAdded.has(t.nodeId));
+
+        const addFromTrend = (trend: TrackedTrend) => {
+          const newSeries: TrendSeries = {
+            nodeId: trend.nodeId,
+            label: trend.label,
+            color: trend.color,
+            unit: trend.unit,
+            visible: true,
+            chartType: tcCfg.chartType,
+          };
+          onUpdate({ config: { ...tcCfg, series: [...tcCfg.series, newSeries] } });
+        };
 
         return (
           <>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-slate-400">Datenpunkte</label>
-                <button
-                  onClick={addSeries}
-                  className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-[10px] text-white transition-colors"
-                >
-                  <Plus className="w-3 h-3" /> Hinzufügen
-                </button>
+                <label className="text-xs font-medium text-slate-400">Trends</label>
               </div>
-              {tcCfg.series.length === 0 && (
-                <p className="text-[10px] text-slate-500 italic">Noch keine Datenpunkte. Klicke auf "Hinzufügen".</p>
+              {trackedTrends.length === 0 && (
+                <p className="text-[10px] text-slate-500 italic">Keine Trends konfiguriert. Zuerst in der Trend-Ansicht Datenpunkte hinzufügen.</p>
               )}
+              {trackedTrends.length > 0 && availableTrends.length === 0 && tcCfg.series.length > 0 && (
+                <p className="text-[10px] text-slate-500 italic">Alle konfigurierten Trends wurden bereits hinzugefügt.</p>
+              )}
+              {availableTrends.map(trend => (
+                <button
+                  key={trend.nodeId}
+                  onClick={() => addFromTrend(trend)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300 transition-colors text-left"
+                >
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: trend.color }} />
+                  <span className="flex-1 truncate">{trend.label}</span>
+                  {trend.unit && <span className="text-slate-500 text-[10px]">{trend.unit}</span>}
+                  <Plus className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                </button>
+              ))}
+              {tcCfg.series.length > 0 && (
+                <div className="border-t border-slate-700 pt-2 space-y-1.5">
+                  <label className="text-xs font-medium text-slate-400">Ausgewählte Trends</label>
               {tcCfg.series.map((s, idx) => (
                 <div key={idx} className="border border-slate-700 rounded-lg p-2 space-y-1.5 bg-slate-800/40">
                   <div className="flex items-center gap-1.5">
@@ -2444,23 +2467,6 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
-                  <select
-                    value={s.nodeId}
-                    onChange={(e) => {
-                      const node = availableNodes.find(n => n.id === e.target.value);
-                      updateSeries(idx, { nodeId: e.target.value, label: node ? getNodeLabel(node) : s.label });
-                    }}
-                    className="w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
-                  >
-                    <option value="">-- Baustein wählen --</option>
-                    {Object.entries(groupedNodes).map(([cat, nodes]) => (
-                      <optgroup key={cat} label={cat}>
-                        {nodes.map(n => (
-                          <option key={n.id} value={n.id}>{getNodeLabel(n)}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
                   <div className="grid grid-cols-2 gap-1.5">
                     <div>
                       <label className="text-[10px] text-slate-500">Diagrammtyp</label>
@@ -2526,6 +2532,8 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 </div>
               ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
