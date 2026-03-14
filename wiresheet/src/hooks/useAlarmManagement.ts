@@ -7,8 +7,58 @@ function getApiBase(): string {
   return m ? `${m[1]}/api` : '/api';
 }
 
-const DEFAULT_ALARM_CLASSES: AlarmClass[] = [];
-const DEFAULT_ALARM_CONSOLES: AlarmConsole[] = [];
+const now = Date.now();
+
+const DEFAULT_ALARM_CLASSES: AlarmClass[] = [
+  {
+    id: 'prio1',
+    name: 'Prio 1',
+    description: 'Höchste Priorität – kritische Alarme',
+    priority: 'critical',
+    color: '#ef4444',
+    soundEnabled: true,
+    autoAcknowledge: false,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'prio2',
+    name: 'Prio 2',
+    description: 'Hohe Priorität – wichtige Alarme',
+    priority: 'high',
+    color: '#f97316',
+    soundEnabled: false,
+    autoAcknowledge: false,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: 'prio3',
+    name: 'Prio 3',
+    description: 'Mittlere Priorität – Warnmeldungen',
+    priority: 'medium',
+    color: '#eab308',
+    soundEnabled: false,
+    autoAcknowledge: false,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
+
+const DEFAULT_ALARM_CONSOLES: AlarmConsole[] = [
+  {
+    id: 'console-default',
+    name: 'Alarmkonsole',
+    description: 'Alle Alarmprioritäten',
+    alarmClassIds: ['prio1', 'prio2', 'prio3'],
+    showHistory: true,
+    historyLimit: 500,
+    sortBy: 'priority',
+    sortDirection: 'desc',
+    createdAt: now,
+    updatedAt: now,
+  },
+];
 
 export function useAlarmManagement() {
   const [alarmClasses, setAlarmClasses] = useState<AlarmClass[]>(DEFAULT_ALARM_CLASSES);
@@ -24,8 +74,10 @@ export function useAlarmManagement() {
         const resp = await fetch(`${apiBase}/alarm-config`);
         if (resp.ok) {
           const data = await resp.json();
-          setAlarmClasses(data.alarmClasses || []);
-          setAlarmConsoles(data.alarmConsoles || []);
+          const classes: AlarmClass[] = data.alarmClasses?.length > 0 ? data.alarmClasses : DEFAULT_ALARM_CLASSES;
+          const consoles: AlarmConsole[] = data.alarmConsoles?.length > 0 ? data.alarmConsoles : DEFAULT_ALARM_CONSOLES;
+          setAlarmClasses(classes);
+          setAlarmConsoles(consoles);
           setActiveAlarms(data.activeAlarms || []);
           setAlarmHistory(data.alarmHistory || []);
         }
