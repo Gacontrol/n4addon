@@ -740,6 +740,82 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'toggle-pulse' && (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Impulsdauer
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={config.togglePulseDurationMs ?? 500}
+                  onChange={e => updateConfig('togglePulseDurationMs', parseInt(e.target.value) || 0)}
+                  className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                />
+                <span className="text-xs text-slate-400 flex-shrink-0">ms</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">{((config.togglePulseDurationMs ?? 500) / 1000).toFixed(1)} Sekunden</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Aktueller Zustand
+              </label>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1.5 rounded text-xs font-medium ${config.togglePulseState ? 'bg-green-500/20 text-green-400' : 'bg-slate-600 text-slate-300'}`}>
+                  {config.togglePulseState ? 'EIN' : 'AUS'}
+                </span>
+                <span className="text-xs text-slate-500">Naechster Impuls: {config.togglePulseState ? 'false' : 'true'}</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Der Zustand wechselt automatisch bei jedem Trigger</p>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.togglePulseInactiveIsNull !== false}
+                  onChange={e => updateConfig('togglePulseInactiveIsNull', e.target.checked)}
+                  className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800"
+                />
+                <span className="text-xs text-slate-300">Inaktiver Wert ist null</span>
+              </label>
+            </div>
+            {config.togglePulseInactiveIsNull === false && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Inaktiver Wert
+                </label>
+                <input
+                  type="text"
+                  value={config.togglePulseInactiveValue !== undefined ? String(config.togglePulseInactiveValue) : ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === 'true') {
+                      updateConfig('togglePulseInactiveValue', true);
+                    } else if (val === 'false') {
+                      updateConfig('togglePulseInactiveValue', false);
+                    } else if (!isNaN(Number(val)) && val !== '') {
+                      updateConfig('togglePulseInactiveValue', Number(val));
+                    } else {
+                      updateConfig('togglePulseInactiveValue', val);
+                    }
+                  }}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors font-mono"
+                />
+                <p className="text-xs text-slate-500 mt-1">Wert wenn nicht aktiv</p>
+              </div>
+            )}
+            <div className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+              <p className="text-xs text-slate-400">
+                <strong className="text-slate-300">Shelly-Modus:</strong> Sendet abwechselnd true/false Impulse.
+                Ideal fuer Wechselschaltungen mit Shelly-Relais.
+              </p>
+            </div>
+          </div>
+        )}
+
         {node.type === 'delay' && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">

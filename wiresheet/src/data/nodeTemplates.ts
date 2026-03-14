@@ -369,6 +369,26 @@ export const nodeTemplates: NodeTemplate[] = [
     }
   },
   {
+    type: 'toggle-pulse',
+    label: 'Toggle Impuls',
+    icon: 'Lightbulb',
+    category: 'special',
+    color: '#eab308',
+    inputs: [
+      { label: 'Trigger', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Sendet abwechselnd true/false Impulse (fuer Shelly)',
+    defaultConfig: {
+      togglePulseDurationMs: 500,
+      togglePulseState: false,
+      togglePulseInactiveValue: null,
+      togglePulseInactiveIsNull: true
+    }
+  },
+  {
     type: 'counter',
     label: 'Zaehler',
     icon: 'ListOrdered',
