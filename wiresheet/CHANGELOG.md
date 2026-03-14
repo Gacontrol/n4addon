@@ -1,8 +1,13 @@
 # Changelog
 
+## [1.0.5] - 2026-03-14
+
+### Geaendert
+- Bugfixes und Verbesserungen
+
 ## [1.0.4] - 2026-03-12
 
-### Geändert
+### Geaendert
 - Umbenennung zu GA-Control
 
 ## [1.0.0] - 2026-03-10

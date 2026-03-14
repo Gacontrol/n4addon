@@ -1,4 +1,5 @@
 ARG BUILD_FROM
+ARG BUILD_VERSION=1.0.5
 
 FROM node:18-alpine AS builder
 
@@ -26,8 +27,10 @@ RUN npm install --production
 
 FROM $BUILD_FROM
 
+ARG BUILD_VERSION
 ENV LANG=C.UTF-8 \
-    NODE_ENV=production
+    NODE_ENV=production \
+    BUILD_VERSION=${BUILD_VERSION}
 
 RUN apk add --no-cache \
     nodejs \
@@ -45,3 +48,5 @@ COPY rootfs /
 
 RUN chmod +x /etc/s6-overlay/s6-rc.d/wiresheet-server/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/nginx/run
+
+LABEL io.hass.version="${BUILD_VERSION}"
