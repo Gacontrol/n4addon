@@ -1911,7 +1911,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
           const boolVal = toBool(val);
           const writeKey = `node:${nodeId}:${entityId}`;
           const lastWritten = haLastWrittenValues.get(writeKey);
-          const valueChanged = lastWritten === undefined || lastWritten !== boolVal;
+          const haState = haLiveValues.get(entityId);
+          const haCurrentBool = haState ? (haState.state === 'on' || haState.state === 'true') : undefined;
+          if (haCurrentBool !== undefined && lastWritten !== undefined && haCurrentBool !== lastWritten) {
+            haLastWrittenValues.delete(writeKey);
+          }
+          const valueChanged = haLastWrittenValues.get(writeKey) === undefined || haLastWrittenValues.get(writeKey) !== boolVal;
           if (valueChanged) {
             try {
               if (domain === 'light') {
@@ -2154,7 +2159,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         const isBoolDomain = ['light', 'switch', 'input_boolean'].includes(domain) || (!['input_number', 'number', 'climate', 'cover'].includes(domain));
         let normalizedValue = valueToWrite;
         if (isBoolDomain) normalizedValue = toBool(valueToWrite);
-        const bindingValueChanged = lastBindingWritten === undefined || String(lastBindingWritten) !== String(normalizedValue);
+        const haBindingState = haLiveValues.get(binding.haEntityId);
+        if (haBindingState && lastBindingWritten !== undefined) {
+          let haBindingCurrent;
+          if (isBoolDomain) haBindingCurrent = haBindingState.state === 'on' || haBindingState.state === 'true';
+          else haBindingCurrent = String(parseFloat(haBindingState.state));
+          if (String(haBindingCurrent) !== String(lastBindingWritten)) {
+            haLastWrittenValues.delete(bindingWriteKey);
+          }
+        }
+        const bindingValueChanged = haLastWrittenValues.get(bindingWriteKey) === undefined || String(haLastWrittenValues.get(bindingWriteKey)) !== String(normalizedValue);
         if (!bindingValueChanged) {
           return;
         }
