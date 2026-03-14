@@ -1003,6 +1003,14 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           {String(portVal).length > 6 ? String(portVal).slice(0, 6) + '..' : String(portVal)}
                         </span>
                       )}
+                      {!hasPortVal && !driverBinding && (portVisuBindings.length === 0) && (() => {
+                        const defVal = (data.config?.portDefaultValues as Record<string, string> | undefined)?.[input.id];
+                        return defVal !== undefined && defVal !== '' ? (
+                          <span className="text-[8px] font-mono text-slate-500 bg-slate-800/80 px-0.5 rounded leading-none max-w-12 truncate border border-slate-700" title="Festwert">
+                            {defVal.length > 6 ? defVal.slice(0, 6) + '..' : defVal}
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                 );

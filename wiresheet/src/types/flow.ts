@@ -90,6 +90,7 @@ export interface NodeConfig {
   containerHeight?: number;
   inputCount?: number;
   constValue?: number | string | boolean;
+  portDefaultValues?: Record<string, string>;
   timerMs?: number;
   counterMax?: number;
   counterMin?: number;

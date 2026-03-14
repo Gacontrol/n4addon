@@ -136,6 +136,7 @@ function App() {
   const [showCycleEditor, setShowCycleEditor] = useState(false);
   const [cycleInput, setCycleInput] = useState(String(activePage.cycleMs));
   const [sidebarTab, setSidebarTab] = useState<'nodes' | 'blocks'>('nodes');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -1057,64 +1058,65 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-2.5 flex-shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-shrink-0">
+      <header className="bg-slate-800 border-b border-slate-700 px-2 sm:px-4 py-2 sm:py-2.5 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap sm:flex-nowrap min-h-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="bg-blue-600 p-1.5 rounded-lg">
               <Workflow className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-sm font-bold text-white leading-tight">GA-Control</h1>
               <p className="text-xs text-slate-500 leading-tight">keep it simple - by Dr. Muff</p>
             </div>
+            <h1 className="sm:hidden text-sm font-bold text-white">GA</h1>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0">
             <button
               onClick={() => setMainView('logic')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'logic'
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Cpu className="w-3.5 h-3.5" />
-              Logik
+              <span className="hidden sm:inline">Logik</span>
             </button>
             <button
               onClick={() => setMainView('drivers')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'drivers'
                   ? 'bg-amber-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Network className="w-3.5 h-3.5" />
-              Treiber
+              <span className="hidden sm:inline">Treiber</span>
             </button>
             <button
               onClick={() => { setMainView('visu'); executeAllPages(); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'visu'
                   ? 'bg-green-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Monitor className="w-3.5 h-3.5" />
-              Visu
+              <span className="hidden sm:inline">Visu</span>
             </button>
             <button
               onClick={() => setMainView('alarms')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mainView === 'alarms'
                   ? 'bg-red-600 text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Bell className="w-3.5 h-3.5" />
-              Alarme
+              <span className="hidden sm:inline">Alarme</span>
               {activeAlarms.length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                <span className="bg-red-500 text-white text-[10px] px-1 py-0.5 rounded-full animate-pulse">
                   {activeAlarms.length}
                 </span>
               )}
@@ -1181,14 +1183,14 @@ function App() {
           )}
 
           {mainView === 'logic' && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <div className="relative">
               <button
                 onClick={() => setShowCycleEditor(v => !v)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors text-xs"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors text-xs"
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>{activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`}</span>
+                <span className="hidden sm:inline">{activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`}</span>
                 {showCycleEditor ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               {showCycleEditor && (
@@ -1231,24 +1233,24 @@ function App() {
 
             <button
               onClick={() => activePage.running ? stopPage(activePageId) : startPage(activePageId)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs font-medium ${
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg transition-all text-xs font-medium ${
                 activePage.running
                   ? 'bg-red-600 hover:bg-red-500 text-white'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white'
               }`}
             >
               {activePage.running ? (
-                <><Square className="w-3.5 h-3.5" /> Stopp</>
+                <><Square className="w-3.5 h-3.5" /><span className="hidden sm:inline">Stopp</span></>
               ) : (
-                <><Play className="w-3.5 h-3.5" /> Start</>
+                <><Play className="w-3.5 h-3.5" /><span className="hidden sm:inline">Start</span></>
               )}
             </button>
 
             <div className="flex items-center gap-1 text-xs">
-              {saveStatus === 'saving' && <span className="text-slate-400 flex items-center gap-1"><Save className="w-3 h-3 animate-pulse" /> Speichert...</span>}
-              {saveStatus === 'saved' && <span className="text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /> Gespeichert</span>}
-              {saveStatus === 'unsaved' && <span className="text-amber-400 flex items-center gap-1"><Save className="w-3 h-3" /> Ungespeichert</span>}
-              {saveStatus === 'error' && <span className="text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Fehler</span>}
+              {saveStatus === 'saving' && <span className="text-slate-400 flex items-center gap-1"><Save className="w-3 h-3 animate-pulse" /><span className="hidden sm:inline">Speichert...</span></span>}
+              {saveStatus === 'saved' && <span className="text-emerald-400 flex items-center gap-1"><Check className="w-3 h-3" /><span className="hidden sm:inline">Gespeichert</span></span>}
+              {saveStatus === 'unsaved' && <span className="text-amber-400 flex items-center gap-1"><Save className="w-3 h-3" /><span className="hidden sm:inline">Ungespeichert</span></span>}
+              {saveStatus === 'error' && <span className="text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /><span className="hidden sm:inline">Fehler</span></span>}
             </div>
           </div>
           )}
@@ -1260,10 +1262,10 @@ function App() {
           <button
             onClick={() => setShowBackupModal(true)}
             title="Backup & Import"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border border-slate-700 hover:border-slate-600"
+            className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border border-slate-700 hover:border-slate-600 flex-shrink-0"
           >
             <DatabaseBackup className="w-3.5 h-3.5" />
-            Backup
+            <span className="hidden sm:inline">Backup</span>
           </button>
         </div>
       </header>
@@ -1278,7 +1280,7 @@ function App() {
 
       {mainView === 'logic' ? (
         <>
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden relative">
             <DriverPanel
               side="left"
               modbusDevices={modbusDevices}
@@ -1294,7 +1296,7 @@ function App() {
               highlightedBinding={highlightedBinding}
             />
 
-            <div className="w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
+            <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} sm:flex w-52 sm:w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col absolute sm:relative z-30 top-0 bottom-0 left-0 h-full`}>
               <div className="flex border-b border-slate-700">
                 <button
                   onClick={() => setSidebarTab('nodes')}
@@ -1323,6 +1325,12 @@ function App() {
                     </span>
                   )}
                 </button>
+                <button
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="sm:hidden px-2 text-slate-400 hover:text-white border-l border-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               <div className="flex-1 overflow-hidden">
                 {sidebarTab === 'nodes' ? (
@@ -1343,6 +1351,15 @@ function App() {
                 )}
               </div>
             </div>
+            {!mobileSidebarOpen && (
+              <button
+                onClick={() => setMobileSidebarOpen(true)}
+                className="sm:hidden absolute left-2 bottom-16 z-20 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white rounded-full p-2.5 shadow-lg transition-colors"
+                title="Bausteine"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            )}
 
             <FlowCanvas
               nodes={nodes}

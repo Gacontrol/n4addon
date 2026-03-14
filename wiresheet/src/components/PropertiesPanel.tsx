@@ -274,8 +274,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
   return (
     <div
-      className="bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0 overflow-hidden relative"
-      style={{ width: panelWidth }}
+      className="bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0 overflow-hidden relative absolute sm:relative inset-y-0 right-0 z-30 sm:z-auto w-full sm:w-auto"
+      style={{ width: window.innerWidth < 640 ? '100%' : panelWidth }}
     >
       <div
         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-blue-500/30 transition-colors flex items-center justify-center z-10 group"
@@ -2026,16 +2026,32 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && !node.type.startsWith('modbus-') && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Ports
+              Ports &amp; Festwerte
             </label>
+            <p className="text-[10px] text-slate-500 mb-2">
+              Festwert: Wird am Eingang verwendet, wenn kein Kabel angeschlossen ist. Leer = null.
+            </p>
             <div className="space-y-1">
-              {node.data.inputs.map(port => (
-                <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
-                  <span className="text-xs text-slate-300 flex-1">{port.label}</span>
-                  <span className="text-xs text-slate-500">Eingang</span>
-                </div>
-              ))}
+              {node.data.inputs.map(port => {
+                const defaultVal = (config.portDefaultValues || {})[port.id] ?? '';
+                return (
+                  <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
+                    <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-300 min-w-0 flex-1 truncate">{port.label}</span>
+                    <input
+                      type="text"
+                      value={defaultVal}
+                      placeholder="null"
+                      title="Festwert wenn kein Eingang verbunden"
+                      onChange={e => {
+                        const vals = { ...(config.portDefaultValues || {}), [port.id]: e.target.value };
+                        updateConfig('portDefaultValues', vals);
+                      }}
+                      className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white outline-none focus:border-blue-500 font-mono placeholder-slate-600 text-right"
+                    />
+                  </div>
+                );
+              })}
               {node.data.outputs.map(port => (
                 <div key={port.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-700/40 rounded">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
