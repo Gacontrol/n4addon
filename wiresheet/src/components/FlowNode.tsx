@@ -42,6 +42,7 @@ interface FlowNodeProps {
   onDriverBindingClick?: (binding: DriverBinding) => void;
   onDriverBindingDelete?: (binding: DriverBinding) => void;
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
+  onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -72,6 +73,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onDriverBindingClick,
   onDriverBindingDelete,
   onVisuBindingClick,
+  onVisuBindingDelete,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -904,7 +906,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                             ? (String(vb.value).length > 6 ? String(vb.value).slice(0, 6) + '..' : String(vb.value))
                             : null;
                           return (
-                            <div key={vbi} className="flex items-center">
+                            <div key={vbi} className="flex items-center group/visu-binding">
+                              <button
+                                className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/visu-binding:opacity-100 transition-opacity mr-0.5"
+                                title="Visu-Verbindung loeschen"
+                                onClick={(e) => { e.stopPropagation(); onVisuBindingDelete?.(vb); }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
+                                <Icons.X className="w-3 h-3 text-red-400" />
+                              </button>
                               <span
                                 className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-pointer"
                                 title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
@@ -1125,7 +1135,15 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 ? (String(vb.value).length > 8 ? String(vb.value).slice(0, 8) + '..' : String(vb.value))
                 : null;
               return (
-                <div key={vbi} className="flex items-center">
+                <div key={vbi} className="flex items-center group/visu-node-binding">
+                  <button
+                    className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/visu-node-binding:opacity-100 transition-opacity mr-0.5 flex-shrink-0"
+                    title="Visu-Verbindung loeschen"
+                    onClick={(e) => { e.stopPropagation(); onVisuBindingDelete?.(vb); }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Icons.X className="w-3 h-3 text-red-400" />
+                  </button>
                   <div
                     className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-pointer hover:bg-pink-900/80 transition-colors"
                     title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}

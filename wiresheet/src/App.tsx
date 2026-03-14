@@ -622,6 +622,16 @@ function App() {
     }
   }, [handlePlaceModbusDatapoint]);
 
+  const clearPortDefaultValue = useCallback((nodeId: string, portId: string) => {
+    updateNodeConfigOnPage(activePageId, nodeId, {
+      portDefaultValues: Object.fromEntries(
+        Object.entries(
+          (nodes.find(n => n.id === nodeId)?.data?.config?.portDefaultValues as Record<string, string> | undefined) || {}
+        ).filter(([k]) => k !== portId)
+      )
+    });
+  }, [activePageId, nodes, updateNodeConfigOnPage]);
+
   const handleDriverDatapointClick = useCallback((
     device: ModbusDevice,
     datapoint: ModbusDevice['datapoints'][0],
@@ -645,9 +655,12 @@ function App() {
         );
         return [...filtered, newBinding];
       });
+      if (!isOutput) {
+        clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+      }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue]);
 
   const handleHaEntityClick = useCallback((
     device: HaDevice,
@@ -675,9 +688,12 @@ function App() {
         );
         return [...filtered, newBinding];
       });
+      if (!isOutput) {
+        clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+      }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue]);
 
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
@@ -694,6 +710,17 @@ function App() {
     setHighlightedWidgetId(binding.widgetId);
     setTimeout(() => setHighlightedWidgetId(null), 3000);
   }, [setActiveVisuPageId]);
+
+  const handleVisuBindingDelete = useCallback((binding: VisuBindingInfo) => {
+    const page = visuPages.find(p => p.id === binding.pageId);
+    if (!page) return;
+    const updatedWidgets = page.widgets.map(w => {
+      if (w.id !== binding.widgetId) return w;
+      const { binding: _b, ...rest } = w;
+      return rest;
+    });
+    updateVisuPage(binding.pageId, { widgets: updatedWidgets });
+  }, [visuPages, updateVisuPage]);
 
   const handlePingModbusDevice = useCallback(async (deviceId: string) => {
     const device = modbusDevices.find(d => d.id === deviceId);
@@ -1408,6 +1435,7 @@ function App() {
                 updateDriverBindings(prev => prev.filter(b => b.id !== binding.id));
               }}
               onVisuBindingClick={handleVisuBindingClick}
+              onVisuBindingDelete={handleVisuBindingDelete}
             />
 
             <DriverPanel

@@ -54,6 +54,7 @@ interface FlowCanvasProps {
   onDriverBindingClick?: (binding: DriverBinding) => void;
   onDriverBindingDelete?: (binding: DriverBinding) => void;
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
+  onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -97,7 +98,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   bindingStatuses = [],
   onDriverBindingClick,
   onDriverBindingDelete,
-  onVisuBindingClick
+  onVisuBindingClick,
+  onVisuBindingDelete
 }) => {
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
     const result: VisuBindingInfo[] = [];
@@ -637,6 +639,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDriverBindingClick={onDriverBindingClick}
                 onDriverBindingDelete={onDriverBindingDelete}
                 onVisuBindingClick={onVisuBindingClick}
+                onVisuBindingDelete={onVisuBindingDelete}
               />
             );
           })}
@@ -761,6 +764,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDriverBindingClick={onDriverBindingClick}
                 onDriverBindingDelete={onDriverBindingDelete}
                 onVisuBindingClick={onVisuBindingClick}
+                onVisuBindingDelete={onVisuBindingDelete}
               />
             );
           })}

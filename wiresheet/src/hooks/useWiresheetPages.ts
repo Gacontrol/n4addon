@@ -654,12 +654,21 @@ export const useWiresheetPages = () => {
       };
       console.log('[useWiresheetPages] Creating connection:', connection);
       addConnection(connection);
+      updateActivePage(p => ({
+        ...p,
+        nodes: p.nodes.map(n => {
+          if (n.id !== targetNodeId) return n;
+          const portDefaultValues = { ...(n.data.config?.portDefaultValues as Record<string, string> | undefined || {}) };
+          delete portDefaultValues[targetPortId];
+          return { ...n, data: { ...n.data, config: { ...n.data.config, portDefaultValues } } };
+        })
+      }));
     } else {
       console.log('[useWiresheetPages] Same node - not creating connection');
     }
     connectingFromRef.current = null;
     setConnectingFrom(null);
-  }, [addConnection]);
+  }, [addConnection, updateActivePage]);
 
   const cancelConnection = useCallback(() => {
     connectingFromRef.current = null;
