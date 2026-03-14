@@ -1026,10 +1026,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       style={{
         backgroundColor: page.backgroundColor || '#0f172a',
         cursor: drawingCursor,
-        width: hasFixedSize ? page.canvasWidth : '100%',
-        height: hasFixedSize ? page.canvasHeight : '100%',
-        minWidth: hasFixedSize ? page.canvasWidth : '100%',
-        minHeight: hasFixedSize ? page.canvasHeight : '100%',
+        width: hasFixedSize ? page.canvasWidth : Math.max(widgetsBounds.maxX + 200, 1200),
+        height: hasFixedSize ? page.canvasHeight : Math.max(widgetsBounds.maxY + 200, 800),
+        minWidth: hasFixedSize ? page.canvasWidth : Math.max(widgetsBounds.maxX + 200, 1200),
+        minHeight: hasFixedSize ? page.canvasHeight : Math.max(widgetsBounds.maxY + 200, 800),
       }}
       onClick={handleCanvasClick}
       onMouseMove={handleCanvasMouseMove}

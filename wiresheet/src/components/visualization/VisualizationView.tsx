@@ -350,7 +350,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   return (
     <>
     <div className="flex flex-col h-full bg-slate-950">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700 bg-slate-900">
+      {isEditMode && <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700 bg-slate-900">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             {visuPages.map((page) => (
@@ -469,9 +469,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
-      {showPageSettings && (
+      {isEditMode && showPageSettings && (
         <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 bg-slate-800/50">
           <div className="flex items-center gap-2">
             <input
