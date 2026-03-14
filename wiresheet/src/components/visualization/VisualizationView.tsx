@@ -350,7 +350,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   return (
     <>
     <div className="flex flex-col h-full bg-slate-950">
-      {isEditMode && <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700 bg-slate-900">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700 bg-slate-900">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             {visuPages.map((page) => (
@@ -375,7 +375,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 ) : (
                   <button
                     onClick={() => onSetActiveVisuPage(page.id)}
-                    onDoubleClick={() => setEditingPageName(page.id)}
+                    onDoubleClick={() => isEditMode && setEditingPageName(page.id)}
                     className={`px-3 py-1 rounded text-sm transition-colors ${
                       page.id === activeVisuPageId
                         ? 'bg-blue-600 text-white'
@@ -387,15 +387,17 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 )}
               </div>
             ))}
-            <button
-              onClick={onAddVisuPage}
-              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded"
-              title="Neue Seite"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            {isEditMode && (
+              <button
+                onClick={onAddVisuPage}
+                className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded"
+                title="Neue Seite"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          {visuPages.length > 1 && (
+          {isEditMode && visuPages.length > 1 && (
             <button
               onClick={() => onDeleteVisuPage(activeVisuPageId)}
               className="p-1.5 text-red-400 hover:bg-red-900/30 rounded"
@@ -469,7 +471,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             )}
           </div>
         </div>
-      </div>}
+      </div>
 
       {isEditMode && showPageSettings && (
         <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 bg-slate-800/50">
