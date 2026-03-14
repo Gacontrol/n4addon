@@ -16,8 +16,13 @@ function getApiBase(): string {
 }
 
 function getVisuUrl(): string {
+  const ingressMatch = window.location.pathname.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+  const appMatch = window.location.pathname.match(/^(\/app\/[^/]+)/);
+  if (ingressMatch) return `${window.location.origin}${ingressMatch[1]}/visu`;
+  if (appMatch) return `${window.location.origin}${appMatch[1]}/visu`;
+  const protocol = window.location.protocol;
   const hostname = window.location.hostname;
-  return `http://${hostname}:8098`;
+  return `${protocol}//${hostname}:8098`;
 }
 
 interface VisualizationViewProps {
