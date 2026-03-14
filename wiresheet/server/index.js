@@ -722,8 +722,9 @@ app.get(['/trend-config', '/api/trend-config'], (req, res) => {
 
 app.post(['/trend-config', '/api/trend-config'], async (req, res) => {
   try {
-    const { trackedNodes } = req.body;
+    const { trackedNodes, chartGroups } = req.body;
     trendConfig.trackedNodes = trackedNodes || [];
+    if (chartGroups !== undefined) trendConfig.chartGroups = chartGroups;
     await saveTrendConfig();
     res.json({ success: true });
   } catch (err) {
