@@ -703,6 +703,7 @@ function getDefaultValueForNodeType(nodeType) {
     case 'delay':
     case 'select':
     case 'sr-flipflop':
+    case 'oneshot':
     case 'python-script':
     case 'ha-input':
     case 'ha-output':
@@ -739,6 +740,9 @@ function getDefaultOutputsForNodeType(node) {
     case 'rising-edge':
     case 'falling-edge':
       defaults['output-0'] = false;
+      break;
+    case 'oneshot':
+      defaults['output-0'] = null;
       break;
     case 'python-script': {
       const pythonOutputs = (node.data && node.data.config && node.data.config.pythonOutputs) || [];
@@ -1145,8 +1149,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = !toBool(inputVals[0]);
     } else if (node.type === 'switch') {
       const sw = toBool(inputVals[0]);
-      const valTrue = inputVals[1];
-      const valFalse = inputVals[2];
+      const valTrue = inputVals[1] !== undefined ? inputVals[1] : true;
+      const valFalse = inputVals[2] !== undefined ? inputVals[2] : false;
       nodeValues[nodeId] = sw ? valTrue : valFalse;
     } else if (node.type === 'select') {
       const a = inputVals[0];
@@ -1342,6 +1346,30 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       st.prevInput = inputVal;
       nodeValues[nodeId] = fallingEdge;
       nodeValues[`${nodeId}:output-0`] = fallingEdge;
+    } else if (node.type === 'oneshot') {
+      const inputVal = toBool(inputVals[0]);
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__oneshotState || (node.__oneshotState = {});
+      const duration = cfg.oneshotDurationMs !== undefined ? cfg.oneshotDurationMs : 1000;
+      const activeValue = cfg.oneshotActiveValue !== undefined ? cfg.oneshotActiveValue : true;
+      const inactiveIsNull = cfg.oneshotInactiveIsNull !== undefined ? cfg.oneshotInactiveIsNull : true;
+      const inactiveValue = inactiveIsNull ? null : (cfg.oneshotInactiveValue !== undefined ? cfg.oneshotInactiveValue : false);
+
+      if (st.prevInput === undefined) st.prevInput = false;
+      if (st.activeUntil === undefined) st.activeUntil = 0;
+
+      const risingEdge = inputVal && !st.prevInput;
+      st.prevInput = inputVal;
+
+      const now = Date.now();
+      if (risingEdge) {
+        st.activeUntil = now + duration;
+      }
+
+      const isActive = now < st.activeUntil;
+      const outputValue = isActive ? activeValue : inactiveValue;
+
+      nodeValues[nodeId] = outputValue;
+      nodeValues[`${nodeId}:output-0`] = outputValue;
     } else if (node.type === 'time-trigger') {
       const cronExpr = cfg.cronExpression || '0 * * * *';
       const st = pageId ? getNodeState(pageId, nodeId) : node.__timeTrigState || (node.__timeTrigState = {});
