@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ButtonConfig, WidgetStyle } from '../../types/visualization';
 
 interface VisuButtonProps {
@@ -19,32 +19,53 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
   statusValue
 }) => {
   const [pressed, setPressed] = useState(false);
+  const [toggleState, setToggleState] = useState(false);
   const buttonColor = config.color || '#3b82f6';
   const pressVal = config.pressValue ?? config.defaultPressValue ?? true;
   const releaseVal = config.releaseValue ?? config.defaultReleaseValue ?? false;
+  const isHoldMode = config.holdMode === true;
+  const pressedRef = useRef(false);
 
   const isActive = statusValue !== undefined && statusValue !== null && statusValue !== false && statusValue !== 0;
+
+  useEffect(() => {
+    if (!isHoldMode && statusValue !== undefined) {
+      setToggleState(isActive);
+    }
+  }, [statusValue, isActive, isHoldMode]);
 
   const handleMouseDown = useCallback(() => {
     if (disabled) return;
     setPressed(true);
-    onValueChange(pressVal);
-  }, [disabled, onValueChange, pressVal]);
+    pressedRef.current = true;
+
+    if (isHoldMode) {
+      onValueChange(pressVal);
+    }
+  }, [disabled, onValueChange, pressVal, isHoldMode]);
 
   const handleMouseUp = useCallback(() => {
     if (disabled) return;
+    if (!pressedRef.current) return;
+    pressedRef.current = false;
     setPressed(false);
-    if (!config.holdMode) {
+
+    if (isHoldMode) {
       onValueChange(releaseVal);
+    } else {
+      const newState = !toggleState;
+      setToggleState(newState);
+      onValueChange(newState ? pressVal : releaseVal);
     }
-  }, [disabled, onValueChange, releaseVal, config.holdMode]);
+  }, [disabled, onValueChange, releaseVal, pressVal, isHoldMode, toggleState]);
 
   const handleMouseLeave = useCallback(() => {
-    if (pressed && !config.holdMode) {
+    if (pressed && isHoldMode) {
       setPressed(false);
+      pressedRef.current = false;
       onValueChange(releaseVal);
     }
-  }, [pressed, config.holdMode, releaseVal, onValueChange]);
+  }, [pressed, isHoldMode, releaseVal, onValueChange]);
 
   const activeColor = isActive ? `${buttonColor}` : buttonColor;
 
