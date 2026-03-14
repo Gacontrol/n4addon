@@ -632,6 +632,11 @@ function App() {
     });
   }, [activePageId, nodes, updateNodeConfigOnPage]);
 
+  const removeConnectionsToInputPort = useCallback((nodeId: string, portId: string) => {
+    const connsToRemove = connections.filter(c => c.target === nodeId && c.targetPort === portId);
+    connsToRemove.forEach(c => deleteConnection(c.id));
+  }, [connections, deleteConnection]);
+
   const handleDriverDatapointClick = useCallback((
     device: ModbusDevice,
     datapoint: ModbusDevice['datapoints'][0],
@@ -657,10 +662,11 @@ function App() {
       });
       if (!isOutput) {
         clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+        removeConnectionsToInputPort(connectingFrom.nodeId, connectingFrom.portId);
       }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort]);
 
   const handleHaEntityClick = useCallback((
     device: HaDevice,
@@ -690,10 +696,11 @@ function App() {
       });
       if (!isOutput) {
         clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+        removeConnectionsToInputPort(connectingFrom.nodeId, connectingFrom.portId);
       }
       cancelConnection();
     }
-  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue]);
+  }, [connectingFrom, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort]);
 
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
@@ -1402,7 +1409,12 @@ function App() {
               onNodesSelect={selectNodes}
               onNodeDelete={handleNodeDelete}
               onConnectionStart={startConnection}
-              onConnectionEnd={endConnection}
+              onConnectionEnd={(targetNodeId, targetPortId, sourceNodeId, sourcePortId) => {
+                updateDriverBindings(prev => prev.filter(b =>
+                  !(b.nodeId === targetNodeId && b.portId === targetPortId && b.direction === 'input')
+                ));
+                endConnection(targetNodeId, targetPortId, sourceNodeId, sourcePortId);
+              }}
               onConnectionCancel={cancelConnection}
               onConnectionSelect={selectConnection}
               onConnectionDelete={deleteConnection}

@@ -366,7 +366,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                 const binding = getBindingForDatapoint(device.id, dp.id);
                                 const isConnecting = !!connectingFrom;
                                 const isWritable = dp.writable;
-                                const effectiveIsOutput = isOutputPanel ? true : isWritable;
+                                const effectiveIsOutput = isOutputPanel;
                                 const canConnect = isConnecting && !isDeviceDisabled && (
                                   (isOutputPanel && dp.writable) ||
                                   (!isOutputPanel)

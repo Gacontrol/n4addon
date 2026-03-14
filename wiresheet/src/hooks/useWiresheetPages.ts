@@ -468,12 +468,15 @@ export const useWiresheetPages = () => {
 
   const addConnection = useCallback((connection: Connection) => {
     updateActivePage(p => {
-      const exists = p.connections.some(
+      const filtered = p.connections.filter(
+        c => !(c.target === connection.target && c.targetPort === connection.targetPort)
+      );
+      const exists = filtered.some(
         c => c.source === connection.source && c.sourcePort === connection.sourcePort &&
              c.target === connection.target && c.targetPort === connection.targetPort
       );
       if (exists) return p;
-      return { ...p, connections: [...p.connections, connection] };
+      return { ...p, connections: [...filtered, connection] };
     });
   }, [updateActivePage]);
 
