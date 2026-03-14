@@ -37,6 +37,7 @@ function App() {
     stopPage,
     liveValues,
     driverLiveValues,
+    modbusDeviceStatusSSE,
     haEntities,
     haLoading,
     haError,
@@ -141,7 +142,14 @@ function App() {
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [modbusDeviceStatus, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
+  const [modbusDeviceStatusManual, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
+  const modbusDeviceStatus = useMemo(() => {
+    const merged: Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }> = { ...modbusDeviceStatusManual };
+    for (const [id, s] of Object.entries(modbusDeviceStatusSSE)) {
+      merged[id] = { ...s, pinging: modbusDeviceStatusManual[id]?.pinging };
+    }
+    return merged;
+  }, [modbusDeviceStatusManual, modbusDeviceStatusSSE]);
   const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
   const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);

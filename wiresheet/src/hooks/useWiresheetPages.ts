@@ -30,6 +30,7 @@ export const useWiresheetPages = () => {
   const [activePageId, setActivePageId] = useState<string>(pages[0].id);
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
   const [driverLiveValues, setDriverLiveValues] = useState<{ modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> }>({ modbus: {}, ha: {} });
+  const [modbusDeviceStatusSSE, setModbusDeviceStatusSSE] = useState<Record<string, { online: boolean; lastSeen?: number }>>({});
   const [haEntities, setHaEntities] = useState<Array<{ entity_id: string; state: string; attributes: Record<string, unknown> }>>([]);
   const [haLoading, setHaLoading] = useState(false);
   const [haError, setHaError] = useState<string | null>(null);
@@ -226,6 +227,13 @@ export const useWiresheetPages = () => {
         try {
           const data = JSON.parse(e.data);
           setDriverLiveValues(data);
+        } catch {}
+      });
+
+      es.addEventListener('modbus-device-status', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          setModbusDeviceStatusSSE(data);
         } catch {}
       });
 
@@ -870,6 +878,7 @@ export const useWiresheetPages = () => {
     stopPage,
     liveValues,
     driverLiveValues,
+    modbusDeviceStatusSSE,
     haEntities,
     haLoading,
     haError,

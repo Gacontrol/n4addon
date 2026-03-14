@@ -1025,6 +1025,33 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'light-toggle' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-amber-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Licht Taster</span>
+            </div>
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-1 font-medium">Impulsdauer</label>
+              <input
+                type="number"
+                min={50}
+                max={10000}
+                step={50}
+                value={config.lightTogglePulseMs ?? 500}
+                onChange={e => updateConfig('lightTogglePulseMs', parseInt(e.target.value) || 500)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+              />
+              <p className="text-xs text-slate-500">{((config.lightTogglePulseMs ?? 500) / 1000).toFixed(2)} Sek.</p>
+            </div>
+            <div className="bg-slate-700/30 rounded-lg p-3 text-xs text-slate-400 space-y-1">
+              <p className="font-medium text-slate-300">Logik:</p>
+              <p>Steigende Flanke am Taster Eingang auswertet Rückmeldung:</p>
+              <p className="text-green-400">Rückmeldung = 0 (Licht aus) → Ausgang sendet true-Impuls</p>
+              <p className="text-red-400">Rückmeldung = 1 (Licht an) → Ausgang sendet false-Impuls</p>
+            </div>
+          </div>
+        )}
+
         {node.type === 'heating-curve' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-orange-400">

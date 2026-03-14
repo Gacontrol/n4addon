@@ -43,15 +43,46 @@ const modbusLiveValues = new Map();
 const haLiveValues = new Map();
 let driverPollingInterval = null;
 const DRIVER_POLL_INTERVAL = 2000;
+let isPollingRunning = false;
+const modbusDeviceOnlineStatus = new Map();
+
+async function pingModbusDevice(device) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let done = false;
+    const finish = (online) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(online);
+    };
+    socket.setTimeout(2000);
+    socket.on('connect', () => finish(true));
+    socket.on('error', () => finish(false));
+    socket.on('timeout', () => finish(false));
+    socket.connect(device.port || 502, device.host);
+  });
+}
 
 async function pollAllDrivers() {
+  if (isPollingRunning) return;
+  isPollingRunning = true;
+  try {
   if (!driverConfig.modbusDriverEnabled && !driverConfig.haDriverEnabled) {
+    isPollingRunning = false;
     return;
   }
 
   if (driverConfig.modbusDriverEnabled) {
     const enabledDevices = (driverConfig.modbusDevices || []).filter(d => d.enabled);
     for (const device of enabledDevices) {
+      const online = await pingModbusDevice(device);
+      modbusDeviceOnlineStatus.set(device.id, { online, lastSeen: online ? Date.now() : (modbusDeviceOnlineStatus.get(device.id)?.lastSeen) });
+      if (!online) {
+        console.log(`Modbus device ${device.name} (${device.host}) offline - skipping poll`);
+        continue;
+      }
       for (const dp of (device.datapoints || [])) {
         if (dp.isConfig) continue;
         try {
@@ -104,6 +135,12 @@ async function pollAllDrivers() {
     modbus: Object.fromEntries(modbusLiveValues),
     ha: Object.fromEntries(haLiveValues)
   });
+  broadcastSSE('modbus-device-status', Object.fromEntries(modbusDeviceOnlineStatus));
+  } catch (err) {
+    console.error('pollAllDrivers error:', err.message);
+  } finally {
+    isPollingRunning = false;
+  }
 }
 
 function startDriverPolling() {
@@ -404,6 +441,10 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
 
 app.get(['/driver-config', '/api/driver-config'], async (req, res) => {
   res.json(driverConfig);
+});
+
+app.get(['/modbus-device-status', '/api/modbus-device-status'], (req, res) => {
+  res.json(Object.fromEntries(modbusDeviceOnlineStatus));
 });
 
 app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
@@ -1772,6 +1813,38 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[`${nodeId}:output-0`] = outputValue;
       nodeValues[`${nodeId}:input-0`] = inputValue;
       nodeValues[`${nodeId}:input-1`] = enable;
+    } else if (node.type === 'light-toggle') {
+      const taster = toBool(inputVals[0]);
+      const rueckmeldung = toBool(inputVals[1]);
+      const pulseMs = toNumber(cfg.lightTogglePulseMs) || 500;
+      const state = getNodeState(pageId, nodeId);
+
+      const prevTaster = state.prevTaster;
+      state.prevTaster = taster;
+
+      const now = Date.now();
+
+      if (taster && !prevTaster) {
+        const command = !rueckmeldung;
+        state.pulseValue = command;
+        state.pulseUntil = now + pulseMs;
+      }
+
+      if (state.pulseUntil && now < state.pulseUntil) {
+        nodeValues[nodeId] = state.pulseValue;
+        nodeValues[`${nodeId}:output-0`] = state.pulseValue;
+      } else {
+        if (state.pulseUntil && now >= state.pulseUntil) {
+          state.pulseUntil = null;
+          state.pulseValue = null;
+        }
+        nodeValues[nodeId] = null;
+        nodeValues[`${nodeId}:output-0`] = null;
+      }
+
+      nodeValues[`${nodeId}:input-0`] = taster;
+      nodeValues[`${nodeId}:input-1`] = rueckmeldung;
+
     } else if (node.type === 'python-script') {
       const pythonInputs = cfg.pythonInputs || [];
       const pythonCode = cfg.pythonCode || '';

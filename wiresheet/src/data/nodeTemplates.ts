@@ -682,6 +682,24 @@ export const nodeTemplates: NodeTemplate[] = [
     }
   },
   {
+    type: 'light-toggle',
+    label: 'Licht Taster',
+    icon: 'Lightbulb',
+    category: 'special',
+    color: '#f59e0b',
+    inputs: [
+      { label: 'Taster', type: 'input' },
+      { label: 'Rückmeldung', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' }
+    ],
+    description: 'Licht Ein/Aus per Taster mit Rückmeldung – sendet true wenn Licht aus, false wenn Licht an',
+    defaultConfig: {
+      lightTogglePulseMs: 500
+    }
+  },
+  {
     type: 'heating-curve',
     label: 'Heizkurve',
     icon: 'TrendingUp',
