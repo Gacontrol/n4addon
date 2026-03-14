@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   TrendingUp, Settings, Trash2, RefreshCw, ChevronDown, ChevronRight,
   Plus, Minus, Download, Eye, EyeOff, Clock, BarChart2, Image,
-  Layers, Calendar, X, Check, ChevronLeft, ChevronRight as ChevronRightIcon
+  Layers, Calendar, X, Check, ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 import { WiresheetPage, FlowNode } from '../types/flow';
 
