@@ -154,7 +154,7 @@ export const nodeTemplates: NodeTemplate[] = [
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Schalter=1: WertTrue (Std:true), Schalter=0: WertFalse (Std:false)'
+    description: 'Gibt WertTrue oder WertFalse aus je nach Schalter'
   },
   {
     type: 'select',
@@ -347,26 +347,6 @@ export const nodeTemplates: NodeTemplate[] = [
       { label: 'Q', type: 'output' }
     ],
     description: 'Set-Reset Speicher'
-  },
-  {
-    type: 'oneshot',
-    label: 'OneShot',
-    icon: 'Zap',
-    category: 'special',
-    color: '#64748b',
-    inputs: [
-      { label: 'Trigger', type: 'input' }
-    ],
-    outputs: [
-      { label: 'Ausgang', type: 'output' }
-    ],
-    description: 'Gibt Wert fuer einstellbare Zeit aus',
-    defaultConfig: {
-      oneshotDurationMs: 1000,
-      oneshotActiveValue: true,
-      oneshotInactiveValue: null,
-      oneshotInactiveIsNull: true
-    }
   },
   {
     type: 'counter',
