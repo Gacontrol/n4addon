@@ -133,29 +133,35 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
     const sources: AlarmSourceNode[] = [];
     const nodeTypesWithAlarms = [
       'sensor-control', 'pump-control', 'aggregate-control', 'valve-control',
-      'threshold', 'compare', 'dp-boolean', 'dp-numeric', 'pid-controller'
+      'threshold', 'compare', 'dp-boolean', 'dp-numeric', 'dp-enum'
     ];
 
     for (const page of pages) {
       for (const node of page.nodes || []) {
         const cfg = node.data?.config || {};
+
+        const boolCfg = cfg.booleanAlarmConfig as { enabled?: boolean; alarmClassId?: string } | undefined;
+        const numCfg = cfg.numericAlarmConfig as { enabled?: boolean; alarmClassId?: string } | undefined;
+        const enumCfg = cfg.enumAlarmConfig as { enabled?: boolean; alarmClassId?: string } | undefined;
+        const aggCfg = cfg.aggregateAlarmConfig as { faultAlarmClassId?: string } | undefined;
+        const valveCfg = cfg.valveAlarmConfig as { alarmClassId?: string } | undefined;
+        const sensorCfg = cfg.sensorAlarmConfig as { alarmClassId?: string } | undefined;
+
         const hasAlarmEnabled =
-          cfg.alarmEnabled === true ||
-          cfg.sensorAlarmEnabled === true ||
-          cfg.pumpAlarmEnabled === true ||
-          cfg.aggregateAlarmEnabled === true ||
-          cfg.valveAlarmEnabled === true ||
-          cfg.thresholdAlarmEnabled === true ||
-          cfg.pidAlarmEnabled === true;
+          boolCfg?.enabled === true ||
+          numCfg?.enabled === true ||
+          enumCfg?.enabled === true ||
+          !!aggCfg?.faultAlarmClassId ||
+          !!valveCfg?.alarmClassId ||
+          !!sensorCfg?.alarmClassId;
 
         const alarmClassId =
-          cfg.alarmClassId as string | undefined ||
-          cfg.sensorAlarmClassId as string | undefined ||
-          cfg.pumpAlarmClassId as string | undefined ||
-          cfg.aggregateAlarmClassId as string | undefined ||
-          cfg.valveAlarmClassId as string | undefined ||
-          cfg.thresholdAlarmClassId as string | undefined ||
-          cfg.pidAlarmClassId as string | undefined;
+          boolCfg?.alarmClassId ||
+          numCfg?.alarmClassId ||
+          enumCfg?.alarmClassId ||
+          aggCfg?.faultAlarmClassId ||
+          valveCfg?.alarmClassId ||
+          sensorCfg?.alarmClassId;
 
         const nodeAlarms = activeAlarms.filter(a => a.sourceNodeId === node.id);
 
@@ -689,76 +695,117 @@ const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const cfg = source.node.data?.config || {};
 
-  const getAlarmConfigKeys = () => {
+  const getAlarmConfig = () => {
     switch (source.node.type) {
       case 'sensor-control':
         return {
-          enabled: 'sensorAlarmEnabled',
-          classId: 'sensorAlarmClassId',
-          text: 'sensorAlarmText',
-          labelPrefix: 'Sensor'
+          configKey: 'sensorAlarmConfig',
+          labelPrefix: 'Sensor',
+          hasEnabled: false,
+          config: (cfg.sensorAlarmConfig || {}) as { alarmClassId?: string }
         };
       case 'pump-control':
         return {
-          enabled: 'pumpAlarmEnabled',
-          classId: 'pumpAlarmClassId',
-          text: 'pumpAlarmText',
-          labelPrefix: 'Pumpe'
+          configKey: 'aggregateAlarmConfig',
+          labelPrefix: 'Pumpe',
+          hasEnabled: false,
+          config: (cfg.aggregateAlarmConfig || {}) as { faultAlarmClassId?: string; maintenanceAlarmClassId?: string }
         };
       case 'aggregate-control':
         return {
-          enabled: 'aggregateAlarmEnabled',
-          classId: 'aggregateAlarmClassId',
-          text: 'aggregateAlarmText',
-          labelPrefix: 'Aggregat'
+          configKey: 'aggregateAlarmConfig',
+          labelPrefix: 'Aggregat',
+          hasEnabled: false,
+          config: (cfg.aggregateAlarmConfig || {}) as { faultAlarmClassId?: string; maintenanceAlarmClassId?: string }
         };
       case 'valve-control':
         return {
-          enabled: 'valveAlarmEnabled',
-          classId: 'valveAlarmClassId',
-          text: 'valveAlarmText',
-          labelPrefix: 'Ventil'
+          configKey: 'valveAlarmConfig',
+          labelPrefix: 'Ventil',
+          hasEnabled: false,
+          config: (cfg.valveAlarmConfig || {}) as { alarmClassId?: string }
+        };
+      case 'dp-boolean':
+        return {
+          configKey: 'booleanAlarmConfig',
+          labelPrefix: 'Boolean',
+          hasEnabled: true,
+          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string; alarmValue: boolean }
+        };
+      case 'dp-numeric':
+        return {
+          configKey: 'numericAlarmConfig',
+          labelPrefix: 'Numerisch',
+          hasEnabled: true,
+          config: (cfg.numericAlarmConfig || { enabled: false }) as { enabled: boolean; alarmClassId?: string }
+        };
+      case 'dp-enum':
+        return {
+          configKey: 'enumAlarmConfig',
+          labelPrefix: 'Enum',
+          hasEnabled: true,
+          config: (cfg.enumAlarmConfig || { enabled: false, alarmValues: [] }) as { enabled: boolean; alarmClassId?: string; alarmValues: (number | string)[] }
         };
       case 'threshold':
         return {
-          enabled: 'thresholdAlarmEnabled',
-          classId: 'thresholdAlarmClassId',
-          text: 'thresholdAlarmText',
-          labelPrefix: 'Schwellwert'
+          configKey: 'booleanAlarmConfig',
+          labelPrefix: 'Schwellwert',
+          hasEnabled: true,
+          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string }
         };
-      case 'pid-controller':
+      case 'compare':
         return {
-          enabled: 'pidAlarmEnabled',
-          classId: 'pidAlarmClassId',
-          text: 'pidAlarmText',
-          labelPrefix: 'PID'
+          configKey: 'booleanAlarmConfig',
+          labelPrefix: 'Vergleich',
+          hasEnabled: true,
+          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string }
         };
       default:
         return {
-          enabled: 'alarmEnabled',
-          classId: 'alarmClassId',
-          text: 'alarmText',
-          labelPrefix: ''
+          configKey: 'booleanAlarmConfig',
+          labelPrefix: '',
+          hasEnabled: true,
+          config: (cfg.booleanAlarmConfig || { enabled: false, alarmValue: true }) as { enabled: boolean; alarmClassId?: string; alarmText?: string }
         };
     }
   };
 
-  const keys = getAlarmConfigKeys();
-  const isEnabled = cfg[keys.enabled] === true;
-  const currentClassId = cfg[keys.classId] as string | undefined;
-  const currentText = cfg[keys.text] as string | undefined;
+  const alarmCfg = getAlarmConfig();
+  const isAggregate = source.node.type === 'pump-control' || source.node.type === 'aggregate-control';
+
+  const isEnabled = alarmCfg.hasEnabled
+    ? (alarmCfg.config as { enabled?: boolean }).enabled === true
+    : isAggregate
+      ? !!(alarmCfg.config as { faultAlarmClassId?: string }).faultAlarmClassId
+      : !!(alarmCfg.config as { alarmClassId?: string }).alarmClassId;
+
+  const currentClassId = isAggregate
+    ? (alarmCfg.config as { faultAlarmClassId?: string }).faultAlarmClassId
+    : (alarmCfg.config as { alarmClassId?: string }).alarmClassId;
+
+  const currentText = (alarmCfg.config as { alarmText?: string }).alarmText;
   const currentClass = alarmClasses.find(ac => ac.id === currentClassId);
 
   const handleToggleEnabled = () => {
-    onUpdateConfig({ [keys.enabled]: !isEnabled });
+    if (alarmCfg.hasEnabled) {
+      const newCfg = { ...alarmCfg.config, enabled: !isEnabled };
+      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+    }
   };
 
   const handleClassChange = (classId: string) => {
-    onUpdateConfig({ [keys.classId]: classId || undefined });
+    if (isAggregate) {
+      const newCfg = { ...alarmCfg.config, faultAlarmClassId: classId || undefined };
+      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+    } else {
+      const newCfg = { ...alarmCfg.config, alarmClassId: classId || undefined };
+      onUpdateConfig({ [alarmCfg.configKey]: newCfg });
+    }
   };
 
   const handleTextChange = (text: string) => {
-    onUpdateConfig({ [keys.text]: text || undefined });
+    const newCfg = { ...alarmCfg.config, alarmText: text || undefined };
+    onUpdateConfig({ [alarmCfg.configKey]: newCfg });
   };
 
   const nodeLabel = cfg.customLabel as string || source.node.data.label || source.node.type;
@@ -781,7 +828,7 @@ const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-white font-medium">{nodeLabel}</span>
               <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">
-                {keys.labelPrefix || source.node.type}
+                {alarmCfg.labelPrefix || source.node.type}
               </span>
               {isEnabled && currentClass && (
                 <span
@@ -803,16 +850,23 @@ const AlarmSourceItem: React.FC<AlarmSourceItemProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); handleToggleEnabled(); }}
-            className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-              isEnabled
-                ? 'bg-green-600 hover:bg-green-500 text-white'
-                : 'bg-slate-600 hover:bg-slate-500 text-slate-300'
-            }`}
-          >
-            {isEnabled ? 'Aktiv' : 'Inaktiv'}
-          </button>
+          {alarmCfg.hasEnabled && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleToggleEnabled(); }}
+              className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                isEnabled
+                  ? 'bg-green-600 hover:bg-green-500 text-white'
+                  : 'bg-slate-600 hover:bg-slate-500 text-slate-300'
+              }`}
+            >
+              {isEnabled ? 'Aktiv' : 'Inaktiv'}
+            </button>
+          )}
+          {!alarmCfg.hasEnabled && isEnabled && (
+            <span className="px-3 py-1.5 text-xs rounded-lg bg-green-600/20 text-green-400">
+              Konfiguriert
+            </span>
+          )}
           {isExpanded ? (
             <ChevronDown className="w-5 h-5 text-slate-400" />
           ) : (

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { VisuWidget, VisuPage, PolygonConfig, LineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
@@ -912,6 +912,94 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const hasFixedSize = page.canvasWidth && page.canvasHeight;
 
   const isMultiSelected = (widgetId: string) => selectedWidgetIds.includes(widgetId);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (isEditMode || !hasFixedSize) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setContainerSize({ width: rect.width, height: rect.height });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isEditMode, hasFixedSize]);
+
+  const responsiveScale = useMemo(() => {
+    if (isEditMode || !hasFixedSize || !containerSize) return 1;
+    const canvasW = page.canvasWidth!;
+    const canvasH = page.canvasHeight!;
+    const scaleX = containerSize.width / canvasW;
+    const scaleY = containerSize.height / canvasH;
+    return Math.min(scaleX, scaleY, 1);
+  }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight]);
+
+  const shouldScale = !isEditMode && hasFixedSize && responsiveScale < 1;
+
+  if (!isEditMode && hasFixedSize) {
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full overflow-hidden flex items-center justify-center"
+        style={{ backgroundColor: page.backgroundColor || '#0f172a' }}
+      >
+        <div
+          ref={canvasRef}
+          className="relative"
+          style={{
+            width: page.canvasWidth,
+            height: page.canvasHeight,
+            transform: shouldScale ? `scale(${responsiveScale})` : undefined,
+            transformOrigin: 'center center',
+            backgroundColor: page.backgroundColor || '#0f172a',
+          }}
+          onClick={handleCanvasClick}
+        >
+          {page.widgets.map((widget) => (
+            <VisuWidgetRenderer
+              key={widget.id}
+              widget={widget}
+              value={getWidgetValue(widget)}
+              statusValue={getWidgetStatusValue(widget)}
+              onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+              onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
+              isEditMode={false}
+              isSelected={false}
+              isMultiSelected={false}
+              onSelect={() => {}}
+              onDoubleClick={() => {}}
+              onMouseDown={() => {}}
+              onContextMenu={() => {}}
+              onNavigateToPage={onNavigateToPage}
+              onNavigateBack={onNavigateBack}
+              onNavigateHome={onNavigateHome}
+              pumpParams={getPumpWidgetParams(widget)}
+              valveParams={getValveWidgetParams(widget)}
+              sensorParams={getSensorWidgetParams(widget)}
+              pidParams={getPIDWidgetParams(widget)}
+              heatingCurveParams={getHeatingCurveWidgetParams(widget)}
+              isHighlighted={highlightedWidgetId === widget.id}
+              alarmClasses={alarmClasses}
+              alarmConsoles={alarmConsoles}
+              activeAlarms={activeAlarms}
+              onAcknowledgeAlarm={onAcknowledgeAlarm}
+              onAcknowledgeAll={onAcknowledgeAll}
+              onClearAlarm={onClearAlarm}
+              onShelveAlarm={onShelveAlarm}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
