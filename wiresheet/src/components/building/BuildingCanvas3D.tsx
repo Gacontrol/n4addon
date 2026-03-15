@@ -36,6 +36,7 @@ interface Props {
   onSelectWidget3D?: (id: string | null) => void;
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
+  onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
@@ -494,6 +495,7 @@ interface BuildingSceneProps {
   onSelectWidget3D?: (id: string | null) => void;
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
+  onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
@@ -503,7 +505,7 @@ interface BuildingSceneProps {
 function BuildingScene({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   selectedWidget3DId, selectedDuctId, selectedPipeId,
-  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   liveValues = {}, alarmStates = {},
   highlightFloor, lighting
 }: BuildingSceneProps) {
@@ -698,15 +700,17 @@ function BuildingScene({
           />
         );
       } else {
+        const wid = widget;
         elements.push(
           <Widget3DMesh
-            key={`widget3d-${widget.id}`}
-            widget={{ ...widget, x: widget.x + offsetX }}
-            liveValue={liveValues[widget.datapoint]}
-            alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
-            selected={widget.id === selectedWidget3DId}
-            onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+            key={`widget3d-${wid.id}`}
+            widget={{ ...wid, x: wid.x + offsetX }}
+            liveValue={liveValues[wid.datapoint]}
+            alarmActive={wid.alarmDatapoint ? alarmStates[wid.alarmDatapoint] : undefined}
+            selected={wid.id === selectedWidget3DId}
+            onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
             baseY={floorBaseYLocal}
+            onDragEnd={(nx, ny, nz) => onUpdateWidget3D?.(wid.id, nx - offsetX, ny, nz)}
           />
         );
       }
@@ -753,7 +757,7 @@ function BuildingScene({
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   selectedWidget3DId, selectedDuctId, selectedPipeId,
-  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   liveValues, alarmStates,
   highlightFloor, bgColor = '#0a1020',
   lighting = DEFAULT_LIGHTING,
@@ -789,6 +793,7 @@ export function BuildingCanvas3D({
             onSelectWidget3D={onSelectWidget3D}
             onSelectDuct={onSelectDuct}
             onSelectPipe={onSelectPipe}
+            onUpdateWidget3D={onUpdateWidget3D}
             liveValues={liveValues}
             alarmStates={alarmStates}
             highlightFloor={highlightFloor}

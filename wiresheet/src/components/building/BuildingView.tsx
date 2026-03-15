@@ -180,13 +180,25 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const selectedWidget = activeBuilding?.widgets3d?.find(w => w.id === selectedWidget3DId) ?? null;
 
   const filteredEntities = useMemo(() => {
-    if (!entitySearch.trim()) return haEntities.slice(0, 80);
-    const q = entitySearch.toLowerCase();
-    return haEntities.filter(e =>
-      e.entity_id.toLowerCase().includes(q) ||
-      String(e.attributes.friendly_name || '').toLowerCase().includes(q)
-    ).slice(0, 80);
+    const q = entitySearch.trim().toLowerCase();
+    const all = q
+      ? haEntities.filter(e =>
+          e.entity_id.toLowerCase().includes(q) ||
+          String(e.attributes.friendly_name || '').toLowerCase().includes(q)
+        )
+      : haEntities;
+    return all.slice(0, 200);
   }, [haEntities, entitySearch]);
+
+  const groupedEntities = useMemo(() => {
+    const groups: Record<string, typeof filteredEntities> = {};
+    for (const e of filteredEntities) {
+      const domain = e.entity_id.split('.')[0] || 'other';
+      if (!groups[domain]) groups[domain] = [];
+      groups[domain].push(e);
+    }
+    return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredEntities]);
 
   const handleAddWall = (x1: number, y1: number, x2: number, y2: number, thickness: number) => {
     if (!activeBuilding || !activeFloor) return;
@@ -611,6 +623,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
                   onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); }}
                   onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); }}
+                  onUpdateWidget3D={(widgetId, x, y, z) => {
+                    if (!activeBuilding) return;
+                    updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
+                  }}
                   highlightFloor={true}
                   bgColor={bgColor}
                   lighting={lighting}
@@ -1444,22 +1460,29 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   )}
                 </div>
               ) : (
-                filteredEntities.map(e => (
-                  <button
-                    key={e.entity_id}
-                    onClick={() => selectDatapoint(e.entity_id)}
-                    className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-slate-200 truncate">{e.entity_id}</div>
-                      {e.attributes.friendly_name && (
-                        <div className="text-[10px] text-slate-500 truncate">{String(e.attributes.friendly_name)}</div>
-                      )}
+                groupedEntities.map(([domain, entities]) => (
+                  <div key={domain}>
+                    <div className="sticky top-0 px-3 py-1 bg-slate-750 border-b border-slate-700 text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-800">
+                      {domain} <span className="text-slate-600 font-normal">({entities.length})</span>
                     </div>
-                    {e.state !== undefined && (
-                      <span className="text-[10px] text-slate-400 flex-shrink-0 bg-slate-700 px-1.5 py-0.5 rounded">{String(e.state)}</span>
-                    )}
-                  </button>
+                    {entities.map(e => (
+                      <button
+                        key={e.entity_id}
+                        onClick={() => selectDatapoint(e.entity_id)}
+                        className="w-full flex items-center gap-2.5 px-4 py-1.5 hover:bg-slate-700 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-slate-200 truncate">{e.entity_id}</div>
+                          {e.attributes.friendly_name && (
+                            <div className="text-[10px] text-slate-500 truncate">{String(e.attributes.friendly_name)}</div>
+                          )}
+                        </div>
+                        {e.state !== undefined && (
+                          <span className="text-[10px] text-slate-400 flex-shrink-0 bg-slate-700 px-1.5 py-0.5 rounded">{String(e.state)}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 ))
               )}
             </div>

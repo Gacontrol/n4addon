@@ -55,42 +55,59 @@ export function useBuildingEditor() {
   const [tool, setTool] = useState<BuildingTool>('select');
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const migrateBuildings = (raw: Building[]) => raw.map((b: Building) => ({
+    ...b,
+    objModels: b.objModels ?? [],
+    widgets3d: b.widgets3d ?? [],
+    floors: b.floors.map((f: Floor) => ({
+      ...f,
+      walls: (f.walls ?? []).map((w: Wall) => ({ ...w, openings: w.openings ?? [] })),
+      ducts: f.ducts ?? [],
+      pipes: f.pipes ?? [],
+      backgroundImage: f.backgroundImage ?? null,
+    })),
+  }));
+
+  const loadFromLocalStorage = () => {
+    try {
+      const stored = localStorage.getItem('wiresheet_building_config');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.buildings?.length > 0) return migrateBuildings(data.buildings);
+      }
+    } catch { }
+    return null;
+  };
+
   useEffect(() => {
     const load = async () => {
+      let loaded = false;
       try {
         const apiBase = getApiBase();
         const resp = await fetch(`${apiBase}/building-config`);
         if (resp.ok) {
           const data = await resp.json();
           if (data.buildings?.length > 0) {
-            const migrated = data.buildings.map((b: Building) => ({
-              ...b,
-              objModels: b.objModels ?? [],
-              widgets3d: b.widgets3d ?? [],
-              floors: b.floors.map((f: Floor) => ({
-                ...f,
-                walls: (f.walls ?? []).map((w: Wall) => ({ ...w, openings: w.openings ?? [] })),
-                ducts: f.ducts ?? [],
-                pipes: f.pipes ?? [],
-                backgroundImage: f.backgroundImage ?? null,
-              })),
-            }));
+            const migrated = migrateBuildings(data.buildings);
             setBuildings(migrated);
             setActiveBuildingId(migrated[0].id);
             setActiveFloorId(migrated[0].floors[0]?.id || '');
-          } else {
-            const def = createDefaultBuilding();
-            setBuildings([def]);
-            setActiveBuildingId(def.id);
-            setActiveFloorId(def.floors[0].id);
+            loaded = true;
           }
-        } else {
-          const def = createDefaultBuilding();
-          setBuildings([def]);
-          setActiveBuildingId(def.id);
-          setActiveFloorId(def.floors[0].id);
         }
-      } catch {
+      } catch { }
+
+      if (!loaded) {
+        const fromLS = loadFromLocalStorage();
+        if (fromLS) {
+          setBuildings(fromLS);
+          setActiveBuildingId(fromLS[0].id);
+          setActiveFloorId(fromLS[0].floors[0]?.id || '');
+          loaded = true;
+        }
+      }
+
+      if (!loaded) {
         const def = createDefaultBuilding();
         setBuildings([def]);
         setActiveBuildingId(def.id);
@@ -109,15 +126,19 @@ export function useBuildingEditor() {
   }, [buildings, activeBuildingId]);
 
   const saveConfig = useCallback(async (updated: Building[]) => {
+    const payload = JSON.stringify({ buildings: updated });
+    try {
+      localStorage.setItem('wiresheet_building_config', payload);
+    } catch { }
     try {
       const apiBase = getApiBase();
       await fetch(`${apiBase}/building-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ buildings: updated }),
+        body: payload,
       });
     } catch {
-      // offline
+      // offline – data persisted in localStorage
     }
   }, []);
 

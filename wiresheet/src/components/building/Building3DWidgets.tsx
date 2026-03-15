@@ -122,10 +122,10 @@ interface Widget3DMeshProps {
   selected: boolean;
   onSelect: () => void;
   baseY: number;
-  roomColor?: string;
+  onDragEnd?: (x: number, y: number, z: number) => void;
 }
 
-export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY }: Widget3DMeshProps) {
+export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd }: Widget3DMeshProps) {
   const baseColor = widget.color || WIDGET_COLORS[widget.type] || '#94a3b8';
   const scale = widget.scale || 1;
   const wx = widget.x;
@@ -145,8 +145,41 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const displayValue = liveValue != null ? String(liveValue) : '–';
   const unit = widget.unit || '';
 
+  const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; startWX: number; startWZ: number } | null>(null);
+  const groupRef = useRef<THREE.Group>(null);
+
   return (
-    <group position={[wx, wy, wz]} scale={[scale, scale, scale]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+    <group
+      ref={groupRef}
+      position={[wx, wy, wz]}
+      scale={[scale, scale, scale]}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onPointerDown={(e) => {
+        if (!selected || !onDragEnd) return;
+        e.stopPropagation();
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, startWX: widget.x, startWZ: widget.y };
+      }}
+      onPointerMove={(e) => {
+        if (!dragRef.current?.dragging || !onDragEnd) return;
+        e.stopPropagation();
+        const dx = (e.clientX - dragRef.current.startX) * 0.02;
+        const dz = (e.clientY - dragRef.current.startY) * 0.02;
+        if (groupRef.current) {
+          groupRef.current.position.x = wx + dx;
+          groupRef.current.position.z = wz + dz;
+        }
+      }}
+      onPointerUp={(e) => {
+        if (!dragRef.current?.dragging || !onDragEnd) return;
+        e.stopPropagation();
+        dragRef.current.dragging = false;
+        const dx = (e.clientX - dragRef.current.startX) * 0.02;
+        const dz = (e.clientY - dragRef.current.startY) * 0.02;
+        onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWZ + dz, widget.z);
+        dragRef.current = null;
+      }}
+    >
       <mesh position={[0, -0.4, 0]} castShadow>
         <cylinderGeometry args={[0.04, 0.06, 0.8, 8]} />
         <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
@@ -304,23 +337,44 @@ interface DuctSegment {
   pos: [number, number, number];
   dir: THREE.Vector3;
   len: number;
+  isVertical: boolean;
 }
 
-function computeDuctSegments(points: { x: number; y: number }[], offsetX: number, elev: number): DuctSegment[] {
+function computeDuctSegments(points: { x: number; y: number; elev?: number }[], offsetX: number, defaultElev: number): DuctSegment[] {
   const segs: DuctSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i];
     const b = points[i + 1];
     const dx = b.x - a.x;
     const dz = b.y - a.y;
-    const len = Math.sqrt(dx * dx + dz * dz);
+    const elevA = a.elev !== undefined ? a.elev : defaultElev;
+    const elevB = b.elev !== undefined ? b.elev : defaultElev;
+    const dy = elevB - elevA;
+    const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
     if (len < 0.01) continue;
     const mx = (a.x + b.x) / 2 + offsetX;
     const mz = (a.y + b.y) / 2;
-    const dir = new THREE.Vector3(dx / len, 0, dz / len);
-    segs.push({ pos: [mx, elev, mz], dir, len });
+    const my = (elevA + elevB) / 2;
+    const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
+    const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
+    segs.push({ pos: [mx, my, mz], dir, len, isVertical });
   }
   return segs;
+}
+
+function getSegmentQuaternion(dir: THREE.Vector3): THREE.Quaternion {
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(dir.dot(up)) > 0.9999) {
+    if (dir.y > 0) {
+      q.identity();
+    } else {
+      q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+    }
+  } else {
+    q.setFromUnitVectors(up, dir);
+  }
+  return q;
 }
 
 interface DuctMeshProps {
@@ -344,9 +398,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
       {segments.map((seg, i) => {
-        const quaternion = new THREE.Quaternion();
-        const up = new THREE.Vector3(0, 1, 0);
-        quaternion.setFromUnitVectors(up, seg.dir);
+        const quaternion = getSegmentQuaternion(seg.dir);
 
         return (
           <group key={i} position={seg.pos} quaternion={quaternion}>
@@ -363,7 +415,10 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
             )}
             {selected && (
               <mesh>
-                <boxGeometry args={[w + 0.04, seg.len + 0.04, h + 0.04]} />
+                {isRound
+                  ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, seg.len + 0.04, 12]} />
+                  : <boxGeometry args={[w + 0.04, seg.len + 0.04, h + 0.04]} />
+                }
                 <meshBasicMaterial color="#60a5fa" wireframe />
               </mesh>
             )}
@@ -375,26 +430,38 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
         if (i === 0 || i === duct.points.length - 1) return null;
         const prev = duct.points[i - 1];
         const next = duct.points[i + 1];
-        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y;
-        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y;
-        const a1 = Math.atan2(dz1, dx1);
-        const a2 = Math.atan2(dz2, dx2);
-        const angleDiff = Math.abs(a2 - a1);
-        const isElbow = angleDiff > 0.1;
 
+        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
+        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
+        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
+
+        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
+        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
+        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
+        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
+        if (len1 < 0.01 || len2 < 0.01) return null;
+
+        const dir1 = new THREE.Vector3(dx1 / len1, dy1 / len1, dz1 / len1);
+        const dir2 = new THREE.Vector3(dx2 / len2, dy2 / len2, dz2 / len2);
+        const dot = dir1.dot(dir2);
+        const isElbow = Math.abs(dot) < 0.99;
         if (!isElbow) return null;
+
+        const jx = pt.x + offsetX;
+        const jy = elevCur;
+        const jz = pt.y;
 
         if (isRound) {
           return (
-            <mesh key={`jnt-${i}`} position={[pt.x + offsetX, elev, pt.y]} castShadow>
+            <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
               <sphereGeometry args={[w / 2 + 0.005, 10, 10]} />
               <meshStandardMaterial color={color} metalness={0.35} roughness={0.5} />
             </mesh>
           );
         }
         return (
-          <mesh key={`jnt-${i}`} position={[pt.x + offsetX, elev, pt.y]} castShadow>
-            <boxGeometry args={[w + 0.01, h + 0.01, w + 0.01]} />
+          <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
+            <boxGeometry args={[Math.max(w, h) + 0.01, Math.max(w, h) + 0.01, Math.max(w, h) + 0.01]} />
             <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
           </mesh>
         );
@@ -402,19 +469,32 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
 
       {duct.points.map((pt, i) => {
         if (i === 0 || i === duct.points.length - 1) return null;
-        const prev = duct.points[i - 1]; const next = duct.points[i + 1];
-        const prevDir = new THREE.Vector2(pt.x - prev.x, pt.y - prev.y).normalize();
-        const nextDir = new THREE.Vector2(next.x - pt.x, next.y - pt.y).normalize();
-        const dot = prevDir.dot(nextDir);
+        const prev = duct.points[i - 1];
+        const next = duct.points[i + 1];
 
-        const prevW = Math.sqrt((pt.x - prev.x) ** 2 + (pt.y - prev.y) ** 2);
-        const nextW = Math.sqrt((next.x - pt.x) ** 2 + (next.y - pt.y) ** 2);
+        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
+        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
+        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
+
+        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
+        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
+        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
+        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
+        if (len1 < 0.01 || len2 < 0.01) return null;
+
+        const dir1 = new THREE.Vector3(dx1 / len1, 0, dz1 / len1);
+        const dir2 = new THREE.Vector3(dx2 / len2, 0, dz2 / len2);
+        const dot = dir1.normalize().dot(dir2.normalize());
         const isT = Math.abs(dot) < 0.15;
 
-        if (!isT || (prevW < 0.1 && nextW < 0.1)) return null;
+        if (!isT) return null;
+
+        const jx = pt.x + offsetX;
+        const jy = elevCur;
+        const jz = pt.y;
 
         return (
-          <mesh key={`t-${i}`} position={[pt.x + offsetX, elev, pt.y]} castShadow>
+          <mesh key={`t-${i}`} position={[jx, jy, jz]} castShadow>
             <sphereGeometry args={[Math.max(w, h) / 2 + 0.01, 8, 8]} />
             <meshStandardMaterial color={color} metalness={0.35} roughness={0.5} />
           </mesh>
@@ -443,25 +523,23 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
       {segments.map((seg, i) => {
-        const quaternion = new THREE.Quaternion();
-        const up = new THREE.Vector3(0, 1, 0);
-        quaternion.setFromUnitVectors(up, seg.dir);
+        const quaternion = getSegmentQuaternion(seg.dir);
 
         return (
           <group key={i} position={seg.pos} quaternion={quaternion}>
             <mesh castShadow>
-              <cylinderGeometry args={[radius, radius, seg.len, 8]} />
+              <cylinderGeometry args={[radius, radius, seg.len, 10]} />
               <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
             </mesh>
             {pipe.insulated && (
               <mesh>
-                <cylinderGeometry args={[insulationRadius, insulationRadius, seg.len, 8]} />
+                <cylinderGeometry args={[insulationRadius, insulationRadius, seg.len, 10]} />
                 <meshStandardMaterial color="#e2e8f0" transparent opacity={0.35} side={THREE.FrontSide} />
               </mesh>
             )}
             {selected && (
               <mesh>
-                <cylinderGeometry args={[insulationRadius + 0.02, insulationRadius + 0.02, seg.len + 0.04, 8]} />
+                <cylinderGeometry args={[insulationRadius + 0.02, insulationRadius + 0.02, seg.len + 0.04, 10]} />
                 <meshBasicMaterial color="#60a5fa" wireframe />
               </mesh>
             )}
@@ -469,14 +547,38 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
         );
       })}
 
-      {pipe.points.map((pt, i) => (
-        i > 0 && i < pipe.points.length - 1 ? (
-          <mesh key={`jnt-${i}`} position={[pt.x + offsetX, elev, pt.y]} castShadow>
-            <sphereGeometry args={[radius + 0.01, 8, 8]} />
+      {pipe.points.map((pt, i) => {
+        if (i === 0 || i === pipe.points.length - 1) return null;
+        const prev = pipe.points[i - 1];
+        const next = pipe.points[i + 1];
+
+        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
+        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
+        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
+
+        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
+        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
+        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
+        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
+        if (len1 < 0.01 || len2 < 0.01) return null;
+
+        const dir1 = new THREE.Vector3(dx1 / len1, dy1 / len1, dz1 / len1);
+        const dir2 = new THREE.Vector3(dx2 / len2, dy2 / len2, dz2 / len2);
+        const dot = dir1.dot(dir2);
+        const isElbow = Math.abs(dot) < 0.99;
+        if (!isElbow) return null;
+
+        const jx = pt.x + offsetX;
+        const jy = elevCur;
+        const jz = pt.y;
+
+        return (
+          <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
+            <sphereGeometry args={[radius * 1.5, 12, 12]} />
             <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
           </mesh>
-        ) : null
-      ))}
+        );
+      })}
     </group>
   );
 }

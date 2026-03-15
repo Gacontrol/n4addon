@@ -125,6 +125,28 @@ export function FloorPlanEditor({
     }
   }, [floor.backgroundImage?.dataUrl]);
 
+  useEffect(() => {
+    const handleGlobalMove = (e: MouseEvent) => {
+      if (!dragState.current || dragState.current.type !== 'move-bg') return;
+      if (!floor.backgroundImage) return;
+      const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
+      const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
+      onSetBackground({ ...floor.backgroundImage, x: (dragState.current.bgOrigX ?? 0) + dx, y: (dragState.current.bgOrigY ?? 0) + dy });
+    };
+    const handleGlobalUp = () => {
+      if (dragState.current?.type === 'move-bg') {
+        setBgDragging(false);
+        dragState.current = null;
+      }
+    };
+    window.addEventListener('mousemove', handleGlobalMove);
+    window.addEventListener('mouseup', handleGlobalUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMove);
+      window.removeEventListener('mouseup', handleGlobalUp);
+    };
+  }, [floor.backgroundImage, zoom, onSetBackground]);
+
   const toWorld = useCallback((px: number, py: number) => ({
     x: (px - offset.x) / (CELL * zoom),
     y: (py - offset.y) / (CELL * zoom),
@@ -883,7 +905,7 @@ export function FloorPlanEditor({
       img.onload = () => {
         bgImageCache.set(dataUrl, img);
         setBgImg(img);
-        const scale = Math.min(20 / img.width, 20 / img.height, 0.1);
+        const scale = Math.min(30 / img.width, 30 / img.height, 0.5);
         onSetBackground({ dataUrl, x: 0, y: 0, scale, opacity: 0.5, rotation: 0 });
       };
       img.src = dataUrl;
@@ -917,25 +939,44 @@ export function FloorPlanEditor({
         </button>
         {bg && (
           <>
+            <button
+              onMouseDown={(e) => {
+                if (!floor.backgroundImage) return;
+                const bg2 = floor.backgroundImage;
+                const bgImgEl2 = bgImageCache.get(bg2.dataUrl);
+                setBgDragging(true);
+                dragState.current = { type: 'move-bg', startX: e.clientX, startY: e.clientY, bgOrigX: bg2.x, bgOrigY: bg2.y };
+                e.preventDefault();
+              }}
+              className="flex items-center gap-1 px-2 py-1 bg-amber-900/50 hover:bg-amber-800/70 text-amber-300 border border-amber-700 rounded text-xs cursor-grab active:cursor-grabbing"
+              title="Bild verschieben (ziehen)"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/>
+                <polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/>
+                <line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>
+              </svg>
+              Pos.
+            </button>
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
               <span className="text-slate-500">Deckkraft</span>
               <input type="range" min="0.05" max="1" step="0.05" value={bg.opacity}
                 onChange={e => onSetBackground({ ...bg, opacity: parseFloat(e.target.value) })}
-                className="w-16 h-1 accent-blue-500" />
+                className="w-20 h-1 accent-blue-500" />
               <span className="text-slate-400 w-7">{Math.round(bg.opacity * 100)}%</span>
             </div>
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
               <span className="text-slate-500">Skala</span>
-              <input type="range" min="0.005" max="0.5" step="0.001" value={bg.scale}
+              <input type="range" min="0.001" max="2" step="0.001" value={bg.scale}
                 onChange={e => onSetBackground({ ...bg, scale: parseFloat(e.target.value) })}
-                className="w-16 h-1 accent-blue-500" />
-              <span className="text-slate-400 w-10">{bg.scale.toFixed(3)}</span>
+                className="w-24 h-1 accent-blue-500" />
+              <span className="text-slate-400 w-12">{bg.scale.toFixed(3)}</span>
             </div>
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
               <span className="text-slate-500">Rot.</span>
               <input type="range" min="-180" max="180" step="1" value={bg.rotation}
                 onChange={e => onSetBackground({ ...bg, rotation: parseInt(e.target.value) })}
-                className="w-12 h-1 accent-blue-500" />
+                className="w-16 h-1 accent-blue-500" />
               <span className="text-slate-400 w-8">{bg.rotation}°</span>
             </div>
             <button onClick={() => onSetBackground(null)}
