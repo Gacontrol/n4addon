@@ -346,7 +346,12 @@ interface DuctSegment {
   isVertical: boolean;
 }
 
-function computeDuctSegments(points: { x: number; y: number; elev?: number }[], offsetX: number, defaultElev: number): DuctSegment[] {
+function computeDuctSegments(
+  points: { x: number; y: number; elev?: number }[],
+  offsetX: number,
+  defaultElev: number,
+  halfJoin: number = 0
+): DuctSegment[] {
   const segs: DuctSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i];
@@ -358,12 +363,22 @@ function computeDuctSegments(points: { x: number; y: number; elev?: number }[], 
     const dy = elevB - elevA;
     const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
     if (len < 0.01) continue;
-    const mx = (a.x + b.x) / 2 + offsetX;
-    const mz = (a.y + b.y) / 2;
-    const my = (elevA + elevB) / 2;
-    const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
     const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
-    segs.push({ pos: [mx, my, mz], dir, len, isVertical });
+
+    const shrinkStart = i > 0 ? halfJoin : 0;
+    const shrinkEnd = i < points.length - 2 ? halfJoin : 0;
+    const newLen = Math.max(0.001, len - shrinkStart - shrinkEnd);
+
+    const startX = a.x + dir.x * shrinkStart;
+    const startY = elevA + dir.y * shrinkStart;
+    const startZ = a.y + dir.z * shrinkStart;
+
+    const mx = startX + dir.x * newLen / 2 + offsetX;
+    const my = startY + dir.y * newLen / 2;
+    const mz = startZ + dir.z * newLen / 2;
+
+    const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
+    segs.push({ pos: [mx, my, mz], dir, len: newLen, isVertical });
   }
   return segs;
 }
@@ -398,14 +413,28 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const h = duct.height || 0.2;
   const isRound = duct.shape === 'round';
   const tex = useMemo(() => getCachedDuctTexture(color), [color]);
+  const halfJoin = isRound ? w / 2 : Math.max(w, h) / 2;
 
-  const segments = useMemo(() => computeDuctSegments(duct.points, offsetX, elev), [duct.points, offsetX, elev]);
+  const segments = useMemo(
+    () => computeDuctSegments(duct.points, offsetX, elev, halfJoin),
+    [duct.points, offsetX, elev, halfJoin]
+  );
+
+  const joints = useMemo(() => {
+    const pts = duct.points;
+    const result: { pos: [number, number, number] }[] = [];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const pt = pts[i];
+      const ptElev = (pt as any).elev !== undefined ? (pt as any).elev : elev;
+      result.push({ pos: [pt.x + offsetX, ptElev, pt.y] });
+    }
+    return result;
+  }, [duct.points, offsetX, elev]);
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
       {segments.map((seg, i) => {
         const quaternion = getSegmentQuaternion(seg.dir);
-
         return (
           <group key={i} position={seg.pos} quaternion={quaternion}>
             {isRound ? (
@@ -432,80 +461,15 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
         );
       })}
 
-      {duct.points.map((pt, i) => {
-        if (i === 0 || i === duct.points.length - 1) return null;
-        const prev = duct.points[i - 1];
-        const next = duct.points[i + 1];
-
-        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
-        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
-        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
-
-        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
-        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
-        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
-        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
-        if (len1 < 0.01 || len2 < 0.01) return null;
-
-        const dir1 = new THREE.Vector3(dx1 / len1, dy1 / len1, dz1 / len1);
-        const dir2 = new THREE.Vector3(dx2 / len2, dy2 / len2, dz2 / len2);
-        const dot = dir1.dot(dir2);
-        const isElbow = Math.abs(dot) < 0.99;
-        if (!isElbow) return null;
-
-        const jx = pt.x + offsetX;
-        const jy = elevCur;
-        const jz = pt.y;
-
-        if (isRound) {
-          return (
-            <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
-              <sphereGeometry args={[w / 2 + 0.005, 10, 10]} />
-              <meshStandardMaterial color={color} metalness={0.35} roughness={0.5} />
-            </mesh>
-          );
-        }
-        return (
-          <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
-            <boxGeometry args={[Math.max(w, h) + 0.01, Math.max(w, h) + 0.01, Math.max(w, h) + 0.01]} />
-            <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
-          </mesh>
-        );
-      })}
-
-      {duct.points.map((pt, i) => {
-        if (i === 0 || i === duct.points.length - 1) return null;
-        const prev = duct.points[i - 1];
-        const next = duct.points[i + 1];
-
-        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
-        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
-        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
-
-        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
-        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
-        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
-        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
-        if (len1 < 0.01 || len2 < 0.01) return null;
-
-        const dir1 = new THREE.Vector3(dx1 / len1, 0, dz1 / len1);
-        const dir2 = new THREE.Vector3(dx2 / len2, 0, dz2 / len2);
-        const dot = dir1.normalize().dot(dir2.normalize());
-        const isT = Math.abs(dot) < 0.15;
-
-        if (!isT) return null;
-
-        const jx = pt.x + offsetX;
-        const jy = elevCur;
-        const jz = pt.y;
-
-        return (
-          <mesh key={`t-${i}`} position={[jx, jy, jz]} castShadow>
-            <sphereGeometry args={[Math.max(w, h) / 2 + 0.01, 8, 8]} />
-            <meshStandardMaterial color={color} metalness={0.35} roughness={0.5} />
-          </mesh>
-        );
-      })}
+      {joints.map((jnt, i) => (
+        <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
+          {isRound
+            ? <sphereGeometry args={[w / 2 + 0.002, 12, 12]} />
+            : <boxGeometry args={[w, w, h]} />
+          }
+          <meshStandardMaterial color={color} map={isRound ? undefined : tex} metalness={isRound ? 0.35 : 0.3} roughness={isRound ? 0.5 : 0.45} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -524,7 +488,21 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
   const radius = (pipe.diameter || 0.05) / 2;
   const insulationRadius = radius + 0.025;
 
-  const segments = useMemo(() => computeDuctSegments(pipe.points, offsetX, elev), [pipe.points, offsetX, elev]);
+  const segments = useMemo(
+    () => computeDuctSegments(pipe.points, offsetX, elev, radius),
+    [pipe.points, offsetX, elev, radius]
+  );
+
+  const joints = useMemo(() => {
+    const pts = pipe.points;
+    const result: { pos: [number, number, number] }[] = [];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const pt = pts[i];
+      const ptElev = (pt as any).elev !== undefined ? (pt as any).elev : elev;
+      result.push({ pos: [pt.x + offsetX, ptElev, pt.y] });
+    }
+    return result;
+  }, [pipe.points, offsetX, elev]);
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -553,38 +531,12 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
         );
       })}
 
-      {pipe.points.map((pt, i) => {
-        if (i === 0 || i === pipe.points.length - 1) return null;
-        const prev = pipe.points[i - 1];
-        const next = pipe.points[i + 1];
-
-        const elevPrev = (prev as any).elev !== undefined ? (prev as any).elev : elev;
-        const elevCur = (pt as any).elev !== undefined ? (pt as any).elev : elev;
-        const elevNext = (next as any).elev !== undefined ? (next as any).elev : elev;
-
-        const dx1 = pt.x - prev.x; const dz1 = pt.y - prev.y; const dy1 = elevCur - elevPrev;
-        const dx2 = next.x - pt.x; const dz2 = next.y - pt.y; const dy2 = elevNext - elevCur;
-        const len1 = Math.sqrt(dx1 * dx1 + dz1 * dz1 + dy1 * dy1);
-        const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2 + dy2 * dy2);
-        if (len1 < 0.01 || len2 < 0.01) return null;
-
-        const dir1 = new THREE.Vector3(dx1 / len1, dy1 / len1, dz1 / len1);
-        const dir2 = new THREE.Vector3(dx2 / len2, dy2 / len2, dz2 / len2);
-        const dot = dir1.dot(dir2);
-        const isElbow = Math.abs(dot) < 0.99;
-        if (!isElbow) return null;
-
-        const jx = pt.x + offsetX;
-        const jy = elevCur;
-        const jz = pt.y;
-
-        return (
-          <mesh key={`jnt-${i}`} position={[jx, jy, jz]} castShadow>
-            <sphereGeometry args={[radius * 1.5, 12, 12]} />
-            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
-          </mesh>
-        );
-      })}
+      {joints.map((jnt, i) => (
+        <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
+          <sphereGeometry args={[radius + 0.002, 12, 12]} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+        </mesh>
+      ))}
     </group>
   );
 }
