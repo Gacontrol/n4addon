@@ -79,7 +79,7 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
             className="absolute left-1/2 -translate-x-1/2 text-center"
             style={{ bottom: 0 }}
           >
-            <span className="text-xl font-mono" style={{ fontSize: gaugeSize * 0.18, color: style.textColor || '#e2e8f0' }}>
+            <span className="font-mono" style={{ fontSize: style.fontSize || gaugeSize * 0.18, color: style.textColor || '#e2e8f0' }}>
               {displayValue}
             </span>
             {config.unit && (

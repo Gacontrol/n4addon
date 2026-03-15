@@ -91,7 +91,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
             min={config.min}
             max={config.max}
             className="w-full px-3 py-2 rounded-lg placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors disabled:cursor-not-allowed"
-            style={{ backgroundColor: bgColor, color: txtColor, border: `1px solid ${borderStyle}` }}
+            style={{ backgroundColor: bgColor, color: txtColor, border: `1px solid ${borderStyle}`, fontSize: 'inherit' }}
           />
           {config.unit && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: txtColor, opacity: 0.6 }}>

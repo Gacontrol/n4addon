@@ -30,7 +30,7 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
 
   const bgColor = style.backgroundColor ?? 'transparent';
   const textColor = style.textColor ?? '#22c55e';
-  const fontSize = config.fontSize || 24;
+  const fontSize = style.fontSize || config.fontSize || 24;
 
   return (
     <div className="flex flex-col gap-1">

@@ -52,11 +52,11 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
           <Minus className="w-5 h-5" style={{ color: textColor }} />
         </button>
         <div className="min-w-[60px] px-3 py-2 bg-slate-800 rounded-lg text-center">
-          <span className="text-lg font-mono" style={{ color: textColor }}>
+          <span className="font-mono" style={{ color: textColor, fontSize: 'inherit' }}>
             {displayValue}
           </span>
           {config.unit && (
-            <span className="text-xs ml-1" style={{ color: textColor, opacity: 0.7 }}>{config.unit}</span>
+            <span className="ml-1" style={{ color: textColor, opacity: 0.7, fontSize: '0.75em' }}>{config.unit}</span>
           )}
         </div>
         <button

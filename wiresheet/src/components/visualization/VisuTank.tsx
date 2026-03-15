@@ -86,7 +86,7 @@ export const VisuTank: React.FC<VisuTankProps> = ({
         </svg>
         {config.showValue && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-mono text-white drop-shadow-lg">
+            <span className="font-mono text-white drop-shadow-lg" style={{ fontSize: style.fontSize || '0.875rem' }}>
               {displayValue}{config.unit}
             </span>
           </div>

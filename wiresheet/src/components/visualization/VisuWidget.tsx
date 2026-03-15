@@ -1392,7 +1392,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isValveWidget = widget.type === 'visu-valve';
   const isSensorWidget = widget.type === 'visu-sensor';
   const isTrendWidget = widget.type === 'visu-trend-chart';
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget;
+  const isPIDWidget = widget.type === 'visu-pid';
+  const isHeatingCurveWidget = widget.type === 'visu-heating-curve';
+  const isAlarmConsoleWidget = widget.type === 'visu-alarm-console';
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',
@@ -1412,6 +1415,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         zIndex: isHighlighted ? 9999 : (widget.zIndex || 1),
         pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
+        fontSize: widget.style.fontSize ? `${widget.style.fontSize}px` : undefined,
+        fontFamily: widget.style.fontFamily && widget.style.fontFamily !== 'system'
+          ? { sans: 'sans-serif', serif: 'serif', mono: 'monospace', system: undefined }[widget.style.fontFamily]
+          : undefined,
         borderRadius: isDrawingWidget ? 0 : resolvedBorderRadius,
         border: isHighlighted
           ? '3px solid #ec4899'

@@ -14,7 +14,7 @@ export const VisuLabel: React.FC<VisuLabelProps> = ({
     <div
       className="flex items-center h-full"
       style={{
-        fontSize: config.fontSize || 16,
+        fontSize: style.fontSize || config.fontSize || 16,
         fontWeight: config.fontWeight || 'normal',
         color: style.textColor || '#e2e8f0',
         textAlign: config.textAlign || 'left',

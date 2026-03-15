@@ -103,8 +103,8 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
       </div>
       {config.showValue && (
         <div className="text-center">
-          <span className="text-lg font-mono" style={{ color: style.textColor || '#e2e8f0' }}>{displayValue}</span>
-          <span className="text-sm ml-1" style={{ color: style.textColor || '#94a3b8' }}>{config.unit || '°C'}</span>
+          <span className="font-mono" style={{ color: style.textColor || '#e2e8f0', fontSize: style.fontSize || '1.125rem' }}>{displayValue}</span>
+          <span className="ml-1" style={{ color: style.textColor || '#94a3b8', fontSize: style.fontSize ? `${style.fontSize * 0.75}px` : '0.875rem' }}>{config.unit || '°C'}</span>
         </div>
       )}
       {style.showLabel && style.labelPosition === 'bottom' && (
