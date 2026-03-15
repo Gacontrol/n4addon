@@ -2,8 +2,8 @@ import { Suspense, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Building, Widget3D } from '../../types/building';
-import { Widget3DMesh, DuctMesh, PipeMesh } from './Building3DWidgets';
+import { Building } from '../../types/building';
+import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
 
 export interface LightingSettings {
   ambientIntensity: number;
@@ -174,30 +174,55 @@ interface RoomMeshProps {
 
 function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs }: RoomMeshProps) {
   const baseColor = hexToThree(color);
-  const opacity = faded ? 0.12 : 1.0;
-  const emissiveIntensity = selected ? 0.18 : 0.0;
+  const opacity = faded ? 0.08 : 0.18;
+  const emissive = selected ? baseColor : new THREE.Color(0x000000);
+  const emissiveIntensity = selected ? 0.12 : 0.0;
+
+  const mat = (
+    <meshStandardMaterial
+      color={baseColor}
+      roughness={0.72}
+      metalness={0.04}
+      emissive={emissive}
+      emissiveIntensity={emissiveIntensity}
+      transparent
+      opacity={opacity}
+      depthWrite={false}
+      side={THREE.DoubleSide}
+    />
+  );
+
+  const hw = width / 2;
+  const hd = depth / 2;
+  const hh = height / 2;
+  const cx = x + hw;
+  const cy = z + hh;
+  const cz = y + hd;
 
   return (
-    <group position={[x + width / 2, z + height / 2, y + depth / 2]}>
-      <mesh
-        castShadow={cs}
-        receiveShadow
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      >
-        <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial
-          color={baseColor}
-          roughness={0.72}
-          metalness={0.04}
-          emissive={selected ? baseColor : new THREE.Color(0x000000)}
-          emissiveIntensity={emissiveIntensity}
-          transparent={faded}
-          opacity={opacity}
-          depthWrite={!faded}
-        />
+    <group position={[cx, cy, cz]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+      <mesh castShadow={cs} receiveShadow position={[0, -hh, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[width, depth]} />
+        {mat}
+      </mesh>
+      <mesh castShadow={cs} receiveShadow position={[0, 0, -hd]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[width, height]} />
+        {mat}
+      </mesh>
+      <mesh castShadow={cs} receiveShadow position={[0, 0, hd]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[width, height]} />
+        {mat}
+      </mesh>
+      <mesh castShadow={cs} receiveShadow position={[-hw, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[depth, height]} />
+        {mat}
+      </mesh>
+      <mesh castShadow={cs} receiveShadow position={[hw, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <planeGeometry args={[depth, height]} />
+        {mat}
       </mesh>
       {selected && (
-        <lineSegments>
+        <lineSegments position={[0, hh / 2, 0]}>
           <edgesGeometry args={[new THREE.BoxGeometry(width + 0.02, height + 0.02, depth + 0.02)]} />
           <lineBasicMaterial color="#60a5fa" linewidth={2} />
         </lineSegments>
@@ -655,17 +680,36 @@ function BuildingScene({
         }
         return 0;
       })();
-      elements.push(
-        <Widget3DMesh
-          key={`widget3d-${widget.id}`}
-          widget={{ ...widget, x: widget.x + offsetX }}
-          liveValue={liveValues[widget.datapoint]}
-          alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
-          selected={widget.id === selectedWidget3DId}
-          onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
-          baseY={floorBaseYLocal}
-        />
-      );
+      const floorForWidget = building.floors.find(f => f.id === widget.floorId);
+      const floorH = floorForWidget?.height ?? 3;
+
+      if (widget.type === 'roomcolor') {
+        elements.push(
+          <RoomColorOverlay
+            key={`widget3d-${widget.id}`}
+            widget={{ ...widget, x: widget.x + offsetX }}
+            baseY={floorBaseYLocal}
+            floorHeight={floorH}
+            buildings={buildings}
+            liveValue={liveValues[widget.datapoint]}
+            alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
+            selected={widget.id === selectedWidget3DId}
+            onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+          />
+        );
+      } else {
+        elements.push(
+          <Widget3DMesh
+            key={`widget3d-${widget.id}`}
+            widget={{ ...widget, x: widget.x + offsetX }}
+            liveValue={liveValues[widget.datapoint]}
+            alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
+            selected={widget.id === selectedWidget3DId}
+            onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+            baseY={floorBaseYLocal}
+          />
+        );
+      }
     }
 
     bldOffX += bldW + 3;

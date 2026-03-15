@@ -1685,7 +1685,7 @@ function App() {
           liveValues={liveValues}
         />
       ) : mainView === 'building' ? (
-        <BuildingView />
+        <BuildingView haEntities={haEntities} haLoading={haLoading} onLoadHaEntities={loadHaEntities} />
       ) : (
         <VisualizationView
           visuPages={visuPages}

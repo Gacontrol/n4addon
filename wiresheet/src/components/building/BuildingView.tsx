@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
   Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
-  Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon
+  Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
+import { HaEntity } from '../../types/flow';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer',
@@ -84,7 +85,13 @@ const WIDGET_TYPE_ICONS: Partial<Record<Widget3DType, React.ReactNode>> = {
 
 type ViewMode = '3d' | 'floor';
 
-export function BuildingView() {
+interface BuildingViewProps {
+  haEntities?: HaEntity[];
+  haLoading?: boolean;
+  onLoadHaEntities?: () => void;
+}
+
+export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntities }: BuildingViewProps) {
   const {
     buildings,
     activeBuildingId,
@@ -161,12 +168,25 @@ export function BuildingView() {
   const [newWidgetX, setNewWidgetX] = useState(0);
   const [newWidgetY, setNewWidgetY] = useState(0);
   const [newWidgetZ, setNewWidgetZ] = useState(1);
+  const [entitySearch, setEntitySearch] = useState('');
+  const [datapointPickerOpen, setDatapointPickerOpen] = useState(false);
+  const [datapointPickerTarget, setDatapointPickerTarget] = useState<'new' | 'widget' | 'alarm'>('new');
+  const [newWidgetRoomIds, setNewWidgetRoomIds] = useState<string[]>([]);
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
   const selectedDuct = activeFloor?.ducts?.find(d => d.id === selectedDuctId) ?? null;
   const selectedPipe = activeFloor?.pipes?.find(p => p.id === selectedPipeId) ?? null;
   const selectedWidget = activeBuilding?.widgets3d?.find(w => w.id === selectedWidget3DId) ?? null;
+
+  const filteredEntities = useMemo(() => {
+    if (!entitySearch.trim()) return haEntities.slice(0, 80);
+    const q = entitySearch.toLowerCase();
+    return haEntities.filter(e =>
+      e.entity_id.toLowerCase().includes(q) ||
+      String(e.attributes.friendly_name || '').toLowerCase().includes(q)
+    ).slice(0, 80);
+  }, [haEntities, entitySearch]);
 
   const handleAddWall = (x1: number, y1: number, x2: number, y2: number, thickness: number) => {
     if (!activeBuilding || !activeFloor) return;
@@ -249,9 +269,29 @@ export function BuildingView() {
       color: WIDGET_COLORS[newWidgetType] || '#94a3b8',
       showLabel: true,
       showValue: true,
+      roomIds: newWidgetType === 'roomcolor' ? [...newWidgetRoomIds] : [],
     });
     setNewWidgetDatapoint('');
     setNewWidgetLabel('');
+    setNewWidgetRoomIds([]);
+  };
+
+  const openDatapointPicker = (target: 'new' | 'widget' | 'alarm') => {
+    setDatapointPickerTarget(target);
+    setEntitySearch('');
+    setDatapointPickerOpen(true);
+    if (haEntities.length === 0) onLoadHaEntities?.();
+  };
+
+  const selectDatapoint = (entityId: string) => {
+    if (datapointPickerTarget === 'new') {
+      setNewWidgetDatapoint(entityId);
+    } else if (datapointPickerTarget === 'widget' && selectedWidget && activeBuilding) {
+      updateWidget3D(activeBuilding.id, selectedWidget.id, { datapoint: entityId });
+    } else if (datapointPickerTarget === 'alarm' && selectedWidget && activeBuilding) {
+      updateWidget3D(activeBuilding.id, selectedWidget.id, { alarmDatapoint: entityId });
+    }
+    setDatapointPickerOpen(false);
   };
 
   const propertiesPanelTitle = () => {
@@ -644,13 +684,46 @@ export function BuildingView() {
 
                     <div>
                       <div className="text-[10px] text-slate-500 mb-1">Datenpunkt</div>
-                      <input
-                        type="text" value={newWidgetDatapoint}
-                        onChange={e => setNewWidgetDatapoint(e.target.value)}
-                        placeholder="z.B. sensors.room1.temp"
-                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-green-500"
-                      />
+                      <div className="flex gap-1">
+                        <input
+                          type="text" value={newWidgetDatapoint}
+                          onChange={e => setNewWidgetDatapoint(e.target.value)}
+                          placeholder="z.B. sensors.room1.temp"
+                          className="flex-1 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-green-500"
+                        />
+                        <button
+                          onClick={() => openDatapointPicker('new')}
+                          className="px-1.5 py-1 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white border border-slate-500 rounded text-xs flex items-center gap-0.5"
+                          title="Datenpunkt auswählen"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
+
+                    {newWidgetType === 'roomcolor' && activeFloor && (
+                      <div>
+                        <div className="text-[10px] text-slate-500 mb-1">Räume auswählen</div>
+                        <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
+                          {activeFloor.rooms.length === 0 ? (
+                            <div className="text-[10px] text-slate-600 italic px-1">Keine Räume vorhanden</div>
+                          ) : activeFloor.rooms.map(r => (
+                            <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newWidgetRoomIds.includes(r.id)}
+                                onChange={e => setNewWidgetRoomIds(prev =>
+                                  e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
+                                )}
+                                className="accent-green-500"
+                              />
+                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
+                              <span className="text-xs text-slate-300 truncate">{r.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <div className="text-[10px] text-slate-500 mb-1">Bezeichnung (optional)</div>
@@ -787,10 +860,60 @@ export function BuildingView() {
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Datenpunkt</label>
-                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
-                        value={selectedWidget.datapoint}
-                        onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { datapoint: e.target.value })} />
+                      <div className="flex gap-1">
+                        <input className="flex-1 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedWidget.datapoint}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { datapoint: e.target.value })} />
+                        <button
+                          onClick={() => openDatapointPicker('widget')}
+                          className="px-1.5 py-1 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white border border-slate-500 rounded text-xs flex items-center"
+                          title="Datenpunkt auswählen"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Alarm-Datenpunkt</label>
+                      <div className="flex gap-1">
+                        <input className="flex-1 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedWidget.alarmDatapoint || ''}
+                          placeholder="optional"
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { alarmDatapoint: e.target.value || undefined })} />
+                        <button
+                          onClick={() => openDatapointPicker('alarm')}
+                          className="px-1.5 py-1 bg-slate-600 hover:bg-slate-500 text-slate-300 hover:text-white border border-slate-500 rounded text-xs flex items-center"
+                          title="Alarm-Datenpunkt auswählen"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    {selectedWidget.type === 'roomcolor' && activeFloor && (
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Räume</label>
+                        <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
+                          {activeFloor.rooms.map(r => (
+                            <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(selectedWidget.roomIds ?? []).includes(r.id)}
+                                onChange={e => {
+                                  if (!activeBuilding) return;
+                                  const prev = selectedWidget.roomIds ?? [];
+                                  updateWidget3D(activeBuilding.id, selectedWidget.id, {
+                                    roomIds: e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
+                                  });
+                                }}
+                                className="accent-green-500"
+                              />
+                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
+                              <span className="text-xs text-slate-300 truncate">{r.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einheit</label>
@@ -1277,6 +1400,72 @@ export function BuildingView() {
           )}
         </div>
       </div>
+
+      {datapointPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDatapointPickerOpen(false)}>
+          <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-96 max-h-[28rem] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <span className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                <Search className="w-4 h-4 text-blue-400" />
+                Datenpunkt auswählen
+              </span>
+              <button onClick={() => setDatapointPickerOpen(false)} className="text-slate-500 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-3 py-2 border-b border-slate-700">
+              <div className="flex items-center gap-2 bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5">
+                <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={entitySearch}
+                  onChange={e => setEntitySearch(e.target.value)}
+                  placeholder="Suchen..."
+                  className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                />
+                {haLoading && <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />}
+                {!haLoading && (
+                  <button onClick={() => onLoadHaEntities?.()} className="text-slate-500 hover:text-slate-300" title="Neu laden">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {filteredEntities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                  <Search className="w-6 h-6 mb-2 opacity-30" />
+                  <span className="text-xs">{haEntities.length === 0 ? 'Keine Entitäten geladen' : 'Keine Treffer'}</span>
+                  {haEntities.length === 0 && (
+                    <button onClick={() => onLoadHaEntities?.()} className="mt-2 text-xs text-blue-400 hover:text-blue-300">
+                      Entitäten laden
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredEntities.map(e => (
+                  <button
+                    key={e.entity_id}
+                    onClick={() => selectDatapoint(e.entity_id)}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-200 truncate">{e.entity_id}</div>
+                      {e.attributes.friendly_name && (
+                        <div className="text-[10px] text-slate-500 truncate">{String(e.attributes.friendly_name)}</div>
+                      )}
+                    </div>
+                    {e.state !== undefined && (
+                      <span className="text-[10px] text-slate-400 flex-shrink-0 bg-slate-700 px-1.5 py-0.5 rounded">{String(e.state)}</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

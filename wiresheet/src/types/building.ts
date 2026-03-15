@@ -86,7 +86,8 @@ export type Widget3DType =
   | 'fan'
   | 'light'
   | 'blinds'
-  | 'custom';
+  | 'custom'
+  | 'roomcolor';
 
 export interface Widget3D {
   id: string;
@@ -105,6 +106,7 @@ export interface Widget3D {
   alarmDatapoint?: string;
   minValue?: number;
   maxValue?: number;
+  roomIds?: string[];
 }
 
 // ---- Ducts & Pipes ----
