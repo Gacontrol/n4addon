@@ -1,8 +1,26 @@
-import { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { Suspense, useRef, useEffect, useMemo } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building } from '../../types/building';
+
+export interface LightingSettings {
+  ambientIntensity: number;
+  sunIntensity: number;
+  sunAngle: number;
+  shadowEnabled: boolean;
+  shadowSoftness: number;
+  fillIntensity: number;
+}
+
+export const DEFAULT_LIGHTING: LightingSettings = {
+  ambientIntensity: 0.4,
+  sunIntensity: 1.6,
+  sunAngle: 45,
+  shadowEnabled: true,
+  shadowSoftness: 2,
+  fillIntensity: 0.35,
+};
 
 interface Props {
   buildings: Building[];
@@ -13,10 +31,122 @@ interface Props {
   onSelectWall: (id: string | null) => void;
   highlightFloor: boolean;
   bgColor?: string;
+  lighting?: LightingSettings;
 }
 
 function hexToThree(hex: string): THREE.Color {
   return new THREE.Color(hex);
+}
+
+const TEXTURE_PATTERNS: Record<string, (ctx: CanvasRenderingContext2D) => void> = {
+  brick: (ctx) => {
+    ctx.fillStyle = '#c0603a';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#b05530';
+    const bw = 40, bh = 16;
+    for (let row = 0; row < 8; row++) {
+      const offset = (row % 2) * 20;
+      for (let col = -1; col < 4; col++) {
+        const x = col * bw + offset;
+        const y = row * bh;
+        ctx.fillRect(x, y, bw - 2, bh - 2);
+      }
+    }
+    ctx.strokeStyle = '#8a4025';
+    ctx.lineWidth = 1.5;
+    for (let row = 0; row < 9; row++) {
+      ctx.beginPath();
+      ctx.moveTo(0, row * bh);
+      ctx.lineTo(128, row * bh);
+      ctx.stroke();
+    }
+    for (let row = 0; row < 8; row++) {
+      const offset = (row % 2) * 20;
+      for (let col = 0; col < 4; col++) {
+        ctx.beginPath();
+        ctx.moveTo(col * bw + offset, row * bh);
+        ctx.lineTo(col * bw + offset, (row + 1) * bh);
+        ctx.stroke();
+      }
+    }
+  },
+  concrete: (ctx) => {
+    ctx.fillStyle = '#a0a8b0';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * 128;
+      const y = Math.random() * 128;
+      const r = Math.random() * 2;
+      ctx.fillStyle = `rgba(${Math.random() > 0.5 ? 80 : 140},${Math.random() > 0.5 ? 85 : 145},${Math.random() > 0.5 ? 90 : 155},0.3)`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  wood: (ctx) => {
+    ctx.fillStyle = '#c49a5c';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = '#a0784a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 20; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, i * 7 + Math.random() * 3);
+      ctx.bezierCurveTo(40, i * 7 + Math.random() * 5 - 2, 90, i * 7 + Math.random() * 5 - 2, 128, i * 7 + Math.random() * 3);
+      ctx.globalAlpha = 0.4 + Math.random() * 0.4;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  },
+  drywall: (ctx) => {
+    ctx.fillStyle = '#e8e4dc';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = '#c8c4bc';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 6; i++) {
+      const y = i * 22;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(128, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(i * 64, 0);
+      ctx.lineTo(i * 64, 128);
+      ctx.stroke();
+    }
+  },
+  glass: (ctx) => {
+    ctx.fillStyle = 'rgba(180,220,255,0.15)';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = 'rgba(200,235,255,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(128, 128);
+    ctx.moveTo(20, 0); ctx.lineTo(128, 108);
+    ctx.moveTo(0, 20); ctx.lineTo(108, 128);
+    ctx.stroke();
+  },
+};
+
+function makeTexture(materialType: string): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const painter = TEXTURE_PATTERNS[materialType] || TEXTURE_PATTERNS.concrete;
+  painter(ctx);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 1);
+  return tex;
+}
+
+const textureCache = new Map<string, THREE.CanvasTexture>();
+function getCachedTexture(materialType: string): THREE.CanvasTexture {
+  if (!textureCache.has(materialType)) {
+    textureCache.set(materialType, makeTexture(materialType));
+  }
+  return textureCache.get(materialType)!;
 }
 
 interface RoomMeshProps {
@@ -27,23 +157,21 @@ interface RoomMeshProps {
   depth: number;
   height: number;
   color: string;
-  name: string;
   selected: boolean;
   faded: boolean;
   onSelect: () => void;
+  castShadow: boolean;
 }
 
-function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect }: RoomMeshProps) {
+function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs }: RoomMeshProps) {
   const baseColor = hexToThree(color);
-
   const opacity = faded ? 0.12 : 1.0;
   const emissiveIntensity = selected ? 0.18 : 0.0;
 
   return (
     <group position={[x + width / 2, z + height / 2, y + depth / 2]}>
       <mesh
-        ref={meshRef}
-        castShadow
+        castShadow={cs}
         receiveShadow
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
       >
@@ -78,13 +206,19 @@ interface WallSegmentProps {
   height: number;
   thickness: number;
   color: string;
+  opacity: number;
   selected: boolean;
   faded: boolean;
   materialType: string;
+  openings: { type: string; position: number; width: number; height: number; sillHeight: number }[];
   onSelect: () => void;
+  castShadow: boolean;
 }
 
-function WallSegment({ x1, y1, x2, y2, baseY, height, thickness, color, selected, faded, materialType, onSelect }: WallSegmentProps) {
+function WallSegment({
+  x1, y1, x2, y2, baseY, height, thickness, color, opacity: wallOpacity,
+  selected, faded, materialType, openings, onSelect, castShadow: cs
+}: WallSegmentProps) {
   const dx = x2 - x1;
   const dz = y2 - y1;
   const len = Math.sqrt(dx * dx + dz * dz);
@@ -95,35 +229,115 @@ function WallSegment({ x1, y1, x2, y2, baseY, height, thickness, color, selected
   const angle = Math.atan2(dz, dx);
 
   const wallColor = hexToThree(color || '#94a3b8');
-  const opacity = faded ? 0.12 : 1.0;
+  const isGlass = materialType === 'glass';
+  const effectiveOpacity = faded ? 0.12 : (isGlass ? 0.3 : wallOpacity);
+  const transparent = faded || isGlass || wallOpacity < 1.0;
 
   let roughness = 0.85;
   let metalness = 0.0;
-  if (materialType === 'glass') { roughness = 0.05; metalness = 0.1; }
-  else if (materialType === 'concrete') { roughness = 0.95; metalness = 0.0; }
-  else if (materialType === 'brick') { roughness = 0.9; metalness = 0.0; }
-  else if (materialType === 'wood') { roughness = 0.8; metalness = 0.0; }
+  if (materialType === 'glass') { roughness = 0.05; metalness = 0.15; }
+  else if (materialType === 'concrete') { roughness = 0.92; }
+  else if (materialType === 'brick') { roughness = 0.88; }
+  else if (materialType === 'wood') { roughness = 0.78; }
+  else if (materialType === 'drywall') { roughness = 0.82; }
 
-  const isGlass = materialType === 'glass';
+  const tex = useMemo(() => isGlass ? null : getCachedTexture(materialType), [materialType, isGlass]);
 
-  return (
-    <group position={[cx, baseY + height / 2, cz]} rotation={[0, -angle, 0]}>
-      <mesh
-        castShadow
-        receiveShadow
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      >
+  const wallParts: JSX.Element[] = [];
+
+  if (openings.length === 0) {
+    wallParts.push(
+      <mesh key="solid" castShadow={cs} receiveShadow onClick={(e) => { e.stopPropagation(); onSelect(); }}>
         <boxGeometry args={[len, height, thickness]} />
         <meshStandardMaterial
           color={wallColor}
+          map={tex}
           roughness={roughness}
           metalness={metalness}
-          transparent={faded || isGlass}
-          opacity={isGlass ? 0.25 : opacity}
-          depthWrite={!faded && !isGlass}
+          transparent={transparent}
+          opacity={effectiveOpacity}
+          depthWrite={!transparent || effectiveOpacity > 0.5}
           envMapIntensity={isGlass ? 1.5 : 0.3}
+          side={isGlass ? THREE.DoubleSide : THREE.FrontSide}
         />
       </mesh>
+    );
+  } else {
+    const sortedOpenings = [...openings].sort((a, b) => a.position - b.position);
+
+    let prevPos = 0;
+    sortedOpenings.forEach((op, idx) => {
+      const opStart = op.position - op.width / 2;
+      const opEnd = op.position + op.width / 2;
+      const clampedStart = Math.max(0, opStart);
+      const clampedEnd = Math.min(len, opEnd);
+
+      if (clampedStart > prevPos + 0.01) {
+        const segLen = clampedStart - prevPos;
+        const segCx = prevPos + segLen / 2 - len / 2;
+        wallParts.push(
+          <mesh key={`seg-${idx}-before`} position={[segCx, 0, 0]} castShadow={cs} receiveShadow onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+            <boxGeometry args={[segLen, height, thickness]} />
+            <meshStandardMaterial color={wallColor} map={tex} roughness={roughness} metalness={metalness} transparent={transparent} opacity={effectiveOpacity} depthWrite={!transparent || effectiveOpacity > 0.5} />
+          </mesh>
+        );
+      }
+
+      const sillH = op.sillHeight || 0;
+      const openH = Math.min(op.height, height - sillH);
+      const segCxOp = clampedStart + (clampedEnd - clampedStart) / 2 - len / 2;
+
+      if (sillH > 0.01) {
+        wallParts.push(
+          <mesh key={`sill-${idx}`} position={[segCxOp, sillH / 2 - height / 2, 0]} castShadow={cs} receiveShadow>
+            <boxGeometry args={[clampedEnd - clampedStart, sillH, thickness]} />
+            <meshStandardMaterial color={wallColor} map={tex} roughness={roughness} metalness={metalness} transparent={transparent} opacity={effectiveOpacity} depthWrite={!transparent || effectiveOpacity > 0.5} />
+          </mesh>
+        );
+      }
+
+      const aboveH = height - sillH - openH;
+      if (aboveH > 0.01) {
+        wallParts.push(
+          <mesh key={`above-${idx}`} position={[segCxOp, height / 2 - aboveH / 2, 0]} castShadow={cs} receiveShadow>
+            <boxGeometry args={[clampedEnd - clampedStart, aboveH, thickness]} />
+            <meshStandardMaterial color={wallColor} map={tex} roughness={roughness} metalness={metalness} transparent={transparent} opacity={effectiveOpacity} depthWrite={!transparent || effectiveOpacity > 0.5} />
+          </mesh>
+        );
+      }
+
+      const isDoor = op.type === 'door' || op.type === 'door-double' || op.type === 'door-arch';
+      if (!isDoor) {
+        wallParts.push(
+          <mesh key={`glass-${idx}`} position={[segCxOp, sillH + openH / 2 - height / 2, 0]}>
+            <boxGeometry args={[clampedEnd - clampedStart, openH, thickness * 0.15]} />
+            <meshStandardMaterial
+              color={new THREE.Color(0x88ccff)}
+              roughness={0.05} metalness={0.1} transparent opacity={0.25} depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        );
+      }
+
+      prevPos = clampedEnd;
+    });
+
+    if (prevPos < len - 0.01) {
+      const segLen = len - prevPos;
+      const segCx = prevPos + segLen / 2 - len / 2;
+      wallParts.push(
+        <mesh key="seg-last" position={[segCx, 0, 0]} castShadow={cs} receiveShadow onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+          <boxGeometry args={[segLen, height, thickness]} />
+          <meshStandardMaterial color={wallColor} map={tex} roughness={roughness} metalness={metalness} transparent={transparent} opacity={effectiveOpacity} depthWrite={!transparent || effectiveOpacity > 0.5} />
+        </mesh>
+      );
+    }
+  }
+
+  return (
+    <group position={[cx, baseY + height / 2, cz]} rotation={[0, -angle, 0]}>
+      {wallParts}
       {selected && (
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(len + 0.02, height + 0.02, thickness + 0.02)]} />
@@ -148,18 +362,30 @@ interface FloorPlaneProps {
 function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: FloorPlaneProps) {
   const w = maxX - minX;
   const d = maxZ - minZ;
+  if (w < 0.1 || d < 0.1) return null;
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
   const floorColor = hexToThree(color || '#1e3a5f');
   const opacity = faded ? 0.08 : (active ? 0.92 : 0.45);
+  const floorY = baseY + 0.001;
+
+  const shape = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(-w / 2, -d / 2);
+    s.lineTo(w / 2, -d / 2);
+    s.lineTo(w / 2, d / 2);
+    s.lineTo(-w / 2, d / 2);
+    s.closePath();
+    return s;
+  }, [w, d]);
 
   return (
     <mesh
-      position={[cx, baseY, cz]}
+      position={[cx, floorY, cz]}
       rotation={[-Math.PI / 2, 0, 0]}
       receiveShadow
     >
-      <planeGeometry args={[w, d]} />
+      <shapeGeometry args={[shape]} />
       <meshStandardMaterial
         color={floorColor}
         roughness={0.88}
@@ -167,16 +393,13 @@ function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: Flo
         transparent
         opacity={opacity}
         depthWrite={opacity > 0.5}
+        side={THREE.DoubleSide}
       />
     </mesh>
   );
 }
 
-interface GroundGridProps {
-  size: number;
-}
-
-function GroundGrid({ size }: GroundGridProps) {
+function GroundGrid({ size }: { size: number }) {
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
@@ -188,6 +411,42 @@ function GroundGrid({ size }: GroundGridProps) {
   );
 }
 
+function CameraAutoFit({ buildings }: { buildings: Building[] }) {
+  const { camera } = useThree();
+  const fitted = useRef(false);
+
+  useEffect(() => {
+    if (fitted.current) return;
+    const allX: number[] = [];
+    const allZ: number[] = [];
+    let totalH = 0;
+
+    for (const b of buildings) {
+      for (const fl of b.floors) {
+        for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
+        for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
+      }
+      const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
+      totalH = sorted.reduce((acc, f) => acc + f.height, 0);
+    }
+
+    if (allX.length < 2) return;
+
+    const minX = Math.min(...allX), maxX = Math.max(...allX);
+    const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const diag = Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10;
+
+    const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+    camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
+    camera.lookAt(cx, totalH * 0.4, cz);
+    fitted.current = true;
+  }, [buildings, camera]);
+
+  return null;
+}
+
 interface BuildingSceneProps {
   buildings: Building[];
   activeFloorId: string | null;
@@ -196,11 +455,20 @@ interface BuildingSceneProps {
   onSelectRoom: (id: string | null) => void;
   onSelectWall: (id: string | null) => void;
   highlightFloor: boolean;
+  lighting: LightingSettings;
 }
 
-function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallId, onSelectRoom, onSelectWall, highlightFloor }: BuildingSceneProps) {
+function BuildingScene({
+  buildings, activeFloorId, selectedRoomId, selectedWallId,
+  onSelectRoom, onSelectWall, highlightFloor, lighting
+}: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
+
+  const sunAngleRad = (lighting.sunAngle * Math.PI) / 180;
+  const sunDist = 30;
+  const sunX = Math.cos(sunAngleRad) * sunDist;
+  const sunZ = Math.sin(sunAngleRad) * sunDist;
 
   let bldOffX = 0;
   for (const building of buildings) {
@@ -212,10 +480,13 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
       for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
       for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
     }
-    const minX = allX.length ? Math.min(...allX) : 0;
-    const maxX = allX.length ? Math.max(...allX) : 10;
-    const minZ = allZ.length ? Math.min(...allZ) : 0;
-    const maxZ = allZ.length ? Math.max(...allZ) : 10;
+
+    if (allX.length === 0) { bldOffX += 12; continue; }
+
+    const minX = Math.min(...allX);
+    const maxX = Math.max(...allX);
+    const minZ = Math.min(...allZ);
+    const maxZ = Math.max(...allZ);
     const bldW = maxX - minX + 2;
 
     allSize = Math.max(allSize, Math.max(bldW, maxZ - minZ) * 2 + 20);
@@ -223,6 +494,8 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
     const floorBaseY: Record<string, number> = {};
     let yAcc = 0;
     for (const fl of sorted) { floorBaseY[fl.id] = yAcc; yAcc += fl.height; }
+
+    const offsetX = bldOffX - minX;
 
     for (const floor of sorted) {
       const baseY = floorBaseY[floor.id];
@@ -232,10 +505,10 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
       elements.push(
         <FloorPlane
           key={`floor-${floor.id}`}
-          minX={minX + bldOffX - 0.3}
-          maxX={maxX + bldOffX + 0.3}
-          minZ={minZ - 0.3}
-          maxZ={maxZ + 0.3}
+          minX={minX + offsetX}
+          maxX={maxX + offsetX}
+          minZ={minZ}
+          maxZ={maxZ}
           baseY={baseY}
           color={floor.floorColor || '#1e3a5f'}
           active={isActive}
@@ -247,37 +520,80 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
         elements.push(
           <RoomMesh
             key={`room-${room.id}`}
-            x={room.x + bldOffX}
+            x={room.x + offsetX}
             y={room.y}
             z={baseY}
             width={room.width}
             depth={room.depth}
             height={floor.height}
             color={room.color}
-            name={room.name}
             selected={room.id === selectedRoomId}
             faded={faded}
             onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
+            castShadow={lighting.shadowEnabled}
           />
         );
       }
 
       for (const wall of floor.walls) {
+        const wallH = wall.height > 0 ? wall.height : floor.height;
+        const adjX1 = wall.x1 + offsetX;
+        const adjX2 = wall.x2 + offsetX;
+
+        const connectedWalls = floor.walls.filter(w => w.id !== wall.id);
+        const dx = wall.x2 - wall.x1;
+        const dz = wall.y2 - wall.y1;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 0.01) continue;
+
+        let extStart = 0;
+        let extEnd = 0;
+
+        for (const other of connectedWalls) {
+          const odx = other.x2 - other.x1;
+          const odz = other.y2 - other.y1;
+          const olen = Math.sqrt(odx * odx + odz * odz);
+          if (olen < 0.01) continue;
+
+          const checkPoints = [
+            { wx: wall.x1, wy: wall.y1, isStart: true },
+            { wx: wall.x2, wy: wall.y2, isStart: false },
+          ];
+          for (const cp of checkPoints) {
+            const dToStart = Math.sqrt((cp.wx - other.x1) ** 2 + (cp.wy - other.y1) ** 2);
+            const dToEnd = Math.sqrt((cp.wx - other.x2) ** 2 + (cp.wy - other.y2) ** 2);
+            if (dToStart < other.thickness || dToEnd < other.thickness) {
+              const ext = other.thickness / 2;
+              if (cp.isStart) extStart = Math.max(extStart, ext);
+              else extEnd = Math.max(extEnd, ext);
+            }
+          }
+        }
+
         elements.push(
           <WallSegment
             key={`wall-${wall.id}`}
-            x1={wall.x1 + bldOffX}
-            y1={wall.y1}
-            x2={wall.x2 + bldOffX}
-            y2={wall.y2}
+            x1={adjX1 - (dx / len) * extStart}
+            y1={wall.y1 - (dz / len) * extStart}
+            x2={adjX2 + (dx / len) * extEnd}
+            y2={wall.y2 + (dz / len) * extEnd}
             baseY={baseY}
-            height={wall.height > 0 ? wall.height : floor.height}
+            height={wallH}
             thickness={wall.thickness || 0.25}
             color={wall.color || '#94a3b8'}
+            opacity={wall.opacity ?? 1}
             selected={wall.id === selectedWallId}
             faded={faded}
             materialType={wall.materialType || 'concrete'}
+            openings={(wall.openings ?? []).map(o => ({
+              type: o.type,
+              position: o.position,
+              width: o.width,
+              height: o.height,
+              sillHeight: o.sillHeight || 0,
+            }))}
             onSelect={() => { onSelectWall(wall.id); onSelectRoom(null); }}
+            castShadow={lighting.shadowEnabled}
           />
         );
       }
@@ -290,40 +606,31 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
     <>
       <GroundGrid size={allSize} />
 
-      <ambientLight intensity={0.35} color="#c8d8f0" />
+      <ambientLight intensity={lighting.ambientIntensity} color="#c8d8f0" />
 
       <directionalLight
-        position={[18, 28, 12]}
-        intensity={1.8}
+        position={[sunX, 28, sunZ]}
+        intensity={lighting.sunIntensity}
         color="#fff5e0"
-        castShadow
+        castShadow={lighting.shadowEnabled}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-near={0.5}
         shadow-camera-far={200}
-        shadow-camera-left={-50}
-        shadow-camera-right={50}
-        shadow-camera-top={50}
-        shadow-camera-bottom={-50}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
         shadow-bias={-0.0005}
-        shadow-radius={3}
+        shadow-radius={lighting.shadowSoftness}
       />
 
       <directionalLight
         position={[-12, 10, -8]}
-        intensity={0.45}
+        intensity={lighting.fillIntensity}
         color="#a0c4ff"
       />
 
-      <hemisphereLight args={['#b0d0ff', '#1a2a40', 0.6]} />
-
-      <ContactShadows
-        position={[0, -0.005, 0]}
-        opacity={0.55}
-        scale={allSize}
-        blur={2.5}
-        far={20}
-        color="#000820"
-      />
+      <hemisphereLight args={['#b0d0ff', '#1a2a40', 0.5]} />
 
       {elements}
     </>
@@ -333,11 +640,12 @@ function BuildingScene({ buildings, activeFloorId, selectedRoomId, selectedWallI
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   onSelectRoom, onSelectWall, highlightFloor, bgColor = '#0a1020',
+  lighting = DEFAULT_LIGHTING,
 }: Props) {
   return (
     <div className="relative w-full h-full select-none">
       <Canvas
-        shadows="soft"
+        shadows={lighting.shadowEnabled ? 'soft' : false}
         camera={{ position: [14, 18, 20], fov: 45, near: 0.1, far: 1000 }}
         gl={{
           antialias: true,
@@ -360,16 +668,19 @@ export function BuildingCanvas3D({
             onSelectRoom={onSelectRoom}
             onSelectWall={onSelectWall}
             highlightFloor={highlightFloor}
+            lighting={lighting}
           />
           <Environment preset="city" />
         </Suspense>
 
+        <CameraAutoFit buildings={buildings} />
+
         <OrbitControls
           makeDefault
-          minPolarAngle={0.1}
-          maxPolarAngle={Math.PI / 2 - 0.02}
-          minDistance={2}
-          maxDistance={120}
+          minPolarAngle={0.05}
+          maxPolarAngle={Math.PI / 2 - 0.01}
+          minDistance={1}
+          maxDistance={200}
           enableDamping
           dampingFactor={0.08}
           panSpeed={0.8}

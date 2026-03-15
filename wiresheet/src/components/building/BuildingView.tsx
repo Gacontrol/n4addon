@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
-  Layers, Box, MousePointer, Square, Settings2, X, Minus
+  Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
-import { BuildingCanvas3D } from './BuildingCanvas3D';
+import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage } from '../../types/building';
 
@@ -84,6 +84,8 @@ export function BuildingView() {
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [wallThickness, setWallThickness] = useState(0.25);
   const [bgColor, setBgColor] = useState('#0a1020');
+  const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
+  const [showLightingPanel, setShowLightingPanel] = useState(false);
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
@@ -97,6 +99,16 @@ export function BuildingView() {
     if (!activeBuilding || !activeFloor) return;
     if (point === 'start') updateWall(activeBuilding.id, activeFloor.id, wallId, { x1: x, y1: y });
     else updateWall(activeBuilding.id, activeFloor.id, wallId, { x2: x, y2: y });
+  };
+
+  const handleMoveWall = (wallId: string, dx: number, dy: number) => {
+    if (!activeBuilding || !activeFloor) return;
+    const wall = activeFloor.walls.find(w => w.id === wallId);
+    if (!wall) return;
+    updateWall(activeBuilding.id, activeFloor.id, wallId, {
+      x1: wall.x1 + dx, y1: wall.y1 + dy,
+      x2: wall.x2 + dx, y2: wall.y2 + dy,
+    });
   };
 
   const handleAddRoom = (x: number, y: number, w: number, d: number) => {
@@ -325,31 +337,25 @@ export function BuildingView() {
             {viewMode === '3d' && (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                  <span>Hintergrund</span>
-                  <input
-                    type="color"
-                    value={bgColor}
-                    onChange={e => setBgColor(e.target.value)}
-                    className="w-6 h-5 rounded cursor-pointer bg-transparent border border-slate-600"
-                    title="Hintergrundfarbe"
-                  />
+                  <span>HG</span>
+                  <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
+                    className="w-5 h-5 rounded cursor-pointer bg-transparent border border-slate-600" title="Hintergrundfarbe" />
                 </div>
                 {activeFloor && (
                   <div className="flex items-center gap-1 text-[10px] text-slate-500">
                     <span>Boden</span>
-                    <input
-                      type="color"
-                      value={activeFloor.floorColor || '#1e3a5f'}
-                      onChange={e => {
-                        if (activeBuilding && activeFloor) {
-                          updateFloorColor(activeBuilding.id, activeFloor.id, e.target.value);
-                        }
-                      }}
-                      className="w-6 h-5 rounded cursor-pointer bg-transparent border border-slate-600"
-                      title="Bodenfarbe"
-                    />
+                    <input type="color" value={activeFloor.floorColor || '#1e3a5f'}
+                      onChange={e => { if (activeBuilding && activeFloor) updateFloorColor(activeBuilding.id, activeFloor.id, e.target.value); }}
+                      className="w-5 h-5 rounded cursor-pointer bg-transparent border border-slate-600" title="Bodenfarbe" />
                   </div>
                 )}
+                <button
+                  onClick={() => setShowLightingPanel(p => !p)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showLightingPanel ? 'bg-amber-700 text-white border-amber-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Beleuchtung"
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 
@@ -368,16 +374,57 @@ export function BuildingView() {
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-hidden">
             {viewMode === '3d' ? (
-              <BuildingCanvas3D
-                buildings={buildings}
-                activeFloorId={activeFloorId}
-                selectedRoomId={selectedRoomId}
-                selectedWallId={selectedWallId}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
-                highlightFloor={true}
-                bgColor={bgColor}
-              />
+              <div className="relative w-full h-full">
+                <BuildingCanvas3D
+                  buildings={buildings}
+                  activeFloorId={activeFloorId}
+                  selectedRoomId={selectedRoomId}
+                  selectedWallId={selectedWallId}
+                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
+                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
+                  highlightFloor={true}
+                  bgColor={bgColor}
+                  lighting={lighting}
+                />
+                {showLightingPanel && (
+                  <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5 text-amber-400" />Beleuchtung</span>
+                      <button onClick={() => setShowLightingPanel(false)} className="text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                    {[
+                      { key: 'ambientIntensity', label: 'Umgebungslicht', min: 0, max: 2, step: 0.05 },
+                      { key: 'sunIntensity', label: 'Sonnenlicht', min: 0, max: 4, step: 0.1 },
+                      { key: 'sunAngle', label: 'Sonnenwinkel', min: 0, max: 360, step: 5 },
+                      { key: 'fillIntensity', label: 'Fülllicht', min: 0, max: 2, step: 0.05 },
+                      { key: 'shadowSoftness', label: 'Schattenweichheit', min: 0, max: 10, step: 0.5 },
+                    ].map(({ key, label, min, max, step }) => (
+                      <div key={key}>
+                        <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                          <span>{label}</span>
+                          <span>{lighting[key as keyof LightingSettings]}</span>
+                        </div>
+                        <input type="range" min={min} max={max} step={step}
+                          value={lighting[key as keyof LightingSettings] as number}
+                          onChange={e => setLighting(l => ({ ...l, [key]: parseFloat(e.target.value) }))}
+                          className="w-full h-1 accent-amber-500" />
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">Schatten</span>
+                      <button
+                        onClick={() => setLighting(l => ({ ...l, shadowEnabled: !l.shadowEnabled }))}
+                        className={`w-8 h-4 rounded-full transition-colors ${lighting.shadowEnabled ? 'bg-amber-500' : 'bg-slate-600'} relative`}
+                      >
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${lighting.shadowEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                    <button onClick={() => setLighting(DEFAULT_LIGHTING)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
+                      Zurücksetzen
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : activeFloor ? (
               <FloorPlanEditor
                 floor={activeFloor}
@@ -388,6 +435,7 @@ export function BuildingView() {
                 onAddWall={handleAddWall}
                 onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
                 onMoveWallPoint={handleMoveWallPoint}
+                onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
                 onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
                 onMoveRoom={handleMoveRoom}
