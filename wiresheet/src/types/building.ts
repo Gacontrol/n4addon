@@ -17,6 +17,17 @@ export interface WallPoint {
   y: number;
 }
 
+export type WallOpeningType = 'door' | 'window' | 'door-double' | 'door-arch' | 'window-large';
+
+export interface WallOpening {
+  id: string;
+  type: WallOpeningType;
+  position: number;
+  width: number;
+  height: number;
+  sillHeight: number;
+}
+
 export interface Wall {
   id: string;
   x1: number;
@@ -28,6 +39,7 @@ export interface Wall {
   color: string;
   opacity: number;
   materialType: 'concrete' | 'brick' | 'wood' | 'glass' | 'drywall';
+  openings: WallOpening[];
 }
 
 export interface Door {

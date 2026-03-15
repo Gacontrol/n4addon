@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Building, Floor, Room, Wall, BackgroundImage, BuildingTool, ObjModel } from '../types/building';
+import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -65,7 +65,7 @@ export function useBuildingEditor() {
               objModels: b.objModels ?? [],
               floors: b.floors.map((f: Floor) => ({
                 ...f,
-                walls: f.walls ?? [],
+                walls: (f.walls ?? []).map((w: Wall) => ({ ...w, openings: w.openings ?? [] })),
                 backgroundImage: f.backgroundImage ?? null,
               })),
             }));
@@ -249,6 +249,7 @@ export function useBuildingEditor() {
       color: '#94a3b8',
       opacity: 1,
       materialType: 'concrete',
+      openings: [],
     };
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -364,6 +365,59 @@ export function useBuildingEditor() {
     setSelectedRoomId(null);
   }, [buildings, updateBuildings]);
 
+  const addWallOpening = useCallback((buildingId: string, floorId: string, wallId: string, opening: Omit<WallOpening, 'id'>) => {
+    const newOpening: WallOpening = { ...opening, id: `opening-${Date.now()}-${Math.random().toString(36).substr(2, 6)}` };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, walls: f.walls.map(w => w.id === wallId ? { ...w, openings: [...(w.openings ?? []), newOpening] } : w) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    return newOpening.id;
+  }, [buildings, updateBuildings]);
+
+  const updateWallOpening = useCallback((buildingId: string, floorId: string, wallId: string, openingId: string, changes: Partial<WallOpening>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, walls: f.walls.map(w => w.id === wallId ? { ...w, openings: (w.openings ?? []).map(o => o.id === openingId ? { ...o, ...changes } : o) } : w) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const deleteWallOpening = useCallback((buildingId: string, floorId: string, wallId: string, openingId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, walls: f.walls.map(w => w.id === wallId ? { ...w, openings: (w.openings ?? []).filter(o => o.id !== openingId) } : w) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const [selectedObjModelId, setSelectedObjModelId] = useState<string | null>(null);
 
   const addObjModel = useCallback((buildingId: string, model: ObjModel) => {
@@ -433,6 +487,9 @@ export function useBuildingEditor() {
     addRoom,
     updateRoom,
     deleteRoom,
+    addWallOpening,
+    updateWallOpening,
+    deleteWallOpening,
     selectedObjModelId,
     setSelectedObjModelId,
     addObjModel,

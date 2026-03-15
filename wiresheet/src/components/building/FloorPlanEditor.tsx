@@ -235,6 +235,7 @@ export function FloorPlanEditor({
       if (len < 0.5) continue;
       const nx = (-dy / len) * thickness / 2;
       const ny = (dx / len) * thickness / 2;
+      const wallLenWorld = dist(wall.x1, wall.y1, wall.x2, wall.y2);
 
       ctx.beginPath();
       ctx.moveTo(s1.x + nx, s1.y + ny);
@@ -249,6 +250,59 @@ export function FloorPlanEditor({
       if (isSelected) { ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 6; }
       ctx.stroke();
       ctx.shadowBlur = 0;
+
+      for (const opening of (wall.openings ?? [])) {
+        const t = opening.position / wallLenWorld;
+        const hw = opening.width / 2;
+        const t1 = Math.max(0, (opening.position - hw) / wallLenWorld);
+        const t2 = Math.min(1, (opening.position + hw) / wallLenWorld);
+        const ox1s = { x: s1.x + dx * t1, y: s1.y + dy * t1 };
+        const ox2s = { x: s1.x + dx * t2, y: s1.y + dy * t2 };
+        const isDoor = opening.type === 'door' || opening.type === 'door-double' || opening.type === 'door-arch';
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(ox1s.x + nx, ox1s.y + ny);
+        ctx.lineTo(ox2s.x + nx, ox2s.y + ny);
+        ctx.lineTo(ox2s.x - nx, ox2s.y - ny);
+        ctx.lineTo(ox1s.x - nx, ox1s.y - ny);
+        ctx.closePath();
+        ctx.fillStyle = isDoor ? '#0f172a' : 'rgba(125,211,252,0.35)';
+        ctx.fill();
+
+        if (isDoor) {
+          const cx = (ox1s.x + ox2s.x) / 2;
+          const cy = (ox1s.y + ox2s.y) / 2;
+          const rad = (opening.width * CELL * zoom) / 2;
+          ctx.strokeStyle = '#60a5fa';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(ox1s.x, ox1s.y);
+          ctx.arc(ox1s.x, ox1s.y, opening.width * CELL * zoom, Math.atan2(dy, dx), Math.atan2(dy, dx) + Math.PI / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1;
+          const mx = (ox1s.x + ox2s.x) / 2 - nx * 0.5;
+          const my = (ox1s.y + ox2s.y) / 2 - ny * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(ox1s.x - nx * 0.5, ox1s.y - ny * 0.5);
+          ctx.lineTo(ox2s.x - nx * 0.5, ox2s.y - ny * 0.5);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        if (zoom > 0.7) {
+          const label = isDoor ? 'T' : 'F';
+          const lx = s1.x + dx * t - nx * 0;
+          const ly = s1.y + dy * t - ny * 0;
+          ctx.font = `bold ${Math.max(8, 8 * zoom)}px Inter, sans-serif`;
+          ctx.fillStyle = isDoor ? '#60a5fa' : '#38bdf8';
+          ctx.textAlign = 'center';
+          ctx.fillText(label, lx, ly + 3);
+        }
+      }
 
       if (isSelected) {
         for (const pt of [{ x: s1.x, y: s1.y }, { x: s2.x, y: s2.y }]) {

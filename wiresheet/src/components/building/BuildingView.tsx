@@ -6,7 +6,7 @@ import {
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
-import { Room, RoomType, Wall, BackgroundImage } from '../../types/building';
+import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage } from '../../types/building';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer',
@@ -66,6 +66,9 @@ export function BuildingView() {
     addRoom,
     updateRoom,
     deleteRoom,
+    addWallOpening,
+    updateWallOpening,
+    deleteWallOpening,
     ROOM_COLORS,
   } = useBuildingEditor();
 
@@ -466,6 +469,102 @@ export function BuildingView() {
                         {Math.sqrt((selectedWall.x2 - selectedWall.x1) ** 2 + (selectedWall.y2 - selectedWall.y1) ** 2).toFixed(2)} m
                       </div>
                     </div>
+
+                    <div className="pt-2 border-t border-slate-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Öffnungen</div>
+                        <div className="flex gap-1">
+                          {([
+                            { type: 'door', label: 'Tür' },
+                            { type: 'window', label: 'Fenster' },
+                          ] as { type: WallOpeningType; label: string }[]).map(({ type, label }) => (
+                            <button
+                              key={type}
+                              onClick={() => {
+                                if (!activeBuilding || !activeFloor) return;
+                                const wallLen = Math.sqrt((selectedWall.x2 - selectedWall.x1) ** 2 + (selectedWall.y2 - selectedWall.y1) ** 2);
+                                addWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, {
+                                  type,
+                                  position: wallLen / 2,
+                                  width: type === 'door' ? 0.9 : 1.2,
+                                  height: type === 'door' ? 2.1 : 1.2,
+                                  sillHeight: type === 'door' ? 0 : 0.9,
+                                });
+                              }}
+                              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-700 hover:bg-blue-800 text-slate-300 hover:text-white border border-slate-600 hover:border-blue-600 rounded text-[10px]"
+                            >
+                              <Plus className="w-2.5 h-2.5" />{label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {(selectedWall.openings ?? []).length === 0 ? (
+                        <div className="text-[10px] text-slate-600 italic">Keine Öffnungen</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {(selectedWall.openings ?? []).map(opening => (
+                            <div key={opening.id} className="bg-slate-750 border border-slate-700 rounded p-2 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <select
+                                  className="bg-slate-700 border border-slate-600 text-slate-300 text-[10px] rounded px-1.5 py-0.5 outline-none"
+                                  value={opening.type}
+                                  onChange={e => activeBuilding && activeFloor && updateWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id, { type: e.target.value as WallOpeningType })}
+                                >
+                                  <option value="door">Tür</option>
+                                  <option value="door-double">Doppeltür</option>
+                                  <option value="door-arch">Bogentür</option>
+                                  <option value="window">Fenster</option>
+                                  <option value="window-large">Grosses Fenster</option>
+                                </select>
+                                <button
+                                  onClick={() => activeBuilding && activeFloor && deleteWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id)}
+                                  className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-red-400 rounded"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                  <div className="text-[9px] text-slate-500 mb-0.5">Position (m)</div>
+                                  <input type="number" step="0.1" min="0"
+                                    className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-blue-500"
+                                    value={opening.position}
+                                    onChange={e => activeBuilding && activeFloor && updateWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id, { position: parseFloat(e.target.value) || 0 })}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-[9px] text-slate-500 mb-0.5">Breite (m)</div>
+                                  <input type="number" step="0.1" min="0.2"
+                                    className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-blue-500"
+                                    value={opening.width}
+                                    onChange={e => activeBuilding && activeFloor && updateWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id, { width: parseFloat(e.target.value) || 0.9 })}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="text-[9px] text-slate-500 mb-0.5">Höhe (m)</div>
+                                  <input type="number" step="0.1" min="0.3"
+                                    className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-blue-500"
+                                    value={opening.height}
+                                    onChange={e => activeBuilding && activeFloor && updateWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id, { height: parseFloat(e.target.value) || 2.1 })}
+                                  />
+                                </div>
+                                {(opening.type === 'window' || opening.type === 'window-large') && (
+                                  <div>
+                                    <div className="text-[9px] text-slate-500 mb-0.5">Brüstung (m)</div>
+                                    <input type="number" step="0.1" min="0"
+                                      className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-[10px] px-1.5 py-0.5 rounded outline-none focus:border-blue-500"
+                                      value={opening.sillHeight}
+                                      onChange={e => activeBuilding && activeFloor && updateWallOpening(activeBuilding.id, activeFloor.id, selectedWall.id, opening.id, { sillHeight: parseFloat(e.target.value) || 0.9 })}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => { if (activeBuilding && activeFloor) deleteWall(activeBuilding.id, activeFloor.id, selectedWall.id); }}
                       className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs"
