@@ -219,11 +219,54 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   };
 
   const isNotAuto = hoaMode !== 2;
+  const labelPos = config.labelPosition || 'bottom';
+  const textFontSize = config.fontSize ? `${config.fontSize}px` : undefined;
+
+  const labelEl = labelPos !== 'none' ? (
+    <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate px-1`} style={{ fontSize: textFontSize }}>
+      {pumpName}
+      {showSpeedOnCanvas && (
+        <span className="text-slate-400 ml-1">{speedOut.toFixed(0)}%</span>
+      )}
+    </div>
+  ) : null;
+
+  const symbolEl = (
+    <div
+      className="relative flex items-center justify-center flex-shrink-0"
+      style={{
+        width: '70%',
+        height: '60%',
+        maxWidth: sizeValues.maxWidth,
+        maxHeight: sizeValues.maxHeight,
+        transform: `rotate(${getRotation()}deg)`
+      }}
+    >
+      <AggregateSymbol
+        symbolType={symbolType}
+        color={statusColor}
+        running={running}
+        size={sizeValues.symbolSize}
+      />
+      {(fault || alarm) && (
+        <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
+          <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
+        </div>
+      )}
+      {revision && !fault && !alarm && (
+        <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
+          <Wrench size={sizeValues.iconSize - 2} className="text-amber-500" />
+        </div>
+      )}
+    </div>
+  );
+
+  const isHorizontal = labelPos === 'left' || labelPos === 'right';
 
   return (
     <>
       <div
-        className="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none relative"
+        className={`w-full h-full ${isHorizontal ? 'flex flex-row' : 'flex flex-col'} items-center justify-center cursor-pointer select-none relative`}
         onClick={handleClick}
         style={{ backgroundColor: 'transparent' }}
       >
@@ -238,41 +281,9 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
             {hoaMode === 0 ? 'AUS' : 'HAND'}
           </div>
         )}
-        <div
-          className="relative flex items-center justify-center"
-          style={{
-            width: '70%',
-            height: '60%',
-            maxWidth: sizeValues.maxWidth,
-            maxHeight: sizeValues.maxHeight,
-            transform: `rotate(${getRotation()}deg)`
-          }}
-        >
-          <AggregateSymbol
-            symbolType={symbolType}
-            color={statusColor}
-            running={running}
-            size={sizeValues.symbolSize}
-          />
-          {(fault || alarm) && (
-            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
-              <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
-            </div>
-          )}
-          {revision && !fault && !alarm && (
-            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(${-getRotation()}deg)` }}>
-              <Wrench size={sizeValues.iconSize - 2} className="text-amber-500" />
-            </div>
-          )}
-        </div>
-        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
-          {pumpName}
-        </div>
-        {showSpeedOnCanvas && (
-          <div className={`${sizeValues.fontSize} text-slate-400`}>
-            {speedOut.toFixed(0)}%
-          </div>
-        )}
+        {(labelPos === 'top' || labelPos === 'left') && labelEl}
+        {symbolEl}
+        {(labelPos === 'bottom' || labelPos === 'right') && labelEl}
       </div>
 
       {showPopup && createPortal(

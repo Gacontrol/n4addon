@@ -28,8 +28,8 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
     return String(value);
   };
 
-  const bgColor = style.backgroundColor || '#1e293b';
-  const textColor = style.textColor || '#22c55e';
+  const bgColor = style.backgroundColor ?? 'transparent';
+  const textColor = style.textColor ?? '#22c55e';
   const fontSize = config.fontSize || 24;
 
   return (
@@ -38,8 +38,8 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
         <span className="text-xs text-slate-400 truncate">{label}</span>
       )}
       <div
-        className="px-4 py-3 rounded-lg border border-slate-600 font-mono text-center"
-        style={{ backgroundColor: bgColor }}
+        className="px-4 py-3 rounded-lg font-mono text-center"
+        style={{ backgroundColor: bgColor, border: bgColor === 'transparent' ? 'none' : undefined }}
       >
         <span style={{ color: textColor, fontSize }}>
           {formatValue()}

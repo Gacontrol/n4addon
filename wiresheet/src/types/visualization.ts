@@ -421,6 +421,8 @@ export interface VisuWidget {
   zIndex?: number;
 }
 
+export type PageTransitionEffect = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out' | 'flip';
+
 export interface VisuPage {
   id: string;
   name: string;
@@ -430,6 +432,8 @@ export interface VisuPage {
   showGrid?: boolean;
   canvasWidth?: number;
   canvasHeight?: number;
+  transitionEffect?: PageTransitionEffect;
+  transitionDuration?: number;
 }
 
 export interface ModernSwitchConfig {

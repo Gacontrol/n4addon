@@ -203,10 +203,47 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   const showFeedback = config.showFeedback !== false;
   const showOutput = config.showOutput !== false;
 
+  const labelPos = config.labelPosition || 'bottom';
+  const textFontSize = config.fontSize ? `${config.fontSize}px` : undefined;
+
+  const labelEl = labelPos !== 'none' ? (
+    <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate px-1`} style={{ fontSize: textFontSize }}>
+      {valveName}
+      {showOutput && <span className="text-slate-400 ml-1">{valveOutput.toFixed(0)}%</span>}
+    </div>
+  ) : null;
+
+  const symbolEl = (
+    <div
+      className="relative flex items-center justify-center flex-shrink-0"
+      style={{
+        width: '70%',
+        height: '60%',
+        maxWidth: sizeValues.maxWidth,
+        maxHeight: sizeValues.maxHeight,
+        transform: `rotate(${rotation}deg)`
+      }}
+    >
+      <ValveSymbol
+        symbolType={symbolType}
+        color={statusColor}
+        openPercent={valveOutput}
+        size={sizeValues.symbolSize}
+      />
+      {alarm && (
+        <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
+          <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
+        </div>
+      )}
+    </div>
+  );
+
+  const isHorizontal = labelPos === 'left' || labelPos === 'right';
+
   return (
     <>
       <div
-        className="w-full h-full flex flex-col items-center justify-center cursor-pointer select-none relative"
+        className={`w-full h-full ${isHorizontal ? 'flex flex-row' : 'flex flex-col'} items-center justify-center cursor-pointer select-none relative`}
         onClick={handleClick}
         style={{ backgroundColor: 'transparent' }}
       >
@@ -220,34 +257,9 @@ export const VisuValve: React.FC<VisuValveProps> = ({
             HAND
           </div>
         )}
-        <div
-          className="relative flex items-center justify-center"
-          style={{
-            width: '70%',
-            height: '60%',
-            maxWidth: sizeValues.maxWidth,
-            maxHeight: sizeValues.maxHeight,
-            transform: `rotate(${rotation}deg)`
-          }}
-        >
-          <ValveSymbol
-            symbolType={symbolType}
-            color={statusColor}
-            openPercent={valveOutput}
-            size={sizeValues.symbolSize}
-          />
-          {alarm && (
-            <div className="absolute -top-1 -right-1" style={{ transform: `rotate(-${rotation}deg)` }}>
-              <AlertTriangle size={sizeValues.iconSize} className="text-red-500" />
-            </div>
-          )}
-        </div>
-        <div className={`${sizeValues.fontSize} text-center text-slate-300 truncate w-full px-1`}>
-          {valveName}
-        </div>
-        <div className={`${sizeValues.fontSize} text-slate-400`}>
-          {valveOutput.toFixed(0)}%
-        </div>
+        {(labelPos === 'top' || labelPos === 'left') && labelEl}
+        {symbolEl}
+        {(labelPos === 'bottom' || labelPos === 'right') && labelEl}
       </div>
 
       {showPopup && createPortal(

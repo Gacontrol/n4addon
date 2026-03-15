@@ -127,7 +127,9 @@ export const widgetTemplates: WidgetTemplate[] = [
     },
     defaultStyle: {
       showLabel: true,
-      labelPosition: 'top'
+      labelPosition: 'top',
+      backgroundColor: '#1e293b',
+      textColor: '#e2e8f0'
     },
     description: 'Direktes Eingabefeld fuer Sollwerte',
     supportsBinding: true,

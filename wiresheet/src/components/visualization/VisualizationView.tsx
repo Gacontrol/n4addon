@@ -509,6 +509,37 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           </div>
           <div className="w-px h-4 bg-slate-600" />
           <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-400">Seitenuebergang:</label>
+            <select
+              value={activePage.transitionEffect || 'none'}
+              onChange={(e) => onUpdateVisuPage(activePage.id, { transitionEffect: e.target.value as VisuPage['transitionEffect'] })}
+              className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+            >
+              <option value="none">Kein</option>
+              <option value="fade">Einblenden</option>
+              <option value="slide-left">Schieben Links</option>
+              <option value="slide-right">Schieben Rechts</option>
+              <option value="slide-up">Schieben Oben</option>
+              <option value="slide-down">Schieben Unten</option>
+              <option value="zoom-in">Zoom Rein</option>
+              <option value="zoom-out">Zoom Raus</option>
+              <option value="flip">Umdrehen</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-400">Dauer (ms):</label>
+            <input
+              type="number"
+              min="100"
+              max="2000"
+              step="100"
+              value={activePage.transitionDuration ?? 300}
+              onChange={(e) => onUpdateVisuPage(activePage.id, { transitionDuration: parseInt(e.target.value) || 300 })}
+              className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+            />
+          </div>
+          <div className="w-px h-4 bg-slate-600" />
+          <div className="flex items-center gap-2">
             <label className="text-xs text-slate-400">Breite:</label>
             <input
               type="number"

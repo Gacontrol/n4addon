@@ -93,7 +93,20 @@ export function useAlarmManagement() {
     const apiBase = getApiBase();
     let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
     let isActive = true;
+
+    async function pollAlarms() {
+      if (!isActive) return;
+      try {
+        const resp = await fetch(`${apiBase}/alarm-config`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
+        }
+      } catch {}
+      if (isActive) pollTimer = setTimeout(pollAlarms, 3000);
+    }
 
     function connect() {
       if (!isActive) return;
@@ -116,10 +129,12 @@ export function useAlarmManagement() {
     }
 
     connect();
+    pollAlarms();
 
     return () => {
       isActive = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       es?.close();
     };
   }, []);

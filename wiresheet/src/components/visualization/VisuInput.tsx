@@ -69,6 +69,10 @@ export const VisuInput: React.FC<VisuInputProps> = ({
     }
   }, [handleSubmit]);
 
+  const bgColor = style.backgroundColor ?? 'transparent';
+  const txtColor = style.textColor ?? '#e2e8f0';
+  const borderStyle = bgColor === 'transparent' ? 'transparent' : '#475569';
+
   return (
     <div className={`flex flex-col gap-1 ${disabled ? 'opacity-50' : ''}`}>
       {style.showLabel && style.labelPosition === 'top' && (
@@ -86,10 +90,11 @@ export const VisuInput: React.FC<VisuInputProps> = ({
             placeholder={config.placeholder}
             min={config.min}
             max={config.max}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 rounded-lg placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors disabled:cursor-not-allowed"
+            style={{ backgroundColor: bgColor, color: txtColor, border: `1px solid ${borderStyle}` }}
           />
           {config.unit && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: txtColor, opacity: 0.6 }}>
               {config.unit}
             </span>
           )}
