@@ -37,11 +37,12 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
 
   const textColor = style.textColor || '#e2e8f0';
   const labelColor = style.textColor || '#94a3b8';
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 12;
 
   return (
     <div className={`flex flex-col items-center gap-1 ${disabled ? 'opacity-50' : ''}`}>
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: labelColor, fontSize }}>{label}</span>
       )}
       <div className="flex items-center gap-2">
         <button
@@ -52,11 +53,11 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
           <Minus className="w-5 h-5" style={{ color: textColor }} />
         </button>
         <div className="min-w-[60px] px-3 py-2 bg-slate-800 rounded-lg text-center">
-          <span className="font-mono" style={{ color: textColor, fontSize: 'inherit' }}>
+          <span className="font-mono" style={{ color: textColor, fontSize }}>
             {displayValue}
           </span>
           {config.unit && (
-            <span className="ml-1" style={{ color: textColor, opacity: 0.7, fontSize: '0.75em' }}>{config.unit}</span>
+            <span className="ml-1" style={{ color: textColor, opacity: 0.7, fontSize }}>{config.unit}</span>
           )}
         </div>
         <button
@@ -68,7 +69,7 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
         </button>
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: labelColor, fontSize }}>{label}</span>
       )}
     </div>
   );

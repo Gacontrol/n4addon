@@ -34,6 +34,7 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
   }, [percent, config.coldColor, config.hotColor]);
 
   const displayValue = typeof value === 'number' ? value.toFixed(1) : '0';
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 14;
   const thermWidth = Math.min(size.width - 10, 40);
   const thermHeight = size.height - 50;
   const bulbRadius = thermWidth / 2;
@@ -43,7 +44,7 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
   return (
     <div className="flex flex-col items-center gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
       )}
       <div className="relative" style={{ width: thermWidth, height: thermHeight }}>
         <svg width={thermWidth} height={thermHeight} viewBox={`0 0 ${thermWidth} ${thermHeight}`}>
@@ -103,12 +104,12 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
       </div>
       {config.showValue && (
         <div className="text-center">
-          <span className="font-mono" style={{ color: style.textColor || '#e2e8f0', fontSize: style.fontSize || '1.125rem' }}>{displayValue}</span>
-          <span className="ml-1" style={{ color: style.textColor || '#94a3b8', fontSize: style.fontSize ? `${style.fontSize * 0.75}px` : '0.875rem' }}>{config.unit || '°C'}</span>
+          <span className="font-mono" style={{ color: style.textColor || '#e2e8f0', fontSize: (config as { fontSize?: number }).fontSize || style.fontSize || '1.125rem' }}>{displayValue}</span>
+          <span className="ml-1" style={{ color: style.textColor || '#94a3b8', fontSize }}>{config.unit || '°C'}</span>
         </div>
       )}
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
       )}
     </div>
   );

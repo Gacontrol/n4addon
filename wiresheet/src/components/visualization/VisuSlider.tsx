@@ -115,14 +115,15 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   const percent = ((localValue - config.min) / (config.max - config.min)) * 100;
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 12;
 
   return (
     <div className="flex flex-col gap-1" style={{ width }}>
       {style.showLabel && style.labelPosition === 'top' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
+            <span className="font-mono" style={{ color: style.textColor || '#cbd5e1', fontSize }}>
               {localValue.toFixed(config.step < 1 ? 1 : 0)}{config.unit}
             </span>
           )}
@@ -153,9 +154,9 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
+            <span className="font-mono" style={{ color: style.textColor || '#cbd5e1', fontSize }}>
               {localValue.toFixed(config.step < 1 ? 1 : 0)}{config.unit}
             </span>
           )}

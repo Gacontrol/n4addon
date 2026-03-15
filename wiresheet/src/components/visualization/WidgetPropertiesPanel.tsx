@@ -388,6 +388,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <option value="true">Ein (1)</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(switchCfg as { fontSize?: number }).fontSize ?? 12}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
           </>
         );
 
@@ -457,6 +468,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               />
               <label className="text-xs text-slate-400">Impulsmodus (True-Impuls bei jedem Klick)</label>
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(btnCfg as { fontSize?: number }).fontSize ?? 14}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 14 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
           </>
         );
 
@@ -509,6 +531,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 type="text"
                 value={sliderCfg.unit || ''}
                 onChange={(e) => onUpdate({ config: { ...config, unit: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(sliderCfg as { fontSize?: number }).fontSize ?? 12}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               />
             </div>
@@ -570,6 +603,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               />
             </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(inputCfg as { fontSize?: number }).fontSize ?? 14}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 14 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
           </>
         );
 
@@ -617,6 +661,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="rounded"
               />
               <label className="text-xs text-slate-400">Wert anzeigen</label>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(rangeCfg as { fontSize?: number }).fontSize ?? 14}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 14 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
             </div>
           </>
         );
@@ -716,6 +771,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <option value="circle">Rund</option>
                 <option value="square">Eckig</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(ledCfg as { fontSize?: number }).fontSize ?? 12}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
             </div>
           </>
         );
@@ -1245,6 +1311,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <option key={i} value={String(o.value)}>{o.label} ({String(o.value)})</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+              <input
+                type="number"
+                min="8"
+                max="48"
+                value={(msCfg as { fontSize?: number }).fontSize ?? 14}
+                onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 14 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
             </div>
           </>
         );

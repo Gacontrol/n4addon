@@ -29,11 +29,13 @@ export const VisuBar: React.FC<VisuBarProps> = ({
     ? value.toFixed(config.unit === '%' ? 0 : 1)
     : '0';
 
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 14;
+
   if (isVertical) {
     return (
       <div className="flex flex-col items-center gap-1" style={{ height: size.height }}>
         {style.showLabel && style.labelPosition === 'top' && (
-          <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
         )}
         <div className="flex items-end gap-2 flex-1">
           <div
@@ -46,13 +48,13 @@ export const VisuBar: React.FC<VisuBarProps> = ({
             />
           </div>
           {config.showValue && (
-            <div className="text-sm font-mono whitespace-nowrap" style={{ color: style.textColor || '#cbd5e1' }}>
+            <div className="font-mono whitespace-nowrap" style={{ color: style.textColor || '#cbd5e1', fontSize }}>
               {displayValue}{config.unit}
             </div>
           )}
         </div>
         {style.showLabel && style.labelPosition === 'bottom' && (
-          <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
         )}
       </div>
     );
@@ -62,9 +64,9 @@ export const VisuBar: React.FC<VisuBarProps> = ({
     <div className="flex flex-col gap-1" style={{ width: size.width }}>
       {style.showLabel && style.labelPosition === 'top' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
+            <span className="font-mono" style={{ color: style.textColor || '#cbd5e1', fontSize }}>
               {displayValue}{config.unit}
             </span>
           )}
@@ -81,9 +83,9 @@ export const VisuBar: React.FC<VisuBarProps> = ({
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+          <span className="truncate" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
+            <span className="font-mono" style={{ color: style.textColor || '#cbd5e1', fontSize }}>
               {displayValue}{config.unit}
             </span>
           )}

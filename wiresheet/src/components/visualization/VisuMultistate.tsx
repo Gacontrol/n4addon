@@ -37,11 +37,12 @@ export const VisuMultistate: React.FC<VisuMultistateProps> = ({
   }, [open]);
 
   const accentColor = style.accentColor || '#3b82f6';
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 14;
 
   return (
     <div className="flex flex-col items-center gap-1 w-full h-full">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
       )}
       <div ref={ref} className="relative w-full">
         <button
@@ -56,7 +57,7 @@ export const VisuMultistate: React.FC<VisuMultistateProps> = ({
             color: style.textColor || '#e2e8f0'
           }}
         >
-          <span className="text-sm font-medium truncate">
+          <span className="font-medium truncate" style={{ fontSize }}>
             {currentOption?.label || '-- Auswahl --'}
           </span>
           <ChevronDown
@@ -101,7 +102,7 @@ export const VisuMultistate: React.FC<VisuMultistateProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: style.textColor || '#94a3b8', fontSize }}>{label}</span>
       )}
     </div>
   );

@@ -72,11 +72,12 @@ export const VisuInput: React.FC<VisuInputProps> = ({
   const bgColor = style.backgroundColor ?? 'transparent';
   const txtColor = style.textColor ?? '#e2e8f0';
   const borderStyle = bgColor === 'transparent' ? 'transparent' : '#475569';
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 14;
 
   return (
     <div className={`flex flex-col gap-1 ${disabled ? 'opacity-50' : ''}`}>
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate" style={{ color: txtColor, opacity: 0.7 }}>{label}</span>
+        <span className="truncate" style={{ color: txtColor, opacity: 0.7, fontSize }}>{label}</span>
       )}
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
@@ -91,7 +92,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
             min={config.min}
             max={config.max}
             className="w-full px-3 py-2 rounded-lg placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors disabled:cursor-not-allowed"
-            style={{ backgroundColor: bgColor, color: txtColor, border: `1px solid ${borderStyle}`, fontSize: 'inherit' }}
+            style={{ backgroundColor: bgColor, color: txtColor, border: `1px solid ${borderStyle}`, fontSize }}
           />
           {config.unit && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: txtColor, opacity: 0.6 }}>
@@ -109,7 +110,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate" style={{ color: txtColor, opacity: 0.7 }}>{label}</span>
+        <span className="truncate" style={{ color: txtColor, opacity: 0.7, fontSize }}>{label}</span>
       )}
     </div>
   );

@@ -87,11 +87,12 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
   const activeColor = isActive ? `${buttonColor}` : buttonColor;
 
   const labelColor = style.textColor || '#94a3b8';
+  const fontSize = (config as { fontSize?: number }).fontSize ?? 14;
 
   return (
     <div className="flex flex-col items-center gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: labelColor, fontSize }}>{label}</span>
       )}
       <div className="relative">
         <button
@@ -110,7 +111,8 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
                 ? `0 0 8px ${buttonColor}80, 0 2px 4px rgba(0,0,0,0.2)`
                 : '0 2px 4px rgba(0,0,0,0.2)',
             outline: isActive ? `2px solid ${buttonColor}` : 'none',
-            outlineOffset: '2px'
+            outlineOffset: '2px',
+            fontSize
           }}
         >
           {config.label || 'Taster'}
@@ -123,7 +125,7 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
+        <span className="truncate max-w-full" style={{ color: labelColor, fontSize }}>{label}</span>
       )}
     </div>
   );

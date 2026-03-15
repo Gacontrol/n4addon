@@ -44,10 +44,12 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
     ? value.toFixed(config.unit === '°C' || config.unit === '%' ? 1 : 0)
     : '0';
 
+  const labelFontSize = (config as { fontSize?: number }).fontSize ?? 14;
+
   return (
     <div className="flex flex-col items-center">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate max-w-full mb-1" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full mb-1" style={{ color: style.textColor || '#94a3b8', fontSize: labelFontSize }}>{label}</span>
       )}
       <div className="relative" style={{ width: gaugeSize, height: gaugeSize / 2 + 20 }}>
         <svg
@@ -79,7 +81,7 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
             className="absolute left-1/2 -translate-x-1/2 text-center"
             style={{ bottom: 0 }}
           >
-            <span className="font-mono" style={{ fontSize: style.fontSize || gaugeSize * 0.18, color: style.textColor || '#e2e8f0' }}>
+            <span className="font-mono" style={{ fontSize: (config as { fontSize?: number }).fontSize || style.fontSize || gaugeSize * 0.18, color: style.textColor || '#e2e8f0' }}>
               {displayValue}
             </span>
             {config.unit && (
@@ -93,7 +95,7 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
         </div>
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate max-w-full mt-2" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
+        <span className="truncate max-w-full mt-2" style={{ color: style.textColor || '#94a3b8', fontSize: labelFontSize }}>{label}</span>
       )}
     </div>
   );
