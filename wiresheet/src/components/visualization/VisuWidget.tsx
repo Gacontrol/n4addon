@@ -546,6 +546,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const lCfg = widget.config as LineConfig;
         const isHidden = lCfg.visibilityBinding && value === false;
         if (isHidden) return null;
+        if (lCfg.x1 === undefined) return null;
         let x1: number, y1: number, x2: number, y2: number;
         if (lCfg.x1 !== undefined && lCfg.y1 !== undefined && lCfg.x2 !== undefined && lCfg.y2 !== undefined) {
           x1 = lCfg.x1; y1 = lCfg.y1; x2 = lCfg.x2; y2 = lCfg.y2;
@@ -645,6 +646,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const pCfg = widget.config as PolygonConfig;
         const isHidden = pCfg.visibilityBinding && value === false;
         if (isHidden) return null;
+        if (!pCfg.points || pCfg.points.length === 0) return null;
         const fillColor = resolveShapeColor(pCfg, value);
         const hasNav = !!pCfg.navigateToPageId && !isEditMode;
         const freehandPts = pCfg.points;
@@ -1395,6 +1397,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isPIDWidget = widget.type === 'visu-pid';
   const isHeatingCurveWidget = widget.type === 'visu-heating-curve';
   const isAlarmConsoleWidget = widget.type === 'visu-alarm-console';
+  const isLineInDrawingMode = widget.type === 'visu-line' && (widget.config as { x1?: number }).x1 === undefined;
+  const isPolygonInDrawingMode = widget.type === 'visu-polygon' && (!(widget.config as { points?: unknown[] }).points || (widget.config as { points?: unknown[] }).points!.length === 0);
   const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget;
 
   const highlightStyle = isHighlighted ? {
@@ -1413,7 +1417,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         width: widget.size.width,
         height: widget.size.height,
         zIndex: isHighlighted ? 9999 : (widget.zIndex || 1),
-        pointerEvents: isEditMode && widget.locked ? 'none' : undefined,
+        pointerEvents: (isEditMode && widget.locked) || isLineInDrawingMode || isPolygonInDrawingMode ? 'none' : undefined,
+        visibility: (isLineInDrawingMode || isPolygonInDrawingMode) ? 'hidden' : undefined,
         backgroundColor: isTransparentWidget ? 'transparent' : resolvedBg,
         fontSize: widget.style.fontSize ? `${widget.style.fontSize}px` : undefined,
         fontFamily: widget.style.fontFamily && widget.style.fontFamily !== 'system'
