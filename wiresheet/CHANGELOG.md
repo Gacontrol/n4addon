@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.6] - 2026-03-15
+
+### Geaendert
+- 3D-Ansicht auf Three.js / React Three Fiber umgestellt (echte WebGL-Schatten, PBR-Materialien)
+- Dockerfile: NODE_OPTIONS fuer stabile Builds auf ARM-Geraeten mit wenig RAM
+
 ## [1.0.5] - 2026-03-14
 
 ### Geaendert

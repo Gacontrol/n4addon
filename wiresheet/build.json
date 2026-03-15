@@ -7,9 +7,9 @@
     "i386": "ghcr.io/home-assistant/i386-base:3.21"
   },
   "labels": {
-    "io.hass.version": "1.0.5"
+    "io.hass.version": "1.0.6"
   },
   "args": {
-    "BUILD_VERSION": "1.0.5"
+    "BUILD_VERSION": "1.0.6"
   }
 }

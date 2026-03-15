@@ -6,7 +6,7 @@ FROM node:18-alpine AS builder
 WORKDIR /build
 
 COPY package.json package-lock.json ./
-RUN npm ci --production=false
+RUN npm ci --production=false --prefer-offline || npm install --production=false
 
 COPY src ./src
 COPY index.html ./
@@ -18,7 +18,7 @@ COPY tsconfig.node.json ./
 COPY postcss.config.js ./
 COPY tailwind.config.js ./
 
-RUN npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1536\" npm run build
 
 WORKDIR /server-build
 
