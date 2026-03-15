@@ -247,6 +247,7 @@ export function useBuildingEditor() {
       thickness,
       height: 0,
       color: '#94a3b8',
+      opacity: 1,
       materialType: 'concrete',
     };
     const updated = buildings.map(b =>

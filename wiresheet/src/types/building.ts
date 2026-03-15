@@ -26,6 +26,7 @@ export interface Wall {
   thickness: number;
   height: number;
   color: string;
+  opacity: number;
   materialType: 'concrete' | 'brick' | 'wood' | 'glass' | 'drywall';
 }
 
