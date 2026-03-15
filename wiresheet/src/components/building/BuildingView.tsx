@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import type { MultiSelection } from './FloorPlanEditor';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
   Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun,
@@ -172,6 +173,55 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [datapointPickerOpen, setDatapointPickerOpen] = useState(false);
   const [datapointPickerTarget, setDatapointPickerTarget] = useState<'new' | 'widget' | 'alarm'>('new');
   const [newWidgetRoomIds, setNewWidgetRoomIds] = useState<string[]>([]);
+
+  const clipboardRef = useRef<{
+    walls: Wall[];
+    rooms: Room[];
+    ducts: Duct[];
+    pipes: Pipe[];
+  }>({ walls: [], rooms: [], ducts: [], pipes: [] });
+
+  const handleCopySelected = (sel: MultiSelection) => {
+    if (!activeFloor) return;
+    clipboardRef.current = {
+      walls: activeFloor.walls.filter(w => sel.wallIds.includes(w.id)),
+      rooms: activeFloor.rooms.filter(r => sel.roomIds.includes(r.id)),
+      ducts: (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id)),
+      pipes: (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id)),
+    };
+  };
+
+  const handlePasteClipboard = () => {
+    if (!activeBuilding || !activeFloor) return;
+    const OFFSET = 1;
+    const { walls, rooms, ducts, pipes } = clipboardRef.current;
+    for (const w of walls) {
+      addWall(activeBuilding.id, activeFloor.id, w.x1 + OFFSET, w.y1 + OFFSET, w.x2 + OFFSET, w.y2 + OFFSET, w.thickness);
+    }
+    for (const r of rooms) {
+      addRoom(activeBuilding.id, activeFloor.id, r.x + OFFSET, r.y + OFFSET, r.width, r.depth, r.type);
+    }
+    for (const d of ducts) {
+      addDuct(activeBuilding.id, activeFloor.id, {
+        ...d,
+        points: d.points.map(p => ({ x: p.x + OFFSET, y: p.y + OFFSET })),
+      });
+    }
+    for (const p of pipes) {
+      addPipe(activeBuilding.id, activeFloor.id, {
+        ...p,
+        points: p.points.map(pt => ({ x: pt.x + OFFSET, y: pt.y + OFFSET })),
+      });
+    }
+  };
+
+  const handleDeleteSelected = (sel: MultiSelection) => {
+    if (!activeBuilding || !activeFloor) return;
+    for (const id of sel.wallIds) deleteWall(activeBuilding.id, activeFloor.id, id);
+    for (const id of sel.roomIds) deleteRoom(activeBuilding.id, activeFloor.id, id);
+    for (const id of sel.ductIds) deleteDuct(activeBuilding.id, activeFloor.id, id);
+    for (const id of sel.pipeIds) deletePipe(activeBuilding.id, activeFloor.id, id);
+  };
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
@@ -838,6 +888,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onAddPipe={handleAddPipe}
                 onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
+                onCopySelected={handleCopySelected}
+                onPasteClipboard={handlePasteClipboard}
+                onDeleteSelected={handleDeleteSelected}
+                onPropertiesRequested={() => setShowRoomPanel(true)}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">
