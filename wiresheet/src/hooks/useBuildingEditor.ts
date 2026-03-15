@@ -213,6 +213,15 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const updateFloorColor = useCallback((buildingId: string, floorId: string, floorColor: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? { ...b, floors: b.floors.map(f => f.id === floorId ? { ...f, floorColor } : f), updatedAt: Date.now() }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const deleteFloor = useCallback((buildingId: string, floorId: string) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building || building.floors.length <= 1) return;
@@ -479,6 +488,7 @@ export function useBuildingEditor() {
     addFloorBelow,
     renameFloor,
     updateFloorHeight,
+    updateFloorColor,
     deleteFloor,
     setFloorBackground,
     addWall,

@@ -271,14 +271,18 @@ export function FloorPlanEditor({
         ctx.fill();
 
         if (isDoor) {
-          const cx = (ox1s.x + ox2s.x) / 2;
-          const cy = (ox1s.y + ox2s.y) / 2;
-          const rad = (opening.width * CELL * zoom) / 2;
+          const doorRad = opening.width * CELL * zoom;
+          const wallAngle = Math.atan2(dy, dx);
           ctx.strokeStyle = '#60a5fa';
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 2]);
           ctx.beginPath();
           ctx.moveTo(ox1s.x, ox1s.y);
-          ctx.arc(ox1s.x, ox1s.y, opening.width * CELL * zoom, Math.atan2(dy, dx), Math.atan2(dy, dx) + Math.PI / 2);
+          ctx.lineTo(ox1s.x + Math.cos(wallAngle) * doorRad, ox1s.y + Math.sin(wallAngle) * doorRad);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(ox1s.x, ox1s.y, doorRad, wallAngle, wallAngle + Math.PI / 2, false);
           ctx.stroke();
           ctx.setLineDash([]);
         } else {

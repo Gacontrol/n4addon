@@ -119,6 +119,7 @@ export interface Floor {
   rooms: Room[];
   walls: Wall[];
   backgroundImage: BackgroundImage | null;
+  floorColor?: string;
 }
 
 export interface Building {

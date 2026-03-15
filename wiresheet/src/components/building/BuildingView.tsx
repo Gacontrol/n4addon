@@ -58,6 +58,7 @@ export function BuildingView() {
     addFloorBelow,
     renameFloor,
     updateFloorHeight,
+    updateFloorColor,
     deleteFloor,
     setFloorBackground,
     addWall,
@@ -82,6 +83,7 @@ export function BuildingView() {
   const [newRoomType, setNewRoomType] = useState<RoomType>('room');
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [wallThickness, setWallThickness] = useState(0.25);
+  const [bgColor, setBgColor] = useState('#0a1020');
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
@@ -320,6 +322,37 @@ export function BuildingView() {
               </select>
             )}
 
+            {viewMode === '3d' && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                  <span>Hintergrund</span>
+                  <input
+                    type="color"
+                    value={bgColor}
+                    onChange={e => setBgColor(e.target.value)}
+                    className="w-6 h-5 rounded cursor-pointer bg-transparent border border-slate-600"
+                    title="Hintergrundfarbe"
+                  />
+                </div>
+                {activeFloor && (
+                  <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                    <span>Boden</span>
+                    <input
+                      type="color"
+                      value={activeFloor.floorColor || '#1e3a5f'}
+                      onChange={e => {
+                        if (activeBuilding && activeFloor) {
+                          updateFloorColor(activeBuilding.id, activeFloor.id, e.target.value);
+                        }
+                      }}
+                      className="w-6 h-5 rounded cursor-pointer bg-transparent border border-slate-600"
+                      title="Bodenfarbe"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
 
 
             <button
@@ -343,6 +376,7 @@ export function BuildingView() {
                 onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
                 onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
                 highlightFloor={true}
+                bgColor={bgColor}
               />
             ) : activeFloor ? (
               <FloorPlanEditor
