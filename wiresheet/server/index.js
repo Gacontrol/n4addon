@@ -1131,14 +1131,14 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         console.log(`Binding Modbus Read ${device.name}/${dp.name}: ${value}`);
       } else if (binding.driverType === 'homeassistant' && binding.haEntityId) {
         if (!driverConfig.haDriverEnabled) {
-          console.log(`Binding ${bindingKey}: HA-Treiber deaktiviert`);
           return;
         }
-        const state = await haGet(`/states/${binding.haEntityId}`);
-        const rawState = state.state;
-        const numVal = parseFloat(rawState);
-        bindingValues[bindingKey] = !isNaN(numVal) ? numVal : rawState;
-        console.log(`Binding HA Read ${binding.haEntityId}: ${bindingValues[bindingKey]}`);
+        const cachedState = haLiveValues.get(binding.haEntityId);
+        if (cachedState) {
+          const rawState = cachedState.state;
+          const numVal = parseFloat(rawState);
+          bindingValues[bindingKey] = !isNaN(numVal) ? numVal : rawState;
+        }
       }
     } catch (err) {
       console.error(`Binding ${bindingKey} Read Fehler:`, err.message);
@@ -1148,16 +1148,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
   const statePromises = nodes
     .filter(n => (n.type === 'ha-input') && n.data.entityId)
     .map(async (n) => {
-      try {
-        const state = await haGet(`/states/${n.data.entityId}`);
-        const rawState = state.state;
+      const cachedState = haLiveValues.get(n.data.entityId);
+      if (cachedState) {
+        const rawState = cachedState.state;
         const numVal = parseFloat(rawState);
-        if (!isNaN(numVal)) {
-          nodeValues[n.id] = numVal;
-        } else {
-          nodeValues[n.id] = rawState;
-        }
-      } catch {
+        nodeValues[n.id] = !isNaN(numVal) ? numVal : rawState;
+      } else {
         nodeValues[n.id] = null;
       }
     });
@@ -2119,38 +2115,64 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         if (val !== null && val !== undefined) {
           const entityId = node.data.entityId;
           const [domain] = entityId.split('.');
-          const boolVal = toBool(val);
+          const isNumericDomain = ['input_number', 'number', 'climate', 'cover'].includes(domain);
           const writeKey = `node:${nodeId}:${entityId}`;
           const lastWritten = haLastWrittenValues.get(writeKey);
           const haState = haLiveValues.get(entityId);
-          const haCurrentBool = haState ? (haState.state === 'on' || haState.state === 'true') : undefined;
-          if (haCurrentBool !== undefined && lastWritten !== undefined && haCurrentBool !== lastWritten) {
-            haLastWrittenValues.delete(writeKey);
-          }
-          const valueChanged = haLastWrittenValues.get(writeKey) === undefined || haLastWrittenValues.get(writeKey) !== boolVal;
-          if (valueChanged) {
-            try {
-              if (domain === 'light') {
-                await haPost(`/services/light/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-              } else if (domain === 'switch') {
-                await haPost(`/services/switch/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-              } else if (domain === 'input_boolean') {
-                await haPost(`/services/input_boolean/${boolVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
-              } else if (domain === 'input_number') {
-                const numVal = parseFloat(val);
-                if (!isNaN(numVal)) {
-                  await haPost('/services/input_number/set_value', { entity_id: entityId, value: numVal });
-                }
-              }
-              haLastWrittenValues.set(writeKey, boolVal);
-              console.log(`HA Output ${entityId}: ${boolVal} (geaendert)`);
-              nodeValues[nodeId] = boolVal;
-            } catch (e) {
-              console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
-              nodeValues[nodeId] = null;
-            }
+
+          let normalizedVal;
+          if (isNumericDomain) {
+            normalizedVal = parseFloat(val);
+            if (isNaN(normalizedVal)) normalizedVal = null;
           } else {
-            nodeValues[nodeId] = boolVal;
+            normalizedVal = toBool(val);
+          }
+
+          if (normalizedVal === null) {
+            nodeValues[nodeId] = null;
+          } else {
+            if (haState && lastWritten !== undefined) {
+              let haCurrentVal;
+              if (isNumericDomain) {
+                haCurrentVal = parseFloat(haState.state);
+              } else {
+                haCurrentVal = haState.state === 'on' || haState.state === 'true';
+              }
+              if (String(haCurrentVal) !== String(lastWritten)) {
+                haLastWrittenValues.delete(writeKey);
+              }
+            }
+
+            const valueChanged = haLastWrittenValues.get(writeKey) === undefined || String(haLastWrittenValues.get(writeKey)) !== String(normalizedVal);
+            if (valueChanged) {
+              try {
+                if (domain === 'light') {
+                  await haPost(`/services/light/${normalizedVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+                } else if (domain === 'switch') {
+                  await haPost(`/services/switch/${normalizedVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+                } else if (domain === 'input_boolean') {
+                  await haPost(`/services/input_boolean/${normalizedVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+                } else if (domain === 'input_number') {
+                  await haPost('/services/input_number/set_value', { entity_id: entityId, value: normalizedVal });
+                } else if (domain === 'number') {
+                  await haPost('/services/number/set_value', { entity_id: entityId, value: normalizedVal });
+                } else if (domain === 'climate') {
+                  await haPost('/services/climate/set_temperature', { entity_id: entityId, temperature: normalizedVal });
+                } else if (domain === 'cover') {
+                  await haPost('/services/cover/set_cover_position', { entity_id: entityId, position: normalizedVal });
+                } else {
+                  await haPost(`/services/${domain}/${normalizedVal ? 'turn_on' : 'turn_off'}`, { entity_id: entityId });
+                }
+                haLastWrittenValues.set(writeKey, normalizedVal);
+                console.log(`HA Output ${entityId}: ${normalizedVal} (geaendert)`);
+                nodeValues[nodeId] = normalizedVal;
+              } catch (e) {
+                console.error(`HA Output Fehler fuer ${entityId}:`, e.message);
+                nodeValues[nodeId] = null;
+              }
+            } else {
+              nodeValues[nodeId] = normalizedVal;
+            }
           }
         }
       }
