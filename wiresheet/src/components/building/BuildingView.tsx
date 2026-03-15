@@ -133,6 +133,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addPipe,
     updatePipe,
     deletePipe,
+    moveMultiSelection,
     selectedWidget3DId,
     setSelectedWidget3DId,
     addWidget3D,
@@ -228,22 +229,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const handleMoveMultiSelection = (sel: MultiSelection, dx: number, dy: number) => {
     if (!activeBuilding || !activeFloor) return;
-    for (const id of sel.wallIds) {
-      const w = activeFloor.walls.find(w => w.id === id);
-      if (w) updateWall(activeBuilding.id, activeFloor.id, id, { x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy });
-    }
-    for (const id of sel.roomIds) {
-      const r = activeFloor.rooms.find(r => r.id === id);
-      if (r) updateRoom(activeBuilding.id, activeFloor.id, id, { x: r.x + dx, y: r.y + dy });
-    }
-    for (const id of sel.ductIds) {
-      const d = activeFloor.ducts?.find(d => d.id === id);
-      if (d) updateDuct(activeBuilding.id, activeFloor.id, id, { points: d.points.map(p => ({ x: p.x + dx, y: p.y + dy })) });
-    }
-    for (const id of sel.pipeIds) {
-      const p = activeFloor.pipes?.find(p => p.id === id);
-      if (p) updatePipe(activeBuilding.id, activeFloor.id, id, { points: p.points.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) });
-    }
+    moveMultiSelection(activeBuilding.id, activeFloor.id, sel, dx, dy);
   };
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
@@ -366,11 +352,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       pageId: page.id,
       pageName: page.name,
       datapoints: page.nodes
-        .filter(n => n.data.entityId)
+        .filter(n => n.data.entityId || n.type.startsWith('dp-'))
         .map(n => ({
-          entityId: n.data.entityId as string,
-          label: n.data.entityLabel || n.data.label || n.data.entityId as string,
-        })),
+          entityId: n.data.entityId || n.data.label || n.id,
+          label: n.data.entityLabel || n.data.label || n.data.entityId || n.id,
+        }))
+        .filter((dp, idx, arr) => arr.findIndex(d => d.entityId === dp.entityId) === idx),
     })).filter(g => g.datapoints.length > 0);
   }, [pages]);
 

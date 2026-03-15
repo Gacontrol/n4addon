@@ -146,6 +146,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const unit = widget.unit || '';
 
   const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; startWX: number; startWZ: number } | null>(null);
+  const didDragRef = useRef(false);
   const groupRef = useRef<THREE.Group>(null);
 
   return (
@@ -153,24 +154,28 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       ref={groupRef}
       position={[wx, wy, wz]}
       scale={[scale, scale, scale]}
-      onClick={(e) => { e.stopPropagation(); if (!dragRef.current) onSelect(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!didDragRef.current) onSelect();
+        didDragRef.current = false;
+      }}
       onPointerDown={(e) => {
         if (!onDragEnd) return;
         e.stopPropagation();
+        didDragRef.current = false;
         const nativeTarget = e.nativeEvent?.target as Element | undefined;
         nativeTarget?.setPointerCapture?.(e.pointerId);
         dragRef.current = { dragging: false, startX: e.clientX, startY: e.clientY, startWX: widget.x, startWZ: widget.y };
-        onSelect();
       }}
       onPointerMove={(e) => {
         if (!dragRef.current || !onDragEnd) return;
         const dx = (e.clientX - dragRef.current.startX) * 0.02;
         const dz = (e.clientY - dragRef.current.startY) * 0.02;
-        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+        if (Math.abs(dx) > 0.05 || Math.abs(dz) > 0.05) {
           dragRef.current.dragging = true;
-          e.stopPropagation();
         }
         if (dragRef.current.dragging && groupRef.current) {
+          e.stopPropagation();
           groupRef.current.position.x = wx + dx;
           groupRef.current.position.z = wz + dz;
         }
@@ -179,6 +184,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         if (!dragRef.current || !onDragEnd) return;
         e.stopPropagation();
         if (dragRef.current.dragging) {
+          didDragRef.current = true;
           const dx = (e.clientX - dragRef.current.startX) * 0.02;
           const dz = (e.clientY - dragRef.current.startY) * 0.02;
           onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWZ + dz, widget.z);
@@ -461,15 +467,18 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
         );
       })}
 
-      {joints.map((jnt, i) => (
-        <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
-          {isRound
-            ? <sphereGeometry args={[w / 2 + 0.002, 12, 12]} />
-            : <boxGeometry args={[w, w, h]} />
-          }
-          <meshStandardMaterial color={color} map={isRound ? undefined : tex} metalness={isRound ? 0.35 : 0.3} roughness={isRound ? 0.5 : 0.45} />
-        </mesh>
-      ))}
+      {joints.map((jnt, i) => {
+        const jSize = isRound ? w / 2 + 0.002 : Math.max(w, h);
+        return (
+          <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
+            {isRound
+              ? <sphereGeometry args={[jSize, 12, 12]} />
+              : <boxGeometry args={[jSize, jSize, jSize]} />
+            }
+            <meshStandardMaterial color={color} map={isRound ? undefined : tex} metalness={isRound ? 0.35 : 0.3} roughness={isRound ? 0.5 : 0.45} />
+          </mesh>
+        );
+      })}
     </group>
   );
 }

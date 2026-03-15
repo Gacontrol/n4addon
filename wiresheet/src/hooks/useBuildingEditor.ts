@@ -560,6 +560,49 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const moveMultiSelection = useCallback((
+    buildingId: string,
+    floorId: string,
+    sel: { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[] },
+    dx: number,
+    dy: number
+  ) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    walls: f.walls.map(w =>
+                      sel.wallIds.includes(w.id)
+                        ? { ...w, x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }
+                        : w
+                    ),
+                    rooms: f.rooms.map(r =>
+                      sel.roomIds.includes(r.id) ? { ...r, x: r.x + dx, y: r.y + dy } : r
+                    ),
+                    ducts: (f.ducts ?? []).map(d =>
+                      sel.ductIds.includes(d.id)
+                        ? { ...d, points: d.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy })) }
+                        : d
+                    ),
+                    pipes: (f.pipes ?? []).map(p =>
+                      sel.pipeIds.includes(p.id)
+                        ? { ...p, points: p.points.map(pt => ({ ...pt, x: pt.x + dx, y: pt.y + dy })) }
+                        : p
+                    ),
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   // ---- Widget3D Actions ----
 
   const [selectedWidget3DId, setSelectedWidget3DId] = useState<string | null>(null);
@@ -684,6 +727,7 @@ export function useBuildingEditor() {
     addPipe,
     updatePipe,
     deletePipe,
+    moveMultiSelection,
     selectedWidget3DId,
     setSelectedWidget3DId,
     addWidget3D,
