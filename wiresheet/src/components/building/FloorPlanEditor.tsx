@@ -1,12 +1,20 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Floor, Wall, Room, BuildingTool, BackgroundImage } from '../../types/building';
+import { Floor, Wall, Room, BuildingTool, BackgroundImage, Duct, Pipe, DuctType, PipeType, DuctShape } from '../../types/building';
 
 interface Props {
   floor: Floor;
   selectedRoomId: string | null;
   selectedWallId: string | null;
+  selectedDuctId?: string | null;
+  selectedPipeId?: string | null;
   tool: BuildingTool;
   wallThickness: number;
+  ductType?: DuctType;
+  ductShape?: DuctShape;
+  ductWidth?: number;
+  ductHeight?: number;
+  pipeType?: PipeType;
+  pipeDiameter?: number;
   onAddWall: (x1: number, y1: number, x2: number, y2: number, thickness: number) => void;
   onSelectWall: (id: string | null) => void;
   onMoveWallPoint: (wallId: string, point: 'start' | 'end', x: number, y: number) => void;
@@ -17,6 +25,12 @@ interface Props {
   onDeleteWall: (wallId: string) => void;
   onDeleteRoom: (roomId: string) => void;
   onSetBackground: (bg: BackgroundImage | null) => void;
+  onAddDuct?: (duct: Omit<Duct, 'id'>) => void;
+  onSelectDuct?: (id: string | null) => void;
+  onDeleteDuct?: (id: string) => void;
+  onAddPipe?: (pipe: Omit<Pipe, 'id'>) => void;
+  onSelectPipe?: (id: string | null) => void;
+  onDeletePipe?: (id: string) => void;
 }
 
 const CELL = 40;
@@ -56,17 +70,30 @@ function loadBgImage(dataUrl: string): Promise<HTMLImageElement> {
 
 type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg';
 
+const DUCT_TYPE_COLORS: Record<string, string> = {
+  supply: '#60a5fa', return: '#94a3b8', exhaust: '#fbbf24', fresh: '#34d399',
+};
+const PIPE_TYPE_COLORS: Record<string, string> = {
+  supply: '#ef4444', return: '#3b82f6', 'domestic-hot': '#f97316', 'domestic-cold': '#06b6d4', sprinkler: '#22c55e', gas: '#facc15',
+};
+
 export function FloorPlanEditor({
-  floor, selectedRoomId, selectedWallId, tool, wallThickness,
+  floor, selectedRoomId, selectedWallId, selectedDuctId, selectedPipeId,
+  tool, wallThickness,
+  ductType = 'supply', ductShape = 'rectangular', ductWidth = 0.3, ductHeight = 0.2,
+  pipeType = 'supply', pipeDiameter = 0.05,
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
+  onAddDuct, onSelectDuct, onDeleteDuct,
+  onAddPipe, onSelectPipe, onDeletePipe,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 80, y: 80 });
   const [zoom, setZoom] = useState(1.0);
   const [drawingWall, setDrawingWall] = useState<DrawingWall | null>(null);
   const [drawRect, setDrawRect] = useState<DrawRect | null>(null);
+  const [drawingPolyline, setDrawingPolyline] = useState<{ x: number; y: number }[]>([]);
   const [bgImg, setBgImg] = useState<HTMLImageElement | null>(null);
   const [bgDragging, setBgDragging] = useState(false);
   const [snapPoint, setSnapPoint] = useState<{ x: number; y: number } | null>(null);
@@ -455,7 +482,122 @@ export function FloorPlanEditor({
       }
     }
 
-    if (snapPoint && (tool === 'wall' || tool === 'room')) {
+    for (const duct of (floor.ducts ?? [])) {
+      const isSelected = duct.id === selectedDuctId;
+      const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+      const pts = duct.points;
+      if (pts.length < 2) continue;
+      const w = duct.width * cellPx;
+      const h = duct.shape === 'rectangular' ? (duct.height * cellPx) : w;
+      ctx.save();
+      ctx.strokeStyle = isSelected ? '#fff' : color;
+      ctx.lineWidth = isSelected ? Math.max(w, h) / 2 + 3 : Math.max(w, h) / 2;
+      ctx.lineCap = 'square';
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      const sp0 = toScreen(pts[0].x, pts[0].y);
+      ctx.moveTo(sp0.x, sp0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const spi = toScreen(pts[i].x, pts[i].y);
+        ctx.lineTo(spi.x, spi.y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(sp0.x, sp0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const spi = toScreen(pts[i].x, pts[i].y);
+        ctx.lineTo(spi.x, spi.y);
+      }
+      ctx.stroke();
+      if (zoom > 0.5 && duct.label) {
+        const mid = toScreen((pts[0].x + pts[pts.length - 1].x) / 2, (pts[0].y + pts[pts.length - 1].y) / 2);
+        ctx.font = `${Math.max(9, 9 * zoom)}px Inter, sans-serif`;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText(duct.label, mid.x, mid.y - 6);
+      }
+      ctx.restore();
+    }
+
+    for (const pipe of (floor.pipes ?? [])) {
+      const isSelected = pipe.id === selectedPipeId;
+      const color = pipe.color || PIPE_TYPE_COLORS[pipe.type] || '#ef4444';
+      const pts = pipe.points;
+      if (pts.length < 2) continue;
+      const r = pipe.diameter * cellPx;
+      ctx.save();
+      ctx.strokeStyle = isSelected ? '#fff' : color;
+      ctx.lineWidth = isSelected ? r + 3 : r;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      const sp0p = toScreen(pts[0].x, pts[0].y);
+      ctx.moveTo(sp0p.x, sp0p.y);
+      for (let i = 1; i < pts.length; i++) {
+        const spi = toScreen(pts[i].x, pts[i].y);
+        ctx.lineTo(spi.x, spi.y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (pipe.insulated) {
+        ctx.strokeStyle = color + '44';
+        ctx.lineWidth = r + 6;
+        ctx.beginPath();
+        ctx.moveTo(sp0p.x, sp0p.y);
+        for (let i = 1; i < pts.length; i++) {
+          const spi = toScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(spi.x, spi.y);
+        }
+        ctx.stroke();
+      }
+      if (zoom > 0.5 && pipe.label) {
+        const mid = toScreen((pts[0].x + pts[pts.length - 1].x) / 2, (pts[0].y + pts[pts.length - 1].y) / 2);
+        ctx.font = `${Math.max(9, 9 * zoom)}px Inter, sans-serif`;
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.fillText(pipe.label, mid.x, mid.y - 6);
+      }
+      ctx.restore();
+    }
+
+    if (drawingPolyline.length > 0 && mouseWorld && (tool === 'duct' || tool === 'pipe')) {
+      const color = tool === 'duct' ? (DUCT_TYPE_COLORS[ductType] || '#60a5fa') : (PIPE_TYPE_COLORS[pipeType] || '#ef4444');
+      const lineW = tool === 'duct' ? ductWidth * cellPx : pipeDiameter * cellPx;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(lineW, 2);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([6, 3]);
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      const fp = toScreen(drawingPolyline[0].x, drawingPolyline[0].y);
+      ctx.moveTo(fp.x, fp.y);
+      for (let i = 1; i < drawingPolyline.length; i++) {
+        const sp = toScreen(drawingPolyline[i].x, drawingPolyline[i].y);
+        ctx.lineTo(sp.x, sp.y);
+      }
+      const ms = toScreen(mouseWorld.x, mouseWorld.y);
+      ctx.lineTo(ms.x, ms.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      for (const pt of drawingPolyline) {
+        const sp = toScreen(pt.x, pt.y);
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (snapPoint && (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe')) {
       const sp = toScreen(snapPoint.x, snapPoint.y);
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
@@ -478,10 +620,11 @@ export function FloorPlanEditor({
 
     ctx.textAlign = 'left';
   }, [
-    floor.walls, floor.rooms, floor.backgroundImage,
-    selectedRoomId, selectedWallId,
-    offset, zoom, toScreen, drawingWall, drawRect, snapPoint,
-    tool, wallThickness, bgImg, bgDragging, drawCornerJoins, mouseWorld,
+    floor.walls, floor.rooms, floor.ducts, floor.pipes, floor.backgroundImage,
+    selectedRoomId, selectedWallId, selectedDuctId, selectedPipeId,
+    offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
+    tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
+    bgImg, bgDragging, drawCornerJoins, mouseWorld,
   ]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -533,7 +676,48 @@ export function FloorPlanEditor({
       return;
     }
 
+    if (tool === 'duct' || tool === 'pipe') {
+      if (e.button === 2) {
+        if (drawingPolyline.length >= 2) {
+          if (tool === 'duct') {
+            onAddDuct?.({ points: drawingPolyline, shape: ductShape, type: ductType, width: ductWidth, height: ductHeight, elevation: 2.4, insulated: false });
+          } else {
+            onAddPipe?.({ points: drawingPolyline, type: pipeType, diameter: pipeDiameter, elevation: 2.2, insulated: false });
+          }
+        }
+        setDrawingPolyline([]);
+        return;
+      }
+      setDrawingPolyline(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      return;
+    }
+
     if (tool === 'select' || tool === 'delete') {
+      for (const duct of [...(floor.ducts ?? [])].reverse()) {
+        for (let i = 0; i < duct.points.length - 1; i++) {
+          const d = pointToSegmentDist(world.x, world.y, duct.points[i].x, duct.points[i].y, duct.points[i + 1].x, duct.points[i + 1].y);
+          if (d < duct.width * 0.5 + 0.2) {
+            if (tool === 'delete') { onDeleteDuct?.(duct.id); return; }
+            onSelectDuct?.(duct.id);
+            onSelectWall(null); onSelectRoom(null); onSelectPipe?.(null);
+            dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
+            return;
+          }
+        }
+      }
+      for (const pipe of [...(floor.pipes ?? [])].reverse()) {
+        for (let i = 0; i < pipe.points.length - 1; i++) {
+          const d = pointToSegmentDist(world.x, world.y, pipe.points[i].x, pipe.points[i].y, pipe.points[i + 1].x, pipe.points[i + 1].y);
+          if (d < pipe.diameter * 0.5 + 0.15) {
+            if (tool === 'delete') { onDeletePipe?.(pipe.id); return; }
+            onSelectPipe?.(pipe.id);
+            onSelectWall(null); onSelectRoom(null); onSelectDuct?.(null);
+            dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
+            return;
+          }
+        }
+      }
+
       if (floor.backgroundImage && tool === 'select' && e.ctrlKey) {
         const bg = floor.backgroundImage;
         const bgImgEl = bgImageCache.get(bg.dataUrl);
@@ -593,7 +777,11 @@ export function FloorPlanEditor({
       onSelectWall(null);
       onSelectRoom(null);
     }
-  }, [tool, floor.walls, floor.rooms, floor.backgroundImage, toWorld, getSnapPoint, onSelectWall, onSelectRoom, onDeleteWall, onDeleteRoom]);
+  }, [tool, floor.walls, floor.rooms, floor.ducts, floor.pipes, floor.backgroundImage, toWorld, getSnapPoint,
+    onSelectWall, onSelectRoom, onDeleteWall, onDeleteRoom,
+    onSelectDuct, onDeleteDuct, onSelectPipe, onDeletePipe,
+    drawingPolyline, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
+    onAddDuct, onAddPipe]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
@@ -601,7 +789,7 @@ export function FloorPlanEditor({
     const snapped = getSnapPoint(world.x, world.y);
     setMouseWorld({ x: world.x, y: world.y });
 
-    if (tool === 'wall' || tool === 'room') {
+    if (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe') {
       setSnapPoint(snapped);
     } else {
       setSnapPoint(null);
@@ -645,7 +833,7 @@ export function FloorPlanEditor({
       const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
       onSetBackground({ ...floor.backgroundImage, x: (dragState.current.bgOrigX ?? 0) + dx, y: (dragState.current.bgOrigY ?? 0) + dy });
     }
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
@@ -705,7 +893,7 @@ export function FloorPlanEditor({
   }, [onSetBackground]);
 
   const getCursor = () => {
-    if (tool === 'wall' || tool === 'room') return 'crosshair';
+    if (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe') return 'crosshair';
     if (tool === 'delete') return 'not-allowed';
     return 'default';
   };
@@ -772,7 +960,20 @@ export function FloorPlanEditor({
           setBgDragging(false);
         }}
         onWheel={onWheel}
-        onContextMenu={e => { e.preventDefault(); if (drawingWall) setDrawingWall(null); }}
+        onContextMenu={e => {
+          e.preventDefault();
+          if (drawingWall) setDrawingWall(null);
+          if (drawingPolyline.length > 0 && (tool === 'duct' || tool === 'pipe')) {
+            if (drawingPolyline.length >= 2) {
+              if (tool === 'duct') {
+                onAddDuct?.({ points: drawingPolyline, shape: ductShape, type: ductType, width: ductWidth, height: ductHeight, elevation: 2.4, insulated: false });
+              } else {
+                onAddPipe?.({ points: drawingPolyline, type: pipeType, diameter: pipeDiameter, elevation: 2.2, insulated: false });
+              }
+            }
+            setDrawingPolyline([]);
+          }
+        }}
       />
 
       <div className="absolute bottom-3 right-3 flex flex-col gap-1">
@@ -791,6 +992,10 @@ export function FloorPlanEditor({
           ? 'Klicken + Ziehen: Raum zeichnen'
           : tool === 'delete'
           ? 'Element anklicken zum Löschen'
+          : tool === 'duct'
+          ? 'Klicken: Punkt setzen · Rechtsklick: Kanal abschließen'
+          : tool === 'pipe'
+          ? 'Klicken: Punkt setzen · Rechtsklick: Leitung abschließen'
           : 'Endpunkt/Mitte: Wand verschieben · Alt+Ziehen: Pan · Strg+Ziehen auf Bild: Bild verschieben'}
       </div>
     </div>

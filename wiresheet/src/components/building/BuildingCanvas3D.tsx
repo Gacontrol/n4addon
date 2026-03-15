@@ -2,7 +2,8 @@ import { Suspense, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Building } from '../../types/building';
+import { Building, Widget3D } from '../../types/building';
+import { Widget3DMesh, DuctMesh, PipeMesh } from './Building3DWidgets';
 
 export interface LightingSettings {
   ambientIntensity: number;
@@ -27,8 +28,16 @@ interface Props {
   activeFloorId: string | null;
   selectedRoomId: string | null;
   selectedWallId: string | null;
+  selectedWidget3DId?: string | null;
+  selectedDuctId?: string | null;
+  selectedPipeId?: string | null;
   onSelectRoom: (id: string | null) => void;
   onSelectWall: (id: string | null) => void;
+  onSelectWidget3D?: (id: string | null) => void;
+  onSelectDuct?: (id: string | null) => void;
+  onSelectPipe?: (id: string | null) => void;
+  liveValues?: Record<string, string | number>;
+  alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
   bgColor?: string;
   lighting?: LightingSettings;
@@ -452,15 +461,26 @@ interface BuildingSceneProps {
   activeFloorId: string | null;
   selectedRoomId: string | null;
   selectedWallId: string | null;
+  selectedWidget3DId?: string | null;
+  selectedDuctId?: string | null;
+  selectedPipeId?: string | null;
   onSelectRoom: (id: string | null) => void;
   onSelectWall: (id: string | null) => void;
+  onSelectWidget3D?: (id: string | null) => void;
+  onSelectDuct?: (id: string | null) => void;
+  onSelectPipe?: (id: string | null) => void;
+  liveValues?: Record<string, string | number>;
+  alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
   lighting: LightingSettings;
 }
 
 function BuildingScene({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
-  onSelectRoom, onSelectWall, highlightFloor, lighting
+  selectedWidget3DId, selectedDuctId, selectedPipeId,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe,
+  liveValues = {}, alarmStates = {},
+  highlightFloor, lighting
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -597,6 +617,55 @@ function BuildingScene({
           />
         );
       }
+
+      for (const duct of (floor.ducts ?? [])) {
+        elements.push(
+          <DuctMesh
+            key={`duct-${duct.id}`}
+            duct={duct}
+            offsetX={offsetX}
+            baseY={baseY}
+            selected={duct.id === selectedDuctId}
+            onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+          />
+        );
+      }
+
+      for (const pipe of (floor.pipes ?? [])) {
+        elements.push(
+          <PipeMesh
+            key={`pipe-${pipe.id}`}
+            pipe={pipe}
+            offsetX={offsetX}
+            baseY={baseY}
+            selected={pipe.id === selectedPipeId}
+            onSelect={() => { onSelectPipe?.(pipe.id); onSelectWall(null); onSelectRoom(null); }}
+          />
+        );
+      }
+    }
+
+    for (const widget of (building.widgets3d ?? [])) {
+      const floorBaseYLocal = (() => {
+        const sorted2 = [...building.floors].sort((a, b) => a.level - b.level);
+        let acc = 0;
+        for (const fl of sorted2) {
+          if (fl.id === widget.floorId) return acc;
+          acc += fl.height;
+        }
+        return 0;
+      })();
+      elements.push(
+        <Widget3DMesh
+          key={`widget3d-${widget.id}`}
+          widget={{ ...widget, x: widget.x + offsetX }}
+          liveValue={liveValues[widget.datapoint]}
+          alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
+          selected={widget.id === selectedWidget3DId}
+          onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+          baseY={floorBaseYLocal}
+        />
+      );
     }
 
     bldOffX += bldW + 3;
@@ -639,7 +708,10 @@ function BuildingScene({
 
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
-  onSelectRoom, onSelectWall, highlightFloor, bgColor = '#0a1020',
+  selectedWidget3DId, selectedDuctId, selectedPipeId,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe,
+  liveValues, alarmStates,
+  highlightFloor, bgColor = '#0a1020',
   lighting = DEFAULT_LIGHTING,
 }: Props) {
   return (
@@ -653,7 +725,7 @@ export function BuildingCanvas3D({
           toneMappingExposure: 1.1,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); }}
+        onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); }}
         style={{ background: bgColor }}
       >
         <color attach="background" args={[bgColor]} />
@@ -665,8 +737,16 @@ export function BuildingCanvas3D({
             activeFloorId={activeFloorId}
             selectedRoomId={selectedRoomId}
             selectedWallId={selectedWallId}
+            selectedWidget3DId={selectedWidget3DId}
+            selectedDuctId={selectedDuctId}
+            selectedPipeId={selectedPipeId}
             onSelectRoom={onSelectRoom}
             onSelectWall={onSelectWall}
+            onSelectWidget3D={onSelectWidget3D}
+            onSelectDuct={onSelectDuct}
+            onSelectPipe={onSelectPipe}
+            liveValues={liveValues}
+            alarmStates={alarmStates}
             highlightFloor={highlightFloor}
             lighting={lighting}
           />

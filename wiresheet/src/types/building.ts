@@ -71,6 +71,79 @@ export interface Room {
   windows: Window2D[];
 }
 
+// ---- 3D Widgets ----
+
+export type Widget3DType =
+  | 'temperature'
+  | 'setpoint'
+  | 'humidity'
+  | 'alarm'
+  | 'co2'
+  | 'presence'
+  | 'energy'
+  | 'valve'
+  | 'pump'
+  | 'fan'
+  | 'light'
+  | 'blinds'
+  | 'custom';
+
+export interface Widget3D {
+  id: string;
+  type: Widget3DType;
+  label: string;
+  datapoint: string;
+  unit: string;
+  x: number;
+  y: number;
+  z: number;
+  floorId: string;
+  scale: number;
+  color: string;
+  showLabel: boolean;
+  showValue: boolean;
+  alarmDatapoint?: string;
+  minValue?: number;
+  maxValue?: number;
+}
+
+// ---- Ducts & Pipes ----
+
+export type DuctShape = 'round' | 'rectangular';
+export type DuctType = 'supply' | 'return' | 'exhaust' | 'fresh';
+export type PipeType = 'supply' | 'return' | 'domestic-hot' | 'domestic-cold' | 'sprinkler' | 'gas';
+
+export interface DuctPoint {
+  x: number;
+  y: number;
+}
+
+export interface Duct {
+  id: string;
+  points: DuctPoint[];
+  shape: DuctShape;
+  type: DuctType;
+  width: number;
+  height: number;
+  elevation: number;
+  color?: string;
+  label?: string;
+  insulated: boolean;
+}
+
+export interface Pipe {
+  id: string;
+  points: DuctPoint[];
+  type: PipeType;
+  diameter: number;
+  elevation: number;
+  color?: string;
+  label?: string;
+  insulated: boolean;
+}
+
+// ---- OBJ Models ----
+
 export interface ObjFace {
   vertices: number[];
   normals: number[];
@@ -118,6 +191,8 @@ export interface Floor {
   height: number;
   rooms: Room[];
   walls: Wall[];
+  ducts: Duct[];
+  pipes: Pipe[];
   backgroundImage: BackgroundImage | null;
   floorColor?: string;
 }
@@ -127,11 +202,12 @@ export interface Building {
   name: string;
   floors: Floor[];
   objModels: ObjModel[];
+  widgets3d: Widget3D[];
   createdAt: number;
   updatedAt: number;
 }
 
-export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure';
+export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;

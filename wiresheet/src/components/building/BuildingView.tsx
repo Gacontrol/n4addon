@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
-  Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun
+  Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun,
+  Wind, Thermometer, Droplets, Bell, Activity,
+  Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
-import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage } from '../../types/building';
+import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape } from '../../types/building';
+import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer',
@@ -32,6 +35,51 @@ const ROOM_TYPE_COLORS: Record<RoomType, string> = {
   storage: '#d1d5db',
   garage: '#9ca3af',
   outdoor: '#6ee7b7',
+};
+
+const DUCT_TYPE_LABELS: Record<DuctType, string> = {
+  supply: 'Zuluft',
+  return: 'Abluft',
+  exhaust: 'Fortluft',
+  fresh: 'Frischluft',
+};
+
+const DUCT_TYPE_COLORS: Record<DuctType, string> = {
+  supply: '#60a5fa',
+  return: '#94a3b8',
+  exhaust: '#fbbf24',
+  fresh: '#34d399',
+};
+
+const PIPE_TYPE_LABELS: Record<PipeType, string> = {
+  supply: 'Vorlauf',
+  return: 'Rücklauf',
+  'domestic-hot': 'Warmwasser',
+  'domestic-cold': 'Kaltwasser',
+  sprinkler: 'Sprinkler',
+  gas: 'Gas',
+};
+
+const PIPE_TYPE_COLORS: Record<PipeType, string> = {
+  supply: '#ef4444',
+  return: '#3b82f6',
+  'domestic-hot': '#f97316',
+  'domestic-cold': '#06b6d4',
+  sprinkler: '#22c55e',
+  gas: '#facc15',
+};
+
+const WIDGET_TYPE_ICONS: Partial<Record<Widget3DType, React.ReactNode>> = {
+  temperature: <Thermometer className="w-3 h-3" />,
+  humidity: <Droplets className="w-3 h-3" />,
+  alarm: <Bell className="w-3 h-3" />,
+  co2: <Activity className="w-3 h-3" />,
+  energy: <Zap className="w-3 h-3" />,
+  fan: <Fan className="w-3 h-3" />,
+  light: <Lightbulb className="w-3 h-3" />,
+  presence: <Radio className="w-3 h-3" />,
+  setpoint: <ChevronsUpDown className="w-3 h-3" />,
+  custom: <BoxIcon className="w-3 h-3" />,
 };
 
 type ViewMode = '3d' | 'floor';
@@ -70,10 +118,19 @@ export function BuildingView() {
     addWallOpening,
     updateWallOpening,
     deleteWallOpening,
+    addDuct,
+    updateDuct,
+    deleteDuct,
+    addPipe,
+    updatePipe,
+    deletePipe,
+    selectedWidget3DId,
+    setSelectedWidget3DId,
+    addWidget3D,
+    updateWidget3D,
+    deleteWidget3D,
     ROOM_COLORS,
   } = useBuildingEditor();
-
-
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
@@ -87,8 +144,29 @@ export function BuildingView() {
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
 
+  const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
+  const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
+  const [ductType, setDuctType] = useState<DuctType>('supply');
+  const [ductShape, setDuctShape] = useState<DuctShape>('rectangular');
+  const [ductWidth, setDuctWidth] = useState(0.3);
+  const [ductHeight, setDuctHeight] = useState(0.2);
+  const [pipeType, setPipeType] = useState<PipeType>('supply');
+  const [pipeDiameter, setPipeDiameter] = useState(0.05);
+
+  const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
+  const [newWidgetType, setNewWidgetType] = useState<Widget3DType>('temperature');
+  const [newWidgetDatapoint, setNewWidgetDatapoint] = useState('');
+  const [newWidgetLabel, setNewWidgetLabel] = useState('');
+  const [newWidgetUnit, setNewWidgetUnit] = useState('');
+  const [newWidgetX, setNewWidgetX] = useState(0);
+  const [newWidgetY, setNewWidgetY] = useState(0);
+  const [newWidgetZ, setNewWidgetZ] = useState(1);
+
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
+  const selectedDuct = activeFloor?.ducts?.find(d => d.id === selectedDuctId) ?? null;
+  const selectedPipe = activeFloor?.pipes?.find(p => p.id === selectedPipeId) ?? null;
+  const selectedWidget = activeBuilding?.widgets3d?.find(w => w.id === selectedWidget3DId) ?? null;
 
   const handleAddWall = (x1: number, y1: number, x2: number, y2: number, thickness: number) => {
     if (!activeBuilding || !activeFloor) return;
@@ -144,6 +222,45 @@ export function BuildingView() {
   const handleSetBackground = (bg: BackgroundImage | null) => {
     if (!activeBuilding || !activeFloor) return;
     setFloorBackground(activeBuilding.id, activeFloor.id, bg);
+  };
+
+  const handleAddDuct = (ductData: Omit<Duct, 'id'>) => {
+    if (!activeBuilding || !activeFloor) return;
+    addDuct(activeBuilding.id, activeFloor.id, ductData);
+  };
+
+  const handleAddPipe = (pipeData: Omit<Pipe, 'id'>) => {
+    if (!activeBuilding || !activeFloor) return;
+    addPipe(activeBuilding.id, activeFloor.id, pipeData);
+  };
+
+  const handleAddWidget3D = () => {
+    if (!activeBuilding || !activeFloor) return;
+    addWidget3D(activeBuilding.id, {
+      type: newWidgetType,
+      label: newWidgetLabel || WIDGET_LABELS[newWidgetType],
+      datapoint: newWidgetDatapoint,
+      unit: newWidgetUnit,
+      x: newWidgetX,
+      y: newWidgetY,
+      z: newWidgetZ,
+      floorId: activeFloor.id,
+      scale: 1,
+      color: WIDGET_COLORS[newWidgetType] || '#94a3b8',
+      showLabel: true,
+      showValue: true,
+    });
+    setNewWidgetDatapoint('');
+    setNewWidgetLabel('');
+  };
+
+  const propertiesPanelTitle = () => {
+    if (selectedWidget) return 'Widget';
+    if (selectedDuct) return 'Lüftungskanal';
+    if (selectedPipe) return 'Leitung';
+    if (selectedWall) return 'Wand';
+    if (selectedRoom) return 'Raum';
+    return 'Eigenschaften';
   };
 
   return (
@@ -254,7 +371,7 @@ export function BuildingView() {
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 bg-slate-800 flex-shrink-0 gap-2">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 bg-slate-800 flex-shrink-0 gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-sm font-semibold text-slate-200 truncate">{activeBuilding?.name}</span>
             {activeFloor && (
@@ -269,7 +386,7 @@ export function BuildingView() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <div className="flex items-center gap-0.5 bg-slate-700 rounded-md p-0.5">
               <button
                 onClick={() => setViewMode('floor')}
@@ -313,6 +430,22 @@ export function BuildingView() {
                   Raum
                 </button>
                 <button
+                  onClick={() => setTool('duct')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'duct' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                  title="Lüftungskanal zeichnen"
+                >
+                  <Wind className="w-3.5 h-3.5" />
+                  Kanal
+                </button>
+                <button
+                  onClick={() => setTool('pipe')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'pipe' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                  title="Leitung zeichnen"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  Rohr
+                </button>
+                <button
                   onClick={() => setTool('delete')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${tool === 'delete' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
                   title="Löschen"
@@ -332,6 +465,50 @@ export function BuildingView() {
                   <option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>
                 ))}
               </select>
+            )}
+
+            {viewMode === 'floor' && tool === 'duct' && (
+              <div className="flex items-center gap-1.5">
+                <select value={ductType} onChange={e => setDuctType(e.target.value as DuctType)}
+                  className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
+                  {(Object.keys(DUCT_TYPE_LABELS) as DuctType[]).map(t => (
+                    <option key={t} value={t}>{DUCT_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+                <select value={ductShape} onChange={e => setDuctShape(e.target.value as DuctShape)}
+                  className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
+                  <option value="rectangular">Eckig</option>
+                  <option value="round">Rund</option>
+                </select>
+                <input type="number" min="0.1" max="2" step="0.1" value={ductWidth}
+                  onChange={e => setDuctWidth(parseFloat(e.target.value) || 0.3)}
+                  className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
+                  title="Breite (m)" placeholder="B" />
+                {ductShape === 'rectangular' && (
+                  <input type="number" min="0.1" max="2" step="0.05" value={ductHeight}
+                    onChange={e => setDuctHeight(parseFloat(e.target.value) || 0.2)}
+                    className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
+                    title="Höhe (m)" placeholder="H" />
+                )}
+              </div>
+            )}
+
+            {viewMode === 'floor' && tool === 'pipe' && (
+              <div className="flex items-center gap-1.5">
+                <select value={pipeType} onChange={e => setPipeType(e.target.value as PipeType)}
+                  className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
+                  {(Object.keys(PIPE_TYPE_LABELS) as PipeType[]).map(t => (
+                    <option key={t} value={t}>{PIPE_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1">
+                  <input type="number" min="0.01" max="0.5" step="0.01" value={pipeDiameter}
+                    onChange={e => setPipeDiameter(parseFloat(e.target.value) || 0.05)}
+                    className="w-16 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
+                    title="Durchmesser (m)" />
+                  <span className="text-xs text-slate-500">m Ø</span>
+                </div>
+              </div>
             )}
 
             {viewMode === '3d' && (
@@ -356,10 +533,16 @@ export function BuildingView() {
                 >
                   <Sun className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  onClick={() => setShowWidget3DPanel(p => !p)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showWidget3DPanel ? 'bg-green-700 text-white border-green-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="3D Widgets"
+                >
+                  <Thermometer className="w-3.5 h-3.5" />
+                  Widgets
+                </button>
               </div>
             )}
-
-
 
             <button
               onClick={() => setShowRoomPanel(p => !p)}
@@ -380,8 +563,14 @@ export function BuildingView() {
                   activeFloorId={activeFloorId}
                   selectedRoomId={selectedRoomId}
                   selectedWallId={selectedWallId}
-                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
-                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
+                  selectedWidget3DId={selectedWidget3DId}
+                  selectedDuctId={selectedDuctId}
+                  selectedPipeId={selectedPipeId}
+                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); }}
+                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); }}
                   highlightFloor={true}
                   bgColor={bgColor}
                   lighting={lighting}
@@ -424,24 +613,142 @@ export function BuildingView() {
                     </button>
                   </div>
                 )}
+
+                {showWidget3DPanel && (
+                  <div className="absolute top-10 left-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-64 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Thermometer className="w-3.5 h-3.5 text-green-400" />
+                        3D Widget hinzufügen
+                      </span>
+                      <button onClick={() => setShowWidget3DPanel(false)} className="text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-slate-500 mb-1">Typ</div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {(Object.keys(WIDGET_LABELS) as Widget3DType[]).map(t => (
+                          <button
+                            key={t}
+                            onClick={() => setNewWidgetType(t)}
+                            className={`flex flex-col items-center gap-0.5 px-1 py-1.5 rounded text-[9px] border transition-colors ${newWidgetType === t ? 'border-current text-white' : 'border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'}`}
+                            style={newWidgetType === t ? { backgroundColor: WIDGET_COLORS[t] + '33', borderColor: WIDGET_COLORS[t], color: WIDGET_COLORS[t] } : {}}
+                            title={WIDGET_LABELS[t]}
+                          >
+                            <span>{WIDGET_TYPE_ICONS[t] || <BoxIcon className="w-3 h-3" />}</span>
+                            <span className="truncate w-full text-center leading-tight">{WIDGET_LABELS[t]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-slate-500 mb-1">Datenpunkt</div>
+                      <input
+                        type="text" value={newWidgetDatapoint}
+                        onChange={e => setNewWidgetDatapoint(e.target.value)}
+                        placeholder="z.B. sensors.room1.temp"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-green-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] text-slate-500 mb-1">Bezeichnung (optional)</div>
+                      <input
+                        type="text" value={newWidgetLabel}
+                        onChange={e => setNewWidgetLabel(e.target.value)}
+                        placeholder={WIDGET_LABELS[newWidgetType]}
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-green-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-[10px] text-slate-500 mb-1">Einheit</div>
+                        <input type="text" value={newWidgetUnit} onChange={e => setNewWidgetUnit(e.target.value)}
+                          placeholder="°C, %, lux..."
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-green-500" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { label: 'X', val: newWidgetX, set: setNewWidgetX },
+                        { label: 'Y', val: newWidgetY, set: setNewWidgetY },
+                        { label: 'Z', val: newWidgetZ, set: setNewWidgetZ },
+                      ].map(({ label, val, set }) => (
+                        <div key={label}>
+                          <div className="text-[10px] text-slate-500 mb-1">{label} (m)</div>
+                          <input type="number" step="0.5" value={val} onChange={e => set(parseFloat(e.target.value) || 0)}
+                            className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1.5 rounded outline-none focus:border-green-500" />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleAddWidget3D}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-2 bg-green-700 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Widget hinzufügen
+                    </button>
+
+                    {(activeBuilding?.widgets3d ?? []).length > 0 && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-[10px] text-slate-500 mb-1.5">Vorhandene Widgets ({activeBuilding!.widgets3d.length})</div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {activeBuilding!.widgets3d.map(w => (
+                            <div
+                              key={w.id}
+                              className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs transition-colors ${selectedWidget3DId === w.id ? 'bg-slate-600' : 'bg-slate-750 hover:bg-slate-700'}`}
+                              onClick={() => setSelectedWidget3DId(w.id)}
+                            >
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: w.color || WIDGET_COLORS[w.type] }} />
+                              <span className="flex-1 text-slate-300 truncate">{w.label}</span>
+                              <span className="text-[9px] text-slate-500 truncate max-w-16">{w.datapoint || '–'}</span>
+                              <button onClick={e => { e.stopPropagation(); if (activeBuilding) deleteWidget3D(activeBuilding.id, w.id); }}
+                                className="text-slate-600 hover:text-red-400 flex-shrink-0">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : activeFloor ? (
               <FloorPlanEditor
                 floor={activeFloor}
                 selectedRoomId={selectedRoomId}
                 selectedWallId={selectedWallId}
+                selectedDuctId={selectedDuctId}
+                selectedPipeId={selectedPipeId}
                 tool={tool}
                 wallThickness={wallThickness}
+                ductType={ductType}
+                ductShape={ductShape}
+                ductWidth={ductWidth}
+                ductHeight={ductHeight}
+                pipeType={pipeType}
+                pipeDiameter={pipeDiameter}
                 onAddWall={handleAddWall}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
                 onMoveWallPoint={handleMoveWallPoint}
                 onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); }}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
                 onMoveRoom={handleMoveRoom}
                 onDeleteWall={handleDeleteWall}
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
+                onAddDuct={handleAddDuct}
+                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); }}
+                onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
+                onAddPipe={handleAddPipe}
+                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); }}
+                onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">
@@ -454,7 +761,7 @@ export function BuildingView() {
             <div className="w-60 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
                 <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  {selectedWall ? 'Wand' : selectedRoom ? 'Raum' : 'Eigenschaften'}
+                  {propertiesPanelTitle()}
                 </span>
                 <button onClick={() => setShowRoomPanel(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
                   <X className="w-3.5 h-3.5" />
@@ -462,7 +769,204 @@ export function BuildingView() {
               </div>
 
               <div className="overflow-y-auto flex-1 p-3 space-y-3">
-                {selectedWall ? (
+                {selectedWidget ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Typ</label>
+                      <select className="w-full bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1.5 outline-none"
+                        value={selectedWidget.type}
+                        onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { type: e.target.value as Widget3DType, color: WIDGET_COLORS[e.target.value as Widget3DType] })}>
+                        {(Object.keys(WIDGET_LABELS) as Widget3DType[]).map(t => <option key={t} value={t}>{WIDGET_LABELS[t]}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Bezeichnung</label>
+                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedWidget.label}
+                        onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { label: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Datenpunkt</label>
+                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedWidget.datapoint}
+                        onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { datapoint: e.target.value })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einheit</label>
+                        <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedWidget.unit}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { unit: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Skalierung</label>
+                        <input type="number" step="0.1" min="0.3" max="5"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedWidget.scale}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { scale: parseFloat(e.target.value) || 1 })} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['x', 'y', 'z'] as const).map(axis => (
+                        <div key={axis}>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">{axis.toUpperCase()} (m)</label>
+                          <input type="number" step="0.5"
+                            className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                            value={selectedWidget[axis]}
+                            onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { [axis]: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" className="w-8 h-7 rounded cursor-pointer bg-transparent border-0"
+                          value={selectedWidget.color || WIDGET_COLORS[selectedWidget.type]}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { color: e.target.value })} />
+                        <span className="text-xs text-slate-400">{selectedWidget.color}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={selectedWidget.showLabel}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { showLabel: e.target.checked })}
+                          className="accent-blue-500" />
+                        Bezeichnung
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={selectedWidget.showValue}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { showValue: e.target.checked })}
+                          className="accent-blue-500" />
+                        Wert
+                      </label>
+                    </div>
+                    <button onClick={() => { if (activeBuilding) { deleteWidget3D(activeBuilding.id, selectedWidget.id); setSelectedWidget3DId(null); } }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Widget löschen
+                    </button>
+                  </>
+                ) : selectedDuct ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Typ</label>
+                      <select className="w-full bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1.5 outline-none"
+                        value={selectedDuct.type}
+                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { type: e.target.value as DuctType })}>
+                        {(Object.keys(DUCT_TYPE_LABELS) as DuctType[]).map(t => <option key={t} value={t}>{DUCT_TYPE_LABELS[t]}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Form</label>
+                      <select className="w-full bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1.5 outline-none"
+                        value={selectedDuct.shape}
+                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { shape: e.target.value as DuctShape })}>
+                        <option value="rectangular">Rechteckig</option>
+                        <option value="round">Rund</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Breite (m)</label>
+                        <input type="number" step="0.05" min="0.1"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedDuct.width}
+                          onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { width: parseFloat(e.target.value) || 0.3 })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Höhe (m)</label>
+                        <input type="number" step="0.05" min="0.1"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedDuct.height}
+                          onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { height: parseFloat(e.target.value) || 0.2 })} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einbauhöhe (m)</label>
+                      <input type="number" step="0.1" min="0"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedDuct.elevation}
+                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { elevation: parseFloat(e.target.value) || 2.4 })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Bezeichnung</label>
+                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedDuct.label || ''}
+                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { label: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" className="w-8 h-7 rounded cursor-pointer bg-transparent border-0"
+                          value={selectedDuct.color || DUCT_TYPE_COLORS[selectedDuct.type]}
+                          onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { color: e.target.value })} />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                      <input type="checkbox" checked={selectedDuct.insulated}
+                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { insulated: e.target.checked })}
+                        className="accent-blue-500" />
+                      Gedämmt
+                    </label>
+                    <div className="pt-1 text-[10px] text-slate-500">{selectedDuct.points.length} Punkte</div>
+                    <button onClick={() => { if (activeBuilding && activeFloor) { deleteDuct(activeBuilding.id, activeFloor.id, selectedDuct.id); setSelectedDuctId(null); } }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Kanal löschen
+                    </button>
+                  </>
+                ) : selectedPipe ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Typ</label>
+                      <select className="w-full bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1.5 outline-none"
+                        value={selectedPipe.type}
+                        onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { type: e.target.value as PipeType })}>
+                        {(Object.keys(PIPE_TYPE_LABELS) as PipeType[]).map(t => <option key={t} value={t}>{PIPE_TYPE_LABELS[t]}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Durchmesser (m)</label>
+                      <input type="number" step="0.005" min="0.01"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedPipe.diameter}
+                        onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { diameter: parseFloat(e.target.value) || 0.05 })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einbauhöhe (m)</label>
+                      <input type="number" step="0.1" min="0"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedPipe.elevation}
+                        onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { elevation: parseFloat(e.target.value) || 2.2 })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Bezeichnung</label>
+                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedPipe.label || ''}
+                        onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { label: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" className="w-8 h-7 rounded cursor-pointer bg-transparent border-0"
+                          value={selectedPipe.color || PIPE_TYPE_COLORS[selectedPipe.type]}
+                          onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { color: e.target.value })} />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                      <input type="checkbox" checked={selectedPipe.insulated}
+                        onChange={e => activeBuilding && activeFloor && updatePipe(activeBuilding.id, activeFloor.id, selectedPipe.id, { insulated: e.target.checked })}
+                        className="accent-blue-500" />
+                      Gedämmt
+                    </label>
+                    <div className="pt-1 text-[10px] text-slate-500">{selectedPipe.points.length} Punkte</div>
+                    <button onClick={() => { if (activeBuilding && activeFloor) { deletePipe(activeBuilding.id, activeFloor.id, selectedPipe.id); setSelectedPipeId(null); } }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Leitung löschen
+                    </button>
+                  </>
+                ) : selectedWall ? (
                   <>
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Material</label>
@@ -724,6 +1228,34 @@ export function BuildingView() {
                         ))}
                       </div>
                     </div>
+                    {(activeFloor.ducts?.length ?? 0) > 0 && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-[10px] text-slate-500 mb-2">Lüftungskanäle ({activeFloor.ducts!.length})</div>
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                          {activeFloor.ducts!.map(d => (
+                            <div key={d.id} className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700 cursor-pointer hover:bg-slate-600" onClick={() => { setSelectedDuctId(d.id); setSelectedWallId(null); setSelectedRoomId(null); }}>
+                              <div className="w-3 h-1.5 rounded flex-shrink-0" style={{ backgroundColor: d.color || DUCT_TYPE_COLORS[d.type] }} />
+                              <span className="flex-1 text-xs text-slate-300 truncate">{d.label || DUCT_TYPE_LABELS[d.type]}</span>
+                              <span className="text-[10px] text-slate-500">{d.points.length}pt</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(activeFloor.pipes?.length ?? 0) > 0 && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-[10px] text-slate-500 mb-2">Leitungen ({activeFloor.pipes!.length})</div>
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                          {activeFloor.pipes!.map(p => (
+                            <div key={p.id} className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700 cursor-pointer hover:bg-slate-600" onClick={() => { setSelectedPipeId(p.id); setSelectedWallId(null); setSelectedRoomId(null); }}>
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || PIPE_TYPE_COLORS[p.type] }} />
+                              <span className="flex-1 text-xs text-slate-300 truncate">{p.label || PIPE_TYPE_LABELS[p.type]}</span>
+                              <span className="text-[10px] text-slate-500">{p.points.length}pt</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-xs text-slate-500 text-center py-8">Stockwerk auswählen</div>
