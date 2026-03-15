@@ -76,7 +76,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
   return (
     <div className={`flex flex-col gap-1 ${disabled ? 'opacity-50' : ''}`}>
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate">{label}</span>
+        <span className="text-xs truncate" style={{ color: txtColor, opacity: 0.7 }}>{label}</span>
       )}
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
@@ -109,7 +109,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate">{label}</span>
+        <span className="text-xs truncate" style={{ color: txtColor, opacity: 0.7 }}>{label}</span>
       )}
     </div>
   );

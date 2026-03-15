@@ -1382,7 +1382,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const showSelectionBorder = isSelected && !isVertexWidget && !['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
 
   const themeVars = getThemeVars(widget.style.theme);
-  const resolvedBg = widget.style.backgroundColor || themeVars.bg;
+  const resolvedBg = widget.style.backgroundColor !== undefined && widget.style.backgroundColor !== ''
+    ? widget.style.backgroundColor
+    : (widget.style.theme ? themeVars.bg : 'transparent');
   const resolvedBorderRadius = widget.style.borderRadius ?? themeVars.borderRadius;
   const resolvedBorderColor = widget.style.borderColor || themeVars.border;
 

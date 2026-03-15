@@ -35,10 +35,12 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
     onChange(!displayValue);
   };
 
+  const textColor = style.textColor || '#94a3b8';
+
   return (
     <div className="flex flex-col items-center gap-1.5">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs font-medium text-slate-400 truncate max-w-full tracking-wide uppercase">{label}</span>
+        <span className="text-xs font-medium truncate max-w-full tracking-wide uppercase" style={{ color: textColor }}>{label}</span>
       )}
 
       <div className="flex flex-col items-center gap-2">
@@ -91,7 +93,7 @@ export const VisuSwitch: React.FC<VisuSwitchProps> = ({
       </div>
 
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs font-medium text-slate-400 truncate max-w-full tracking-wide uppercase">{label}</span>
+        <span className="text-xs font-medium truncate max-w-full tracking-wide uppercase" style={{ color: textColor }}>{label}</span>
       )}
     </div>
   );

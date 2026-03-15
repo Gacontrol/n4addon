@@ -43,7 +43,7 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
   return (
     <div className="flex flex-col items-center gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
       <div className="relative" style={{ width: thermWidth, height: thermHeight }}>
         <svg width={thermWidth} height={thermHeight} viewBox={`0 0 ${thermWidth} ${thermHeight}`}>
@@ -103,12 +103,12 @@ export const VisuThermometer: React.FC<VisuThermometerProps> = ({
       </div>
       {config.showValue && (
         <div className="text-center">
-          <span className="text-lg font-mono text-slate-200">{displayValue}</span>
-          <span className="text-sm text-slate-400 ml-1">{config.unit || '°C'}</span>
+          <span className="text-lg font-mono" style={{ color: style.textColor || '#e2e8f0' }}>{displayValue}</span>
+          <span className="text-sm ml-1" style={{ color: style.textColor || '#94a3b8' }}>{config.unit || '°C'}</span>
         </div>
       )}
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
     </div>
   );

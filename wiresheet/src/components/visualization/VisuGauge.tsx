@@ -47,7 +47,7 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
   return (
     <div className="flex flex-col items-center">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full mb-1">{label}</span>
+        <span className="text-xs truncate max-w-full mb-1" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
       <div className="relative" style={{ width: gaugeSize, height: gaugeSize / 2 + 20 }}>
         <svg
@@ -79,21 +79,21 @@ export const VisuGauge: React.FC<VisuGaugeProps> = ({
             className="absolute left-1/2 -translate-x-1/2 text-center"
             style={{ bottom: 0 }}
           >
-            <span className="text-xl font-mono text-slate-200" style={{ fontSize: gaugeSize * 0.18 }}>
+            <span className="text-xl font-mono" style={{ fontSize: gaugeSize * 0.18, color: style.textColor || '#e2e8f0' }}>
               {displayValue}
             </span>
             {config.unit && (
-              <span className="text-sm text-slate-400 ml-1">{config.unit}</span>
+              <span className="text-sm ml-1" style={{ color: style.textColor || '#94a3b8' }}>{config.unit}</span>
             )}
           </div>
         )}
-        <div className="absolute left-0 right-0 flex justify-between text-[10px] text-slate-500" style={{ bottom: -12 }}>
+        <div className="absolute left-0 right-0 flex justify-between text-[10px]" style={{ bottom: -12, color: style.textColor || '#64748b', opacity: 0.7 }}>
           <span>{config.min}</span>
           <span>{config.max}</span>
         </div>
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full mt-2">{label}</span>
+        <span className="text-xs truncate max-w-full mt-2" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
     </div>
   );

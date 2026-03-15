@@ -33,7 +33,7 @@ export const VisuBar: React.FC<VisuBarProps> = ({
     return (
       <div className="flex flex-col items-center gap-1" style={{ height: size.height }}>
         {style.showLabel && style.labelPosition === 'top' && (
-          <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+          <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
         )}
         <div className="flex items-end gap-2 flex-1">
           <div
@@ -46,13 +46,13 @@ export const VisuBar: React.FC<VisuBarProps> = ({
             />
           </div>
           {config.showValue && (
-            <div className="text-sm text-slate-300 font-mono whitespace-nowrap">
+            <div className="text-sm font-mono whitespace-nowrap" style={{ color: style.textColor || '#cbd5e1' }}>
               {displayValue}{config.unit}
             </div>
           )}
         </div>
         {style.showLabel && style.labelPosition === 'bottom' && (
-          <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+          <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
         )}
       </div>
     );
@@ -62,9 +62,9 @@ export const VisuBar: React.FC<VisuBarProps> = ({
     <div className="flex flex-col gap-1" style={{ width: size.width }}>
       {style.showLabel && style.labelPosition === 'top' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-400 truncate">{label}</span>
+          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs text-slate-300 font-mono">
+            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
               {displayValue}{config.unit}
             </span>
           )}
@@ -81,9 +81,9 @@ export const VisuBar: React.FC<VisuBarProps> = ({
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-400 truncate">{label}</span>
+          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs text-slate-300 font-mono">
+            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
               {displayValue}{config.unit}
             </span>
           )}

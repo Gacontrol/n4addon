@@ -35,7 +35,7 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
   return (
     <div className="flex flex-col gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate">{label}</span>
+        <span className="text-xs truncate" style={{ color: textColor, opacity: 0.7 }}>{label}</span>
       )}
       <div
         className="px-4 py-3 rounded-lg font-mono text-center"
@@ -51,7 +51,7 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate">{label}</span>
+        <span className="text-xs truncate" style={{ color: textColor, opacity: 0.7 }}>{label}</span>
       )}
     </div>
   );

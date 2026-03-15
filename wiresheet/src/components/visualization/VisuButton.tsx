@@ -86,10 +86,12 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
 
   const activeColor = isActive ? `${buttonColor}` : buttonColor;
 
+  const labelColor = style.textColor || '#94a3b8';
+
   return (
     <div className="flex flex-col items-center gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
       )}
       <div className="relative">
         <button
@@ -121,7 +123,7 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
       )}
     </div>
   );

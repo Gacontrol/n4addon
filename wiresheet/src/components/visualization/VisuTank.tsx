@@ -44,7 +44,7 @@ export const VisuTank: React.FC<VisuTankProps> = ({
   return (
     <div className="flex flex-col items-center gap-1">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
       <div className="relative" style={{ width: tankWidth, height: tankHeight }}>
         <svg width={tankWidth} height={tankHeight} viewBox={`0 0 ${tankWidth} ${tankHeight}`}>
@@ -93,7 +93,7 @@ export const VisuTank: React.FC<VisuTankProps> = ({
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
       )}
     </div>
   );

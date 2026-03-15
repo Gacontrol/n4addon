@@ -35,10 +35,13 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
     ? (config.step < 1 ? value.toFixed(1) : value.toString())
     : '0';
 
+  const textColor = style.textColor || '#e2e8f0';
+  const labelColor = style.textColor || '#94a3b8';
+
   return (
     <div className={`flex flex-col items-center gap-1 ${disabled ? 'opacity-50' : ''}`}>
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
       )}
       <div className="flex items-center gap-2">
         <button
@@ -46,14 +49,14 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
           disabled={disabled || value <= config.min}
           className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
         >
-          <Minus className="w-5 h-5 text-slate-300" />
+          <Minus className="w-5 h-5" style={{ color: textColor }} />
         </button>
         <div className="min-w-[60px] px-3 py-2 bg-slate-800 rounded-lg text-center">
-          <span className="text-lg font-mono text-slate-200">
+          <span className="text-lg font-mono" style={{ color: textColor }}>
             {displayValue}
           </span>
           {config.unit && (
-            <span className="text-xs text-slate-400 ml-1">{config.unit}</span>
+            <span className="text-xs ml-1" style={{ color: textColor, opacity: 0.7 }}>{config.unit}</span>
           )}
         </div>
         <button
@@ -61,11 +64,11 @@ export const VisuIncrementer: React.FC<VisuIncrementerProps> = ({
           disabled={disabled || value >= config.max}
           className="w-10 h-10 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
         >
-          <Plus className="w-5 h-5 text-slate-300" />
+          <Plus className="w-5 h-5" style={{ color: textColor }} />
         </button>
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs text-slate-400 truncate max-w-full">{label}</span>
+        <span className="text-xs truncate max-w-full" style={{ color: labelColor }}>{label}</span>
       )}
     </div>
   );

@@ -120,9 +120,9 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
     <div className="flex flex-col gap-1" style={{ width }}>
       {style.showLabel && style.labelPosition === 'top' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-400 truncate">{label}</span>
+          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs text-slate-300 font-mono">
+            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
               {localValue.toFixed(config.step < 1 ? 1 : 0)}{config.unit}
             </span>
           )}
@@ -147,15 +147,15 @@ export const VisuSlider: React.FC<VisuSliderProps> = ({
           style={{ left: `calc(${percent}% - 14px)` }}
         />
       </div>
-      <div className="flex justify-between text-[10px] text-slate-500">
+      <div className="flex justify-between text-[10px]" style={{ color: style.textColor || '#64748b', opacity: 0.7 }}>
         <span>{config.min}</span>
         <span>{config.max}</span>
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-400 truncate">{label}</span>
+          <span className="text-xs truncate" style={{ color: style.textColor || '#94a3b8' }}>{label}</span>
           {config.showValue && (
-            <span className="text-xs text-slate-300 font-mono">
+            <span className="text-xs font-mono" style={{ color: style.textColor || '#cbd5e1' }}>
               {localValue.toFixed(config.step < 1 ? 1 : 0)}{config.unit}
             </span>
           )}
