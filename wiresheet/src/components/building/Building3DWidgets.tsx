@@ -153,30 +153,36 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       ref={groupRef}
       position={[wx, wy, wz]}
       scale={[scale, scale, scale]}
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onClick={(e) => { e.stopPropagation(); if (!dragRef.current) onSelect(); }}
       onPointerDown={(e) => {
-        if (!selected || !onDragEnd) return;
+        if (!onDragEnd) return;
         e.stopPropagation();
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-        dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, startWX: widget.x, startWZ: widget.y };
+        const nativeTarget = e.nativeEvent?.target as Element | undefined;
+        nativeTarget?.setPointerCapture?.(e.pointerId);
+        dragRef.current = { dragging: false, startX: e.clientX, startY: e.clientY, startWX: widget.x, startWZ: widget.y };
+        onSelect();
       }}
       onPointerMove={(e) => {
-        if (!dragRef.current?.dragging || !onDragEnd) return;
-        e.stopPropagation();
+        if (!dragRef.current || !onDragEnd) return;
         const dx = (e.clientX - dragRef.current.startX) * 0.02;
         const dz = (e.clientY - dragRef.current.startY) * 0.02;
-        if (groupRef.current) {
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          dragRef.current.dragging = true;
+          e.stopPropagation();
+        }
+        if (dragRef.current.dragging && groupRef.current) {
           groupRef.current.position.x = wx + dx;
           groupRef.current.position.z = wz + dz;
         }
       }}
       onPointerUp={(e) => {
-        if (!dragRef.current?.dragging || !onDragEnd) return;
+        if (!dragRef.current || !onDragEnd) return;
         e.stopPropagation();
-        dragRef.current.dragging = false;
-        const dx = (e.clientX - dragRef.current.startX) * 0.02;
-        const dz = (e.clientY - dragRef.current.startY) * 0.02;
-        onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWZ + dz, widget.z);
+        if (dragRef.current.dragging) {
+          const dx = (e.clientX - dragRef.current.startX) * 0.02;
+          const dz = (e.clientY - dragRef.current.startY) * 0.02;
+          onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWZ + dz, widget.z);
+        }
         dragRef.current = null;
       }}
     >

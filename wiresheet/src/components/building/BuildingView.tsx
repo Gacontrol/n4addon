@@ -11,7 +11,7 @@ import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './Building
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
-import { HaEntity } from '../../types/flow';
+import { HaEntity, WiresheetPage } from '../../types/flow';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer',
@@ -90,9 +90,10 @@ interface BuildingViewProps {
   haEntities?: HaEntity[];
   haLoading?: boolean;
   onLoadHaEntities?: () => void;
+  pages?: WiresheetPage[];
 }
 
-export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntities }: BuildingViewProps) {
+export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntities, pages = [] }: BuildingViewProps) {
   const {
     buildings,
     activeBuildingId,
@@ -173,6 +174,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [datapointPickerOpen, setDatapointPickerOpen] = useState(false);
   const [datapointPickerTarget, setDatapointPickerTarget] = useState<'new' | 'widget' | 'alarm'>('new');
   const [newWidgetRoomIds, setNewWidgetRoomIds] = useState<string[]>([]);
+  const [pickerTab, setPickerTab] = useState<'driver' | 'logic'>('driver');
+  const [pickerDevice, setPickerDevice] = useState<string | null>(null);
 
   const clipboardRef = useRef<{
     walls: Wall[];
@@ -221,6 +224,26 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     for (const id of sel.roomIds) deleteRoom(activeBuilding.id, activeFloor.id, id);
     for (const id of sel.ductIds) deleteDuct(activeBuilding.id, activeFloor.id, id);
     for (const id of sel.pipeIds) deletePipe(activeBuilding.id, activeFloor.id, id);
+  };
+
+  const handleMoveMultiSelection = (sel: MultiSelection, dx: number, dy: number) => {
+    if (!activeBuilding || !activeFloor) return;
+    for (const id of sel.wallIds) {
+      const w = activeFloor.walls.find(w => w.id === id);
+      if (w) updateWall(activeBuilding.id, activeFloor.id, id, { x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy });
+    }
+    for (const id of sel.roomIds) {
+      const r = activeFloor.rooms.find(r => r.id === id);
+      if (r) updateRoom(activeBuilding.id, activeFloor.id, id, { x: r.x + dx, y: r.y + dy });
+    }
+    for (const id of sel.ductIds) {
+      const d = activeFloor.ducts?.find(d => d.id === id);
+      if (d) updateDuct(activeBuilding.id, activeFloor.id, id, { points: d.points.map(p => ({ x: p.x + dx, y: p.y + dy })) });
+    }
+    for (const id of sel.pipeIds) {
+      const p = activeFloor.pipes?.find(p => p.id === id);
+      if (p) updatePipe(activeBuilding.id, activeFloor.id, id, { points: p.points.map(pt => ({ x: pt.x + dx, y: pt.y + dy })) });
+    }
   };
 
   const selectedRoom = activeFloor?.rooms.find(r => r.id === selectedRoomId) ?? null;
@@ -338,9 +361,24 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     setNewWidgetRoomIds([]);
   };
 
+  const logicPageGroups = useMemo(() => {
+    return pages.map(page => ({
+      pageId: page.id,
+      pageName: page.name,
+      datapoints: page.nodes
+        .filter(n => n.data.entityId)
+        .map(n => ({
+          entityId: n.data.entityId as string,
+          label: n.data.entityLabel || n.data.label || n.data.entityId as string,
+        })),
+    })).filter(g => g.datapoints.length > 0);
+  }, [pages]);
+
   const openDatapointPicker = (target: 'new' | 'widget' | 'alarm') => {
     setDatapointPickerTarget(target);
     setEntitySearch('');
+    setPickerTab('driver');
+    setPickerDevice(null);
     setDatapointPickerOpen(true);
     if (haEntities.length === 0) onLoadHaEntities?.();
   };
@@ -891,6 +929,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onCopySelected={handleCopySelected}
                 onPasteClipboard={handlePasteClipboard}
                 onDeleteSelected={handleDeleteSelected}
+                onMoveMultiSelection={handleMoveMultiSelection}
                 onPropertiesRequested={() => setShowRoomPanel(true)}
               />
             ) : (
@@ -1473,7 +1512,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
       {datapointPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDatapointPickerOpen(false)}>
-          <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-96 max-h-[28rem] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-[26rem] max-h-[32rem] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
               <span className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                 <Search className="w-4 h-4 text-blue-400" />
@@ -1483,47 +1522,125 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="px-3 py-2 border-b border-slate-700">
-              <div className="flex items-center gap-2 bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5">
-                <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                <input
-                  autoFocus
-                  type="text"
-                  value={entitySearch}
-                  onChange={e => setEntitySearch(e.target.value)}
-                  placeholder="Suchen..."
-                  className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
-                />
-                {haLoading && <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />}
-                {!haLoading && (
-                  <button onClick={() => onLoadHaEntities?.()} className="text-slate-500 hover:text-slate-300" title="Neu laden">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+
+            <div className="flex border-b border-slate-700">
+              <button
+                onClick={() => { setPickerTab('driver'); setPickerDevice(null); setEntitySearch(''); }}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${pickerTab === 'driver' ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-750' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Treiber
+              </button>
+              <button
+                onClick={() => { setPickerTab('logic'); setPickerDevice(null); setEntitySearch(''); }}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${pickerTab === 'logic' ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-750' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Logik
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {filteredEntities.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-slate-500">
-                  <Search className="w-6 h-6 mb-2 opacity-30" />
-                  <span className="text-xs">{haEntities.length === 0 ? 'Keine Entitäten geladen' : 'Keine Treffer'}</span>
-                  {haEntities.length === 0 && (
-                    <button onClick={() => onLoadHaEntities?.()} className="mt-2 text-xs text-blue-400 hover:text-blue-300">
-                      Entitäten laden
+
+            {pickerDevice !== null && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-750">
+                <button
+                  onClick={() => { setPickerDevice(null); setEntitySearch(''); }}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  <ChevronDown className="w-3.5 h-3.5 rotate-90" />
+                  Zurück
+                </button>
+                <span className="text-slate-600 text-xs">/</span>
+                <span className="text-xs text-slate-200 font-medium truncate">
+                  {pickerTab === 'logic'
+                    ? (logicPageGroups.find(g => g.pageId === pickerDevice)?.pageName ?? pickerDevice)
+                    : pickerDevice}
+                </span>
+              </div>
+            )}
+
+            {pickerDevice === null && (
+              <div className="px-3 py-2 border-b border-slate-700">
+                <div className="flex items-center gap-2 bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5">
+                  <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={entitySearch}
+                    onChange={e => setEntitySearch(e.target.value)}
+                    placeholder="Suchen..."
+                    className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                  />
+                  {pickerTab === 'driver' && haLoading && <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />}
+                  {pickerTab === 'driver' && !haLoading && (
+                    <button onClick={() => onLoadHaEntities?.()} className="text-slate-500 hover:text-slate-300" title="Neu laden">
+                      <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-              ) : (
-                groupedEntities.map(([domain, entities]) => (
-                  <div key={domain}>
-                    <div className="sticky top-0 px-3 py-1 bg-slate-750 border-b border-slate-700 text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-800">
-                      {domain} <span className="text-slate-600 font-normal">({entities.length})</span>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto">
+              {pickerTab === 'driver' && pickerDevice === null && (
+                groupedEntities.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                    <Search className="w-6 h-6 mb-2 opacity-30" />
+                    <span className="text-xs">{haEntities.length === 0 ? 'Keine Entitäten geladen' : 'Keine Treffer'}</span>
+                    {haEntities.length === 0 && (
+                      <button onClick={() => onLoadHaEntities?.()} className="mt-2 text-xs text-blue-400 hover:text-blue-300">
+                        Entitäten laden
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  groupedEntities.map(([domain, entities]) => (
+                    <button
+                      key={domain}
+                      onClick={() => setPickerDevice(domain)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center">
+                          <Activity className="w-3.5 h-3.5 text-blue-400" />
+                        </div>
+                        <span className="text-xs text-slate-200 font-medium">{domain}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 bg-slate-700 px-1.5 py-0.5 rounded">{entities.length}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-500 -rotate-90" />
+                      </div>
+                    </button>
+                  ))
+                )
+              )}
+
+              {pickerTab === 'driver' && pickerDevice !== null && (() => {
+                const entities = groupedEntities.find(([d]) => d === pickerDevice)?.[1] ?? [];
+                const q = entitySearch.trim().toLowerCase();
+                const filtered = q ? entities.filter(e => e.entity_id.toLowerCase().includes(q) || String(e.attributes.friendly_name || '').toLowerCase().includes(q)) : entities;
+                return filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                    <Search className="w-6 h-6 mb-2 opacity-30" />
+                    <span className="text-xs">Keine Treffer</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-3 py-2 border-b border-slate-700">
+                      <div className="flex items-center gap-2 bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5">
+                        <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <input
+                          autoFocus
+                          type="text"
+                          value={entitySearch}
+                          onChange={e => setEntitySearch(e.target.value)}
+                          placeholder="Suchen..."
+                          className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                        />
+                      </div>
                     </div>
-                    {entities.map(e => (
+                    {filtered.map(e => (
                       <button
                         key={e.entity_id}
                         onClick={() => selectDatapoint(e.entity_id)}
-                        className="w-full flex items-center gap-2.5 px-4 py-1.5 hover:bg-slate-700 transition-colors text-left"
+                        className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-700 transition-colors text-left border-b border-slate-700/30"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-slate-200 truncate">{e.entity_id}</div>
@@ -1536,9 +1653,84 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         )}
                       </button>
                     ))}
+                  </>
+                );
+              })()}
+
+              {pickerTab === 'logic' && pickerDevice === null && (
+                logicPageGroups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                    <Activity className="w-6 h-6 mb-2 opacity-30" />
+                    <span className="text-xs">Keine Logik-Datenpunkte gefunden</span>
                   </div>
-                ))
+                ) : (
+                  logicPageGroups
+                    .filter(g => !entitySearch || g.pageName.toLowerCase().includes(entitySearch.toLowerCase()))
+                    .map(group => (
+                      <button
+                        key={group.pageId}
+                        onClick={() => setPickerDevice(group.pageId)}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                          </div>
+                          <span className="text-xs text-slate-200 font-medium">{group.pageName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500 bg-slate-700 px-1.5 py-0.5 rounded">{group.datapoints.length}</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-500 -rotate-90" />
+                        </div>
+                      </button>
+                    ))
+                )
               )}
+
+              {pickerTab === 'logic' && pickerDevice !== null && (() => {
+                const group = logicPageGroups.find(g => g.pageId === pickerDevice);
+                const q = entitySearch.trim().toLowerCase();
+                const dps = group ? (q ? group.datapoints.filter(d => d.entityId.toLowerCase().includes(q) || d.label.toLowerCase().includes(q)) : group.datapoints) : [];
+                return dps.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+                    <Search className="w-6 h-6 mb-2 opacity-30" />
+                    <span className="text-xs">Keine Datenpunkte</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-3 py-2 border-b border-slate-700">
+                      <div className="flex items-center gap-2 bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5">
+                        <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <input
+                          autoFocus
+                          type="text"
+                          value={entitySearch}
+                          onChange={e => setEntitySearch(e.target.value)}
+                          placeholder="Suchen..."
+                          className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                        />
+                      </div>
+                    </div>
+                    {dps.map(dp => (
+                      <button
+                        key={dp.entityId}
+                        onClick={() => selectDatapoint(dp.entityId)}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-700 transition-colors text-left border-b border-slate-700/30"
+                      >
+                        <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center flex-shrink-0">
+                          <Zap className="w-3 h-3 text-emerald-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-slate-200 truncate">{dp.entityId}</div>
+                          {dp.label !== dp.entityId && (
+                            <div className="text-[10px] text-slate-500 truncate">{dp.label}</div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

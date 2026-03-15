@@ -43,6 +43,7 @@ interface Props {
   onCopySelected?: (sel: MultiSelection) => void;
   onPasteClipboard?: () => void;
   onPropertiesRequested?: () => void;
+  onMoveMultiSelection?: (sel: MultiSelection, dx: number, dy: number) => void;
 }
 
 const CELL = 40;
@@ -81,7 +82,7 @@ function loadBgImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'lasso' | 'move-selection';
+type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'lasso' | 'move-multi';
 
 const DUCT_TYPE_COLORS: Record<string, string> = {
   supply: '#60a5fa', return: '#94a3b8', exhaust: '#fbbf24', fresh: '#34d399',
@@ -110,7 +111,7 @@ export function FloorPlanEditor({
   onAddDuct, onSelectDuct, onDeleteDuct,
   onAddPipe, onSelectPipe, onDeletePipe,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
-  onPropertiesRequested,
+  onPropertiesRequested, onMoveMultiSelection,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 80, y: 80 });
@@ -144,7 +145,8 @@ export function FloorPlanEditor({
     bgOrigY?: number;
     lassoX?: number;
     lassoY?: number;
-    selOrigPositions?: Array<{ id: string; kind: 'wall' | 'room' | 'duct' | 'pipe'; x?: number; y?: number; x1?: number; y1?: number; x2?: number; y2?: number }>;
+    multiOrigWX?: number;
+    multiOrigWY?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -890,9 +892,12 @@ export function FloorPlanEditor({
           return;
         }
 
-        if (!isInMultiSel) {
-          setMultiSel({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] });
+        if (isInMultiSel) {
+          dragState.current = { type: 'move-multi', startX: e.clientX, startY: e.clientY, multiOrigWX: world.x, multiOrigWY: world.y };
+          return;
         }
+
+        setMultiSel({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] });
 
         if (hit.type === 'duct') {
           onSelectDuct?.(hit.id);
@@ -915,24 +920,18 @@ export function FloorPlanEditor({
           const wall = floor.walls.find(w => w.id === hit.id)!;
           const distToStart = dist(world.x, world.y, wall.x1, wall.y1);
           const distToEnd = dist(world.x, world.y, wall.x2, wall.y2);
-          const wallLen = dist(wall.x1, wall.y1, wall.x2, wall.y2);
-          const midX = (wall.x1 + wall.x2) / 2;
-          const midY = (wall.y1 + wall.y2) / 2;
-          const distToMid = dist(world.x, world.y, midX, midY);
 
           if (distToStart < ENDPOINT_SNAP_RADIUS) {
             dragState.current = { type: 'move-wall-point', startX: e.clientX, startY: e.clientY, wallId: hit.id, point: 'start' };
           } else if (distToEnd < ENDPOINT_SNAP_RADIUS) {
             dragState.current = { type: 'move-wall-point', startX: e.clientX, startY: e.clientY, wallId: hit.id, point: 'end' };
-          } else if (distToMid < Math.max(0.4, wallLen * 0.15)) {
+          } else {
             dragState.current = {
               type: 'move-wall', startX: e.clientX, startY: e.clientY,
               wallId: hit.id,
               wallOrigX1: wall.x1, wallOrigY1: wall.y1,
               wallOrigX2: wall.x2, wallOrigY2: wall.y2,
             };
-          } else {
-            dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
           }
           return;
         }
@@ -1029,8 +1028,18 @@ export function FloorPlanEditor({
       const lx = dragState.current.lassoX ?? world.x;
       const ly = dragState.current.lassoY ?? world.y;
       setLassoRect({ x1: lx, y1: ly, x2: world.x, y2: world.y });
+    } else if (dragState.current.type === 'move-multi') {
+      const origWX = dragState.current.multiOrigWX ?? world.x;
+      const origWY = dragState.current.multiOrigWY ?? world.y;
+      const ddx = snapTo(world.x - origWX);
+      const ddy = snapTo(world.y - origWY);
+      if (ddx !== 0 || ddy !== 0) {
+        onMoveMultiSelection?.(multiSel, ddx, ddy);
+        dragState.current.multiOrigWX = origWX + ddx;
+        dragState.current.multiOrigWY = origWY + ddy;
+      }
     }
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
