@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab } from '../types/building';
+import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab, FloorLayers } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -529,6 +529,25 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  // ---- Layer Actions ----
+
+  const updateFloorLayers = useCallback((buildingId: string, floorId: string, layers: Partial<FloorLayers>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, layers: { walls: true, ducts: true, pipes: true, background: true, rooms: true, slabs: true, ...(f.layers ?? {}), ...layers } }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   // ---- Duct Actions ----
 
   const addDuct = useCallback((buildingId: string, floorId: string, duct: Omit<Duct, 'id'>) => {
@@ -632,9 +651,12 @@ export function useBuildingEditor() {
         floors: b.floors.map(f =>
           f.id === floorId ? {
             ...f,
-            ducts: (f.ducts ?? []).map(d =>
-              d.id === ductId ? { ...d, points: d.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy })) } : d
-            ),
+            ducts: (f.ducts ?? []).map(d => {
+              if (d.id !== ductId) return d;
+              const moved = { ...d, points: d.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy })) };
+              if (d.isVertical && d.verticalX != null) moved.verticalX = d.verticalX + dx;
+              return moved;
+            }),
           } : f
         ),
         updatedAt: Date.now(),
@@ -1198,6 +1220,7 @@ export function useBuildingEditor() {
     addWallOpening,
     updateWallOpening,
     deleteWallOpening,
+    updateFloorLayers,
     addDuct,
     updateDuct,
     moveDuctPoint,

@@ -1132,6 +1132,33 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
     />
   );
 
+  if (duct.isVertical && duct.verticalX != null) {
+    const vx = duct.verticalX + offsetX;
+    const vz = duct.points[0]?.y ?? 0;
+    const ductH = (duct.elevation ?? 2.4) * 0.5;
+    const midY = baseY + (duct.elevation ?? 2.4) - ductH / 2;
+    return (
+      <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <mesh castShadow position={[vx, midY, vz]}>
+          {isRound
+            ? <cylinderGeometry args={[w / 2, w / 2, ductH, 12]} />
+            : <boxGeometry args={[w, ductH, h]} />
+          }
+          <meshStandardMaterial color={color} metalness={0.65} roughness={0.38} />
+        </mesh>
+        {selected && (
+          <mesh position={[vx, midY, vz]}>
+            {isRound
+              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductH + 0.03, 12]} />
+              : <boxGeometry args={[w + 0.03, ductH + 0.03, h + 0.03]} />
+            }
+            <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
+          </mesh>
+        )}
+      </group>
+    );
+  }
+
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
 

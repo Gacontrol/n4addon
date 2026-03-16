@@ -2,7 +2,7 @@ import { Suspense, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Building, Slab } from '../../types/building';
+import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
 
 export interface LightingSettings {
@@ -781,7 +781,10 @@ function BuildingScene({
         );
       }
 
+      const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
+
       for (const room of floor.rooms) {
+        if (!flLayers.rooms) break;
         if (room.points && room.points.length > 2) {
           elements.push(
             <PolygonRoomMesh
@@ -817,6 +820,7 @@ function BuildingScene({
       }
 
       for (const wall of floor.walls) {
+        if (!flLayers.walls) break;
         const wallH = wall.height > 0 ? wall.height : floor.height;
         const adjX1 = wall.x1 + offsetX;
         const adjX2 = wall.x2 + offsetX;
@@ -880,6 +884,7 @@ function BuildingScene({
       }
 
       for (const duct of (floor.ducts ?? [])) {
+        if (!flLayers.ducts) break;
         elements.push(
           <DuctMesh
             key={`duct-${duct.id}`}
@@ -893,6 +898,7 @@ function BuildingScene({
       }
 
       for (const pipe of (floor.pipes ?? [])) {
+        if (!flLayers.pipes) break;
         elements.push(
           <PipeMesh
             key={`pipe-${pipe.id}`}
@@ -906,6 +912,7 @@ function BuildingScene({
       }
 
       for (const slab of (floor.slabs ?? [])) {
+        if (!flLayers.slabs) break;
         elements.push(
           <SlabMesh
             key={`slab-${slab.id}`}

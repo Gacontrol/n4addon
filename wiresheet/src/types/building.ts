@@ -216,6 +216,24 @@ export interface BackgroundImage {
   rotation: number;
 }
 
+export interface FloorLayers {
+  walls: boolean;
+  ducts: boolean;
+  pipes: boolean;
+  background: boolean;
+  rooms: boolean;
+  slabs: boolean;
+}
+
+export const DEFAULT_LAYERS: FloorLayers = {
+  walls: true,
+  ducts: true,
+  pipes: true,
+  background: true,
+  rooms: true,
+  slabs: true,
+};
+
 export interface Floor {
   id: string;
   name: string;
@@ -229,6 +247,7 @@ export interface Floor {
   backgroundImage: BackgroundImage | null;
   floorColor?: string;
   showFloorPlane?: boolean;
+  layers?: FloorLayers;
 }
 
 export interface Building {

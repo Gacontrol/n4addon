@@ -4,13 +4,14 @@ import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
   Layers, Box, MousePointer, MousePointer2, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
-  Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw
+  Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw,
+  Eye, EyeOff
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
-import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab } from '../../types/building';
+import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
@@ -132,6 +133,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addWallOpening,
     updateWallOpening,
     deleteWallOpening,
+    updateFloorLayers,
     addDuct,
     updateDuct,
     moveDuctPoint,
@@ -168,6 +170,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [editingFloorName, setEditingFloorName] = useState('');
   const [newRoomType, setNewRoomType] = useState<RoomType>('room');
   const [showRoomPanel, setShowRoomPanel] = useState(true);
+  const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [wallThickness, setWallThickness] = useState(0.25);
   const [gridSize, setGridSize] = useState(1);
   const [bgColor, setBgColor] = useState('#0a1020');
@@ -805,6 +808,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
             )}
 
             <button
+              onClick={() => setShowLayersPanel(p => !p)}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showLayersPanel ? 'bg-slate-600 text-white border-slate-500' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+              title="Layer"
+            >
+              <Layers className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={() => setShowRoomPanel(p => !p)}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showRoomPanel ? 'bg-slate-600 text-white border-slate-500' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
               title="Eigenschaften"
@@ -1169,6 +1179,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onPropertiesRequested={() => setShowRoomPanel(true)}
                 gridSize={gridSize}
                 forceMultiSel={pastedMultiSel}
+                layers={activeFloor?.layers}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">
@@ -1176,6 +1187,42 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
             )}
           </div>
+
+          {showLayersPanel && activeFloor && (
+            <div className="w-48 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
+                <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />Layer
+                </span>
+                <button onClick={() => setShowLayersPanel(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                {([
+                  { key: 'walls', label: 'Wände' },
+                  { key: 'rooms', label: 'Räume' },
+                  { key: 'ducts', label: 'Kanäle' },
+                  { key: 'pipes', label: 'Rohre' },
+                  { key: 'slabs', label: 'Decken' },
+                  { key: 'background', label: 'Hintergrundbild' },
+                ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
+                  const layers = { ...DEFAULT_LAYERS, ...(activeFloor.layers ?? {}) };
+                  const visible = layers[key];
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => activeBuilding && updateFloorLayers(activeBuilding.id, activeFloor.id, { [key]: !visible })}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
+                    >
+                      {visible ? <Eye className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {showRoomPanel && (
             <div className="w-60 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">

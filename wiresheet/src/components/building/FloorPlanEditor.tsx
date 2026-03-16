@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { Floor, Wall, Room, BuildingTool, BackgroundImage, Duct, Pipe, DuctType, PipeType, DuctShape, Slab } from '../../types/building';
+import { Floor, Wall, Room, BuildingTool, BackgroundImage, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, FloorLayers, DEFAULT_LAYERS } from '../../types/building';
 
 export interface MultiSelection {
   wallIds: string[];
@@ -60,6 +60,7 @@ interface Props {
   onMoveMultiSelection?: (sel: MultiSelection, dx: number, dy: number) => void;
   gridSize?: number;
   forceMultiSel?: MultiSelection | null;
+  layers?: FloorLayers;
 }
 
 const CELL = 40;
@@ -238,7 +239,9 @@ export function FloorPlanEditor({
   onDuplicateSelected, onPropertiesRequested, onMoveMultiSelection,
   gridSize = 1,
   forceMultiSel,
+  layers: layersProp,
 }: Props) {
+  const layers: FloorLayers = { ...DEFAULT_LAYERS, ...(layersProp ?? {}) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 80, y: 80 });
   const [zoom, setZoom] = useState(1.0);
@@ -490,7 +493,7 @@ export function FloorPlanEditor({
 
     const cellPx = CELL * zoom;
 
-    if (floor.backgroundImage && bgImg) {
+    if (layers.background && floor.backgroundImage && bgImg) {
       const bg = floor.backgroundImage;
       ctx.save();
       ctx.globalAlpha = bg.opacity;
@@ -608,6 +611,7 @@ export function FloorPlanEditor({
     ctx.beginPath(); ctx.moveTo(0, offset.y); ctx.lineTo(W, offset.y); ctx.stroke();
 
     for (const slab of (floor.slabs ?? [])) {
+      if (!layers.slabs) continue;
       const pts = slab.points;
       if (pts.length < 3) continue;
       const isSlabSelected = slab.id === selectedSlabId;
@@ -646,6 +650,7 @@ export function FloorPlanEditor({
     }
 
     for (const room of floor.rooms) {
+      if (!layers.rooms) continue;
       const isSelected = room.id === selectedRoomId || multiSel.roomIds.includes(room.id);
       if (room.points && room.points.length >= 3) {
         const pts = room.points;
@@ -712,6 +717,7 @@ export function FloorPlanEditor({
     drawCornerJoins(ctx, cellPx);
 
     for (const wall of floor.walls) {
+      if (!layers.walls) continue;
       const isSelected = wall.id === selectedWallId || multiSel.wallIds.includes(wall.id);
       const s1 = toScreen(wall.x1, wall.y1);
       const s2 = toScreen(wall.x2, wall.y2);
@@ -917,6 +923,7 @@ export function FloorPlanEditor({
     }
 
     for (const duct of (floor.ducts ?? [])) {
+      if (!layers.ducts) continue;
       const isSelected = duct.id === selectedDuctId || multiSel.ductIds.includes(duct.id);
       const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
       const pts = duct.points;
@@ -1029,6 +1036,7 @@ export function FloorPlanEditor({
     }
 
     for (const pipe of (floor.pipes ?? [])) {
+      if (!layers.pipes) continue;
       const isSelected = pipe.id === selectedPipeId || multiSel.pipeIds.includes(pipe.id);
       const color = pipe.color || PIPE_TYPE_COLORS[pipe.type] || '#ef4444';
       const pts = pipe.points;
@@ -1265,7 +1273,7 @@ export function FloorPlanEditor({
     offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
     tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
     bgImg, bgDragging, bgCornerDragging, bgCalibrating, bgCalibLine, bgCalibRefLen,
-    drawCornerJoins, mouseWorld, lassoRect,
+    drawCornerJoins, mouseWorld, lassoRect, layers,
   ]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -1314,6 +1322,13 @@ export function FloorPlanEditor({
       }
     }
     for (const duct of [...(floor.ducts ?? [])].reverse()) {
+      if (duct.isVertical && duct.verticalX != null) {
+        const vx = duct.verticalX;
+        const vy = duct.points[0]?.y ?? 0;
+        const r = Math.max(duct.width * 0.6, 0.3);
+        if (dist(wx, wy, vx, vy) < r) return { type: 'duct' as const, id: duct.id };
+        continue;
+      }
       for (let i = 0; i < duct.points.length - 1; i++) {
         const d = pointToSegmentDist(wx, wy, duct.points[i].x, duct.points[i].y, duct.points[i + 1].x, duct.points[i + 1].y);
         const threshold = Math.max(duct.width * 0.5 + 0.15, 0.25);
@@ -1470,16 +1485,20 @@ export function FloorPlanEditor({
           onPropertiesRequested?.();
           const duct = floor.ducts?.find(d => d.id === hit.id);
           if (duct) {
-            let closestPtIdx = -1;
-            let closestPtDist = ENDPOINT_SNAP_RADIUS;
-            for (let pi = 0; pi < duct.points.length; pi++) {
-              const pd = dist(world.x, world.y, duct.points[pi].x, duct.points[pi].y);
-              if (pd < closestPtDist) { closestPtDist = pd; closestPtIdx = pi; }
-            }
-            if (closestPtIdx >= 0) {
-              dragState.current = { type: 'move-duct-point', startX: e.clientX, startY: e.clientY, ductId: hit.id, ductPointIndex: closestPtIdx };
-            } else {
+            if (duct.isVertical && duct.verticalX != null) {
               dragState.current = { type: 'move-duct', startX: e.clientX, startY: e.clientY, ductId: hit.id };
+            } else {
+              let closestPtIdx = -1;
+              let closestPtDist = ENDPOINT_SNAP_RADIUS;
+              for (let pi = 0; pi < duct.points.length; pi++) {
+                const pd = dist(world.x, world.y, duct.points[pi].x, duct.points[pi].y);
+                if (pd < closestPtDist) { closestPtDist = pd; closestPtIdx = pi; }
+              }
+              if (closestPtIdx >= 0) {
+                dragState.current = { type: 'move-duct-point', startX: e.clientX, startY: e.clientY, ductId: hit.id, ductPointIndex: closestPtIdx };
+              } else {
+                dragState.current = { type: 'move-duct', startX: e.clientX, startY: e.clientY, ductId: hit.id };
+              }
             }
           } else {
             dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
