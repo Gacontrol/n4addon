@@ -688,6 +688,42 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const pasteComponents = useCallback((
+    buildingId: string,
+    floorId: string,
+    walls: Wall[],
+    rooms: Room[],
+    ducts: Duct[],
+    pipes: Pipe[],
+    offset: number
+  ) => {
+    const mkId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const newWalls = walls.map(w => ({ ...w, id: mkId('wall'), x1: w.x1 + offset, y1: w.y1 + offset, x2: w.x2 + offset, y2: w.y2 + offset }));
+    const newRooms = rooms.map(r => ({ ...r, id: mkId('room'), x: r.x + offset, y: r.y + offset }));
+    const newDucts = ducts.map(d => ({ ...d, id: mkId('duct'), points: d.points.map(p => ({ ...p, x: p.x + offset, y: p.y + offset })) }));
+    const newPipes = pipes.map(p => ({ ...p, id: mkId('pipe'), points: p.points.map(pt => ({ ...pt, x: pt.x + offset, y: pt.y + offset })) }));
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    walls: [...f.walls, ...newWalls],
+                    rooms: [...f.rooms, ...newRooms],
+                    ducts: [...(f.ducts ?? []), ...newDucts],
+                    pipes: [...(f.pipes ?? []), ...newPipes],
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   // ---- Widget3D Actions ----
 
   const [selectedWidget3DId, setSelectedWidget3DId] = useState<string | null>(null);
@@ -869,6 +905,7 @@ export function useBuildingEditor() {
     movePipe,
     deletePipe,
     moveMultiSelection,
+    pasteComponents,
     addSlab,
     updateSlab,
     deleteSlab,

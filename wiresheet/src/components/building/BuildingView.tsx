@@ -144,6 +144,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addSlab,
     deleteSlab,
     moveMultiSelection,
+    pasteComponents,
     selectedWidget3DId,
     setSelectedWidget3DId,
     addWidget3D,
@@ -208,26 +209,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const handlePasteClipboard = () => {
     if (!activeBuilding || !activeFloor) return;
-    const OFFSET = 1;
     const { walls, rooms, ducts, pipes } = clipboardRef.current;
-    for (const w of walls) {
-      addWall(activeBuilding.id, activeFloor.id, w.x1 + OFFSET, w.y1 + OFFSET, w.x2 + OFFSET, w.y2 + OFFSET, w.thickness);
-    }
-    for (const r of rooms) {
-      addRoom(activeBuilding.id, activeFloor.id, r.x + OFFSET, r.y + OFFSET, r.width, r.depth, r.type);
-    }
-    for (const d of ducts) {
-      addDuct(activeBuilding.id, activeFloor.id, {
-        ...d,
-        points: d.points.map(p => ({ x: p.x + OFFSET, y: p.y + OFFSET })),
-      });
-    }
-    for (const p of pipes) {
-      addPipe(activeBuilding.id, activeFloor.id, {
-        ...p,
-        points: p.points.map(pt => ({ x: pt.x + OFFSET, y: pt.y + OFFSET })),
-      });
-    }
+    pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
   };
 
   const handleDeleteSelected = (sel: MultiSelection) => {
@@ -936,27 +919,27 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 pipeType={pipeType}
                 pipeDiameter={pipeDiameter}
                 onAddWall={handleAddWall}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
                 onMoveWallPoint={handleMoveWallPoint}
                 onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
                 onMoveRoom={handleMoveRoom}
                 onDeleteWall={handleDeleteWall}
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
                 onAddDuct={handleAddDuct}
-                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
+                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
                 onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
                 onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onAddPipe={handleAddPipe}
-                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); if (id) setShowRoomPanel(true); }}
+                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
                 onMovePipePoint={(pipeId, ptIdx, x, y) => { if (activeBuilding && activeFloor) movePipePoint(activeBuilding.id, activeFloor.id, pipeId, ptIdx, x, y); }}
                 onMovePipe={(pipeId, dx, dy) => { if (activeBuilding && activeFloor) movePipe(activeBuilding.id, activeFloor.id, pipeId, dx, dy); }}
                 selectedSlabId={selectedSlabId}
-                onSelectSlab={id => { setSelectedSlabId(id); }}
+                onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
                 onAddSlab={slab => { if (activeBuilding && activeFloor) addSlab(activeBuilding.id, activeFloor.id, slab); }}
                 onDeleteSlab={id => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, id); setSelectedSlabId(null); } }}
                 onCopySelected={handleCopySelected}
