@@ -183,6 +183,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [globalWallOpacity, setGlobalWallOpacity] = useState(1);
   const [exposureMode, setExposureMode] = useState(false);
   const [exposureMaxLevel, setExposureMaxLevel] = useState<number>(999);
+  const [explodeMode, setExplodeMode] = useState(false);
+  const [explodeSpacing, setExplodeSpacing] = useState(3);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
 
@@ -845,38 +847,28 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   Widgets
                 </button>
                 <button
-                  onClick={() => {
-                    const newMode = !exposureMode;
-                    setExposureMode(newMode);
-                    if (newMode && activeBuilding) {
-                      const maxLvl = Math.max(...activeBuilding.floors.map(f => f.level));
-                      setExposureMaxLevel(maxLvl);
-                    }
-                  }}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${exposureMode ? 'bg-teal-700 text-white border-teal-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                  title="Etagen-Exposition"
+                  onClick={() => setExplodeMode(m => !m)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${explodeMode ? 'bg-orange-700 text-white border-orange-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Etagen-Explosion"
                 >
                   <ChevronsUpDown className="w-3.5 h-3.5" />
-                  Exposition
+                  Explosion
                 </button>
-                {exposureMode && activeBuilding && (() => {
-                  const sortedLevels = [...new Set(activeBuilding.floors.map(f => f.level))].sort((a, b) => a - b);
-                  const floorsByLevel = sortedLevels.map(lvl => activeBuilding.floors.find(f => f.level === lvl)!);
-                  return (
-                    <div className="flex items-center gap-1 bg-slate-800 border border-teal-700 rounded px-2 py-0.5">
-                      {floorsByLevel.map(fl => (
-                        <button
-                          key={fl.id}
-                          onClick={() => setExposureMaxLevel(fl.level)}
-                          className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${exposureMaxLevel >= fl.level ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-500'}`}
-                          title={fl.name}
-                        >
-                          {fl.level + 1}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
+                {explodeMode && (
+                  <div className="flex items-center gap-2 bg-slate-800 border border-orange-700 rounded px-2 py-1">
+                    <span className="text-[11px] text-slate-400">Abstand</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={0.5}
+                      value={explodeSpacing}
+                      onChange={e => setExplodeSpacing(Number(e.target.value))}
+                      className="w-20 accent-orange-500"
+                    />
+                    <span className="text-[11px] text-orange-300 w-6">{explodeSpacing}m</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -925,6 +917,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   showGrid={showGrid3D}
                   globalWallOpacity={globalWallOpacity}
                   exposureMaxLevel={exposureMode ? exposureMaxLevel : undefined}
+                  explodeSpacing={explodeMode ? explodeSpacing : 0}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
                   widgetPlacementMode={widgetPlacementMode}
