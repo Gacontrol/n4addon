@@ -599,6 +599,50 @@ function CameraAutoFit({ buildings }: { buildings: Building[] }) {
   return null;
 }
 
+function DynamicOrbitTarget() {
+  const { camera, controls, scene, gl } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const groundPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    const updateTargetToScreenCenter = () => {
+      if (!controls || !(controls as any).target) return;
+
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+      const intersects = raycaster.intersectObjects(scene.children, true);
+      const validHit = intersects.find(i => i.object.visible && i.distance > 0.1);
+
+      if (validHit) {
+        (controls as any).target.copy(validHit.point);
+      } else {
+        const planeHit = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(groundPlane, planeHit)) {
+          (controls as any).target.copy(planeHit);
+        } else {
+          const dir = raycaster.ray.direction.clone();
+          const fallbackDist = camera.position.length() * 0.5 || 10;
+          const fallbackPoint = camera.position.clone().add(dir.multiplyScalar(fallbackDist));
+          (controls as any).target.copy(fallbackPoint);
+        }
+      }
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button === 0) {
+        updateTargetToScreenCenter();
+      }
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    return () => canvas.removeEventListener('pointerdown', onPointerDown);
+  }, [camera, controls, scene, gl, raycaster, groundPlane]);
+
+  return null;
+}
+
 interface BuildingSceneProps {
   buildings: Building[];
   activeFloorId: string | null;
@@ -959,6 +1003,7 @@ export function BuildingCanvas3D({
         </Suspense>
 
         <CameraAutoFit buildings={buildings} />
+        <DynamicOrbitTarget />
 
         <OrbitControls
           makeDefault

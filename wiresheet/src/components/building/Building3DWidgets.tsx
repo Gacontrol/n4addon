@@ -568,8 +568,11 @@ const FLANGE_OVERHANG  = 0.030;
 const ELBOW_SEGMENTS   = 20;
 
 // ── stable world-up profile frame ──────────────────────────────────────────
-// Always aligns the profile so that the "up" axis of the rectangle stays
-// world-Y (gravity-aligned). This prevents the duct walls from twisting.
+// Creates an orthogonal coordinate frame aligned to duct direction:
+//   Z-axis = duct direction (tangent)
+//   Y-axis = world-up (gravity-aligned, or closest orthogonal for vertical ducts)
+//   X-axis = cross product of Y and Z (perpendicular to both)
+// This ensures flanges and duct profiles maintain consistent orientation.
 
 function profileFrame(tangent: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
   const worldUp = new THREE.Vector3(0, 1, 0);
