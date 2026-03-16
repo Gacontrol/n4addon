@@ -47,38 +47,77 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     }
   }, [config.buildingId, config.floorId, config.showAllFloors]);
 
+  const loadFromLocalStorage = useCallback((): Building[] => {
+    try {
+      const ls = localStorage.getItem('wiresheet_building_config');
+      if (ls) {
+        const parsed = JSON.parse(ls);
+        return parsed.buildings || (parsed.id ? [parsed] : []);
+      }
+    } catch { }
+    return [];
+  }, []);
+
   const loadBuildings = useCallback(async () => {
+    const localList = loadFromLocalStorage();
+    if (localList.length > 0) {
+      applyBuildingList(localList);
+      setError(null);
+      setLoading(false);
+    }
+
     try {
       const res = await fetch(`${getApiBase()}/building-config`);
       if (res.ok) {
         const data = await res.json();
         let buildingList: Building[] = data.buildings || (data.id ? [data] : []);
         if (buildingList.length === 0) {
-          try {
-            const ls = localStorage.getItem('wiresheet_building_config');
-            if (ls) {
-              const parsed = JSON.parse(ls);
-              buildingList = parsed.buildings || (parsed.id ? [parsed] : []);
-            }
-          } catch { }
+          buildingList = localList;
         }
-        applyBuildingList(buildingList);
-        setError(null);
-      } else {
+        if (buildingList.length > 0) {
+          applyBuildingList(buildingList);
+          setError(null);
+        } else if (localList.length === 0) {
+          setError('Kein Gebäude vorhanden');
+        }
+      } else if (localList.length === 0) {
         setError('Gebäude nicht gefunden');
       }
     } catch {
-      setError('Verbindungsfehler');
+      if (localList.length === 0) {
+        setError('Verbindungsfehler');
+      }
     } finally {
       setLoading(false);
     }
-  }, [applyBuildingList]);
+  }, [applyBuildingList, loadFromLocalStorage]);
 
   useEffect(() => {
     loadBuildings();
     pollRef.current = setInterval(loadBuildings, 5000);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'wiresheet_building_config') {
+        loadBuildings();
+      }
+    };
+    const onBuildingUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.buildings) {
+        applyBuildingList(detail.buildings);
+        setError(null);
+        setLoading(false);
+      } else {
+        loadBuildings();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('wiresheet-building-updated', onBuildingUpdated);
+
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('wiresheet-building-updated', onBuildingUpdated);
     };
   }, [loadBuildings]);
 
@@ -128,6 +167,13 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
           </div>
           <p className="text-xs text-slate-400">{error || 'Kein Gebäude vorhanden'}</p>
           <p className="text-[10px] text-slate-600">Zuerst ein Gebäude im Gebäude-Editor erstellen</p>
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); loadBuildings(); }}
+            className="mt-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-600 transition-colors"
+          >
+            Neu laden
+          </button>
         </div>
       </div>
     );

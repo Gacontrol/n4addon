@@ -75,11 +75,11 @@ import { getThemeVars } from '../../utils/widgetThemes';
 
 class Widget3DErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; retryKey: number }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, retryKey: 0 };
   }
   static getDerivedStateFromError() {
     return { hasError: true };
@@ -95,7 +95,7 @@ class Widget3DErrorBoundary extends React.Component<
             <p className="text-xs text-slate-400">3D nicht verfugbar</p>
             <button
               className="text-[10px] text-blue-400 hover:text-blue-300"
-              onClick={() => this.setState({ hasError: false })}
+              onClick={() => this.setState(s => ({ hasError: false, retryKey: s.retryKey + 1 }))}
             >
               Neu laden
             </button>
@@ -103,7 +103,11 @@ class Widget3DErrorBoundary extends React.Component<
         </div>
       );
     }
-    return this.props.children;
+    return (
+      <React.Fragment key={this.state.retryKey}>
+        {this.props.children}
+      </React.Fragment>
+    );
   }
 }
 import {

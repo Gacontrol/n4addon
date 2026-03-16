@@ -143,6 +143,7 @@ export function useBuildingEditor() {
     const payload = JSON.stringify({ buildings: updated });
     try {
       localStorage.setItem('wiresheet_building_config', payload);
+      window.dispatchEvent(new CustomEvent('wiresheet-building-updated', { detail: { buildings: updated } }));
     } catch { }
     try {
       const apiBase = getApiBase();
