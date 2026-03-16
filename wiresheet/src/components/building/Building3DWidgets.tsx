@@ -487,9 +487,9 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
           if (roomIds.length > 0 && !roomIds.includes(room.id)) continue;
           if (room.points && room.points.length >= 3) {
             const shape = new THREE.Shape();
-            shape.moveTo(room.points[0].x + offsetX, room.points[0].y);
+            shape.moveTo(room.points[0].x, -room.points[0].y);
             for (let i = 1; i < room.points.length; i++) {
-              shape.lineTo(room.points[i].x + offsetX, room.points[i].y);
+              shape.lineTo(room.points[i].x, -room.points[i].y);
             }
             shape.closePath();
             const extrudeGeo = new THREE.ExtrudeGeometry(shape, { depth: floorHeight, bevelEnabled: false });
@@ -497,7 +497,7 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
           } else {
             entries.push({
               kind: 'box',
-              x: room.x + offsetX + room.width / 2,
+              x: room.x + room.width / 2,
               z: room.y + room.depth / 2,
               w: room.width,
               d: room.depth,
@@ -507,7 +507,7 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
       }
     }
     return entries;
-  }, [buildings, widget.floorId, roomIds, offsetX, floorHeight]);
+  }, [buildings, widget.floorId, roomIds, floorHeight]);
 
   const isActive = alarmActive === true || (liveValue !== undefined && liveValue !== '0' && liveValue !== 'off' && liveValue !== false && liveValue !== 0);
 
@@ -526,12 +526,12 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
         if (entry.kind === 'poly') {
           return (
             <group key={i}>
-              <mesh position={[0, baseY + floorHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <mesh position={[offsetX, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                 <primitive object={entry.extrudeGeo} />
                 <meshBasicMaterial color={overlayColor} transparent opacity={overlayOpacity} side={THREE.DoubleSide} depthWrite={false} />
               </mesh>
               {selected && (
-                <lineSegments position={[0, baseY + floorHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <lineSegments position={[offsetX, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                   <edgesGeometry args={[entry.extrudeGeo]} />
                   <lineBasicMaterial color="#60a5fa" />
                 </lineSegments>
@@ -541,12 +541,12 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
         }
         return (
           <group key={i}>
-            <mesh position={[entry.x, baseY + floorHeight / 2, entry.z]}>
+            <mesh position={[entry.x + offsetX, baseY + floorHeight / 2, entry.z]}>
               <boxGeometry args={[entry.w, floorHeight, entry.d]} />
               <meshBasicMaterial color={overlayColor} transparent opacity={overlayOpacity} side={THREE.DoubleSide} depthWrite={false} />
             </mesh>
             {selected && (
-              <lineSegments position={[entry.x, baseY + floorHeight / 2, entry.z]}>
+              <lineSegments position={[entry.x + offsetX, baseY + floorHeight / 2, entry.z]}>
                 <edgesGeometry args={[new THREE.BoxGeometry(entry.w, floorHeight, entry.d)]} />
                 <lineBasicMaterial color="#60a5fa" />
               </lineSegments>

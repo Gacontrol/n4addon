@@ -555,16 +555,18 @@ export function FloorPlanEditor({
     const endGX = Math.ceil((W - offset.x) / cellPx) + 1;
     const endGY = Math.ceil((H - offset.y) / cellPx) + 1;
 
-    const majorGrid = Math.max(1, gridSize);
-    const minorGrid = majorGrid <= 1 ? 1 : majorGrid;
+    const minorGrid = gridSize;
+    const majorGrid = gridSize < 1 ? 1 : gridSize;
 
     ctx.strokeStyle = 'rgba(148,163,184,0.07)';
     ctx.lineWidth = 0.5;
-    for (let gx = startGX; gx <= endGX; gx++) {
+    const minorStartGX = Math.floor(startGX / minorGrid) * minorGrid;
+    const minorStartGY = Math.floor(startGY / minorGrid) * minorGrid;
+    for (let gx = minorStartGX; gx <= endGX; gx += minorGrid) {
       const sx = gx * cellPx + offset.x;
       ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
     }
-    for (let gy = startGY; gy <= endGY; gy++) {
+    for (let gy = minorStartGY; gy <= endGY; gy += minorGrid) {
       const sy = gy * cellPx + offset.y;
       ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
     }
