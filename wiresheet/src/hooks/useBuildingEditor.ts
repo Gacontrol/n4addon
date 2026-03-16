@@ -696,11 +696,28 @@ export function useBuildingEditor() {
     const pt2 = d2.points[pointIdx2];
     if (!pt1 || !pt2) return null;
 
+    const isStart1 = pointIdx1 === 0;
     const isEnd1 = pointIdx1 === d1.points.length - 1;
+    const isStart2 = pointIdx2 === 0;
     const isEnd2 = pointIdx2 === d2.points.length - 1;
 
-    const pts1 = isEnd1 ? [...d1.points] : [...d1.points].reverse();
-    const pts2 = isEnd2 ? [...d2.points].reverse() : [...d2.points];
+    let pts1: typeof d1.points;
+    if (isEnd1) {
+      pts1 = [...d1.points];
+    } else if (isStart1) {
+      pts1 = [...d1.points].reverse();
+    } else {
+      pts1 = d1.points.slice(0, pointIdx1 + 1);
+    }
+
+    let pts2: typeof d2.points;
+    if (isStart2) {
+      pts2 = [...d2.points];
+    } else if (isEnd2) {
+      pts2 = [...d2.points].reverse();
+    } else {
+      pts2 = d2.points.slice(pointIdx2);
+    }
 
     const sizeMismatch =
       Math.abs(d1.width - d2.width) > 0.001 ||
