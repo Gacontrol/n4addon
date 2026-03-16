@@ -719,7 +719,6 @@ interface BuildingSceneProps {
   showGrid?: boolean;
   globalWallOpacity?: number;
   exposureMaxLevel?: number;
-  explodeSpacing?: number;
 }
 
 function BuildingScene({
@@ -728,7 +727,7 @@ function BuildingScene({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true, globalWallOpacity = 1, exposureMaxLevel, explodeSpacing = 0
+  highlightFloor, lighting, floorTransparent, showGrid = true, globalWallOpacity = 1, exposureMaxLevel
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -761,11 +760,7 @@ function BuildingScene({
 
     const floorBaseY: Record<string, number> = {};
     let yAcc = 0;
-    for (let fi = 0; fi < sorted.length; fi++) {
-      const fl = sorted[fi];
-      floorBaseY[fl.id] = yAcc + fi * explodeSpacing;
-      yAcc += fl.height;
-    }
+    for (const fl of sorted) { floorBaseY[fl.id] = yAcc; yAcc += fl.height; }
 
     const offsetX = bldOffX - minX;
 
@@ -1044,7 +1039,6 @@ export function BuildingCanvas3D({
   showGrid = true,
   globalWallOpacity = 1,
   exposureMaxLevel,
-  explodeSpacing,
   lighting = DEFAULT_LIGHTING,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
@@ -1091,7 +1085,6 @@ export function BuildingCanvas3D({
             showGrid={showGrid}
             globalWallOpacity={globalWallOpacity}
             exposureMaxLevel={exposureMaxLevel}
-            explodeSpacing={explodeSpacing ?? 0}
           />
           <Environment preset="city" />
         </Suspense>
