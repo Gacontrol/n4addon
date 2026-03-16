@@ -286,6 +286,15 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const unhideAllFloors = useCallback((buildingId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? { ...b, floors: b.floors.map(f => ({ ...f, hidden: false })), updatedAt: Date.now() }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const deleteFloor = useCallback((buildingId: string, floorId: string) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building || building.floors.length <= 1) return;
@@ -1133,6 +1142,33 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const deleteMultiSelection = useCallback((
+    buildingId: string,
+    floorId: string,
+    sel: { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[] }
+  ) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    walls: f.walls.filter(w => !sel.wallIds.includes(w.id)),
+                    rooms: f.rooms.filter(r => !sel.roomIds.includes(r.id)),
+                    ducts: (f.ducts ?? []).filter(d => !sel.ductIds.includes(d.id)),
+                    pipes: (f.pipes ?? []).filter(p => !sel.pipeIds.includes(p.id)),
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const pasteComponents = useCallback((
     buildingId: string,
     floorId: string,
@@ -1335,6 +1371,7 @@ export function useBuildingEditor() {
     updateFloorHeight,
     updateFloorColor,
     updateFloorProps,
+    unhideAllFloors,
     deleteFloor,
     setFloorBackground,
     addWall,
@@ -1364,6 +1401,7 @@ export function useBuildingEditor() {
     movePipe,
     deletePipe,
     moveMultiSelection,
+    deleteMultiSelection,
     pasteComponents,
     addSlab,
     updateSlab,

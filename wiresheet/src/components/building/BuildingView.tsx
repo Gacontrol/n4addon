@@ -122,6 +122,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     updateFloorHeight,
     updateFloorColor,
     updateFloorProps,
+    unhideAllFloors,
     deleteFloor,
     setFloorBackground,
     addWall,
@@ -154,6 +155,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     deleteSlab,
     addPolygonRoom,
     moveMultiSelection,
+    deleteMultiSelection,
     pasteComponents,
     selectedWidget3DId,
     setSelectedWidget3DId,
@@ -181,6 +183,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [bgTransparent, setBgTransparent] = useState(false);
   const [showGrid3D, setShowGrid3D] = useState(true);
   const [globalWallOpacity, setGlobalWallOpacity] = useState(1);
+  const [highlightFloor, setHighlightFloor] = useState(true);
   const [exposureMode, setExposureMode] = useState(false);
   const [exposureMaxLevel, setExposureMaxLevel] = useState<number>(999);
   const [explodeMode, setExplodeMode] = useState(false);
@@ -262,10 +265,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const handleDeleteSelected = (sel: MultiSelection) => {
     if (!activeBuilding || !activeFloor) return;
-    for (const id of sel.wallIds) deleteWall(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.roomIds) deleteRoom(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.ductIds) deleteDuct(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.pipeIds) deletePipe(activeBuilding.id, activeFloor.id, id);
+    deleteMultiSelection(activeBuilding.id, activeFloor.id, sel);
   };
 
   const handleDuplicateSelected = (sel: MultiSelection) => {
@@ -511,9 +511,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onClick={() => {
                   setActiveBuildingId(building.id);
                   setActiveFloorId(building.floors[0]?.id || '');
-                  building.floors.forEach(f => {
-                    if (f.hidden) updateFloorProps(building.id, f.id, { hidden: false });
-                  });
+                  unhideAllFloors(building.id);
+                  setHighlightFloor(false);
                 }}
               >
                 <Building2 className={`w-3.5 h-3.5 flex-shrink-0 ${building.id === activeBuildingId ? 'text-blue-400' : 'text-slate-500'}`} />
@@ -541,7 +540,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     <div
                       key={floor.id}
                       className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer group ${floor.id === activeFloorId ? 'bg-slate-600 rounded-r' : 'hover:bg-slate-700 rounded-r'} ${floor.hidden ? 'opacity-50' : ''}`}
-                      onClick={() => setActiveFloorId(floor.id)}
+                      onClick={() => { setActiveFloorId(floor.id); setHighlightFloor(true); }}
                     >
                       <Layers className={`w-3 h-3 flex-shrink-0 ${floor.id === activeFloorId ? 'text-blue-400' : 'text-slate-500'}`} />
                       {editingFloorId === floor.id ? (
@@ -910,7 +909,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
                   }}
-                  highlightFloor={true}
+                  highlightFloor={highlightFloor}
                   bgColor={bgColor}
                   floorTransparent={floorTransparent}
                   bgTransparent={bgTransparent}
