@@ -1140,34 +1140,50 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     const vx = duct.verticalX + offsetX;
     const vz = duct.verticalY ?? 5;
 
-    let ductH: number;
-    let midY: number;
+    let minY: number;
+    let maxY: number;
 
     if (duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
       const ys = duct.verticalSectionPoints.map(p => p.y);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-      ductH = Math.max(0.1, maxY - minY);
-      midY = (minY + maxY) / 2;
+      minY = Math.min(...ys);
+      maxY = Math.max(...ys);
     } else {
-      ductH = Math.max(0.1, (duct.elevation ?? 2.4) * 0.5);
-      midY = baseY + (duct.elevation ?? 2.4) - ductH / 2;
+      const ductH = Math.max(0.1, (duct.elevation ?? 2.4) * 0.5);
+      maxY = baseY + (duct.elevation ?? 2.4);
+      minY = maxY - ductH;
     }
+
+    const vertStart = new THREE.Vector3(vx, minY, vz);
+    const vertEnd   = new THREE.Vector3(vx, maxY, vz);
+    const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
+    const upDir     = new THREE.Vector3(0, 1, 0);
+    const downDir   = new THREE.Vector3(0, -1, 0);
+    const qUp       = ductQuaternion(upDir);
+    const qDown     = ductQuaternion(downDir);
 
     return (
       <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <mesh castShadow position={[vx, midY, vz]}>
-          {isRound
-            ? <cylinderGeometry args={[w / 2, w / 2, ductH, 12]} />
-            : <boxGeometry args={[w, ductH, h]} />
-          }
-          <meshStandardMaterial color={color} metalness={0.65} roughness={0.38} />
+        <mesh castShadow>
+          <primitive object={vertGeo} />
+          {mat}
         </mesh>
+        <group position={vertStart.toArray()} quaternion={qDown}>
+          {isRound
+            ? <FlangeRound r={w / 2} tex={flangeTex} />
+            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
+          }
+        </group>
+        <group position={vertEnd.toArray()} quaternion={qUp}>
+          {isRound
+            ? <FlangeRound r={w / 2} tex={flangeTex} />
+            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
+          }
+        </group>
         {selected && (
-          <mesh position={[vx, midY, vz]}>
+          <mesh position={[(minY + maxY) / 2 === 0 ? vx : vx, (minY + maxY) / 2, vz]}>
             {isRound
-              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductH + 0.03, 12]} />
-              : <boxGeometry args={[w + 0.03, ductH + 0.03, h + 0.03]} />
+              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, maxY - minY + 0.03, 12]} />
+              : <boxGeometry args={[w + 0.03, maxY - minY + 0.03, h + 0.03]} />
             }
             <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
           </mesh>
