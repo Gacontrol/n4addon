@@ -776,6 +776,7 @@ export interface Building3DWidgetDatapointOverride {
 }
 
 export interface Building3DWidgetConfig {
+  buildingId?: string;
   floorId?: string;
   showAllFloors?: boolean;
   cameraAngle?: 'isometric' | 'top' | 'front' | 'perspective';

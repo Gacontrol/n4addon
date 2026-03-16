@@ -39,14 +39,16 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         setBuildings(buildingList);
 
         if (buildingList.length > 0) {
-          const firstBuilding = buildingList[0];
+          const selectedBuilding = config.buildingId
+            ? (buildingList.find(b => b.id === config.buildingId) || buildingList[0])
+            : buildingList[0];
           if (config.floorId) {
-            const floorExists = firstBuilding.floors.some(f => f.id === config.floorId);
-            setActiveFloorId(floorExists ? config.floorId : (firstBuilding.floors[0]?.id || null));
+            const floorExists = selectedBuilding.floors.some(f => f.id === config.floorId);
+            setActiveFloorId(floorExists ? config.floorId : (selectedBuilding.floors[0]?.id || null));
           } else if (config.showAllFloors) {
             setActiveFloorId(null);
           } else {
-            setActiveFloorId(firstBuilding.floors[0]?.id || null);
+            setActiveFloorId(selectedBuilding.floors[0]?.id || null);
           }
         }
         setError(null);
@@ -58,7 +60,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [config.floorId, config.showAllFloors]);
+  }, [config.buildingId, config.floorId, config.showAllFloors]);
 
   useEffect(() => {
     loadBuildings();
@@ -82,7 +84,9 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
 
   const bgColor = config.backgroundColor || '#0a1020';
 
-  const activeBuilding = buildings[0];
+  const activeBuilding = config.buildingId
+    ? (buildings.find(b => b.id === config.buildingId) || buildings[0])
+    : buildings[0];
   const floors = activeBuilding?.floors || [];
   const activeFloor = floors.find(f => f.id === activeFloorId);
 

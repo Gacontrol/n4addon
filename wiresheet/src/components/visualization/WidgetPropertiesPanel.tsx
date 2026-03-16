@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen } from 'lucide-react';
 
 interface ColorPickerProps {
@@ -248,6 +248,22 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [availableBuildings, setAvailableBuildings] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (widget.type !== 'visu-3d-building') return;
+    const p = window.location.pathname;
+    const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+    const apiBase = m ? `${m[1]}/api` : '/api';
+    fetch(`${apiBase}/building-config`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        const list = data.buildings || (data.id ? [data] : []);
+        setAvailableBuildings(list.map((b: { id: string; name: string }) => ({ id: b.id, name: b.name })));
+      })
+      .catch(() => {});
+  }, [widget.type]);
 
   const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
   const isShapeWidget = SHAPE_TYPES.has(widget.type);
@@ -2717,6 +2733,22 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         return (
           <>
             <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-400">Gebäude</label>
+              <select
+                value={b3dCfg.buildingId || ''}
+                onChange={(e) => onUpdate({ config: { ...b3dCfg, buildingId: e.target.value || undefined } })}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
+              >
+                <option value="">
+                  {availableBuildings.length === 0 ? '— Kein Gebäude vorhanden —' : '— Erstes Gebäude —'}
+                </option>
+                {availableBuildings.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
               <label className="text-xs font-medium text-slate-400">Hintergrundfarbe</label>
               <input
                 type="color"
