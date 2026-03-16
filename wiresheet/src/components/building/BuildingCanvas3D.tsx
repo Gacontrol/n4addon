@@ -41,6 +41,8 @@ interface Props {
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
   bgColor?: string;
+  floorTransparent?: boolean;
+  bgTransparent?: boolean;
   lighting?: LightingSettings;
 }
 
@@ -487,14 +489,16 @@ function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
   );
 }
 
-function GroundGrid({ size }: { size: number }) {
+function GroundGrid({ size, transparent }: { size: number; transparent?: boolean }) {
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <planeGeometry args={[size * 2, size * 2]} />
-        <meshStandardMaterial color="#0d1929" roughness={1} metalness={0} />
-      </mesh>
-      <gridHelper args={[size * 2, size * 4, '#1e3a5f', '#132035']} position={[0, 0, 0]} />
+      {!transparent && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <planeGeometry args={[size * 2, size * 2]} />
+          <meshStandardMaterial color="#0d1929" roughness={1} metalness={0} />
+        </mesh>
+      )}
+      <gridHelper args={[size * 2, size * 4, '#1e3a5f', transparent ? '#2a4a6f' : '#132035']} position={[0, 0, 0]} />
     </group>
   );
 }
@@ -553,6 +557,7 @@ interface BuildingSceneProps {
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
   lighting: LightingSettings;
+  floorTransparent?: boolean;
 }
 
 function BuildingScene({
@@ -560,7 +565,7 @@ function BuildingScene({
   selectedWidget3DId, selectedDuctId, selectedPipeId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting
+  highlightFloor, lighting, floorTransparent
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -787,7 +792,7 @@ function BuildingScene({
 
   return (
     <>
-      <GroundGrid size={allSize} />
+      <GroundGrid size={allSize} transparent={floorTransparent} />
 
       <ambientLight intensity={lighting.ambientIntensity} color="#c8d8f0" />
 
@@ -826,10 +831,13 @@ export function BuildingCanvas3D({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   liveValues, alarmStates,
   highlightFloor, bgColor = '#0a1020',
+  floorTransparent = false,
+  bgTransparent = false,
   lighting = DEFAULT_LIGHTING,
 }: Props) {
+  const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
-    <div className="relative w-full h-full select-none">
+    <div className="relative w-full h-full select-none" style={bgTransparent ? { background: 'transparent' } : undefined}>
       <Canvas
         shadows={lighting.shadowEnabled ? 'soft' : false}
         camera={{ position: [14, 18, 20], fov: 45, near: 0.1, far: 1000 }}
@@ -838,12 +846,13 @@ export function BuildingCanvas3D({
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.1,
           outputColorSpace: THREE.SRGBColorSpace,
+          alpha: bgTransparent,
         }}
         onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); }}
-        style={{ background: bgColor }}
+        style={{ background: bgTransparent ? 'transparent' : bgColor }}
       >
-        <color attach="background" args={[bgColor]} />
-        <fog attach="fog" args={[bgColor, 60, 200]} />
+        {!bgTransparent && <color attach="background" args={[bgColor]} />}
+        {!bgTransparent && <fog attach="fog" args={[effectiveBgColor, 60, 200]} />}
 
         <Suspense fallback={null}>
           <BuildingScene
@@ -864,6 +873,7 @@ export function BuildingCanvas3D({
             alarmStates={alarmStates}
             highlightFloor={highlightFloor}
             lighting={lighting}
+            floorTransparent={floorTransparent}
           />
           <Environment preset="city" />
         </Suspense>

@@ -67,6 +67,108 @@ function dist(x1: number, y1: number, x2: number, y2: number): number {
   return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
+function lineIntersect(ax: number, ay: number, adx: number, ady: number, bx: number, by: number, bdx: number, bdy: number): { x: number; y: number } | null {
+  const denom = adx * bdy - ady * bdx;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((bx - ax) * bdy - (by - ay) * bdx) / denom;
+  return { x: ax + adx * t, y: ay + ady * t };
+}
+
+function buildDuctPolygon(pts: { x: number; y: number }[], halfW: number, halfH: number, toScreen: (wx: number, wy: number) => { x: number; y: number }): { left: { x: number; y: number }[]; right: { x: number; y: number }[] } {
+  const n = pts.length;
+  const left: { x: number; y: number }[] = [];
+  const right: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const prev = i > 0 ? pts[i - 1] : null;
+    const cur = pts[i];
+    const next = i < n - 1 ? pts[i + 1] : null;
+
+    if (i === 0 && next) {
+      const dx = next.x - cur.x, dy = next.y - cur.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) continue;
+      const nx = -dy / len * halfW, ny = dx / len * halfW;
+      const sp = toScreen(cur.x, cur.y);
+      const snx = toScreen(cur.x + nx, cur.y + ny);
+      const lx = snx.x - sp.x, ly = snx.y - sp.y;
+      left.push({ x: sp.x + lx, y: sp.y + ly });
+      right.push({ x: sp.x - lx, y: sp.y - ly });
+    } else if (i === n - 1 && prev) {
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) continue;
+      const nx = -dy / len * halfW, ny = dx / len * halfW;
+      const sp = toScreen(cur.x, cur.y);
+      const snx = toScreen(cur.x + nx, cur.y + ny);
+      const lx = snx.x - sp.x, ly = snx.y - sp.y;
+      left.push({ x: sp.x + lx, y: sp.y + ly });
+      right.push({ x: sp.x - lx, y: sp.y - ly });
+    } else if (prev && next) {
+      const dx1 = cur.x - prev.x, dy1 = cur.y - prev.y;
+      const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+      const dx2 = next.x - cur.x, dy2 = next.y - cur.y;
+      const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      if (len1 === 0 || len2 === 0) continue;
+
+      const nx1 = -dy1 / len1, ny1 = dx1 / len1;
+      const nx2 = -dy2 / len2, ny2 = dx2 / len2;
+
+      const p1l = toScreen(prev.x + nx1 * halfW, prev.y + ny1 * halfW);
+      const c1l = toScreen(cur.x + nx1 * halfW, cur.y + ny1 * halfW);
+      const c2l = toScreen(cur.x + nx2 * halfW, cur.y + ny2 * halfW);
+      const n1l = toScreen(next.x + nx2 * halfW, next.y + ny2 * halfW);
+
+      const p1r = toScreen(prev.x - nx1 * halfW, prev.y - ny1 * halfW);
+      const c1r = toScreen(cur.x - nx1 * halfW, cur.y - ny1 * halfW);
+      const c2r = toScreen(cur.x - nx2 * halfW, cur.y - ny2 * halfW);
+      const n1r = toScreen(next.x - nx2 * halfW, next.y - ny2 * halfW);
+
+      const il = lineIntersect(p1l.x, p1l.y, c1l.x - p1l.x, c1l.y - p1l.y, n1l.x, n1l.y, c2l.x - n1l.x, c2l.y - n1l.y);
+      const ir = lineIntersect(p1r.x, p1r.y, c1r.x - p1r.x, c1r.y - p1r.y, n1r.x, n1r.y, c2r.x - n1r.x, c2r.y - n1r.y);
+
+      left.push(il ?? c1l);
+      right.push(ir ?? c1r);
+    }
+  }
+  return { left, right };
+}
+
+function drawDuctWithMiters(
+  ctx: CanvasRenderingContext2D,
+  pts: { x: number; y: number }[],
+  halfW: number,
+  color: string,
+  alpha: number,
+  isSelected: boolean,
+  toScreen: (wx: number, wy: number) => { x: number; y: number }
+) {
+  if (pts.length < 2) return;
+  const { left, right } = buildDuctPolygon(pts, halfW, halfW, toScreen);
+  if (left.length < 2) return;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = isSelected ? '#fff' : color;
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = isSelected ? '#ffffff' : color;
+  ctx.lineWidth = isSelected ? 2 : 1;
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax, dy = by - ay;
   const lenSq = dx * dx + dy * dy;
@@ -657,32 +759,36 @@ export function FloorPlanEditor({
       const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
       const pts = duct.points;
       if (pts.length < 2) continue;
-      const w = duct.width * cellPx;
-      const h = duct.shape === 'rectangular' ? (duct.height * cellPx) : w;
-      ctx.save();
-      ctx.strokeStyle = isSelected ? '#fff' : color;
-      ctx.lineWidth = isSelected ? Math.max(w, h) / 2 + 3 : Math.max(w, h) / 2;
-      ctx.lineCap = 'square';
-      ctx.globalAlpha = 0.75;
-      ctx.beginPath();
-      const sp0 = toScreen(pts[0].x, pts[0].y);
-      ctx.moveTo(sp0.x, sp0.y);
-      for (let i = 1; i < pts.length; i++) {
-        const spi = toScreen(pts[i].x, pts[i].y);
-        ctx.lineTo(spi.x, spi.y);
+      const halfW = duct.width * cellPx / 2;
+      if (duct.shape === 'round') {
+        ctx.save();
+        ctx.strokeStyle = isSelected ? '#fff' : color;
+        ctx.lineWidth = isSelected ? duct.width * cellPx + 3 : duct.width * cellPx;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        const sp0r = toScreen(pts[0].x, pts[0].y);
+        ctx.moveTo(sp0r.x, sp0r.y);
+        for (let i = 1; i < pts.length; i++) {
+          const spi = toScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(spi.x, spi.y);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sp0r.x, sp0r.y);
+        for (let i = 1; i < pts.length; i++) {
+          const spi = toScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(spi.x, spi.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        drawDuctWithMiters(ctx, pts, halfW, color, 0.75, isSelected, toScreen);
       }
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(sp0.x, sp0.y);
-      for (let i = 1; i < pts.length; i++) {
-        const spi = toScreen(pts[i].x, pts[i].y);
-        ctx.lineTo(spi.x, spi.y);
-      }
-      ctx.stroke();
       if (zoom > 0.5 && duct.label) {
         const mid = toScreen((pts[0].x + pts[pts.length - 1].x) / 2, (pts[0].y + pts[pts.length - 1].y) / 2);
         ctx.font = `${Math.max(9, 9 * zoom)}px Inter, sans-serif`;
@@ -702,7 +808,6 @@ export function FloorPlanEditor({
           ctx.stroke();
         }
       }
-      ctx.restore();
     }
 
     for (const pipe of (floor.pipes ?? [])) {

@@ -365,34 +365,42 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         </mesh>
       )}
 
-      <Html position={[0, isDuct ? 0.45 : 0.28 * displaySize, 0]} center distanceFactor={8} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+      <Html
+        position={[0, isDuct ? 0.55 + 0.15 * displaySize : 0.32 * displaySize + 0.12, 0]}
+        center
+        sprite
+        distanceFactor={6}
+        zIndexRange={[10, 0]}
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+      >
         <div style={{
-          background: 'rgba(15,23,42,0.88)',
+          background: 'rgba(15,23,42,0.92)',
           border: `1px solid ${alarmActive ? '#ef4444' : baseColor}60`,
-          borderRadius: 6,
-          padding: '3px 7px',
-          minWidth: 56,
+          borderRadius: Math.round(5 * displaySize) + 'px',
+          padding: `${Math.round(3 * displaySize)}px ${Math.round(7 * displaySize)}px`,
+          minWidth: Math.round(56 * displaySize) + 'px',
           textAlign: 'center',
           backdropFilter: 'blur(4px)',
-          boxShadow: alarmActive ? `0 0 8px #ef444480` : 'none',
+          boxShadow: alarmActive ? `0 0 ${Math.round(8 * displaySize)}px #ef444480` : 'none',
+          whiteSpace: 'nowrap',
         }}>
           {widget.showLabel !== false && (
-            <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: 'sans-serif', lineHeight: 1.2 }}>
+            <div style={{ fontSize: Math.round(9 * displaySize), color: '#94a3b8', fontFamily: 'sans-serif', lineHeight: 1.2 }}>
               {widget.label || WIDGET_LABELS[widget.type]}
             </div>
           )}
           {widget.showValue !== false && !isBoolean && (
             <div style={{
-              fontSize: 13, fontWeight: 700,
+              fontSize: Math.round(13 * displaySize), fontWeight: 700,
               color: alarmActive ? '#ef4444' : baseColor,
               fontFamily: 'monospace', lineHeight: 1.2, letterSpacing: '-0.02em',
             }}>
-              {displayValue}{unit ? <span style={{ fontSize: 9, color: '#64748b', marginLeft: 2 }}>{unit}</span> : null}
+              {displayValue}{unit ? <span style={{ fontSize: Math.round(9 * displaySize), color: '#64748b', marginLeft: 2 }}>{unit}</span> : null}
             </div>
           )}
           {isBoolean && widget.showValue !== false && (
             <div style={{
-              fontSize: 11, fontWeight: 700,
+              fontSize: Math.round(11 * displaySize), fontWeight: 700,
               color: (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? baseColor : '#475569',
               fontFamily: 'monospace', lineHeight: 1.2,
             }}>

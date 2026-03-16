@@ -142,6 +142,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     movePipe,
     deletePipe,
     addSlab,
+    updateSlab,
     deleteSlab,
     moveMultiSelection,
     pasteComponents,
@@ -162,6 +163,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [wallThickness, setWallThickness] = useState(0.25);
   const [bgColor, setBgColor] = useState('#0a1020');
+  const [floorTransparent, setFloorTransparent] = useState(false);
+  const [bgTransparent, setBgTransparent] = useState(false);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
 
@@ -724,6 +727,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   }}
                   highlightFloor={true}
                   bgColor={bgColor}
+                  floorTransparent={floorTransparent}
+                  bgTransparent={bgTransparent}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
                 />
@@ -759,6 +764,27 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       >
                         <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${lighting.shadowEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                       </button>
+                    </div>
+                    <div className="border-t border-slate-700 pt-2 mt-1 space-y-1.5">
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Ansicht</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">Boden transparent</span>
+                        <button
+                          onClick={() => setFloorTransparent(v => !v)}
+                          className={`w-8 h-4 rounded-full transition-colors ${floorTransparent ? 'bg-blue-500' : 'bg-slate-600'} relative`}
+                        >
+                          <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${floorTransparent ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">HG transparent</span>
+                        <button
+                          onClick={() => setBgTransparent(v => !v)}
+                          className={`w-8 h-4 rounded-full transition-colors ${bgTransparent ? 'bg-blue-500' : 'bg-slate-600'} relative`}
+                        >
+                          <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${bgTransparent ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </button>
+                      </div>
                     </div>
                     <button onClick={() => setLighting(DEFAULT_LIGHTING)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
                       Zurücksetzen
@@ -1805,9 +1831,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           <Zap className="w-3 h-3 text-emerald-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs text-slate-200 truncate">{dp.entityId}</div>
+                          <div className="text-xs text-slate-200 truncate">{dp.label !== dp.entityId ? dp.label : dp.entityId}</div>
                           {dp.label !== dp.entityId && (
-                            <div className="text-[10px] text-slate-500 truncate">{dp.label}</div>
+                            <div className="text-[10px] text-slate-500 truncate">{dp.entityId}</div>
                           )}
                         </div>
                       </button>
