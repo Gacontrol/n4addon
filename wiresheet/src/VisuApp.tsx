@@ -58,8 +58,6 @@ function getApiBase(): string {
   return '/api';
 }
 
-const WRITE_DEBOUNCE_MS = 300;
-
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
   const [activePageId, setActivePageId] = useState<string>('');
@@ -75,7 +73,7 @@ export function VisuApp() {
   const [displayedPageId, setDisplayedPageId] = useState<string>('');
   const pageHistoryRef = useRef<string[]>([]);
   const visuPagesRef = useRef<VisuPage[]>([]);
-  const lastWriteRef = useRef<Map<string, number>>(new Map());
+  const lastWriteRef = useRef<Map<string, { time: number; value: unknown }>>(new Map());
   const logicNodesRef = useRef<FlowNode[]>([]);
   const apiBase = getApiBase();
 
@@ -164,16 +162,12 @@ export function VisuApp() {
   }, [apiBase, applyNodeConfigs]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
-    console.log('[VISUAPP 8098 DEBUG] handleWidgetValueChange aufgerufen');
-    console.log('[VISUAPP 8098 DEBUG]   widgetId:', widgetId);
-    console.log('[VISUAPP 8098 DEBUG]   value:', value, 'type:', typeof value);
     const now = Date.now();
-    const lastWrite = lastWriteRef.current.get(widgetId) || 0;
-    if (now - lastWrite < WRITE_DEBOUNCE_MS) {
-      console.log('[VISUAPP 8098 DEBUG] Debounced - zu schnell!');
+    const last = lastWriteRef.current.get(widgetId);
+    if (last && now - last.time < 50 && last.value === value) {
       return;
     }
-    lastWriteRef.current.set(widgetId, now);
+    lastWriteRef.current.set(widgetId, { time: now, value });
 
     const pages = visuPagesRef.current;
     let binding: VisuWidget['binding'] | undefined;
@@ -185,10 +179,8 @@ export function VisuApp() {
       }
     }
     if (!binding) {
-      console.log('[VISUAPP 8098 DEBUG] Kein Binding gefunden fuer Widget:', widgetId);
       return;
     }
-    console.log('[VISUAPP 8098 DEBUG] Binding gefunden:', JSON.stringify(binding));
 
     if (binding.paramKey) {
       setLogicNodes(prev => prev.map(n => {
@@ -205,15 +197,13 @@ export function VisuApp() {
 
     try {
       const payload = { nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value };
-      const resp = await fetch(`${apiBase}/visu/write-value`, {
+      await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const respData = await resp.json();
-      console.log('[VISUAPP 8098 DEBUG] Server Response Status:', resp.status, JSON.stringify(respData));
     } catch (err) {
-      console.error('[VISUAPP 8098 DEBUG] write value error:', err);
+      console.error('write value error:', err);
     }
   }, [apiBase]);
 
