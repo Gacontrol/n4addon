@@ -683,17 +683,47 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         )}
 
         {node.type === 'threshold' && (
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Schwellwert
-            </label>
-            <input
-              type="number"
-              step="any"
-              value={config.thresholdValue ?? 0}
-              onChange={e => updateConfig('thresholdValue', parseFloat(e.target.value) || 0)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
-            />
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Schwellwert
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={config.thresholdValue ?? 0}
+                onChange={e => updateConfig('thresholdValue', parseFloat(e.target.value) || 0)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Hysterese Einschalten (+)
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={config.hysteresisUpper !== undefined ? String(config.hysteresisUpper) : ''}
+                onChange={e => updateConfig('hysteresisUpper', e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                placeholder="Leer = keine Hysterese"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">EIN wenn Wert &ge; Schwellwert + Hysterese</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Hysterese Ausschalten (-)
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={config.hysteresisLower !== undefined ? String(config.hysteresisLower) : ''}
+                onChange={e => updateConfig('hysteresisLower', e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                placeholder="Leer = keine Hysterese"
+                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">AUS wenn Wert &lt; Schwellwert - Hysterese</p>
+            </div>
           </div>
         )}
 

@@ -1398,14 +1398,13 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'not-gate') {
       nodeValues[nodeId] = !toBool(inputVals[0]);
     } else if (node.type === 'switch') {
-      const val = inputVals[0];
-      const sw = toBool(inputVals[1]);
-      const valTrue = inputVals[2];
-      const valFalse = inputVals[3];
+      const sw = toBool(inputVals[0]);
+      const valTrue = inputVals[1];
+      const valFalse = inputVals[2];
       if (sw) {
-        nodeValues[nodeId] = valTrue !== undefined ? valTrue : val;
+        nodeValues[nodeId] = valTrue !== undefined ? valTrue : true;
       } else {
-        nodeValues[nodeId] = valFalse !== undefined ? valFalse : null;
+        nodeValues[nodeId] = valFalse !== undefined ? valFalse : false;
       }
     } else if (node.type === 'select') {
       const a = inputVals[0];
@@ -1446,7 +1445,20 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     } else if (node.type === 'threshold') {
       const val = toNumber(inputVals[0]);
       const thr = cfg.thresholdValue !== undefined ? toNumber(cfg.thresholdValue) : 0;
-      nodeValues[nodeId] = val > thr ? 'above' : 'below';
+      const hasHysteresis = cfg.hysteresisUpper !== undefined && cfg.hysteresisLower !== undefined;
+      if (hasHysteresis) {
+        const upperBand = thr + toNumber(cfg.hysteresisUpper);
+        const lowerBand = thr - toNumber(cfg.hysteresisLower);
+        const st = pageId ? getNodeState(pageId, nodeId) : node.__hysteresisState || (node.__hysteresisState = {});
+        const prevOutput = st.output !== undefined ? st.output : false;
+        let output = prevOutput;
+        if (val >= upperBand) output = true;
+        else if (val < lowerBand) output = false;
+        st.output = output;
+        nodeValues[nodeId] = output;
+      } else {
+        nodeValues[nodeId] = val >= thr;
+      }
     } else if (node.type === 'timer') {
       const inputVal = toBool(inputVals[0]);
       const timerOnMs = cfg.timerOnMs !== undefined ? cfg.timerOnMs : (cfg.timerMs || 1000);
@@ -2994,18 +3006,24 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     broadcastSSE('state', { liveValues: getLiveSnapshot() });
 
     const isImpulse = req.body.impulse === true;
-    if (isImpulse && value) {
-      const resetDelay = 200;
+    if (isImpulse) {
+      const capturedNodeId = nodeId;
+      const capturedOverrideKey = overrideKey;
+      const resetDelay = 300;
       setTimeout(() => {
         const resetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-        visuControlledDps.set(nodeId, resetVal);
-        if (overrideKey !== nodeId) visuControlledDps.set(overrideKey, resetVal);
-        for (const [pageId, nodeValues] of lastNodeValues) {
-          if (nodeId in nodeValues) {
-            const updated = { ...nodeValues, [nodeId]: resetVal };
-            if (overrideKey !== nodeId) updated[overrideKey] = resetVal;
-            lastNodeValues.set(pageId, updated);
-          }
+        visuControlledDps.set(capturedNodeId, resetVal);
+        if (capturedOverrideKey !== capturedNodeId) visuControlledDps.set(capturedOverrideKey, resetVal);
+        setPersistentDpValue(capturedNodeId, resetVal);
+        const globalOverrides = clientVisuOverrides.get('global');
+        if (globalOverrides) {
+          globalOverrides[capturedNodeId] = resetVal;
+          if (capturedOverrideKey !== capturedNodeId) globalOverrides[capturedOverrideKey] = resetVal;
+        }
+        for (const [pgId, nodeVals] of lastNodeValues) {
+          const updated = { ...nodeVals, [capturedNodeId]: resetVal };
+          if (capturedOverrideKey !== capturedNodeId) updated[capturedOverrideKey] = resetVal;
+          lastNodeValues.set(pgId, updated);
         }
         broadcastSSE('state', { liveValues: getLiveSnapshot() });
       }, resetDelay);

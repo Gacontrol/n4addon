@@ -291,9 +291,11 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
       } else {
         const isImpulseWidget = widget.type === 'visu-button' || widget.type === 'modern-button';
         const isImpulseMode = isImpulseWidget && ((widget.config as Record<string, unknown>)?.impulseMode !== false);
-        if (isImpulseMode && value === true) {
-          const releaseVal = (widget.config as Record<string, unknown>)?.releaseValue ?? false;
-          onWidgetValueChange(widgetId, { ...widget.binding, impulse: true, releaseValue: releaseVal } as typeof widget.binding & { impulse?: boolean; releaseValue?: unknown }, value);
+        if (isImpulseMode) {
+          if (value === true) {
+            const releaseVal = (widget.config as Record<string, unknown>)?.releaseValue ?? false;
+            onWidgetValueChange(widgetId, { ...widget.binding, impulse: true, releaseValue: releaseVal } as typeof widget.binding & { impulse?: boolean; releaseValue?: unknown }, value);
+          }
         } else {
           onWidgetValueChange(widgetId, widget.binding, value);
         }

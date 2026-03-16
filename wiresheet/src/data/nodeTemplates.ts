@@ -147,7 +147,6 @@ export const nodeTemplates: NodeTemplate[] = [
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Wert', type: 'input' },
       { label: 'Schalter', type: 'input' },
       { label: 'Wert True', type: 'input' },
       { label: 'Wert False', type: 'input' }
@@ -155,7 +154,7 @@ export const nodeTemplates: NodeTemplate[] = [
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Schaltet Wert durch wenn Schalter true; optionale True/False-Werte'
+    description: 'Schaltet zwischen True/False-Wert je nach Schalter'
   },
   {
     type: 'select',
@@ -387,13 +386,13 @@ export const nodeTemplates: NodeTemplate[] = [
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Wert A', type: 'input' },
-      { label: 'Wert B', type: 'input' }
+      { label: 'A (Eingang)', type: 'input' },
+      { label: 'B (Vergleich)', type: 'input' }
     ],
     outputs: [
       { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Vergleicht zwei Werte',
+    description: 'Vergleicht A gegen B: A op B',
     defaultConfig: { compareOperator: '>', compareValue: 0 }
   },
   {
@@ -413,18 +412,17 @@ export const nodeTemplates: NodeTemplate[] = [
   },
   {
     type: 'threshold',
-    label: 'Schwellwert',
+    label: 'Hysterese',
     icon: 'TrendingUp',
     category: 'logic',
     color: '#10b981',
     inputs: [
-      { label: 'Wert', type: 'input' }
+      { label: 'Eingang', type: 'input' }
     ],
     outputs: [
-      { label: 'Über', type: 'output' },
-      { label: 'Unter', type: 'output' }
+      { label: 'Ausgang', type: 'output' }
     ],
-    description: 'Prüft gegen Schwellwert',
+    description: 'Schwellwert mit einstellbarer Hysterese',
     defaultConfig: { thresholdValue: 0 }
   },
   {
