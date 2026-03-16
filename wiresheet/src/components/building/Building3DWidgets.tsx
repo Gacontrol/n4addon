@@ -843,8 +843,7 @@ function createTee(
   branchDir: THREE.Vector3,
   w: number, h: number, isRound: boolean
 ): THREE.BufferGeometry[] {
-  const trimR    = elbowRadius(w, h);
-  const mainLen  = trimR * 2;
+  const mainLen  = Math.max(w, h) * 1.5;
 
   // Main duct passes straight through the node
   const mainStart = nodePos.clone().addScaledVector(mainInDir,  -mainLen / 2);
