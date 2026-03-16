@@ -112,6 +112,7 @@ export interface Widget3D {
   minValue?: number;
   maxValue?: number;
   roomIds?: string[];
+  opacity?: number;
 }
 
 // ---- Ducts & Pipes ----

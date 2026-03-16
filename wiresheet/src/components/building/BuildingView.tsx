@@ -194,6 +194,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [datapointPickerOpen, setDatapointPickerOpen] = useState(false);
   const [datapointPickerTarget, setDatapointPickerTarget] = useState<'new' | 'widget' | 'alarm'>('new');
   const [newWidgetRoomIds, setNewWidgetRoomIds] = useState<string[]>([]);
+  const [newWidgetOpacity, setNewWidgetOpacity] = useState(0.45);
   const [pickerTab, setPickerTab] = useState<'driver' | 'logic'>('driver');
   const [pickerDevice, setPickerDevice] = useState<string | null>(null);
 
@@ -371,10 +372,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       showLabel: true,
       showValue: true,
       roomIds: newWidgetType === 'roomcolor' ? [...newWidgetRoomIds] : [],
+      opacity: newWidgetType === 'roomcolor' ? newWidgetOpacity : undefined,
     });
     setNewWidgetDatapoint('');
     setNewWidgetLabel('');
     setNewWidgetRoomIds([]);
+    setNewWidgetOpacity(0.45);
   };
 
   const logicPageGroups = useMemo(() => {
@@ -902,27 +905,41 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     </div>
 
                     {newWidgetType === 'roomcolor' && activeFloor && (
-                      <div>
-                        <div className="text-[10px] text-slate-500 mb-1">Räume auswählen</div>
-                        <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
-                          {activeFloor.rooms.length === 0 ? (
-                            <div className="text-[10px] text-slate-600 italic px-1">Keine Räume vorhanden</div>
-                          ) : activeFloor.rooms.map(r => (
-                            <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={newWidgetRoomIds.includes(r.id)}
-                                onChange={e => setNewWidgetRoomIds(prev =>
-                                  e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
-                                )}
-                                className="accent-green-500"
-                              />
-                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
-                              <span className="text-xs text-slate-300 truncate">{r.name}</span>
-                            </label>
-                          ))}
+                      <>
+                        <div>
+                          <div className="text-[10px] text-slate-500 mb-1">Räume auswählen</div>
+                          <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
+                            {activeFloor.rooms.length === 0 ? (
+                              <div className="text-[10px] text-slate-600 italic px-1">Keine Räume vorhanden</div>
+                            ) : activeFloor.rooms.map(r => (
+                              <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={newWidgetRoomIds.includes(r.id)}
+                                  onChange={e => setNewWidgetRoomIds(prev =>
+                                    e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
+                                  )}
+                                  className="accent-green-500"
+                                />
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
+                                <span className="text-xs text-slate-300 truncate">{r.name}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                        <div>
+                          <div className="text-[10px] text-slate-500 mb-1">Transparenz</div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range" min="0.05" max="1" step="0.05"
+                              value={newWidgetOpacity}
+                              onChange={e => setNewWidgetOpacity(parseFloat(e.target.value))}
+                              className="flex-1 h-1 accent-green-500"
+                            />
+                            <span className="text-xs text-slate-400 w-10 text-right">{Math.round(newWidgetOpacity * 100)}%</span>
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     <div>
@@ -1107,29 +1124,43 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       </div>
                     </div>
                     {selectedWidget.type === 'roomcolor' && activeFloor && (
-                      <div>
-                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Räume</label>
-                        <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
-                          {activeFloor.rooms.map(r => (
-                            <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={(selectedWidget.roomIds ?? []).includes(r.id)}
-                                onChange={e => {
-                                  if (!activeBuilding) return;
-                                  const prev = selectedWidget.roomIds ?? [];
-                                  updateWidget3D(activeBuilding.id, selectedWidget.id, {
-                                    roomIds: e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
-                                  });
-                                }}
-                                className="accent-green-500"
-                              />
-                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
-                              <span className="text-xs text-slate-300 truncate">{r.name}</span>
-                            </label>
-                          ))}
+                      <>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Räume</label>
+                          <div className="space-y-1 max-h-28 overflow-y-auto bg-slate-750 border border-slate-700 rounded p-1.5">
+                            {activeFloor.rooms.map(r => (
+                              <label key={r.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-700 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(selectedWidget.roomIds ?? []).includes(r.id)}
+                                  onChange={e => {
+                                    if (!activeBuilding) return;
+                                    const prev = selectedWidget.roomIds ?? [];
+                                    updateWidget3D(activeBuilding.id, selectedWidget.id, {
+                                      roomIds: e.target.checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
+                                    });
+                                  }}
+                                  className="accent-green-500"
+                                />
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: r.color }} />
+                                <span className="text-xs text-slate-300 truncate">{r.name}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Transparenz</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range" min="0.05" max="1" step="0.05"
+                              value={selectedWidget.opacity ?? 0.45}
+                              onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { opacity: parseFloat(e.target.value) })}
+                              className="flex-1 h-1 accent-green-500"
+                            />
+                            <span className="text-xs text-slate-400 w-10 text-right">{Math.round((selectedWidget.opacity ?? 0.45) * 100)}%</span>
+                          </div>
+                        </div>
+                      </>
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
