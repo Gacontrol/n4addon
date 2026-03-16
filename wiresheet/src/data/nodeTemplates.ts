@@ -335,18 +335,35 @@ export const nodeTemplates: NodeTemplate[] = [
   },
   {
     type: 'sr-flipflop',
-    label: 'SR Flipflop',
+    label: 'SR-FlipFlop (R-dom.)',
     icon: 'FlipHorizontal',
     category: 'special',
     color: '#64748b',
     inputs: [
-      { label: 'Set', type: 'input' },
-      { label: 'Reset', type: 'input' }
+      { label: 'S (Setzen)', type: 'input' },
+      { label: 'R (Rücksetzen)', type: 'input' }
     ],
     outputs: [
-      { label: 'Q', type: 'output' }
+      { label: 'Q', type: 'output' },
+      { label: 'Q̄', type: 'output' }
     ],
-    description: 'Set-Reset Speicher'
+    description: 'SR-FlipFlop – Reset hat Priorität bei S=1 und R=1'
+  },
+  {
+    type: 'rs-flipflop',
+    label: 'RS-FlipFlop (S-dom.)',
+    icon: 'FlipHorizontal2',
+    category: 'special',
+    color: '#0891b2',
+    inputs: [
+      { label: 'R (Rücksetzen)', type: 'input' },
+      { label: 'S (Setzen)', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Q', type: 'output' },
+      { label: 'Q̄', type: 'output' }
+    ],
+    description: 'RS-FlipFlop – Set hat Priorität bei S=1 und R=1'
   },
   {
     type: 'counter',

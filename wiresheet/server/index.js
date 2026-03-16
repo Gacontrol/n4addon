@@ -956,6 +956,7 @@ function getDefaultValueForNodeType(nodeType) {
     case 'delay':
     case 'select':
     case 'sr-flipflop':
+    case 'rs-flipflop':
     case 'python-script':
     case 'ha-input':
     case 'ha-output':
@@ -987,7 +988,9 @@ function getDefaultOutputsForNodeType(node) {
       defaults['output-0'] = 0;
       break;
     case 'sr-flipflop':
+    case 'rs-flipflop':
       defaults['output-0'] = false;
+      defaults['output-1'] = true;
       break;
     case 'rising-edge':
     case 'falling-edge':
@@ -1597,6 +1600,17 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (resetInput) st.output = false;
       nodeValues[nodeId] = st.output;
       nodeValues[`${nodeId}:output-0`] = st.output;
+      nodeValues[`${nodeId}:output-1`] = !st.output;
+    } else if (node.type === 'rs-flipflop') {
+      const resetInput = toBool(inputVals[0]);
+      const setInput = toBool(inputVals[1]);
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__rsState || (node.__rsState = {});
+      if (st.output === undefined) st.output = false;
+      if (resetInput) st.output = false;
+      if (setInput) st.output = true;
+      nodeValues[nodeId] = st.output;
+      nodeValues[`${nodeId}:output-0`] = st.output;
+      nodeValues[`${nodeId}:output-1`] = !st.output;
     } else if (node.type === 'rising-edge') {
       const inputVal = toBool(inputVals[0]);
       const st = pageId ? getNodeState(pageId, nodeId) : node.__risingState || (node.__risingState = {});
