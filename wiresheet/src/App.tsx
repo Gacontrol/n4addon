@@ -47,6 +47,7 @@ function App() {
     saveStatus,
     loadError,
     loadPages,
+    measuredCycleTimes,
     nodes,
     connections,
     selectedNodes,
@@ -1318,11 +1319,31 @@ function App() {
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`}</span>
+                {activePage.running && measuredCycleTimes[activePageId] !== undefined && (() => {
+                  const measured = measuredCycleTimes[activePageId];
+                  const ratio = measured / activePage.cycleMs;
+                  const color = ratio > 2 ? 'text-red-400' : ratio > 1.3 ? 'text-amber-400' : 'text-emerald-400';
+                  const label = measured >= 1000 ? `${(measured / 1000).toFixed(1)}s` : `${measured}ms`;
+                  return <span className={`hidden sm:inline font-mono ${color}`}>({label})</span>;
+                })()}
                 {showCycleEditor ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               {showCycleEditor && (
                 <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-xl z-50 w-52">
-                  <p className="text-xs text-slate-400 mb-2 font-semibold">Zykluszeit</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-slate-400 font-semibold">Zykluszeit</p>
+                    {activePage.running && measuredCycleTimes[activePageId] !== undefined && (() => {
+                      const measured = measuredCycleTimes[activePageId];
+                      const ratio = measured / activePage.cycleMs;
+                      const color = ratio > 2 ? 'text-red-400' : ratio > 1.3 ? 'text-amber-400' : 'text-emerald-400';
+                      const label = measured >= 1000 ? `${(measured / 1000).toFixed(2)}s` : `${measured}ms`;
+                      return (
+                        <span className={`text-[10px] font-mono ${color}`}>
+                          Gemessen: {label}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <div className="flex gap-1 mb-2 flex-wrap">
                     {cycleOptions.map(ms => (
                       <button

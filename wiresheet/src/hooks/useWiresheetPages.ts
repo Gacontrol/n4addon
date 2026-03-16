@@ -36,7 +36,9 @@ export const useWiresheetPages = () => {
   const [haError, setHaError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [measuredCycleTimes, setMeasuredCycleTimes] = useState<Record<string, number>>({});
   const localCycleTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const lastExecuteStart = useRef<Record<string, number>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInProgress = useRef(false);
   const pagesRef = useRef<WiresheetPage[]>(pages);
@@ -332,6 +334,14 @@ export const useWiresheetPages = () => {
     const page = pagesRef.current.find(p => p.id === pageId);
     if (!page) return;
 
+    const now = Date.now();
+    const prev = lastExecuteStart.current[pageId];
+    if (prev !== undefined) {
+      const measured = now - prev;
+      setMeasuredCycleTimes(m => ({ ...m, [pageId]: measured }));
+    }
+    lastExecuteStart.current[pageId] = now;
+
     const manualOverrides: Record<string, unknown> = {};
     for (const node of page.nodes) {
       if (node.data.override?.manual) {
@@ -388,6 +398,8 @@ export const useWiresheetPages = () => {
       clearInterval(localCycleTimers.current[pageId]);
       delete localCycleTimers.current[pageId];
     }
+    delete lastExecuteStart.current[pageId];
+    setMeasuredCycleTimes(m => { const n = { ...m }; delete n[pageId]; return n; });
   }, [updatePages]);
 
   useEffect(() => {
@@ -905,6 +917,7 @@ export const useWiresheetPages = () => {
     saveStatus,
     loadError,
     loadPages,
+    measuredCycleTimes,
     nodes: activePage.nodes,
     connections: activePage.connections,
     selectedNodes,
