@@ -5,13 +5,14 @@ import {
   Layers, Box, MousePointer, MousePointer2, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
   Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw,
-  Eye, EyeOff
+  Eye, EyeOff, GripVertical, RotateCcw
 } from 'lucide-react';
+import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING, ExplosionSettings, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
-import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers } from '../../types/building';
+import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers, FurnitureItem, FurnitureTemplate, FurnitureCategory } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
@@ -163,6 +164,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     ROOM_COLORS,
     undo,
     deleteMultiSelection,
+    selectedFurnitureId,
+    setSelectedFurnitureId,
+    addFurniture,
+    updateFurniture,
+    deleteFurniture,
   } = useBuildingEditor();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
@@ -197,6 +203,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [pipeDiameter, setPipeDiameter] = useState(0.05);
 
   const [showAllFloors, setShowAllFloors] = useState(false);
+  const [wallsTransparent, setWallsTransparent] = useState(false);
+  const [dropFurnitureTemplate, setDropFurnitureTemplate] = useState<FurnitureTemplate | null>(null);
+  const [showFurniturePanel, setShowFurniturePanel] = useState(false);
+  const [furnitureCategoryFilter, setFurnitureCategoryFilter] = useState<FurnitureCategory>('office');
+  const [dropOpeningType, setDropOpeningType] = useState<WallOpeningType | null>(null);
+  const [showOpeningPanel, setShowOpeningPanel] = useState(false);
   const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
   const [newWidgetType, setNewWidgetType] = useState<Widget3DType>('temperature');
   const [newWidgetDatapoint, setNewWidgetDatapoint] = useState('');
@@ -283,6 +295,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const selectedPipe = activeFloor?.pipes?.find(p => p.id === selectedPipeId) ?? null;
   const selectedSlab = activeFloor?.slabs?.find(s => s.id === selectedSlabId) ?? null;
   const selectedWidget = activeBuilding?.widgets3d?.find(w => w.id === selectedWidget3DId) ?? null;
+  const selectedFurniture = activeFloor?.furniture?.find(f => f.id === selectedFurnitureId) ?? null;
 
   const filteredEntities = useMemo(() => {
     const q = entitySearch.trim().toLowerCase();
@@ -472,6 +485,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const propertiesPanelTitle = () => {
     if (selectedWidget) return 'Widget';
+    if (selectedFurniture) return 'Mobiliar';
     if (selectedDuct) return 'Lüftungskanal';
     if (selectedPipe) return 'Leitung';
     if (selectedSlab) return 'Bodenplatte';
@@ -844,6 +858,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   Explode
                 </button>
                 <button
+                  onClick={() => setWallsTransparent(v => !v)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${wallsTransparent ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Wände transparent"
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  X-Ray
+                </button>
+                <button
                   onClick={() => setShowWidget3DPanel(p => !p)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showWidget3DPanel ? 'bg-green-700 text-white border-green-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
                   title="3D Widgets"
@@ -852,6 +874,27 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   Widgets
                 </button>
               </div>
+            )}
+
+            {viewMode === 'floor' && (
+              <>
+                <button
+                  onClick={() => { setShowOpeningPanel(p => !p); if (showFurniturePanel) setShowFurniturePanel(false); }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showOpeningPanel ? 'bg-teal-700 text-white border-teal-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Türen & Fenster"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  Öffnungen
+                </button>
+                <button
+                  onClick={() => { setShowFurniturePanel(p => !p); if (showOpeningPanel) setShowOpeningPanel(false); }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showFurniturePanel ? 'bg-amber-700 text-white border-amber-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Mobiliar-Palette"
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                  Mobiliar
+                </button>
+              </>
             )}
 
             <button
@@ -883,11 +926,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedWidget3DId={selectedWidget3DId}
                   selectedDuctId={selectedDuctId}
                   selectedPipeId={selectedPipeId}
-                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
-                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
-                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
-                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
-                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
+                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  selectedFurnitureId={selectedFurnitureId}
+                  onSelectFurniture={id => { setSelectedFurnitureId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  wallsTransparent={wallsTransparent}
                   onUpdateWidget3D={(widgetId, x, y, z) => {
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
@@ -1323,6 +1369,19 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   .filter(f => f.id !== activeFloorId && floorOverlays[f.id])
                   .map(f => ({ floor: f, opacity: 0.25 })) : undefined}
                 allFloors={activeBuilding?.floors}
+                selectedFurnitureId={selectedFurnitureId}
+                onSelectFurniture={id => { setSelectedFurnitureId(id); if (id) setShowRoomPanel(true); }}
+                onAddFurniture={item => { if (activeBuilding && activeFloor) addFurniture(activeBuilding.id, activeFloor.id, item); }}
+                onMoveFurniture={(itemId, x, y) => { if (activeBuilding && activeFloor) updateFurniture(activeBuilding.id, activeFloor.id, itemId, { x, y }); }}
+                onDeleteFurniture={itemId => { if (activeBuilding && activeFloor) { deleteFurniture(activeBuilding.id, activeFloor.id, itemId); setSelectedFurnitureId(null); } }}
+                dropFurnitureTemplate={dropFurnitureTemplate}
+                dropOpeningType={dropOpeningType}
+                onAddWallOpening={(wallId, type, position, width, height, sillHeight) => {
+                  if (!activeBuilding || !activeFloor) return;
+                  addWallOpening(activeBuilding.id, activeFloor.id, wallId, { type, position, width, height, sillHeight });
+                  setSelectedWallId(wallId);
+                  setShowRoomPanel(true);
+                }}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">
@@ -1330,6 +1389,102 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
             )}
           </div>
+
+          {showOpeningPanel && viewMode === 'floor' && (
+            <div className="w-52 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
+                <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Square className="w-3.5 h-3.5" />Türen & Fenster
+                </span>
+                <button onClick={() => setShowOpeningPanel(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 px-1">Türen</div>
+                {([
+                  { type: 'door', label: 'Einfachtür', desc: '0.9m' },
+                  { type: 'door-double', label: 'Doppeltür', desc: '1.8m' },
+                  { type: 'door-arch', label: 'Bogentür', desc: '1.0m' },
+                ] as { type: WallOpeningType; label: string; desc: string }[]).map(item => (
+                  <div
+                    key={item.type}
+                    draggable
+                    onDragStart={() => setDropOpeningType(item.type)}
+                    onDragEnd={() => setDropOpeningType(null)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-700 hover:border-teal-600 hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-colors group"
+                  >
+                    <div className="w-3 h-4 border-2 border-slate-400 rounded-sm flex-shrink-0 group-hover:border-teal-400" />
+                    <span className="flex-1 text-xs text-slate-300 group-hover:text-white">{item.label}</span>
+                    <span className="text-[9px] text-slate-600">{item.desc}</span>
+                  </div>
+                ))}
+                <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-3 mb-2 px-1">Fenster</div>
+                {([
+                  { type: 'window', label: 'Standardfenster', desc: '1.2m' },
+                  { type: 'window-large', label: 'Grosses Fenster', desc: '2.4m' },
+                ] as { type: WallOpeningType; label: string; desc: string }[]).map(item => (
+                  <div
+                    key={item.type}
+                    draggable
+                    onDragStart={() => setDropOpeningType(item.type)}
+                    onDragEnd={() => setDropOpeningType(null)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-700 hover:border-teal-600 hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-colors group"
+                  >
+                    <div className="w-4 h-3 border-2 border-cyan-400/60 rounded-sm flex-shrink-0 group-hover:border-cyan-400" />
+                    <span className="flex-1 text-xs text-slate-300 group-hover:text-white">{item.label}</span>
+                    <span className="text-[9px] text-slate-600">{item.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2 border-t border-slate-700 text-[10px] text-slate-500">
+                Auf eine Wand ziehen
+              </div>
+            </div>
+          )}
+
+          {showFurniturePanel && viewMode === 'floor' && (
+            <div className="w-56 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
+                <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <GripVertical className="w-3.5 h-3.5" />Mobiliar
+                </span>
+                <button onClick={() => setShowFurniturePanel(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex border-b border-slate-700 overflow-x-auto shrink-0">
+                {(Object.keys(FURNITURE_CATEGORY_LABELS) as FurnitureCategory[]).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setFurnitureCategoryFilter(cat)}
+                    className={`flex-shrink-0 px-2 py-1.5 text-[10px] font-medium transition-colors border-b-2 ${furnitureCategoryFilter === cat ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {FURNITURE_CATEGORY_LABELS[cat]}
+                  </button>
+                ))}
+              </div>
+              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                {(FURNITURE_BY_CATEGORY[furnitureCategoryFilter] ?? []).map(tmpl => (
+                  <div
+                    key={tmpl.id}
+                    draggable
+                    onDragStart={() => setDropFurnitureTemplate(tmpl)}
+                    onDragEnd={() => setDropFurnitureTemplate(null)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-slate-750 border border-slate-700 hover:border-amber-600 hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-colors group"
+                    title={`${tmpl.width}×${tmpl.depth}m, H: ${tmpl.height}m`}
+                  >
+                    <div className="w-3 h-3 rounded-sm flex-shrink-0 border border-slate-600" style={{ backgroundColor: tmpl.color }} />
+                    <span className="flex-1 text-xs text-slate-300 truncate group-hover:text-white">{tmpl.label}</span>
+                    <span className="text-[9px] text-slate-600 shrink-0">{tmpl.width}×{tmpl.depth}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2 border-t border-slate-700 text-[10px] text-slate-500">
+                Elemente in den Grundriss ziehen
+              </div>
+            </div>
+          )}
 
           {showLayersPanel && activeBuilding && (
             <div className="w-52 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
@@ -1381,6 +1536,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                                 { key: 'verticalDucts', label: 'Vert. Kanäle' },
                                 { key: 'pipes', label: 'Rohre' },
                                 { key: 'slabs', label: 'Decken' },
+                                { key: 'furniture', label: 'Mobiliar' },
                               ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
                                 const visible = flLayers[key as keyof typeof flLayers];
                                 return (
@@ -1408,6 +1564,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       { key: 'verticalDucts', label: 'Vertikale Kanäle' },
                       { key: 'pipes', label: 'Rohre' },
                       { key: 'slabs', label: 'Decken' },
+                      { key: 'furniture', label: 'Mobiliar' },
                       { key: 'background', label: 'Hintergrundbild' },
                     ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
                       const layers = { ...DEFAULT_LAYERS, ...(activeFloor.layers ?? {}) };
@@ -1464,7 +1621,94 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
 
               <div className="overflow-y-auto flex-1 p-3 space-y-3">
-                {selectedWidget ? (
+                {selectedFurniture ? (
+                  <>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold pb-1 border-b border-slate-700 flex items-center gap-1.5">
+                      <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0 border border-slate-600" style={{ backgroundColor: selectedFurniture.color }} />
+                      {selectedFurniture.label}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Bezeichnung</label>
+                      <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedFurniture.label}
+                        onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { label: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" className="w-8 h-7 rounded cursor-pointer bg-transparent border-0"
+                          value={selectedFurniture.color}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { color: e.target.value })} />
+                        <span className="text-xs text-slate-400">{selectedFurniture.color}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Drehung (°)</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min="0" max="360" step="15"
+                          value={selectedFurniture.rotation}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { rotation: parseFloat(e.target.value) })}
+                          className="flex-1 h-1 accent-blue-500" />
+                        <span className="text-xs text-slate-400 w-10 text-right">{selectedFurniture.rotation}°</span>
+                        <button onClick={() => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { rotation: 0 })}
+                          className="p-1 text-slate-500 hover:text-white rounded hover:bg-slate-700" title="Zurücksetzen">
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {[0, 45, 90, 135, 180, 270].map(deg => (
+                          <button key={deg} onClick={() => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { rotation: deg })}
+                            className={`px-1.5 py-0.5 rounded text-[10px] border ${selectedFurniture.rotation === deg ? 'bg-blue-700 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white hover:bg-slate-600'}`}>
+                            {deg}°
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Breite (m)</label>
+                        <input type="number" step="0.1" min="0.1"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedFurniture.width}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { width: parseFloat(e.target.value) || 0.5 })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Tiefe (m)</label>
+                        <input type="number" step="0.1" min="0.1"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedFurniture.depth}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { depth: parseFloat(e.target.value) || 0.5 })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Höhe (m)</label>
+                        <input type="number" step="0.1" min="0.05"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedFurniture.height}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { height: parseFloat(e.target.value) || 0.1 })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Position X</label>
+                        <input type="number" step="0.25"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedFurniture.x.toFixed(2)}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { x: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Position Y</label>
+                        <input type="number" step="0.25"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedFurniture.y.toFixed(2)}
+                          onChange={e => activeBuilding && activeFloor && updateFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id, { y: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                    </div>
+                    <div className="pt-1 text-[10px] text-slate-500">Kategorie: {selectedFurniture.category}</div>
+                    <button onClick={() => { if (activeBuilding && activeFloor) { deleteFurniture(activeBuilding.id, activeFloor.id, selectedFurniture.id); setSelectedFurnitureId(null); } }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Mobiliar löschen
+                    </button>
+                  </>
+                ) : selectedWidget ? (
                   <>
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Typ</label>

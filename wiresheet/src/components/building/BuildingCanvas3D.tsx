@@ -4,6 +4,7 @@ import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
+import { FurnitureMesh } from './Furniture3D';
 
 export interface LightingSettings {
   ambientIntensity: number;
@@ -45,11 +46,13 @@ interface Props {
   selectedWidget3DId?: string | null;
   selectedDuctId?: string | null;
   selectedPipeId?: string | null;
+  selectedFurnitureId?: string | null;
   onSelectRoom: (id: string | null) => void;
   onSelectWall: (id: string | null) => void;
   onSelectWidget3D?: (id: string | null) => void;
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
+  onSelectFurniture?: (id: string | null) => void;
   onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
   onPlaceWidget?: (x: number, y: number, z: number, floorId: string) => void;
   widgetPlacementMode?: boolean;
@@ -62,6 +65,7 @@ interface Props {
   showGrid?: boolean;
   lighting?: LightingSettings;
   explosion?: ExplosionSettings;
+  wallsTransparent?: boolean;
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -716,11 +720,13 @@ interface BuildingSceneProps {
   selectedWidget3DId?: string | null;
   selectedDuctId?: string | null;
   selectedPipeId?: string | null;
+  selectedFurnitureId?: string | null;
   onSelectRoom: (id: string | null) => void;
   onSelectWall: (id: string | null) => void;
   onSelectWidget3D?: (id: string | null) => void;
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
+  onSelectFurniture?: (id: string | null) => void;
   onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
   onPlaceWidget?: (x: number, y: number, z: number, floorId: string) => void;
   widgetPlacementMode?: boolean;
@@ -731,15 +737,16 @@ interface BuildingSceneProps {
   floorTransparent?: boolean;
   showGrid?: boolean;
   explosion?: ExplosionSettings;
+  wallsTransparent?: boolean;
 }
 
 function BuildingScene({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
-  selectedWidget3DId, selectedDuctId, selectedPipeId,
-  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
+  selectedWidget3DId, selectedDuctId, selectedPipeId, selectedFurnitureId,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true, explosion
+  highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -903,10 +910,10 @@ function BuildingScene({
             height={wallH}
             thickness={wall.thickness || 0.25}
             color={wall.color || '#94a3b8'}
-            opacity={wall.opacity ?? 1}
+            opacity={wallsTransparent ? 0.18 : (wall.opacity ?? 1)}
             selected={wall.id === selectedWallId}
             faded={faded}
-            materialType={wall.materialType || 'concrete'}
+            materialType={wallsTransparent ? 'glass' : (wall.materialType || 'concrete')}
             openings={(wall.openings ?? []).map(o => ({
               type: o.type,
               position: o.position,
@@ -915,7 +922,7 @@ function BuildingScene({
               sillHeight: o.sillHeight || 0,
             }))}
             onSelect={() => { onSelectWall(wall.id); onSelectRoom(null); }}
-            castShadow={lighting.shadowEnabled}
+            castShadow={lighting.shadowEnabled && !wallsTransparent}
           />
         );
       }
@@ -961,6 +968,22 @@ function BuildingScene({
             baseY={baseY}
           />
         );
+      }
+
+      if (flLayers.furniture !== false) {
+        for (const fi of (floor.furniture ?? [])) {
+          floorElements.push(
+            <FurnitureMesh
+              key={`furniture-${fi.id}`}
+              item={fi}
+              offsetX={offsetX}
+              baseY={baseY}
+              selected={fi.id === selectedFurnitureId}
+              faded={faded}
+              onSelect={() => { onSelectFurniture?.(fi.id); onSelectWall(null); onSelectRoom(null); }}
+            />
+          );
+        }
       }
 
       elements.push(
@@ -1070,8 +1093,8 @@ function BuildingScene({
 
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
-  selectedWidget3DId, selectedDuctId, selectedPipeId,
-  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
+  selectedWidget3DId, selectedDuctId, selectedPipeId, selectedFurnitureId,
+  onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues, alarmStates,
   highlightFloor, bgColor = '#0a1020',
@@ -1080,6 +1103,7 @@ export function BuildingCanvas3D({
   showGrid = true,
   lighting = DEFAULT_LIGHTING,
   explosion = DEFAULT_EXPLOSION,
+  wallsTransparent = false,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
@@ -1094,7 +1118,7 @@ export function BuildingCanvas3D({
           outputColorSpace: THREE.SRGBColorSpace,
           alpha: bgTransparent,
         }}
-        onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); }}
+        onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); onSelectFurniture?.(null); }}
         style={{ background: bgTransparent ? 'transparent' : bgColor }}
       >
         {!bgTransparent && <color attach="background" args={[bgColor]} />}
@@ -1109,11 +1133,13 @@ export function BuildingCanvas3D({
             selectedWidget3DId={selectedWidget3DId}
             selectedDuctId={selectedDuctId}
             selectedPipeId={selectedPipeId}
+            selectedFurnitureId={selectedFurnitureId}
             onSelectRoom={onSelectRoom}
             onSelectWall={onSelectWall}
             onSelectWidget3D={onSelectWidget3D}
             onSelectDuct={onSelectDuct}
             onSelectPipe={onSelectPipe}
+            onSelectFurniture={onSelectFurniture}
             onUpdateWidget3D={onUpdateWidget3D}
             onPlaceWidget={onPlaceWidget}
             widgetPlacementMode={widgetPlacementMode}
@@ -1123,6 +1149,7 @@ export function BuildingCanvas3D({
             lighting={lighting}
             floorTransparent={floorTransparent}
             showGrid={showGrid}
+            wallsTransparent={wallsTransparent}
             explosion={explosion}
           />
           <Environment preset="city" />

@@ -225,6 +225,7 @@ export interface FloorLayers {
   rooms: boolean;
   slabs: boolean;
   verticalDucts: boolean;
+  furniture: boolean;
 }
 
 export const DEFAULT_LAYERS: FloorLayers = {
@@ -235,6 +236,7 @@ export const DEFAULT_LAYERS: FloorLayers = {
   rooms: true,
   slabs: true,
   verticalDucts: true,
+  furniture: true,
 };
 
 export interface Floor {
@@ -247,6 +249,7 @@ export interface Floor {
   ducts: Duct[];
   pipes: Pipe[];
   slabs: Slab[];
+  furniture?: FurnitureItem[];
   backgroundImage: BackgroundImage | null;
   floorColor?: string;
   showFloorPlane?: boolean;
@@ -264,7 +267,43 @@ export interface Building {
   updatedAt: number;
 }
 
-export type BuildingTool = 'select' | 'room' | 'polygon-room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab';
+// ---- Furniture / Equipment Layer ----
+
+export type FurnitureCategory =
+  | 'office'
+  | 'sanitary'
+  | 'hvac'
+  | 'vehicle'
+  | 'reception';
+
+export interface FurnitureTemplate {
+  id: string;
+  category: FurnitureCategory;
+  label: string;
+  width: number;
+  depth: number;
+  height: number;
+  color: string;
+  shape: 'rect' | 'circle' | 'l-shape' | 'custom';
+}
+
+export interface FurnitureItem {
+  id: string;
+  templateId: string;
+  label: string;
+  x: number;
+  y: number;
+  rotation: number;
+  width: number;
+  depth: number;
+  height: number;
+  color: string;
+  floorId: string;
+  shape: 'rect' | 'circle' | 'l-shape' | 'custom';
+  category: FurnitureCategory;
+}
+
+export type BuildingTool = 'select' | 'room' | 'polygon-room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab' | 'furniture';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;

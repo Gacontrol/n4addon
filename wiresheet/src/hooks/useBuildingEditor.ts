@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab, FloorLayers } from '../types/building';
+import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab, FloorLayers, FurnitureItem } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -66,6 +66,7 @@ export function useBuildingEditor() {
       ducts: f.ducts ?? [],
       pipes: f.pipes ?? [],
       slabs: f.slabs ?? [],
+      furniture: f.furniture ?? [],
       backgroundImage: f.backgroundImage ?? null,
     })),
   }));
@@ -1310,6 +1311,61 @@ export function useBuildingEditor() {
     setSelectedObjModelId(null);
   }, [buildings, updateBuildings]);
 
+  // ---- Furniture Actions ----
+
+  const [selectedFurnitureId, setSelectedFurnitureId] = useState<string | null>(null);
+
+  const addFurniture = useCallback((buildingId: string, floorId: string, item: Omit<FurnitureItem, 'id'>) => {
+    const newItem: FurnitureItem = { ...item, id: `furniture-${Date.now()}-${Math.random().toString(36).substr(2, 6)}` };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, furniture: [...(f.furniture ?? []), newItem] } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedFurnitureId(newItem.id);
+    return newItem.id;
+  }, [buildings, updateBuildings]);
+
+  const updateFurniture = useCallback((buildingId: string, floorId: string, itemId: string, changes: Partial<FurnitureItem>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, furniture: (f.furniture ?? []).map(fi => fi.id === itemId ? { ...fi, ...changes } : fi) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const deleteFurniture = useCallback((buildingId: string, floorId: string, itemId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, furniture: (f.furniture ?? []).filter(fi => fi.id !== itemId) } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedFurnitureId(null);
+  }, [buildings, updateBuildings]);
+
   const deleteMultiSelection = useCallback((
     buildingId: string,
     floorId: string,
@@ -1408,6 +1464,11 @@ export function useBuildingEditor() {
     updateObjModel,
     deleteObjModel,
     deleteMultiSelection,
+    selectedFurnitureId,
+    setSelectedFurnitureId,
+    addFurniture,
+    updateFurniture,
+    deleteFurniture,
     ROOM_COLORS,
   };
 }
