@@ -476,7 +476,7 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
 
   type RoomEntry =
     | { kind: 'box'; x: number; z: number; w: number; d: number }
-    | { kind: 'poly'; shapeGeo: THREE.BufferGeometry; cx: number; cz: number; w: number; d: number };
+    | { kind: 'poly'; extrudeGeo: THREE.BufferGeometry };
 
   const roomEntries = useMemo(() => {
     const entries: RoomEntry[] = [];
@@ -492,19 +492,8 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
               shape.lineTo(room.points[i].x + offsetX, room.points[i].y);
             }
             shape.closePath();
-            const shapeGeo = new THREE.ShapeGeometry(shape);
-            const xs = room.points.map(p => p.x + offsetX);
-            const ys = room.points.map(p => p.y);
-            const xMin = Math.min(...xs), xMax = Math.max(...xs);
-            const yMin = Math.min(...ys), yMax = Math.max(...ys);
-            entries.push({
-              kind: 'poly',
-              shapeGeo,
-              cx: (xMin + xMax) / 2,
-              cz: (yMin + yMax) / 2,
-              w: xMax - xMin,
-              d: yMax - yMin,
-            });
+            const extrudeGeo = new THREE.ExtrudeGeometry(shape, { depth: floorHeight, bevelEnabled: false });
+            entries.push({ kind: 'poly', extrudeGeo });
           } else {
             entries.push({
               kind: 'box',
@@ -518,13 +507,11 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
       }
     }
     return entries;
-  }, [buildings, widget.floorId, roomIds, offsetX]);
+  }, [buildings, widget.floorId, roomIds, offsetX, floorHeight]);
 
   const active = alarmActive === true || (liveValue !== undefined && liveValue !== '0' && liveValue !== 'off' && liveValue !== false);
   const overlayColor = widget.color || '#22c55e';
   const configuredOpacity = (widget as any).opacity ?? 0.45;
-  const opacity = active ? configuredOpacity : 0.0;
-  const floorY = baseY + 0.01;
 
   if (!active) return null;
 
@@ -534,13 +521,13 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
         if (entry.kind === 'poly') {
           return (
             <group key={i}>
-              <mesh position={[0, floorY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                <primitive object={entry.shapeGeo} />
-                <meshBasicMaterial color={overlayColor} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+              <mesh position={[0, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <primitive object={entry.extrudeGeo} />
+                <meshBasicMaterial color={overlayColor} transparent opacity={configuredOpacity} side={THREE.DoubleSide} depthWrite={false} />
               </mesh>
               {selected && (
-                <lineSegments position={[0, floorY + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-                  <edgesGeometry args={[entry.shapeGeo]} />
+                <lineSegments position={[0, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <edgesGeometry args={[entry.extrudeGeo]} />
                   <lineBasicMaterial color="#60a5fa" />
                 </lineSegments>
               )}
@@ -549,13 +536,13 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
         }
         return (
           <group key={i}>
-            <mesh position={[entry.x, floorY, entry.z]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[entry.w, entry.d]} />
-              <meshBasicMaterial color={overlayColor} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+            <mesh position={[entry.x, baseY + floorHeight / 2, entry.z]}>
+              <boxGeometry args={[entry.w, floorHeight, entry.d]} />
+              <meshBasicMaterial color={overlayColor} transparent opacity={configuredOpacity} side={THREE.DoubleSide} depthWrite={false} />
             </mesh>
             {selected && (
-              <lineSegments position={[entry.x, floorY + 0.005, entry.z]}>
-                <edgesGeometry args={[new THREE.BoxGeometry(entry.w, 0.01, entry.d)]} />
+              <lineSegments position={[entry.x, baseY + floorHeight / 2, entry.z]}>
+                <edgesGeometry args={[new THREE.BoxGeometry(entry.w, floorHeight, entry.d)]} />
                 <lineBasicMaterial color="#60a5fa" />
               </lineSegments>
             )}

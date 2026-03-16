@@ -771,11 +771,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedWidget3DId={selectedWidget3DId}
                   selectedDuctId={selectedDuctId}
                   selectedPipeId={selectedPipeId}
-                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
-                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
-                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
-                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
-                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
+                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
+                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
+                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
+                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                   onUpdateWidget3D={(widgetId, x, y, z) => {
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
@@ -1024,27 +1024,27 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 pipeType={pipeType}
                 pipeDiameter={pipeDiameter}
                 onAddWall={handleAddWall}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onMoveWallPoint={handleMoveWallPoint}
                 onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onMoveRoom={handleMoveRoom}
                 onDeleteWall={handleDeleteWall}
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
                 onAddDuct={handleAddDuct}
-                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
                 onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
                 onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onAddPipe={handleAddPipe}
-                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
                 onMovePipePoint={(pipeId, ptIdx, x, y) => { if (activeBuilding && activeFloor) movePipePoint(activeBuilding.id, activeFloor.id, pipeId, ptIdx, x, y); }}
                 onMovePipe={(pipeId, dx, dy) => { if (activeBuilding && activeFloor) movePipe(activeBuilding.id, activeFloor.id, pipeId, dx, dy); }}
                 selectedSlabId={selectedSlabId}
-                onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
+                onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setShowRoomPanel(true); }}
                 onAddSlab={slab => { if (activeBuilding && activeFloor) addSlab(activeBuilding.id, activeFloor.id, slab); }}
                 onAddPolygonRoom={points => { if (activeBuilding && activeFloor) addPolygonRoom(activeBuilding.id, activeFloor.id, points, newRoomType); }}
                 onDeleteSlab={id => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, id); setSelectedSlabId(null); } }}
@@ -1706,6 +1706,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || PIPE_TYPE_COLORS[p.type] }} />
                               <span className="flex-1 text-xs text-slate-300 truncate">{p.label || PIPE_TYPE_LABELS[p.type]}</span>
                               <span className="text-[10px] text-slate-500">{p.points.length}pt</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewMode === '3d' && (activeFloor.widgets3d?.length ?? 0) > 0 && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-[10px] text-slate-500 mb-2">3D Widgets ({activeFloor.widgets3d!.length})</div>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {activeFloor.widgets3d!.map(w => (
+                            <div key={w.id} className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700 cursor-pointer hover:bg-slate-600" onClick={() => { setSelectedWidget3DId(w.id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); }}>
+                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: w.color || '#64748b' }} />
+                              <span className="flex-1 text-xs text-slate-300 truncate">{w.label || w.type}</span>
+                              <span className="text-[10px] text-slate-500">{w.type}</span>
                             </div>
                           ))}
                         </div>
