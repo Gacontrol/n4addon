@@ -162,6 +162,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [newRoomType, setNewRoomType] = useState<RoomType>('room');
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [wallThickness, setWallThickness] = useState(0.25);
+  const [gridSize, setGridSize] = useState(1);
   const [bgColor, setBgColor] = useState('#0a1020');
   const [floorTransparent, setFloorTransparent] = useState(false);
   const [bgTransparent, setBgTransparent] = useState(false);
@@ -222,6 +223,15 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     for (const id of sel.roomIds) deleteRoom(activeBuilding.id, activeFloor.id, id);
     for (const id of sel.ductIds) deleteDuct(activeBuilding.id, activeFloor.id, id);
     for (const id of sel.pipeIds) deletePipe(activeBuilding.id, activeFloor.id, id);
+  };
+
+  const handleDuplicateSelected = (sel: MultiSelection) => {
+    if (!activeBuilding || !activeFloor) return;
+    const walls = activeFloor.walls.filter(w => sel.wallIds.includes(w.id));
+    const rooms = activeFloor.rooms.filter(r => sel.roomIds.includes(r.id));
+    const ducts = (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id));
+    const pipes = (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id));
+    pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
   };
 
   const handleMoveMultiSelection = (sel: MultiSelection, dx: number, dy: number) => {
@@ -501,6 +511,18 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none focus:border-blue-500"
             />
             <span className="text-xs text-slate-500">cm</span>
+          </div>
+        </div>
+        <div className="border-t border-slate-700 p-2">
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Raster</div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[0.25, 0.5, 1, 2, 5].map(sz => (
+              <button
+                key={sz}
+                onClick={() => setGridSize(sz)}
+                className={`px-2 py-1 rounded text-xs border ${gridSize === sz ? 'bg-blue-700 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white hover:bg-slate-600'}`}
+              >{sz}m</button>
+            ))}
           </div>
         </div>
       </div>
@@ -971,8 +993,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onCopySelected={handleCopySelected}
                 onPasteClipboard={handlePasteClipboard}
                 onDeleteSelected={handleDeleteSelected}
+                onDuplicateSelected={handleDuplicateSelected}
                 onMoveMultiSelection={handleMoveMultiSelection}
                 onPropertiesRequested={() => setShowRoomPanel(true)}
+                gridSize={gridSize}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">

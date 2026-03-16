@@ -50,8 +50,10 @@ interface Props {
   onDeleteSelected?: (sel: MultiSelection) => void;
   onCopySelected?: (sel: MultiSelection) => void;
   onPasteClipboard?: () => void;
+  onDuplicateSelected?: (sel: MultiSelection) => void;
   onPropertiesRequested?: () => void;
   onMoveMultiSelection?: (sel: MultiSelection, dx: number, dy: number) => void;
+  gridSize?: number;
 }
 
 const CELL = 40;
@@ -192,7 +194,7 @@ function loadBgImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'lasso' | 'move-multi' | 'move-duct' | 'move-duct-point' | 'move-pipe' | 'move-pipe-point';
+type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'move-bg-corner' | 'calib-draw' | 'lasso' | 'move-multi' | 'move-duct' | 'move-duct-point' | 'move-pipe' | 'move-pipe-point';
 
 const DUCT_TYPE_COLORS: Record<string, string> = {
   supply: '#60a5fa', return: '#94a3b8', exhaust: '#fbbf24', fresh: '#34d399',
@@ -223,7 +225,8 @@ export function FloorPlanEditor({
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
-  onPropertiesRequested, onMoveMultiSelection,
+  onDuplicateSelected, onPropertiesRequested, onMoveMultiSelection,
+  gridSize = 1,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 80, y: 80 });
@@ -233,6 +236,11 @@ export function FloorPlanEditor({
   const [drawingPolyline, setDrawingPolyline] = useState<{ x: number; y: number }[]>([]);
   const [bgImg, setBgImg] = useState<HTMLImageElement | null>(null);
   const [bgDragging, setBgDragging] = useState(false);
+  const [bgCornerDragging, setBgCornerDragging] = useState<number | null>(null);
+  const [bgCalibrating, setBgCalibrating] = useState(false);
+  const [bgCalibLine, setBgCalibLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [bgCalibRefLen, setBgCalibRefLen] = useState(1.0);
+  const [bgCalibDrawing, setBgCalibDrawing] = useState(false);
   const [snapPoint, setSnapPoint] = useState<{ x: number; y: number } | null>(null);
   const [mouseWorld, setMouseWorld] = useState<{ x: number; y: number } | null>(null);
   const [lassoRect, setLassoRect] = useState<LassoRect | null>(null);
@@ -255,6 +263,12 @@ export function FloorPlanEditor({
     wallOrigY2?: number;
     bgOrigX?: number;
     bgOrigY?: number;
+    bgOrigScale?: number;
+    bgOrigW?: number;
+    bgOrigH?: number;
+    bgCorner?: number;
+    calibX1?: number;
+    calibY1?: number;
     lassoX?: number;
     lassoY?: number;
     multiOrigWX?: number;
@@ -281,11 +295,46 @@ export function FloorPlanEditor({
         const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
         const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
         onSetBackground({ ...floor.backgroundImage, x: (dragState.current.bgOrigX ?? 0) + dx, y: (dragState.current.bgOrigY ?? 0) + dy });
+      } else if (dragState.current.type === 'move-bg-corner') {
+        if (!floor.backgroundImage || !bgImg) return;
+        const corner = dragState.current.bgCorner ?? 0;
+        const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
+        const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
+        const origX = dragState.current.bgOrigX ?? floor.backgroundImage.x;
+        const origY = dragState.current.bgOrigY ?? floor.backgroundImage.y;
+        const origScale = dragState.current.bgOrigScale ?? floor.backgroundImage.scale;
+        const origW = bgImg.width * origScale;
+        const origH = bgImg.height * origScale;
+        let newX = floor.backgroundImage.x;
+        let newY = floor.backgroundImage.y;
+        let newScale = origScale;
+        if (corner === 0) {
+          const newW = Math.max(0.5, origW - dx);
+          const newH = Math.max(0.5, origH - dy);
+          newScale = Math.max(newW / bgImg.width, newH / bgImg.height);
+          newX = origX + origW - bgImg.width * newScale;
+          newY = origY + origH - bgImg.height * newScale;
+        } else if (corner === 1) {
+          const newW = Math.max(0.5, origW + dx);
+          newScale = newW / bgImg.width;
+          newY = origY + origH - bgImg.height * newScale;
+        } else if (corner === 2) {
+          const newW = Math.max(0.5, origW + dx);
+          newScale = newW / bgImg.width;
+        } else if (corner === 3) {
+          const newW = Math.max(0.5, origW - dx);
+          newScale = newW / bgImg.width;
+          newX = origX + origW - bgImg.width * newScale;
+        }
+        onSetBackground({ ...floor.backgroundImage, x: newX, y: newY, scale: Math.max(0.001, newScale) });
       }
     };
     const handleGlobalUp = () => {
       if (dragState.current?.type === 'move-bg') {
         setBgDragging(false);
+        dragState.current = null;
+      } else if (dragState.current?.type === 'move-bg-corner') {
+        setBgCornerDragging(null);
         dragState.current = null;
       }
     };
@@ -295,7 +344,7 @@ export function FloorPlanEditor({
       window.removeEventListener('mousemove', handleGlobalMove);
       window.removeEventListener('mouseup', handleGlobalUp);
     };
-  }, [floor.backgroundImage, zoom, onSetBackground]);
+  }, [floor.backgroundImage, zoom, onSetBackground, bgImg]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -435,12 +484,56 @@ export function FloorPlanEditor({
       ctx.restore();
       ctx.globalAlpha = 1;
 
-      if (bgDragging) {
+      const showHandles = bgDragging || bgCornerDragging !== null || bgCalibrating;
+      if (showHandles) {
         ctx.strokeStyle = '#f59e0b';
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 3]);
         ctx.strokeRect(sx, sy, imgW, imgH);
         ctx.setLineDash([]);
+        const corners = [
+          { x: sx, y: sy },
+          { x: sx + imgW, y: sy },
+          { x: sx + imgW, y: sy + imgH },
+          { x: sx, y: sy + imgH },
+        ];
+        for (let ci = 0; ci < corners.length; ci++) {
+          const c = corners[ci];
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, 7, 0, Math.PI * 2);
+          ctx.fillStyle = bgCornerDragging === ci ? '#f59e0b' : '#1e293b';
+          ctx.fill();
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+
+      if (bgCalibrating && bgCalibLine) {
+        const cl = bgCalibLine;
+        ctx.beginPath();
+        ctx.moveTo(cl.x1, cl.y1);
+        ctx.lineTo(cl.x2, cl.y2);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cl.x1, cl.y1, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cl.x2, cl.y2, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        const midX = (cl.x1 + cl.x2) / 2;
+        const midY = (cl.y1 + cl.y2) / 2;
+        const pxLen = Math.sqrt((cl.x2 - cl.x1) ** 2 + (cl.y2 - cl.y1) ** 2);
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${pxLen.toFixed(0)}px = ${bgCalibRefLen}m`, midX, midY - 8);
+        ctx.textAlign = 'left';
       }
     }
 
@@ -448,6 +541,9 @@ export function FloorPlanEditor({
     const startGY = Math.floor(-offset.y / cellPx) - 1;
     const endGX = Math.ceil((W - offset.x) / cellPx) + 1;
     const endGY = Math.ceil((H - offset.y) / cellPx) + 1;
+
+    const majorGrid = Math.max(1, gridSize);
+    const minorGrid = majorGrid <= 1 ? 1 : majorGrid;
 
     ctx.strokeStyle = 'rgba(148,163,184,0.07)';
     ctx.lineWidth = 0.5;
@@ -462,23 +558,23 @@ export function FloorPlanEditor({
 
     ctx.strokeStyle = 'rgba(148,163,184,0.18)';
     ctx.lineWidth = 1;
-    for (let gx = Math.floor(startGX / 5) * 5; gx <= endGX; gx += 5) {
+    for (let gx = Math.floor(startGX / majorGrid) * majorGrid; gx <= endGX; gx += majorGrid) {
       const sx = gx * cellPx + offset.x;
       ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); ctx.stroke();
     }
-    for (let gy = Math.floor(startGY / 5) * 5; gy <= endGY; gy += 5) {
+    for (let gy = Math.floor(startGY / majorGrid) * majorGrid; gy <= endGY; gy += majorGrid) {
       const sy = gy * cellPx + offset.y;
       ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
     }
 
     ctx.font = '10px Inter, sans-serif';
     ctx.fillStyle = 'rgba(148,163,184,0.35)';
-    for (let gx = Math.floor(startGX / 5) * 5; gx <= endGX; gx += 5) {
+    for (let gx = Math.floor(startGX / majorGrid) * majorGrid; gx <= endGX; gx += majorGrid) {
       if (gx === 0) continue;
       const sx = gx * cellPx + offset.x;
       ctx.fillText(`${gx}m`, sx + 2, offset.y - 3);
     }
-    for (let gy = Math.floor(startGY / 5) * 5; gy <= endGY; gy += 5) {
+    for (let gy = Math.floor(startGY / majorGrid) * majorGrid; gy <= endGY; gy += majorGrid) {
       if (gy === 0) continue;
       const sy = gy * cellPx + offset.y;
       ctx.fillText(`${gy}m`, offset.x + 2, sy - 3);
@@ -991,7 +1087,8 @@ export function FloorPlanEditor({
     multiSel,
     offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
     tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
-    bgImg, bgDragging, drawCornerJoins, mouseWorld, lassoRect,
+    bgImg, bgDragging, bgCornerDragging, bgCalibrating, bgCalibLine, bgCalibRefLen,
+    drawCornerJoins, mouseWorld, lassoRect,
   ]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -1257,12 +1354,45 @@ export function FloorPlanEditor({
         }
       }
 
-      if (floor.backgroundImage && tool === 'select' && e.ctrlKey) {
+      if (floor.backgroundImage && tool === 'select') {
         const bg = floor.backgroundImage;
         const bgImgEl = bgImageCache.get(bg.dataUrl);
         if (bgImgEl) {
           const imgW = bgImgEl.width * bg.scale;
           const imgH = bgImgEl.height * bg.scale;
+          const corners = [
+            { x: bg.x, y: bg.y },
+            { x: bg.x + imgW, y: bg.y },
+            { x: bg.x + imgW, y: bg.y + imgH },
+            { x: bg.x, y: bg.y + imgH },
+          ];
+          const cornerRadius = 0.4 / zoom;
+          let hitCorner = -1;
+          for (let ci = 0; ci < corners.length; ci++) {
+            const cdx = world.x - corners[ci].x;
+            const cdy = world.y - corners[ci].y;
+            if (Math.sqrt(cdx * cdx + cdy * cdy) < cornerRadius) { hitCorner = ci; break; }
+          }
+
+          if (bgCalibrating) {
+            if (!bgCalibLine) {
+              setBgCalibLine({ x1: px, y1: py, x2: px, y2: py });
+              setBgCalibDrawing(true);
+              dragState.current = { type: 'calib-draw', startX: e.clientX, startY: e.clientY, calibX1: px, calibY1: py };
+            }
+            return;
+          }
+
+          if (hitCorner >= 0) {
+            setBgCornerDragging(hitCorner);
+            dragState.current = {
+              type: 'move-bg-corner', startX: e.clientX, startY: e.clientY,
+              bgOrigX: bg.x, bgOrigY: bg.y, bgOrigScale: bg.scale,
+              bgCorner: hitCorner,
+            };
+            return;
+          }
+
           if (world.x >= bg.x && world.x <= bg.x + imgW && world.y >= bg.y && world.y <= bg.y + imgH) {
             setBgDragging(true);
             dragState.current = { type: 'move-bg', startX: e.clientX, startY: e.clientY, bgOrigX: bg.x, bgOrigY: bg.y };
@@ -1337,6 +1467,10 @@ export function FloorPlanEditor({
       const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
       onSetBackground({ ...floor.backgroundImage, x: (dragState.current.bgOrigX ?? 0) + dx, y: (dragState.current.bgOrigY ?? 0) + dy });
+    } else if (dragState.current.type === 'calib-draw') {
+      const x1 = dragState.current.calibX1 ?? px;
+      const y1 = dragState.current.calibY1 ?? py;
+      setBgCalibLine({ x1, y1, x2: px, y2: py });
     } else if (dragState.current.type === 'lasso') {
       const lx = dragState.current.lassoX ?? world.x;
       const ly = dragState.current.lassoY ?? world.y;
@@ -1398,6 +1532,8 @@ export function FloorPlanEditor({
       setDrawRect(null);
     } else if (dragState.current?.type === 'move-bg') {
       setBgDragging(false);
+    } else if (dragState.current?.type === 'calib-draw') {
+      setBgCalibDrawing(false);
     } else if (dragState.current?.type === 'lasso' && lassoRect) {
       const sel = getLassoSelection(lassoRect);
       const hasSel = sel.wallIds.length + sel.roomIds.length + sel.ductIds.length + sel.pipeIds.length > 0;
@@ -1511,23 +1647,49 @@ export function FloorPlanEditor({
         {bg && (
           <>
             <button
-              onMouseDown={(e) => {
-                if (!floor.backgroundImage) return;
-                const bg2 = floor.backgroundImage;
-                setBgDragging(true);
-                dragState.current = { type: 'move-bg', startX: e.clientX, startY: e.clientY, bgOrigX: bg2.x, bgOrigY: bg2.y };
-                e.preventDefault();
-              }}
-              className="flex items-center gap-1 px-2 py-1 bg-amber-900/50 hover:bg-amber-800/70 text-amber-300 border border-amber-700 rounded text-xs cursor-grab active:cursor-grabbing"
-              title="Bild verschieben (ziehen)"
+              onClick={() => { setBgCalibrating(v => !v); setBgCalibLine(null); }}
+              className={`flex items-center gap-1 px-2 py-1 border rounded text-xs ${bgCalibrating ? 'bg-red-800/70 text-red-200 border-red-600' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'}`}
+              title="Referenzlinie zeichnen und Massstab kalibrieren"
             >
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/>
-                <polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/>
-                <line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>
+                <path d="M2 12h20M2 12l4-4M2 12l4 4M22 12l-4-4M22 12l-4 4"/>
               </svg>
-              Pos.
+              Kalibrieren
             </button>
+            {bgCalibrating && (
+              <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-red-700 rounded text-xs text-slate-300">
+                {!bgCalibLine ? (
+                  <span className="text-red-300 italic">Referenzlinie auf Bild zeichnen...</span>
+                ) : (
+                  <>
+                    <span className="text-slate-500">Länge:</span>
+                    <input
+                      type="number" min="0.01" step="0.1"
+                      value={bgCalibRefLen}
+                      onChange={e => setBgCalibRefLen(parseFloat(e.target.value) || 1)}
+                      className="w-16 bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs text-white"
+                    />
+                    <span className="text-slate-500">m</span>
+                    <button
+                      onClick={() => {
+                        if (!bgCalibLine || !bgImg) return;
+                        const pxLen = Math.sqrt((bgCalibLine.x2 - bgCalibLine.x1) ** 2 + (bgCalibLine.y2 - bgCalibLine.y1) ** 2);
+                        if (pxLen < 5) return;
+                        const newScale = bg.scale * bgCalibRefLen * CELL * zoom / pxLen;
+                        onSetBackground({ ...bg, scale: Math.max(0.001, newScale) });
+                        setBgCalibrating(false);
+                        setBgCalibLine(null);
+                      }}
+                      className="px-1.5 py-0.5 bg-green-700 hover:bg-green-600 text-white rounded text-[10px] font-medium"
+                    >Übernehmen</button>
+                    <button
+                      onClick={() => setBgCalibLine(null)}
+                      className="px-1.5 py-0.5 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded text-[10px]"
+                    >Neu</button>
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
               <span className="text-slate-500">Deckkraft</span>
               <input type="range" min="0.05" max="1" step="0.05" value={bg.opacity}
@@ -1549,7 +1711,7 @@ export function FloorPlanEditor({
                 className="w-16 h-1 accent-blue-500" />
               <span className="text-slate-400 w-8">{bg.rotation}°</span>
             </div>
-            <button onClick={() => onSetBackground(null)}
+            <button onClick={() => { onSetBackground(null); setBgCalibrating(false); setBgCalibLine(null); }}
               className="px-2 py-1 bg-red-900/40 hover:bg-red-900/70 text-red-400 border border-red-800 rounded text-xs">✕</button>
           </>
         )}
@@ -1559,10 +1721,10 @@ export function FloorPlanEditor({
         <div className="absolute top-2 right-10 z-10 flex items-center gap-1.5 bg-blue-900/80 border border-blue-600 rounded px-2.5 py-1.5 text-xs text-blue-200">
           <span>{totalMultiSel} ausgewählt</span>
           <button
-            onClick={() => { onCopySelected?.(multiSel); }}
+            onClick={() => { onDuplicateSelected?.(multiSel); setMultiSel({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] }); }}
             className="px-1.5 py-0.5 bg-blue-700 hover:bg-blue-600 rounded text-blue-100 text-[10px]"
-            title="Kopieren (Strg+C)"
-          >Kopieren</button>
+            title="Duplizieren"
+          >Duplizieren</button>
           <button
             onClick={() => { onDeleteSelected?.(multiSel); setMultiSel({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] }); }}
             className="px-1.5 py-0.5 bg-red-800 hover:bg-red-700 rounded text-red-200 text-[10px]"
