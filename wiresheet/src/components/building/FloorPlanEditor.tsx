@@ -46,6 +46,7 @@ interface Props {
   onDeleteSlab?: (slabId: string) => void;
   selectedSlabId?: string | null;
   onSelectSlab?: (id: string | null) => void;
+  onAddPolygonRoom?: (points: { x: number; y: number }[]) => void;
   onSelectionChange?: (sel: MultiSelection) => void;
   onDeleteSelected?: (sel: MultiSelection) => void;
   onCopySelected?: (sel: MultiSelection) => void;
@@ -224,7 +225,7 @@ export function FloorPlanEditor({
   onDeleteWall, onDeleteRoom, onSetBackground,
   onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
-  onAddSlab, onDeleteSlab,
+  onAddSlab, onDeleteSlab, onAddPolygonRoom,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
   onDuplicateSelected, onPropertiesRequested, onMoveMultiSelection,
   gridSize = 1,
@@ -398,12 +399,17 @@ export function FloorPlanEditor({
         onAddSlab?.({ points: drawingPolyline, color: '#64748b', opacity: 0.25 });
         setDrawingPolyline([]);
       }
+
+      if (e.key === 'Enter' && tool === 'polygon-room' && drawingPolyline.length >= 3) {
+        onAddPolygonRoom?.(drawingPolyline);
+        setDrawingPolyline([]);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [multiSel, selectedWallId, selectedRoomId, selectedDuctId, selectedPipeId,
     onDeleteSelected, onDeleteWall, onDeleteRoom, onDeleteDuct, onDeletePipe,
-    onCopySelected, onPasteClipboard, drawingWall, drawingPolyline, tool, onAddSlab]);
+    onCopySelected, onPasteClipboard, drawingWall, drawingPolyline, tool, onAddSlab, onAddPolygonRoom]);
 
   const toWorld = useCallback((px: number, py: number) => ({
     x: (px - offset.x) / (CELL * zoom),
@@ -631,22 +637,66 @@ export function FloorPlanEditor({
 
     for (const room of floor.rooms) {
       const isSelected = room.id === selectedRoomId || multiSel.roomIds.includes(room.id);
-      const s = toScreen(room.x, room.y);
-      const rw = room.width * cellPx;
-      const rd = room.depth * cellPx;
-      ctx.fillStyle = room.color + '22';
-      ctx.fillRect(s.x, s.y, rw, rd);
-      ctx.strokeStyle = isSelected ? '#60a5fa' : room.color + 'aa';
-      ctx.lineWidth = isSelected ? 2 : 1;
-      if (isSelected) { ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 5; }
-      ctx.strokeRect(s.x, s.y, rw, rd);
-      ctx.shadowBlur = 0;
-      const fs = Math.max(9, Math.min(12, 10 * zoom));
-      ctx.font = `${fs}px Inter, sans-serif`;
-      ctx.fillStyle = 'rgba(226,232,240,0.7)';
-      ctx.textAlign = 'center';
-      ctx.fillText(room.name, s.x + rw / 2, s.y + rd / 2 + fs * 0.35);
-      ctx.textAlign = 'left';
+      if (room.points && room.points.length >= 3) {
+        const pts = room.points;
+        const sp0 = toScreen(pts[0].x, pts[0].y);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(sp0.x, sp0.y);
+        for (let i = 1; i < pts.length; i++) {
+          const spi = toScreen(pts[i].x, pts[i].y);
+          ctx.lineTo(spi.x, spi.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = room.color + '25';
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? '#22c55e' : room.color + 'bb';
+        ctx.lineWidth = isSelected ? 2 : 1.5;
+        ctx.setLineDash(isSelected ? [] : [5, 3]);
+        if (isSelected) { ctx.shadowColor = '#22c55e'; ctx.shadowBlur = 5; }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        const sc = toScreen(cx, cy);
+        const fs = Math.max(9, Math.min(12, 10 * zoom));
+        ctx.font = `${fs}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(226,232,240,0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(room.name, sc.x, sc.y + fs * 0.35);
+        ctx.textAlign = 'left';
+        if (isSelected) {
+          for (const pt of pts) {
+            const sp = toScreen(pt.x, pt.y);
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#22c55e';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      } else {
+        const s = toScreen(room.x, room.y);
+        const rw = room.width * cellPx;
+        const rd = room.depth * cellPx;
+        ctx.fillStyle = room.color + '22';
+        ctx.fillRect(s.x, s.y, rw, rd);
+        ctx.strokeStyle = isSelected ? '#60a5fa' : room.color + 'aa';
+        ctx.lineWidth = isSelected ? 2 : 1;
+        if (isSelected) { ctx.shadowColor = '#3b82f6'; ctx.shadowBlur = 5; }
+        ctx.strokeRect(s.x, s.y, rw, rd);
+        ctx.shadowBlur = 0;
+        const fs = Math.max(9, Math.min(12, 10 * zoom));
+        ctx.font = `${fs}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(226,232,240,0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(room.name, s.x + rw / 2, s.y + rd / 2 + fs * 0.35);
+        ctx.textAlign = 'left';
+      }
     }
 
     drawCornerJoins(ctx, cellPx);
@@ -1021,6 +1071,61 @@ export function FloorPlanEditor({
       ctx.restore();
     }
 
+    if (drawingPolyline.length > 0 && mouseWorld && tool === 'polygon-room') {
+      const roomPreviewColor = '#22c55e';
+      ctx.save();
+      ctx.strokeStyle = roomPreviewColor;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.setLineDash([6, 3]);
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      const rfp = toScreen(drawingPolyline[0].x, drawingPolyline[0].y);
+      ctx.moveTo(rfp.x, rfp.y);
+      for (let i = 1; i < drawingPolyline.length; i++) {
+        const spi = toScreen(drawingPolyline[i].x, drawingPolyline[i].y);
+        ctx.lineTo(spi.x, spi.y);
+      }
+      const rms = toScreen(mouseWorld.x, mouseWorld.y);
+      ctx.lineTo(rms.x, rms.y);
+      ctx.stroke();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = roomPreviewColor + '66';
+      ctx.lineTo(rfp.x, rfp.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (drawingPolyline.length >= 3) {
+        ctx.fillStyle = roomPreviewColor + '20';
+        ctx.beginPath();
+        ctx.moveTo(rfp.x, rfp.y);
+        for (let i = 1; i < drawingPolyline.length; i++) {
+          const spi = toScreen(drawingPolyline[i].x, drawingPolyline[i].y);
+          ctx.lineTo(spi.x, spi.y);
+        }
+        ctx.lineTo(rms.x, rms.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      for (const pt of drawingPolyline) {
+        const sp = toScreen(pt.x, pt.y);
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = roomPreviewColor;
+        ctx.fill();
+      }
+      const rCloseDist = dist(mouseWorld.x, mouseWorld.y, drawingPolyline[0].x, drawingPolyline[0].y);
+      if (drawingPolyline.length >= 3 && rCloseDist < ENDPOINT_SNAP_RADIUS * 2) {
+        ctx.beginPath();
+        ctx.arc(rfp.x, rfp.y, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     if (drawingPolyline.length > 0 && mouseWorld && (tool === 'duct' || tool === 'pipe')) {
       const color = tool === 'duct' ? (DUCT_TYPE_COLORS[ductType] || '#60a5fa') : (PIPE_TYPE_COLORS[pipeType] || '#ef4444');
       const lineW = tool === 'duct' ? ductWidth * cellPx : pipeDiameter * cellPx;
@@ -1231,6 +1336,19 @@ export function FloorPlanEditor({
         const closeDist = dist(world.x, world.y, drawingPolyline[0].x, drawingPolyline[0].y);
         if (closeDist < ENDPOINT_SNAP_RADIUS * 2) {
           onAddSlab?.({ points: drawingPolyline, color: '#64748b', opacity: 0.25 });
+          setDrawingPolyline([]);
+          return;
+        }
+      }
+      setDrawingPolyline(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      return;
+    }
+
+    if (tool === 'polygon-room') {
+      if (drawingPolyline.length >= 3) {
+        const closeDist = dist(world.x, world.y, drawingPolyline[0].x, drawingPolyline[0].y);
+        if (closeDist < ENDPOINT_SNAP_RADIUS * 2) {
+          onAddPolygonRoom?.(drawingPolyline);
           setDrawingPolyline([]);
           return;
         }
@@ -1586,7 +1704,7 @@ export function FloorPlanEditor({
   }, [onSetBackground]);
 
   const getCursor = () => {
-    if (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe' || tool === 'slab') return 'crosshair';
+    if (tool === 'wall' || tool === 'room' || tool === 'polygon-room' || tool === 'duct' || tool === 'pipe' || tool === 'slab') return 'crosshair';
     if (tool === 'delete') return 'not-allowed';
     if (dragState.current?.type === 'lasso') return 'crosshair';
     return 'default';
@@ -1599,6 +1717,13 @@ export function FloorPlanEditor({
     if (tool === 'slab') {
       if (drawingPolyline.length >= 3) {
         onAddSlab?.({ points: drawingPolyline, color: '#64748b', opacity: 0.25 });
+      }
+      setDrawingPolyline([]);
+      return;
+    }
+    if (tool === 'polygon-room') {
+      if (drawingPolyline.length >= 3) {
+        onAddPolygonRoom?.(drawingPolyline);
       }
       setDrawingPolyline([]);
       return;

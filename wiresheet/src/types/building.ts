@@ -69,6 +69,7 @@ export interface Room {
   color: string;
   doors: Door[];
   windows: Window2D[];
+  points?: { x: number; y: number }[];
 }
 
 // ---- 3D Widgets ----
@@ -232,7 +233,7 @@ export interface Building {
   updatedAt: number;
 }
 
-export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab';
+export type BuildingTool = 'select' | 'room' | 'polygon-room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;

@@ -405,6 +405,44 @@ export function useBuildingEditor() {
     return room.id;
   }, [buildings, updateBuildings]);
 
+  const addPolygonRoom = useCallback((
+    buildingId: string,
+    floorId: string,
+    points: { x: number; y: number }[],
+    type: Room['type'],
+    name?: string
+  ) => {
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    const room: Room = {
+      id: `room-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      name: name || `Zone ${Math.floor(Math.random() * 900 + 100)}`,
+      type,
+      x: minX, y: minY,
+      width: Math.max(...xs) - minX,
+      depth: Math.max(...ys) - minY,
+      color: ROOM_COLORS[type] || '#22c55e',
+      doors: [],
+      windows: [],
+      points,
+    };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, rooms: [...f.rooms, room] } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedRoomId(room.id);
+    return room.id;
+  }, [buildings, updateBuildings]);
+
   const updateRoom = useCallback((buildingId: string, floorId: string, roomId: string, changes: Partial<Room>) => {
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -916,6 +954,7 @@ export function useBuildingEditor() {
     updateWall,
     deleteWall,
     addRoom,
+    addPolygonRoom,
     updateRoom,
     deleteRoom,
     addWallOpening,

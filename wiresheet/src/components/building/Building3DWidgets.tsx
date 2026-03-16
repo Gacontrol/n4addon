@@ -343,18 +343,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
             />
           </mesh>
         </group>
-      ) : (
-        <mesh position={[0, 0, 0]} castShadow>
-          <boxGeometry args={[0.38 * displaySize, 0.28 * displaySize, 0.06]} />
-          <meshStandardMaterial
-            color={baseColor}
-            emissive={alarmActive ? new THREE.Color('#ef4444') : new THREE.Color(baseColor)}
-            emissiveIntensity={alarmActive ? 0.5 : 0.08}
-            metalness={0.25}
-            roughness={0.55}
-          />
-        </mesh>
-      )}
+      ) : null}
 
       {(isAlarm || alarmActive) && <PulseRing color={pulseColor} radius={0.22 * displaySize} />}
 
@@ -366,7 +355,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       )}
 
       <Html
-        position={[0, isDuct ? 0.55 + 0.15 * displaySize : 0.32 * displaySize + 0.12, 0]}
+        position={[0, isDuct ? 0.55 + 0.15 * displaySize : 0.18, 0]}
         center
         sprite
         distanceFactor={6}
@@ -374,14 +363,14 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
         <div style={{
-          background: 'rgba(15,23,42,0.92)',
-          border: `1px solid ${alarmActive ? '#ef4444' : baseColor}60`,
-          borderRadius: Math.round(5 * displaySize) + 'px',
-          padding: `${Math.round(3 * displaySize)}px ${Math.round(7 * displaySize)}px`,
-          minWidth: Math.round(56 * displaySize) + 'px',
+          background: 'rgba(10,18,36,0.88)',
+          border: `2px solid ${alarmActive ? '#ef4444' : baseColor}`,
+          borderRadius: Math.round(12 * displaySize) + 'px',
+          padding: `${Math.round(4 * displaySize)}px ${Math.round(10 * displaySize)}px`,
+          minWidth: Math.round(60 * displaySize) + 'px',
           textAlign: 'center',
-          backdropFilter: 'blur(4px)',
-          boxShadow: alarmActive ? `0 0 ${Math.round(8 * displaySize)}px #ef444480` : 'none',
+          backdropFilter: 'blur(6px)',
+          boxShadow: `0 0 ${Math.round(6 * displaySize)}px ${alarmActive ? '#ef444480' : baseColor + '50'}`,
           whiteSpace: 'nowrap',
         }}>
           {widget.showLabel !== false && (
@@ -427,19 +416,34 @@ interface RoomColorOverlayProps {
 export function RoomColorOverlay({ widget, baseY, floorHeight, buildings, liveValue, alarmActive, selected, onSelect }: RoomColorOverlayProps) {
   const roomIds: string[] = (widget as any).roomIds ?? [];
 
-  const roomBoxes = useMemo(() => {
-    const boxes: { x: number; z: number; w: number; d: number }[] = [];
+  type RoomEntry =
+    | { kind: 'box'; x: number; z: number; w: number; d: number }
+    | { kind: 'poly'; shape: THREE.Shape; cx: number; cz: number };
+
+  const roomEntries = useMemo(() => {
+    const entries: RoomEntry[] = [];
     for (const building of buildings) {
       for (const floor of building.floors) {
         if (floor.id !== widget.floorId) continue;
         for (const room of floor.rooms) {
-          if (roomIds.length === 0 || roomIds.includes(room.id)) {
-            boxes.push({ x: room.x + room.width / 2, z: room.y + room.depth / 2, w: room.width, d: room.depth });
+          if (roomIds.length > 0 && !roomIds.includes(room.id)) continue;
+          if (room.points && room.points.length >= 3) {
+            const shape = new THREE.Shape();
+            shape.moveTo(room.points[0].x, -room.points[0].y);
+            for (let i = 1; i < room.points.length; i++) {
+              shape.lineTo(room.points[i].x, -room.points[i].y);
+            }
+            shape.closePath();
+            const xs = room.points.map(p => p.x);
+            const ys = room.points.map(p => p.y);
+            entries.push({ kind: 'poly', shape, cx: (Math.min(...xs) + Math.max(...xs)) / 2, cz: -(Math.min(...ys) + Math.max(...ys)) / 2 });
+          } else {
+            entries.push({ kind: 'box', x: room.x + room.width / 2, z: room.y + room.depth / 2, w: room.width, d: room.depth });
           }
         }
       }
     }
-    return boxes;
+    return entries;
   }, [buildings, widget.floorId, roomIds]);
 
   const active = alarmActive === true || (liveValue !== undefined && liveValue !== '0' && liveValue !== 'off' && liveValue !== false);
@@ -450,18 +454,34 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, buildings, liveVa
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-      {roomBoxes.map((b, i) => (
-        <mesh key={i} position={[b.x, baseY + floorHeight - 0.01, b.z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[b.w - 0.05, b.d - 0.05]} />
-          <meshBasicMaterial color={overlayColor} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
-        </mesh>
-      ))}
-      {selected && roomBoxes.map((b, i) => (
-        <lineSegments key={`sel-${i}`} position={[b.x, baseY + floorHeight * 0.5, b.z]}>
-          <edgesGeometry args={[new THREE.BoxGeometry(b.w, floorHeight, b.d)]} />
-          <lineBasicMaterial color="#60a5fa" />
-        </lineSegments>
-      ))}
+      {roomEntries.map((entry, i) => {
+        if (entry.kind === 'poly') {
+          const geo = new THREE.ShapeGeometry(entry.shape);
+          return (
+            <mesh key={i} position={[0, baseY + floorHeight - 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <primitive object={geo} />
+              <meshBasicMaterial color={overlayColor} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+            </mesh>
+          );
+        }
+        return (
+          <mesh key={i} position={[entry.x, baseY + floorHeight - 0.01, entry.z]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[entry.w - 0.05, entry.d - 0.05]} />
+            <meshBasicMaterial color={overlayColor} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        );
+      })}
+      {selected && roomEntries.map((entry, i) => {
+        if (entry.kind === 'box') {
+          return (
+            <lineSegments key={`sel-${i}`} position={[entry.x, baseY + floorHeight * 0.5, entry.z]}>
+              <edgesGeometry args={[new THREE.BoxGeometry(entry.w, floorHeight, entry.d)]} />
+              <lineBasicMaterial color="#60a5fa" />
+            </lineSegments>
+          );
+        }
+        return null;
+      })}
     </group>
   );
 }

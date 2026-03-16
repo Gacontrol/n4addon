@@ -452,13 +452,13 @@ function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
   const shape = useMemo(() => {
     if (slab.points.length < 3) return null;
     const s = new THREE.Shape();
-    s.moveTo(slab.points[0].x + offsetX, slab.points[0].y);
+    s.moveTo(slab.points[0].x, -slab.points[0].y);
     for (let i = 1; i < slab.points.length; i++) {
-      s.lineTo(slab.points[i].x + offsetX, slab.points[i].y);
+      s.lineTo(slab.points[i].x, -slab.points[i].y);
     }
     s.closePath();
     return s;
-  }, [slab.points, offsetX]);
+  }, [slab.points]);
 
   if (!shape) return null;
 
@@ -467,11 +467,11 @@ function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
     bevelEnabled: false,
   }), [thickness]);
 
-  const y = baseY + elevation + thickness / 2;
+  const y = baseY + elevation;
 
   return (
     <mesh
-      position={[0, y, 0]}
+      position={[offsetX, y, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       castShadow
       receiveShadow
@@ -627,6 +627,7 @@ function BuildingScene({
       }
 
       for (const room of floor.rooms) {
+        if (room.points && room.points.length > 0) continue;
         elements.push(
           <RoomMesh
             key={`room-${room.id}`}
