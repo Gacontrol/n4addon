@@ -714,53 +714,23 @@ function createStraightDuct(
 // Both straight ducts are shortened by `trim` before the elbow is inserted,
 // guaranteeing a gap-free joint at any angle.
 
-function elbowRadius(w: number, h: number): number {
-  return Math.max(w, h) * 0.75;
-}
-
-function createElbow(
+function createMiterCorner(
   nodePos: THREE.Vector3,
   inDir: THREE.Vector3,
   outDir: THREE.Vector3,
   w: number, h: number, isRound: boolean
 ): THREE.BufferGeometry {
   const dot = Math.max(-1, Math.min(1, inDir.dot(outDir)));
-  const interiorAngle = Math.acos(dot);
-  if (interiorAngle < 0.02) return new THREE.BufferGeometry();
-
-  const axis = new THREE.Vector3().crossVectors(inDir, outDir);
-  if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
-  axis.normalize();
-
-  // sweepAngle = the actual bend/deflection angle between the two duct directions
-  const sweepAngle = interiorAngle;
-  const R = elbowRadius(w, h);
-  const trim = R * Math.tan(sweepAngle / 2);
-
-  // Arc starts at nodePos - inDir*trim (where the trimmed straight ends).
-  // Arc center is perpendicular (inward) at distance R from the start point.
-  const inwardDir = new THREE.Vector3().crossVectors(axis, inDir).normalize();
-  const arcCenter = nodePos.clone()
-    .addScaledVector(inDir, -trim)
-    .addScaledVector(inwardDir, R);
-
-  const spine: THREE.Vector3[]    = [];
-  const tangents: THREE.Vector3[] = [];
-
-  for (let s = 0; s <= ELBOW_SEGMENTS; s++) {
-    const frac   = s / ELBOW_SEGMENTS;
-    const angle  = frac * sweepAngle;
-    const quat   = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-
-    const tangent   = inDir.clone().applyQuaternion(quat).normalize();
-    const radialOut = inwardDir.clone().negate().applyQuaternion(quat).normalize();
-    const pt        = arcCenter.clone().addScaledVector(radialOut, R);
-
-    spine.push(pt);
-    tangents.push(tangent);
-  }
+  const angle = Math.acos(dot);
+  if (angle < 0.02) return new THREE.BufferGeometry();
 
   const profile = isRound ? circleProfile(w / 2) : rectProfile(w / 2, h / 2);
+  const spine: THREE.Vector3[] = [
+    nodePos.clone().addScaledVector(inDir, -0.001),
+    nodePos.clone(),
+    nodePos.clone().addScaledVector(outDir, 0.001),
+  ];
+  const tangents: THREE.Vector3[] = [inDir.clone(), inDir.clone().lerp(outDir, 0.5).normalize(), outDir.clone()];
   return buildSweptTube(profile, spine, tangents);
 }
 
@@ -936,37 +906,30 @@ function buildDuctNetwork(
     rawDirs.push(d.divideScalar(len));
   }
 
-  // 3. Compute trim distances at each interior node
-  //    trim = R * tan(sweepAngle / 2)   where sweepAngle = actual deflection angle
-  const R = elbowRadius(w, h);
+  // 3. No trim - ducts go all the way to the corner node (sharp miter)
   const trims: number[] = new Array(worldPts.length).fill(0);
 
-  for (let i = 1; i < worldPts.length - 1; i++) {
-    const dIn  = rawDirs[i - 1];
-    const dOut = rawDirs[i];
-    const dot  = Math.max(-1, Math.min(1, dIn.dot(dOut)));
-    const sweepAngle = Math.acos(dot);
-    if (sweepAngle < 0.02) continue;
-    trims[i] = R * Math.tan(sweepAngle / 2);
-  }
+  // 4. Detect which endpoints connect to a vertical segment (augmented elev points)
+  //    - first point is a vertical connect if points[0].elev is defined
+  //    - last point is a vertical connect if points[last].elev is defined
+  const firstIsVertConn = points[0].elev !== undefined;
+  const lastIsVertConn  = points[points.length - 1].elev !== undefined;
 
-  // 4. Generate trimmed straight segments
+  // 5. Generate straight segments (no trimming, sharp corners)
   for (let i = 0; i < worldPts.length - 1; i++) {
     const a       = worldPts[i];
     const dir     = rawDirs[i];
     const fullLen = a.distanceTo(worldPts[i + 1]);
-    const pullA   = trims[i];
-    const pullB   = trims[i + 1];
-    const usedLen = fullLen - pullA - pullB;
+    const usedLen = fullLen - trims[i] - trims[i + 1];
 
     if (usedLen < 0.005) continue;
 
-    const start = a.clone().addScaledVector(dir, pullA);
-    const end   = a.clone().addScaledVector(dir, pullA + usedLen);
+    const start = a.clone().addScaledVector(dir, trims[i]);
+    const end   = a.clone().addScaledVector(dir, trims[i] + usedLen);
     const geo   = createStraightDuct(start, end, w, h, isRound);
     result.straightGeos.push({ geo, start, end, w, h });
 
-    // Flanges
+    // Only add intermediate flanges along the segment length, no end flanges
     const nFlanges = Math.max(0, Math.floor(usedLen / FLANGE_SPACING) - 1);
     for (let f = 1; f <= nFlanges; f++) {
       result.flangePositions.push({
@@ -974,11 +937,20 @@ function buildDuctNetwork(
         dir: dir.clone(), w, h,
       });
     }
-    result.flangePositions.push({ pos: start.clone().addScaledVector(dir,  FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
-    result.flangePositions.push({ pos: end.clone().addScaledVector(dir,  -FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
+    // End flanges: only add at true endpoints (not corners, not vertical connections)
+    const isFirstSeg = i === 0;
+    const isLastSeg  = i === worldPts.length - 2;
+    const hasCornerAtStart = isFirstSeg ? false : true;
+    const hasCornerAtEnd   = isLastSeg  ? false : true;
+    if (!hasCornerAtStart && !(isFirstSeg && firstIsVertConn)) {
+      result.flangePositions.push({ pos: start.clone().addScaledVector(dir, FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
+    }
+    if (!hasCornerAtEnd && !(isLastSeg && lastIsVertConn)) {
+      result.flangePositions.push({ pos: end.clone().addScaledVector(dir, -FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
+    }
   }
 
-  // 5. Generate elbows at interior nodes where the direction changes
+  // 6. Generate sharp miter corners at interior nodes where the direction changes
   for (let i = 1; i < worldPts.length - 1; i++) {
     const dIn   = rawDirs[i - 1];
     const dOut  = rawDirs[i];
@@ -986,7 +958,7 @@ function buildDuctNetwork(
     const angle = Math.acos(dot);
     if (angle < 0.02) continue;
 
-    const geo = createElbow(worldPts[i], dIn, dOut, w, h, isRound);
+    const geo = createMiterCorner(worldPts[i], dIn, dOut, w, h, isRound);
     result.elbowGeos.push(geo);
   }
 
@@ -1216,10 +1188,6 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect, allD
     const vertStart = new THREE.Vector3(vx, minY, vz);
     const vertEnd   = new THREE.Vector3(vx, maxY, vz);
     const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
-    const upDir     = new THREE.Vector3(0, 1, 0);
-    const downDir   = new THREE.Vector3(0, -1, 0);
-    const qUp       = ductQuaternion(upDir);
-    const qDown     = ductQuaternion(downDir);
 
     return (
       <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -1227,20 +1195,8 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect, allD
           <primitive object={vertGeo} />
           {mat}
         </mesh>
-        <group position={vertStart.toArray()} quaternion={qDown}>
-          {isRound
-            ? <FlangeRound r={w / 2} tex={flangeTex} />
-            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
-          }
-        </group>
-        <group position={vertEnd.toArray()} quaternion={qUp}>
-          {isRound
-            ? <FlangeRound r={w / 2} tex={flangeTex} />
-            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
-          }
-        </group>
         {selected && (
-          <mesh position={[(minY + maxY) / 2 === 0 ? vx : vx, (minY + maxY) / 2, vz]}>
+          <mesh position={[vx, (minY + maxY) / 2, vz]}>
             {isRound
               ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, maxY - minY + 0.03, 12]} />
               : <boxGeometry args={[w + 0.03, maxY - minY + 0.03, h + 0.03]} />
