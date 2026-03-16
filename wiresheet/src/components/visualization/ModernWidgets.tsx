@@ -101,6 +101,9 @@ export const ModernButton: React.FC<ModernButtonProps> = ({ onValueChange, confi
       onValueChange(config.releaseValue ?? false);
     } else {
       onValueChange(config.pressValue ?? true);
+      setTimeout(() => {
+        onValueChange(config.releaseValue ?? false);
+      }, 300);
     }
     setTimeout(() => setRipple(null), 600);
   };
