@@ -940,7 +940,7 @@ export function FloorPlanEditor({
 
       if (duct.isVertical && duct.verticalX != null) {
         const vx = duct.verticalX;
-        const vy = pts[0].y;
+        const vy = duct.verticalY ?? pts[0].y;
         const sp = toScreen(vx, vy);
         const r = Math.max(duct.width * cellPx * 0.6, 10);
         ctx.save();
@@ -1379,7 +1379,7 @@ export function FloorPlanEditor({
     for (const duct of [...(floor.ducts ?? [])].reverse()) {
       if (duct.isVertical && duct.verticalX != null) {
         const vx = duct.verticalX;
-        const vy = duct.points[0]?.y ?? 0;
+        const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
         const r = Math.max(duct.width * 0.6, 0.3);
         if (dist(wx, wy, vx, vy) < r) return { type: 'duct' as const, id: duct.id };
         continue;

@@ -1122,6 +1122,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   addPipe(activeBuilding.id, fromFloorId, pipe);
                   addPipe(activeBuilding.id, toFloorId, pipe);
                 }}
+                onUpdateVerticalDuct={(ductId, floorId, changes) => {
+                  if (!activeBuilding) return;
+                  updateDuct(activeBuilding.id, floorId, ductId, changes);
+                }}
                 onMergeDucts={(ductIds, floorId) => {
                   if (!activeBuilding) return null;
                   return mergeDucts(activeBuilding.id, floorId, ductIds);

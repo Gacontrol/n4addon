@@ -654,7 +654,10 @@ export function useBuildingEditor() {
             ducts: (f.ducts ?? []).map(d => {
               if (d.id !== ductId) return d;
               const moved = { ...d, points: d.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy })) };
-              if (d.isVertical && d.verticalX != null) moved.verticalX = d.verticalX + dx;
+              if (d.isVertical && d.verticalX != null) {
+                moved.verticalX = d.verticalX + dx;
+                moved.verticalY = (d.verticalY ?? 0) + dy;
+              }
               return moved;
             }),
           } : f

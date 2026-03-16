@@ -12,6 +12,7 @@ interface Props {
   tool: 'select' | 'duct' | 'pipe';
   onAddVerticalDuct: (duct: Omit<Duct, 'id'>, fromFloorId: string) => void;
   onAddVerticalPipe: (pipe: Omit<Pipe, 'id'>, fromFloorId: string, toFloorId: string) => void;
+  onUpdateVerticalDuct?: (ductId: string, floorId: string, changes: Partial<Duct>) => void;
   onMergeDucts?: (ductIds: string[], floorId: string) => string | null;
   gridSize: number;
 }
@@ -39,6 +40,12 @@ interface ContextMenu {
   y: number;
 }
 
+interface DragState {
+  ductId: string;
+  floorId: string;
+  pointIndex: number;
+}
+
 export function SectionView({
   building,
   ductType,
@@ -50,6 +57,7 @@ export function SectionView({
   tool,
   onAddVerticalDuct,
   onAddVerticalPipe,
+  onUpdateVerticalDuct,
   onMergeDucts,
   gridSize,
 }: Props) {
@@ -60,6 +68,8 @@ export function SectionView({
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [selectedDuctIds, setSelectedDuctIds] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [hoverPoint, setHoverPoint] = useState<{ ductId: string; pointIndex: number } | null>(null);
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0 });
   const panOffsetStart = useRef({ x: 0, y: 0 });
@@ -95,7 +105,7 @@ export function SectionView({
     y: getTotalHeight() - (sy - offset.y) / (CELL * zoom),
   }), [offset, zoom, getTotalHeight]);
 
-  const snapTo = (v: number) => Math.round(v / gridSize) * gridSize;
+  const snapTo = useCallback((v: number) => Math.round(v / gridSize) * gridSize, [gridSize]);
 
   const getAllSectionDucts = useCallback((): { duct: Duct; floor: Floor; floorBaseY: number }[] => {
     const result: { duct: Duct; floor: Floor; floorBaseY: number }[] = [];
@@ -123,8 +133,20 @@ export function SectionView({
         if (len2 < 1e-9) continue;
         const t = Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / len2));
         const px = ax + t * dx, py = ay + t * dy;
-        const dist = Math.sqrt((wx - px) ** 2 + (wy - py) ** 2);
-        if (dist < duct.width * 0.6 + 0.2) return { duct, floor };
+        const d = Math.sqrt((wx - px) ** 2 + (wy - py) ** 2);
+        if (d < duct.width * 0.6 + 0.2) return { duct, floor };
+      }
+    }
+    return null;
+  }, [getAllSectionDucts]);
+
+  const hitTestPoint = useCallback((wx: number, wy: number, radius = 0.35): { ductId: string; floorId: string; pointIndex: number } | null => {
+    const entries = getAllSectionDucts();
+    for (const { duct, floor } of [...entries].reverse()) {
+      const pts = duct.verticalSectionPoints!;
+      for (let i = 0; i < pts.length; i++) {
+        const d = Math.sqrt((wx - pts[i].x) ** 2 + (wy - pts[i].y) ** 2);
+        if (d < radius) return { ductId: duct.id, floorId: floor.id, pointIndex: i };
       }
     }
     return null;
@@ -251,12 +273,20 @@ export function SectionView({
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      for (const pt of pts) {
-        const sp = toScreen(pt.x, pt.y);
+      for (let pi = 0; pi < pts.length; pi++) {
+        const sp = toScreen(pts[pi].x, pts[pi].y);
+        const isHover = hoverPoint?.ductId === duct.id && hoverPoint?.pointIndex === pi;
+        const isDragging = dragState?.ductId === duct.id && dragState?.pointIndex === pi;
+        const r = (isHover || isDragging) ? 7 : 4;
         ctx.beginPath();
-        ctx.arc(sp.x, sp.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? '#fff' : color;
+        ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = isDragging ? '#f59e0b' : isHover ? '#fff' : (isSelected ? '#fff' : color);
         ctx.fill();
+        if (isHover || isDragging) {
+          ctx.strokeStyle = isDragging ? '#f59e0b' : color;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
@@ -320,7 +350,20 @@ export function SectionView({
       ctx.fill();
     }
 
-  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds]);
+    if (dragState && mousePos) {
+      const world = toWorld(mousePos.x, mousePos.y);
+      const sp = toScreen(snapTo(world.x), snapTo(world.y));
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds, hoverPoint, dragState, snapTo]);
 
   const getCanvasPos = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -348,6 +391,15 @@ export function SectionView({
 
     if (tool === 'select') {
       const world = toWorld(cx, cy);
+
+      const ptHit = hitTestPoint(world.x, world.y);
+      if (ptHit) {
+        setDragState(ptHit);
+        setSelectedDuctIds([ptHit.ductId]);
+        setContextMenu(null);
+        return;
+      }
+
       const hit = hitTestDuct(world.x, world.y);
       if (hit) {
         setSelectedDuctIds(prev => {
@@ -361,7 +413,7 @@ export function SectionView({
       }
       setContextMenu(null);
     }
-  }, [tool, toWorld, offset, hitTestDuct]);
+  }, [tool, toWorld, offset, hitTestDuct, hitTestPoint, snapTo]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning.current) {
@@ -372,15 +424,48 @@ export function SectionView({
     }
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }, []);
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    setMousePos({ x: cx, y: cy });
+
+    if (dragState) return;
+
+    if (tool === 'select') {
+      const world = toWorld(cx, cy);
+      const ptHit = hitTestPoint(world.x, world.y);
+      setHoverPoint(ptHit ? { ductId: ptHit.ductId, pointIndex: ptHit.pointIndex } : null);
+    }
+  }, [dragState, tool, toWorld, hitTestPoint]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (isPanning.current) {
       isPanning.current = false;
       return;
     }
-  }, []);
+    if (dragState && tool === 'select') {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const world = toWorld(cx, cy);
+        const snappedX = snapTo(world.x);
+        const snappedY = snapTo(world.y);
+
+        const entries = getAllSectionDucts();
+        const entry = entries.find(({ duct }) => duct.id === dragState.ductId);
+        if (entry) {
+          const newPts = entry.duct.verticalSectionPoints!.map((p, i) =>
+            i === dragState.pointIndex ? { x: snappedX, y: snappedY } : p
+          );
+          onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, {
+            verticalSectionPoints: newPts,
+            verticalX: newPts[0].x,
+          });
+        }
+      }
+      setDragState(null);
+    }
+  }, [dragState, tool, toWorld, snapTo, getAllSectionDucts, onUpdateVerticalDuct]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     if (polyline.length < 2) { setPolyline([]); return; }
@@ -391,14 +476,18 @@ export function SectionView({
     const midX = pts[0].x;
 
     let fromFloor: Floor | null = null;
+    let toFloor: Floor | null = null;
     let floorY = 0;
     for (let i = 0; i < sortedFloors.length; i++) {
       const floor = sortedFloors[i];
       const topY = floorY + floor.height;
       if (minY >= floorY && minY < topY) fromFloor = floor;
+      const maxY = Math.max(...pts.map(p => p.y));
+      if (maxY >= floorY && maxY < topY) toFloor = floor;
       floorY = topY;
     }
     if (!fromFloor) fromFloor = sortedFloors[0];
+    if (!toFloor) toFloor = fromFloor;
 
     if (tool === 'duct') {
       const duct: Omit<Duct, 'id'> = {
@@ -411,6 +500,7 @@ export function SectionView({
         insulated: false,
         isVertical: true,
         verticalX: midX,
+        verticalY: 5,
         verticalSectionPoints: pts,
       };
       onAddVerticalDuct(duct, fromFloor.id);
@@ -475,16 +565,22 @@ export function SectionView({
 
   const allSectionDucts = getAllSectionDucts();
   const selectedSectionDucts = allSectionDucts.filter(({ duct }) => selectedDuctIds.includes(duct.id));
+  const isDraggingPoint = dragState !== null;
 
   return (
     <div className="relative w-full h-full" onClick={() => setContextMenu(null)}>
       <canvas
         ref={canvasRef}
-        className={`w-full h-full ${tool === 'select' ? 'cursor-default' : 'cursor-crosshair'}`}
+        className={`w-full h-full ${
+          tool !== 'select' ? 'cursor-crosshair' :
+          isDraggingPoint ? 'cursor-grabbing' :
+          hoverPoint ? 'cursor-grab' :
+          'cursor-default'
+        }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { setMousePos(null); isPanning.current = false; }}
+        onMouseLeave={() => { setMousePos(null); isPanning.current = false; if (dragState) setDragState(null); setHoverPoint(null); }}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         onWheel={handleWheel}
@@ -515,7 +611,7 @@ export function SectionView({
 
       <div className="absolute bottom-3 left-3 text-slate-500 text-[10px] bg-slate-900/70 px-2 py-1 rounded">
         {tool === 'select'
-          ? 'Schnittansicht · Shift+Klick: mehrere auswählen · Rechtsklick: verbinden'
+          ? 'Schnittansicht · Knotenpunkt ziehen: Kanal bearbeiten · Shift+Klick: mehrere auswählen · Rechtsklick: verbinden'
           : tool === 'duct'
           ? 'Kanal zeichnen · Klicken: Punkt setzen · Doppelklick/Rechtsklick: fertigstellen'
           : 'Rohr zeichnen · Klicken: Punkt setzen · Doppelklick/Rechtsklick: fertigstellen'}

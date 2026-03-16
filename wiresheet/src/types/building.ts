@@ -143,6 +143,7 @@ export interface Duct {
   transitionToShape?: DuctShape;
   isVertical?: boolean;
   verticalX?: number;
+  verticalY?: number;
   verticalSectionPoints?: DuctPoint[];
 }
 

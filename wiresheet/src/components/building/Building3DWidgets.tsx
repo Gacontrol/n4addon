@@ -1134,9 +1134,22 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
 
   if (duct.isVertical && duct.verticalX != null) {
     const vx = duct.verticalX + offsetX;
-    const vz = duct.points[0]?.y ?? 0;
-    const ductH = (duct.elevation ?? 2.4) * 0.5;
-    const midY = baseY + (duct.elevation ?? 2.4) - ductH / 2;
+    const vz = duct.verticalY ?? 5;
+
+    let ductH: number;
+    let midY: number;
+
+    if (duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
+      const ys = duct.verticalSectionPoints.map(p => p.y);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      ductH = Math.max(0.1, maxY - minY);
+      midY = (minY + maxY) / 2;
+    } else {
+      ductH = Math.max(0.1, (duct.elevation ?? 2.4) * 0.5);
+      midY = baseY + (duct.elevation ?? 2.4) - ductH / 2;
+    }
+
     return (
       <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
         <mesh castShadow position={[vx, midY, vz]}>
