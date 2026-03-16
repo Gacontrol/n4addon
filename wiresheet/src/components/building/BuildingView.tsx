@@ -195,6 +195,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [datapointPickerTarget, setDatapointPickerTarget] = useState<'new' | 'widget' | 'alarm'>('new');
   const [newWidgetRoomIds, setNewWidgetRoomIds] = useState<string[]>([]);
   const [newWidgetOpacity, setNewWidgetOpacity] = useState(0.45);
+  const [newWidgetColor, setNewWidgetColor] = useState('#22c55e');
+  const [newWidgetColorFalse, setNewWidgetColorFalse] = useState('');
   const [pickerTab, setPickerTab] = useState<'driver' | 'logic'>('driver');
   const [pickerDevice, setPickerDevice] = useState<string | null>(null);
 
@@ -368,16 +370,19 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       z: newWidgetZ,
       floorId: activeFloor.id,
       scale: 1,
-      color: WIDGET_COLORS[newWidgetType] || '#94a3b8',
+      color: newWidgetType === 'roomcolor' ? newWidgetColor : (WIDGET_COLORS[newWidgetType] || '#94a3b8'),
       showLabel: true,
       showValue: true,
       roomIds: newWidgetType === 'roomcolor' ? [...newWidgetRoomIds] : [],
       opacity: newWidgetType === 'roomcolor' ? newWidgetOpacity : undefined,
-    });
+      ...(newWidgetType === 'roomcolor' && newWidgetColorFalse ? { colorFalse: newWidgetColorFalse } : {}),
+    } as any);
     setNewWidgetDatapoint('');
     setNewWidgetLabel('');
     setNewWidgetRoomIds([]);
     setNewWidgetOpacity(0.45);
+    setNewWidgetColor('#22c55e');
+    setNewWidgetColorFalse('');
   };
 
   const logicPageGroups = useMemo(() => {
@@ -927,6 +932,18 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                             ))}
                           </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="text-[10px] text-slate-500 mb-1">Farbe TRUE</div>
+                            <input type="color" value={newWidgetColor} onChange={e => setNewWidgetColor(e.target.value)}
+                              className="w-full h-7 rounded cursor-pointer bg-slate-700 border border-slate-600" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 mb-1">Farbe FALSE</div>
+                            <input type="color" value={newWidgetColorFalse || '#334155'} onChange={e => setNewWidgetColorFalse(e.target.value)}
+                              className="w-full h-7 rounded cursor-pointer bg-slate-700 border border-slate-600" />
+                          </div>
+                        </div>
                         <div>
                           <div className="text-[10px] text-slate-500 mb-1">Transparenz</div>
                           <div className="flex items-center gap-2">
@@ -1146,6 +1163,22 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                                 <span className="text-xs text-slate-300 truncate">{r.name}</span>
                               </label>
                             ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe TRUE</label>
+                            <input type="color"
+                              value={(selectedWidget as any).colorTrue || selectedWidget.color || '#22c55e'}
+                              onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { color: e.target.value, colorTrue: e.target.value } as any)}
+                              className="w-full h-7 rounded cursor-pointer bg-slate-700 border border-slate-600" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe FALSE</label>
+                            <input type="color"
+                              value={(selectedWidget as any).colorFalse || '#334155'}
+                              onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { colorFalse: e.target.value } as any)}
+                              className="w-full h-7 rounded cursor-pointer bg-slate-700 border border-slate-600" />
                           </div>
                         </div>
                         <div>
@@ -1711,20 +1744,24 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         </div>
                       </div>
                     )}
-                    {viewMode === '3d' && (activeFloor.widgets3d?.length ?? 0) > 0 && (
-                      <div className="pt-2 border-t border-slate-700">
-                        <div className="text-[10px] text-slate-500 mb-2">3D Widgets ({activeFloor.widgets3d!.length})</div>
-                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                          {activeFloor.widgets3d!.map(w => (
-                            <div key={w.id} className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700 cursor-pointer hover:bg-slate-600" onClick={() => { setSelectedWidget3DId(w.id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); }}>
-                              <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: w.color || '#64748b' }} />
-                              <span className="flex-1 text-xs text-slate-300 truncate">{w.label || w.type}</span>
-                              <span className="text-[10px] text-slate-500">{w.type}</span>
-                            </div>
-                          ))}
+                    {(() => {
+                      const floorWidgets = (activeBuilding?.widgets3d ?? []).filter(w => w.floorId === activeFloor.id);
+                      if (!viewMode || viewMode !== '3d' || floorWidgets.length === 0) return null;
+                      return (
+                        <div className="pt-2 border-t border-slate-700">
+                          <div className="text-[10px] text-slate-500 mb-2">3D Widgets ({floorWidgets.length})</div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {floorWidgets.map(w => (
+                              <div key={w.id} className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700 cursor-pointer hover:bg-slate-600" onClick={() => { setSelectedWidget3DId(w.id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); }}>
+                                <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: w.color || '#64748b' }} />
+                                <span className="flex-1 text-xs text-slate-300 truncate">{w.label || w.type}</span>
+                                <span className="text-[10px] text-slate-500">{w.type}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </>
                 ) : (
                   <div className="text-xs text-slate-500 text-center py-8">Stockwerk auswählen</div>

@@ -509,11 +509,16 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
     return entries;
   }, [buildings, widget.floorId, roomIds, offsetX, floorHeight]);
 
-  const active = alarmActive === true || (liveValue !== undefined && liveValue !== '0' && liveValue !== 'off' && liveValue !== false);
-  const overlayColor = widget.color || '#22c55e';
+  const isActive = alarmActive === true || (liveValue !== undefined && liveValue !== '0' && liveValue !== 'off' && liveValue !== false && liveValue !== 0);
+
+  const colorTrue  = (widget as any).colorTrue  || widget.color || '#22c55e';
+  const colorFalse = (widget as any).colorFalse || null;
   const configuredOpacity = (widget as any).opacity ?? 0.45;
 
-  if (!active) return null;
+  const overlayColor   = isActive ? colorTrue : colorFalse;
+  const overlayOpacity = isActive ? configuredOpacity : (colorFalse ? configuredOpacity : 0);
+
+  if (!overlayColor || overlayOpacity === 0) return null;
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -521,12 +526,12 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
         if (entry.kind === 'poly') {
           return (
             <group key={i}>
-              <mesh position={[0, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <mesh position={[0, baseY + floorHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                 <primitive object={entry.extrudeGeo} />
-                <meshBasicMaterial color={overlayColor} transparent opacity={configuredOpacity} side={THREE.DoubleSide} depthWrite={false} />
+                <meshBasicMaterial color={overlayColor} transparent opacity={overlayOpacity} side={THREE.DoubleSide} depthWrite={false} />
               </mesh>
               {selected && (
-                <lineSegments position={[0, baseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <lineSegments position={[0, baseY + floorHeight, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                   <edgesGeometry args={[entry.extrudeGeo]} />
                   <lineBasicMaterial color="#60a5fa" />
                 </lineSegments>
@@ -538,7 +543,7 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
           <group key={i}>
             <mesh position={[entry.x, baseY + floorHeight / 2, entry.z]}>
               <boxGeometry args={[entry.w, floorHeight, entry.d]} />
-              <meshBasicMaterial color={overlayColor} transparent opacity={configuredOpacity} side={THREE.DoubleSide} depthWrite={false} />
+              <meshBasicMaterial color={overlayColor} transparent opacity={overlayOpacity} side={THREE.DoubleSide} depthWrite={false} />
             </mesh>
             {selected && (
               <lineSegments position={[entry.x, baseY + floorHeight / 2, entry.z]}>
@@ -558,8 +563,8 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FLANGE_SPACING   = 1.5;
-const FLANGE_THICKNESS = 0.008;
-const FLANGE_OVERHANG  = 0.035;
+const FLANGE_THICKNESS = 0.004;
+const FLANGE_OVERHANG  = 0.030;
 const ELBOW_SEGMENTS   = 20;
 
 // ── stable world-up profile frame ──────────────────────────────────────────
@@ -1039,19 +1044,25 @@ function FlangeRect({ w, h, tex }: { w: number; h: number; tex: THREE.CanvasText
   const fw = w + FLANGE_OVERHANG * 2;
   const fh = h + FLANGE_OVERHANG * 2;
   const ft = FLANGE_THICKNESS;
+  const bw = FLANGE_OVERHANG;
+  const mat = <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.82} roughness={0.28} />;
   return (
     <group>
-      <mesh castShadow>
-        <boxGeometry args={[fw, fh, ft]} />
-        <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
+      <mesh castShadow position={[0, fh / 2 - bw / 2, 0]}>
+        <boxGeometry args={[fw, bw, ft]} />
+        {mat}
       </mesh>
-      <mesh castShadow>
-        <boxGeometry args={[fw + ft * 2, ft * 2, ft * 2.5]} />
-        <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
+      <mesh castShadow position={[0, -(fh / 2 - bw / 2), 0]}>
+        <boxGeometry args={[fw, bw, ft]} />
+        {mat}
       </mesh>
-      <mesh castShadow>
-        <boxGeometry args={[ft * 2, fh + ft * 2, ft * 2.5]} />
-        <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
+      <mesh castShadow position={[fw / 2 - bw / 2, 0, 0]}>
+        <boxGeometry args={[bw, fh - bw * 2, ft]} />
+        {mat}
+      </mesh>
+      <mesh castShadow position={[-(fw / 2 - bw / 2), 0, 0]}>
+        <boxGeometry args={[bw, fh - bw * 2, ft]} />
+        {mat}
       </mesh>
     </group>
   );
@@ -1061,8 +1072,8 @@ function FlangeRound({ r, tex }: { r: number; tex: THREE.CanvasTexture }) {
   const fr = r + FLANGE_OVERHANG;
   return (
     <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-      <cylinderGeometry args={[fr, fr, FLANGE_THICKNESS * 3, 16, 1, false]} />
-      <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
+      <cylinderGeometry args={[fr, fr, FLANGE_THICKNESS, 24, 1, false]} />
+      <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.82} roughness={0.28} />
     </mesh>
   );
 }
