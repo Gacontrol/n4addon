@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw } from 'lucide-react';
 
 interface ColorPickerProps {
   value: string | undefined;
@@ -250,8 +250,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [availableBuildings, setAvailableBuildings] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    if (widget.type !== 'visu-3d-building') return;
+  const refreshBuildings = useCallback(() => {
     const p = window.location.pathname;
     const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
     const apiBase = m ? `${m[1]}/api` : '/api';
@@ -259,11 +258,25 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return;
-        const list = data.buildings || (data.id ? [data] : []);
+        let list: { id: string; name: string }[] = (data.buildings || (data.id ? [data] : []));
+        if (list.length === 0) {
+          try {
+            const ls = localStorage.getItem('wiresheet_building_config');
+            if (ls) {
+              const parsed = JSON.parse(ls);
+              list = parsed.buildings || (parsed.id ? [parsed] : []);
+            }
+          } catch { }
+        }
         setAvailableBuildings(list.map((b: { id: string; name: string }) => ({ id: b.id, name: b.name })));
       })
       .catch(() => {});
-  }, [widget.type]);
+  }, []);
+
+  useEffect(() => {
+    if (widget.type !== 'visu-3d-building') return;
+    refreshBuildings();
+  }, [widget.type, widget.id, refreshBuildings]);
 
   const isDecorationWidget = NON_BINDABLE_TYPES.has(widget.type);
   const isShapeWidget = SHAPE_TYPES.has(widget.type);
@@ -2733,7 +2746,16 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         return (
           <>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-400">Gebäude</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-400">Gebäude</label>
+                <button
+                  onClick={refreshBuildings}
+                  className="p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                  title="Gebäude neu laden"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              </div>
               <select
                 value={b3dCfg.buildingId || ''}
                 onChange={(e) => onUpdate({ config: { ...b3dCfg, buildingId: e.target.value || undefined } })}

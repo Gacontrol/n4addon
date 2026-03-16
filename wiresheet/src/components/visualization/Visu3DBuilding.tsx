@@ -30,27 +30,39 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const [showFloorSelector, setShowFloorSelector] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const applyBuildingList = useCallback((buildingList: Building[]) => {
+    setBuildings(buildingList);
+    if (buildingList.length > 0) {
+      const selectedBuilding = config.buildingId
+        ? (buildingList.find(b => b.id === config.buildingId) || buildingList[0])
+        : buildingList[0];
+      if (config.floorId) {
+        const floorExists = selectedBuilding.floors.some(f => f.id === config.floorId);
+        setActiveFloorId(floorExists ? config.floorId : (selectedBuilding.floors[0]?.id || null));
+      } else if (config.showAllFloors) {
+        setActiveFloorId(null);
+      } else {
+        setActiveFloorId(selectedBuilding.floors[0]?.id || null);
+      }
+    }
+  }, [config.buildingId, config.floorId, config.showAllFloors]);
+
   const loadBuildings = useCallback(async () => {
     try {
       const res = await fetch(`${getApiBase()}/building-config`);
       if (res.ok) {
         const data = await res.json();
-        const buildingList: Building[] = data.buildings || (data.id ? [data] : []);
-        setBuildings(buildingList);
-
-        if (buildingList.length > 0) {
-          const selectedBuilding = config.buildingId
-            ? (buildingList.find(b => b.id === config.buildingId) || buildingList[0])
-            : buildingList[0];
-          if (config.floorId) {
-            const floorExists = selectedBuilding.floors.some(f => f.id === config.floorId);
-            setActiveFloorId(floorExists ? config.floorId : (selectedBuilding.floors[0]?.id || null));
-          } else if (config.showAllFloors) {
-            setActiveFloorId(null);
-          } else {
-            setActiveFloorId(selectedBuilding.floors[0]?.id || null);
-          }
+        let buildingList: Building[] = data.buildings || (data.id ? [data] : []);
+        if (buildingList.length === 0) {
+          try {
+            const ls = localStorage.getItem('wiresheet_building_config');
+            if (ls) {
+              const parsed = JSON.parse(ls);
+              buildingList = parsed.buildings || (parsed.id ? [parsed] : []);
+            }
+          } catch { }
         }
+        applyBuildingList(buildingList);
         setError(null);
       } else {
         setError('Gebäude nicht gefunden');
@@ -60,7 +72,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [config.buildingId, config.floorId, config.showAllFloors]);
+  }, [applyBuildingList]);
 
   useEffect(() => {
     loadBuildings();
