@@ -550,13 +550,20 @@ interface DuctSegment {
   isVertical: boolean;
 }
 
+function getElbowRadius(w: number, h: number): number {
+  return Math.max(w, h) * 0.75;
+}
+
 function computeDuctSegments(
   points: { x: number; y: number; elev?: number }[],
   offsetX: number,
   defaultElev: number,
-  halfSize = 0
+  w: number,
+  h: number
 ): DuctSegment[] {
   const segs: DuctSegment[] = [];
+  const elbowR = getElbowRadius(w, h);
+
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i];
     const b = points[i + 1];
@@ -568,15 +575,19 @@ function computeDuctSegments(
     const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
     if (len < 0.01) continue;
     const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
-    const pullA = (i > 0 && halfSize > 0) ? halfSize : 0;
-    const pullB = (i < points.length - 2 && halfSize > 0) ? halfSize : 0;
+
+    const pullA = i > 0 ? elbowR : 0;
+    const pullB = i < points.length - 2 ? elbowR : 0;
     const usedLen = Math.max(0.01, len - pullA - pullB);
-    const ax = a.x + dir.x * pullA;
-    const ay = elevA + dir.y * pullA;
-    const az = a.y + dir.z * pullA;
-    const mx = ax + dir.x * usedLen / 2 + offsetX;
-    const my = ay + dir.y * usedLen / 2;
-    const mz = az + dir.z * usedLen / 2;
+
+    const startX = a.x + offsetX + dir.x * pullA;
+    const startY = elevA + dir.y * pullA;
+    const startZ = a.y + dir.z * pullA;
+
+    const mx = startX + dir.x * usedLen / 2;
+    const my = startY + dir.y * usedLen / 2;
+    const mz = startZ + dir.z * usedLen / 2;
+
     const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
     segs.push({ pos: [mx, my, mz], dir, len: usedLen, isVertical });
   }
@@ -602,7 +613,6 @@ const FLANGE_SPACING = 1.5;
 const FLANGE_THICKNESS = 0.008;
 const FLANGE_OVERHANG = 0.035;
 
-
 function buildRectDuctGeoSimple(w: number, h: number, len: number): THREE.BufferGeometry {
   const geo = new THREE.BoxGeometry(w, len, h, 1, Math.max(1, Math.round(len / 0.5)), 1);
   const uv = geo.attributes.uv as THREE.BufferAttribute;
@@ -616,56 +626,74 @@ function buildRectDuctGeoSimple(w: number, h: number, len: number): THREE.Buffer
   return geo;
 }
 
+function buildRectProfile(hw: number, hh: number): THREE.Vector2[] {
+  return [
+    new THREE.Vector2(-hw, -hh),
+    new THREE.Vector2( hw, -hh),
+    new THREE.Vector2( hw,  hh),
+    new THREE.Vector2(-hw,  hh),
+  ];
+}
+
+function buildCircleProfile(hw: number, hh: number, n = 12): THREE.Vector2[] {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2;
+    return new THREE.Vector2(Math.cos(a) * hw, Math.sin(a) * hh);
+  });
+}
+
 function buildElbowGeometry(
   w: number, h: number, isRound: boolean,
-  dirA: THREE.Vector3, dirB: THREE.Vector3,
-  segments = 8
+  cornerWorldPos: THREE.Vector3,
+  dirA: THREE.Vector3,
+  dirB: THREE.Vector3,
+  segments = 10
 ): THREE.BufferGeometry {
-  const radius = Math.max(w, h) * 0.6;
-  const angle = Math.acos(Math.max(-1, Math.min(1, -dirA.dot(dirB))));
-  if (angle < 0.05) return new THREE.BufferGeometry();
+  const elbowR = getElbowRadius(w, h);
+
+  const dot = Math.max(-1, Math.min(1, dirA.dot(dirB)));
+  const turnAngle = Math.acos(dot);
+  if (turnAngle < 0.04) return new THREE.BufferGeometry();
+
+  const axis = new THREE.Vector3().crossVectors(dirA, dirB);
+  if (axis.lengthSq() < 1e-8) return new THREE.BufferGeometry();
+  axis.normalize();
+
+  const hw = w / 2, hh = h / 2;
+  const profile = isRound ? buildCircleProfile(hw, hh) : buildRectProfile(hw, hh);
+  const pCount = profile.length;
+
+  const sweepAngle = Math.PI - turnAngle;
+
+  const entryPoint = cornerWorldPos.clone().addScaledVector(dirA, -elbowR);
+
+  const sideDir = new THREE.Vector3().crossVectors(axis, dirA).normalize();
+  const arcCenter = entryPoint.clone().addScaledVector(sideDir, elbowR);
 
   const positions: number[] = [];
-  const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const axis = new THREE.Vector3().crossVectors(dirA, dirB).normalize();
-  if (axis.length() < 0.001) return new THREE.BufferGeometry();
-
-  const hw = w / 2, hh = h / 2;
-  const profilePoints = isRound
-    ? Array.from({ length: 12 }, (_, i) => {
-        const a = (i / 12) * Math.PI * 2;
-        return new THREE.Vector2(Math.cos(a) * hw, Math.sin(a) * hh);
-      })
-    : [
-        new THREE.Vector2(-hw, -hh), new THREE.Vector2(hw, -hh),
-        new THREE.Vector2(hw, hh), new THREE.Vector2(-hw, hh),
-      ];
-  const pCount = profilePoints.length;
-
-  const elbowCenter = new THREE.Vector3(0, 0, 0);
-
   for (let s = 0; s <= segments; s++) {
     const t = s / segments;
-    const sweepAngle = t * angle;
-    const quat = new THREE.Quaternion().setFromAxisAngle(axis, sweepAngle);
-    const sweepDir = dirA.clone().negate().applyQuaternion(quat).normalize();
-    const right = new THREE.Vector3().crossVectors(sweepDir, axis).normalize();
-    const up = new THREE.Vector3().crossVectors(right, sweepDir).normalize();
+    const angle = t * sweepAngle;
 
-    const arcPoint = elbowCenter.clone().addScaledVector(sweepDir, radius);
+    const quat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+    const tangent = dirA.clone().applyQuaternion(quat).normalize();
+
+    const right = new THREE.Vector3().crossVectors(tangent, axis).normalize();
+    const up = new THREE.Vector3().crossVectors(right, tangent).normalize();
+
+    const radialDir = sideDir.clone().negate().applyQuaternion(quat).normalize();
+    const spinePoint = arcCenter.clone().addScaledVector(radialDir, elbowR);
 
     for (let p = 0; p < pCount; p++) {
-      const pp = profilePoints[p];
-      const worldPt = arcPoint.clone()
+      const pp = profile[p];
+      const worldPt = spinePoint.clone()
         .addScaledVector(right, pp.x)
         .addScaledVector(up, pp.y);
       positions.push(worldPt.x, worldPt.y, worldPt.z);
-      const n = right.clone().multiplyScalar(pp.x / hw).add(up.clone().multiplyScalar(pp.y / hh)).normalize();
-      normals.push(n.x, n.y, n.z);
-      uvs.push(p / pCount, t * (radius * angle) / 0.3);
+      uvs.push(p / pCount, t * (elbowR * sweepAngle) / 0.4);
     }
   }
 
@@ -679,9 +707,36 @@ function buildElbowGeometry(
     }
   }
 
+  const centerStartIdx = positions.length / 3;
+
+  const capRings = [0, segments];
+  for (const ring of capRings) {
+    const ringOffset = ring * pCount;
+    let cx = 0, cy = 0, cz = 0;
+    for (let p = 0; p < pCount; p++) {
+      cx += positions[(ringOffset + p) * 3];
+      cy += positions[(ringOffset + p) * 3 + 1];
+      cz += positions[(ringOffset + p) * 3 + 2];
+    }
+    positions.push(cx / pCount, cy / pCount, cz / pCount);
+    uvs.push(0.5, 0.5);
+  }
+
+  const ci0 = centerStartIdx;
+  const ci1 = centerStartIdx + 1;
+  for (let p = 0; p < pCount; p++) {
+    const a = p;
+    const b = (p + 1) % pCount;
+    indices.push(ci0, b, a);
+  }
+  for (let p = 0; p < pCount; p++) {
+    const a = segments * pCount + p;
+    const b = segments * pCount + (p + 1) % pCount;
+    indices.push(ci1, a, b);
+  }
+
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
@@ -734,7 +789,6 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const w = duct.width || 0.3;
   const h = duct.height || 0.2;
   const isRound = duct.shape === 'round';
-  const halfSize = Math.max(w, h) / 2;
   const tex = useMemo(() => {
     const t = getCachedDuctTexture(color);
     t.repeat.set(1, 1);
@@ -743,27 +797,26 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const flangeTex = useMemo(() => getCachedFlangeTexture(), []);
 
   const segments = useMemo(
-    () => computeDuctSegments(duct.points, offsetX, elev, halfSize),
-    [duct.points, offsetX, elev, halfSize]
+    () => computeDuctSegments(duct.points, offsetX, elev, w, h),
+    [duct.points, offsetX, elev, w, h]
   );
 
   const flangePositionsPerSeg = useMemo(() => {
     return segments.map(seg => {
       const positions: number[] = [];
       const count = Math.floor(seg.len / FLANGE_SPACING);
-      if (count < 1) return positions;
-      const step = seg.len / (count + 1);
+      const step = seg.len / Math.max(count + 1, 2);
       for (let k = 1; k <= count; k++) {
         positions.push(-seg.len / 2 + step * k);
       }
-      positions.push(-seg.len / 2 + 0.004);
-      positions.push(seg.len / 2 - 0.004);
+      positions.push(-seg.len / 2 + FLANGE_THICKNESS * 2);
+      positions.push(seg.len / 2 - FLANGE_THICKNESS * 2);
       return positions;
     });
   }, [segments]);
 
   const elbowData = useMemo(() => {
-    const result: { pos: [number,number,number]; geo: THREE.BufferGeometry; quat: THREE.Quaternion }[] = [];
+    const result: { geo: THREE.BufferGeometry }[] = [];
     const pts = duct.points;
     for (let i = 1; i < pts.length - 1; i++) {
       const prev = pts[i - 1];
@@ -780,12 +833,9 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
       const dirA = new THREE.Vector3(dxA/lenA, dyA/lenA, dzA/lenA);
       const dirB = new THREE.Vector3(dxB/lenB, dyB/lenB, dzB/lenB);
 
-      const dot = Math.max(-1, Math.min(1, dirA.dot(dirB)));
-      if (Math.acos(dot) < 0.05) continue;
-
-      const geo = buildElbowGeometry(w, h, isRound, dirA, dirB);
-      const q = new THREE.Quaternion();
-      result.push({ pos: [cur.x + offsetX, elevCur, cur.y], geo, quat: q });
+      const cornerWorldPos = new THREE.Vector3(cur.x + offsetX, elevCur, cur.y);
+      const geo = buildElbowGeometry(w, h, isRound, cornerWorldPos, dirA, dirB);
+      result.push({ geo });
     }
     return result;
   }, [duct.points, offsetX, elev, w, h, isRound, baseY]);
@@ -832,7 +882,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
       })}
 
       {elbowData.map((eb, i) => (
-        <mesh key={`elbow-${i}`} position={eb.pos} castShadow>
+        <mesh key={`elbow-${i}`} castShadow>
           <primitive object={eb.geo} />
           <meshStandardMaterial color={color} map={tex} metalness={0.6} roughness={0.38} />
         </mesh>
