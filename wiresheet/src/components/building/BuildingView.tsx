@@ -1149,6 +1149,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis="xz"
                     label="Vorderansicht (X-Achse)"
+                    selectedDuctId={selectedDuctId}
+                    onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
+                    onDeleteDuct={(ductId, floorId) => { if (activeBuilding) { deleteDuct(activeBuilding.id, floorId, ductId); setSelectedDuctId(null); } }}
+                    onUpdateDuct={(ductId, floorId, changes) => { if (activeBuilding) updateDuct(activeBuilding.id, floorId, ductId, changes); }}
                     onAddVerticalDuct={(duct, fromFloorId) => {
                       if (!activeBuilding) return;
                       addDuct(activeBuilding.id, fromFloorId, duct);
@@ -1180,7 +1184,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis="yz"
-                    label="Seitenansicht rechts (Y-Achse)"
+                    label="Seitenansicht links (Y-Achse)"
+                    selectedDuctId={selectedDuctId}
+                    onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
+                    onDeleteDuct={(ductId, floorId) => { if (activeBuilding) { deleteDuct(activeBuilding.id, floorId, ductId); setSelectedDuctId(null); } }}
+                    onUpdateDuct={(ductId, floorId, changes) => { if (activeBuilding) updateDuct(activeBuilding.id, floorId, ductId, changes); }}
                     onAddVerticalDuct={(duct, fromFloorId) => {
                       if (!activeBuilding) return;
                       addDuct(activeBuilding.id, fromFloorId, duct);
