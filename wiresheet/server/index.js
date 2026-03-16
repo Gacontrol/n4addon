@@ -40,6 +40,7 @@ const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
 const visuControlledDps = new Map();
+const impulseResetPending = new Map();
 let dpValuesSaveTimeout = null;
 
 let driverConfig = {
@@ -2469,9 +2470,24 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
 app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
   const { pageId } = req.params;
-  const { nodes, connections, manualOverrides = {}, visuOverrides = {} } = req.body;
+  const { nodes, connections, manualOverrides = {} } = req.body;
   try {
-    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, visuOverrides, pageId);
+    const serverOverrides = { ...(clientVisuOverrides.get('global') || {}) };
+    clientVisuOverrides.set('global', {});
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, serverOverrides, pageId);
+
+    for (const [key, pending] of impulseResetPending) {
+      if (serverOverrides[key] !== undefined) {
+        visuControlledDps.set(key, pending.resetVal);
+        setPersistentDpValue(key, pending.resetVal);
+        for (const [pgId, nodeVals] of lastNodeValues) {
+          lastNodeValues.set(pgId, { ...nodeVals, [key]: pending.resetVal });
+        }
+        nodeValues[key] = pending.resetVal;
+        impulseResetPending.delete(key);
+      }
+    }
+
     res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
@@ -2504,9 +2520,21 @@ async function runPageCycle(pageId) {
 
       const allOverrides = { ...(clientVisuOverrides.get('global') || {}) };
       clientVisuOverrides.set('global', {});
-      console.log(`[CYCLE DEBUG] Page ${pageId} - clientVisuOverrides.get('global'):`, JSON.stringify(allOverrides));
-      console.log(`[CYCLE DEBUG] Page ${pageId} - visuControlledDps:`, JSON.stringify([...visuControlledDps.entries()]));
+
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
+
+      for (const [key, pending] of impulseResetPending) {
+        if (allOverrides[key] !== undefined) {
+          visuControlledDps.set(key, pending.resetVal);
+          setPersistentDpValue(key, pending.resetVal);
+          for (const [pgId, nodeVals] of lastNodeValues) {
+            lastNodeValues.set(pgId, { ...nodeVals, [key]: pending.resetVal });
+          }
+          nodeValues[key] = pending.resetVal;
+          impulseResetPending.delete(key);
+        }
+      }
+
       lastNodeValues.set(pageId, nodeValues);
       const trendNow = Date.now();
       for (const trackedNode of trendConfig.trackedNodes) {
@@ -3024,21 +3052,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       const capturedNodeId = nodeId;
       const capturedOverrideKey = overrideKey;
       const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-      setTimeout(() => {
-        visuControlledDps.set(capturedNodeId, capturedResetVal);
-        if (capturedOverrideKey !== capturedNodeId) visuControlledDps.set(capturedOverrideKey, capturedResetVal);
-        setPersistentDpValue(capturedNodeId, capturedResetVal);
-        if (!clientVisuOverrides.has('global')) clientVisuOverrides.set('global', {});
-        const freshOverrides = clientVisuOverrides.get('global');
-        freshOverrides[capturedNodeId] = capturedResetVal;
-        if (capturedOverrideKey !== capturedNodeId) freshOverrides[capturedOverrideKey] = capturedResetVal;
-        for (const [pgId, nodeVals] of lastNodeValues) {
-          const updated = { ...nodeVals, [capturedNodeId]: capturedResetVal };
-          if (capturedOverrideKey !== capturedNodeId) updated[capturedOverrideKey] = capturedResetVal;
-          lastNodeValues.set(pgId, updated);
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot() });
-      }, 300);
+      impulseResetPending.set(capturedNodeId, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey });
+      if (capturedOverrideKey !== capturedNodeId) {
+        impulseResetPending.set(capturedOverrideKey, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey });
+      }
     }
 
     res.json({ success: true });
