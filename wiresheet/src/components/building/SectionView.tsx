@@ -82,6 +82,16 @@ export function SectionView({
     if (axis === 'xz') return pt.x;
     return axisMaxH - pt.y;
   };
+
+  const getDuctSectionX = useCallback((duct: Duct) => {
+    if (axis === 'xz') return duct.verticalX ?? duct.verticalSectionPoints?.[0]?.x ?? 0;
+    return axisMaxH - (duct.verticalY ?? (axisMaxH - (duct.verticalSectionPoints?.[0]?.x ?? 0)));
+  }, [axis, axisMaxH]);
+
+  const sectionXToBuildingCoords = useCallback((sectionX: number): { bx?: number; by?: number } => {
+    if (axis === 'xz') return { bx: sectionX };
+    return { by: axisMaxH - sectionX };
+  }, [axis, axisMaxH]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 100, y: 100 });
   const [zoom, setZoom] = useState(1.0);
@@ -141,32 +151,34 @@ export function SectionView({
     const entries = getAllSectionDucts();
     for (const { duct, floor } of [...entries].reverse()) {
       const pts = duct.verticalSectionPoints!;
+      const sx = axis === 'xz'
+        ? (duct.verticalX ?? pts[0]?.x ?? 0)
+        : axisMaxH - (duct.verticalY ?? (axisMaxH - (pts[0]?.x ?? 0)));
       for (let i = 0; i < pts.length - 1; i++) {
-        const ax = pts[i].x, ay = pts[i].y;
-        const bx = pts[i + 1].x, by = pts[i + 1].y;
-        const dx = bx - ax, dy = by - ay;
-        const len2 = dx * dx + dy * dy;
-        if (len2 < 1e-9) continue;
-        const t = Math.max(0, Math.min(1, ((wx - ax) * dx + (wy - ay) * dy) / len2));
-        const px = ax + t * dx, py = ay + t * dy;
-        const d = Math.sqrt((wx - px) ** 2 + (wy - py) ** 2);
+        const ay = pts[i].y, by = pts[i + 1].y;
+        const t = Math.max(0, Math.min(1, (wy - ay) / (by - ay || 1)));
+        const py = ay + t * (by - ay);
+        const d = Math.sqrt((wx - sx) ** 2 + (wy - py) ** 2);
         if (d < duct.width * 0.6 + 0.2) return { duct, floor };
       }
     }
     return null;
-  }, [getAllSectionDucts]);
+  }, [getAllSectionDucts, axis, axisMaxH]);
 
   const hitTestPoint = useCallback((wx: number, wy: number, radius = 0.35): { ductId: string; floorId: string; pointIndex: number } | null => {
     const entries = getAllSectionDucts();
     for (const { duct, floor } of [...entries].reverse()) {
       const pts = duct.verticalSectionPoints!;
+      const sx = axis === 'xz'
+        ? (duct.verticalX ?? pts[0]?.x ?? 0)
+        : axisMaxH - (duct.verticalY ?? (axisMaxH - (pts[0]?.x ?? 0)));
       for (let i = 0; i < pts.length; i++) {
-        const d = Math.sqrt((wx - pts[i].x) ** 2 + (wy - pts[i].y) ** 2);
+        const d = Math.sqrt((wx - sx) ** 2 + (wy - pts[i].y) ** 2);
         if (d < radius) return { ductId: duct.id, floorId: floor.id, pointIndex: i };
       }
     }
     return null;
-  }, [getAllSectionDucts]);
+  }, [getAllSectionDucts, axis, axisMaxH]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -276,6 +288,7 @@ export function SectionView({
     const sectionDucts = getAllSectionDucts();
     for (const { duct } of sectionDucts) {
       const pts = duct.verticalSectionPoints!;
+      const sectX = getDuctSectionX(duct);
       const color = duct.color || DUCT_COLORS[duct.type];
       const isSelected = selectedDuctIds.includes(duct.id);
       ctx.save();
@@ -286,7 +299,7 @@ export function SectionView({
       ctx.globalAlpha = isSelected ? 0.9 : 0.75;
       ctx.beginPath();
       for (let pi = 0; pi < pts.length; pi++) {
-        const sp = toScreen(pts[pi].x, pts[pi].y);
+        const sp = toScreen(sectX, pts[pi].y);
         if (pi === 0) ctx.moveTo(sp.x, sp.y);
         else ctx.lineTo(sp.x, sp.y);
       }
@@ -299,7 +312,7 @@ export function SectionView({
       }
       ctx.globalAlpha = 1;
       for (let pi = 0; pi < pts.length; pi++) {
-        const sp = toScreen(pts[pi].x, pts[pi].y);
+        const sp = toScreen(sectX, pts[pi].y);
         const isHover = hoverPoint?.ductId === duct.id && hoverPoint?.pointIndex === pi;
         const isDragging = dragState?.ductId === duct.id && dragState?.pointIndex === pi;
         const r = (isHover || isDragging) ? 7 : 4;
@@ -389,7 +402,7 @@ export function SectionView({
       ctx.restore();
     }
 
-  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds, hoverPoint, dragState, snapTo, axis, label, getH]);
+  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds, hoverPoint, dragState, snapTo, axis, label, getH, getDuctSectionX]);
 
   const getCanvasPos = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -483,14 +496,16 @@ export function SectionView({
           const newPts = entry.duct.verticalSectionPoints!.map((p, i) =>
             i === dragState.pointIndex ? { x: snappedX, y: snappedY } : p
           );
-          onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, {
-            verticalSectionPoints: newPts,
-          });
+          const buildingCoords = sectionXToBuildingCoords(snappedX);
+          const changes: Partial<Duct> = { verticalSectionPoints: newPts };
+          if (buildingCoords.bx !== undefined) changes.verticalX = buildingCoords.bx;
+          if (buildingCoords.by !== undefined) changes.verticalY = buildingCoords.by;
+          onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, changes);
         }
       }
       setDragState(null);
     }
-  }, [dragState, tool, toWorld, snapTo, getAllSectionDucts, onUpdateVerticalDuct]);
+  }, [dragState, tool, toWorld, snapTo, getAllSectionDucts, onUpdateVerticalDuct, sectionXToBuildingCoords]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     if (polyline.length < 2) { setPolyline([]); return; }
@@ -515,6 +530,7 @@ export function SectionView({
     if (!toFloor) toFloor = fromFloor;
 
     if (tool === 'duct') {
+      const buildingCoords = sectionXToBuildingCoords(midX);
       const duct: Omit<Duct, 'id'> = {
         points: [{ x: midX, y: 0 }, { x: midX, y: 0 }],
         shape: ductShape,
@@ -524,8 +540,8 @@ export function SectionView({
         elevation: 0,
         insulated: false,
         isVertical: true,
-        verticalX: midX,
-        verticalY: 5,
+        verticalX: buildingCoords.bx ?? midX,
+        verticalY: buildingCoords.by ?? 5,
         verticalSectionPoints: pts,
       };
       onAddVerticalDuct(duct, fromFloor.id);
@@ -540,7 +556,7 @@ export function SectionView({
       onAddVerticalPipe(pipe, fromFloor.id, toFloor.id);
     }
     setPolyline([]);
-  }, [polyline, tool, sortedFloors, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddVerticalDuct, onAddVerticalPipe]);
+  }, [polyline, tool, sortedFloors, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddVerticalDuct, onAddVerticalPipe, sectionXToBuildingCoords]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
