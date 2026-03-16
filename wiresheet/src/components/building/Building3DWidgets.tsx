@@ -580,7 +580,7 @@ function profileFrame(tangent: THREE.Vector3): { right: THREE.Vector3; up: THREE
 
 function ductQuaternion(dir: THREE.Vector3): THREE.Quaternion {
   const { right, up } = profileFrame(dir);
-  const m = new THREE.Matrix4().makeBasis(right, dir, up);
+  const m = new THREE.Matrix4().makeBasis(right, up, dir);
   return new THREE.Quaternion().setFromRotationMatrix(m);
 }
 
@@ -1042,15 +1042,15 @@ function FlangeRect({ w, h, tex }: { w: number; h: number; tex: THREE.CanvasText
   return (
     <group>
       <mesh castShadow>
-        <boxGeometry args={[fw, ft, fh]} />
+        <boxGeometry args={[fw, fh, ft]} />
         <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
       </mesh>
       <mesh castShadow>
-        <boxGeometry args={[fw + ft * 2, ft * 2.5, ft * 2]} />
+        <boxGeometry args={[fw + ft * 2, ft * 2, ft * 2.5]} />
         <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
       </mesh>
       <mesh castShadow>
-        <boxGeometry args={[ft * 2, ft * 2.5, fh + ft * 2]} />
+        <boxGeometry args={[ft * 2, fh + ft * 2, ft * 2.5]} />
         <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
       </mesh>
     </group>
