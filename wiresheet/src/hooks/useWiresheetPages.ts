@@ -69,32 +69,7 @@ export const useWiresheetPages = () => {
           for (const page of data) {
             if (page.running && !localCycleTimers.current[page.id]) {
               const interval = Math.max(200, page.cycleMs || 1000);
-              localCycleTimers.current[page.id] = setInterval(() => {
-                const currentPage = pagesRef.current.find(p => p.id === page.id);
-                if (!currentPage) return;
-
-                const manualOverrides: Record<string, unknown> = {};
-                for (const node of currentPage.nodes) {
-                  if (node.data.override?.manual) {
-                    manualOverrides[node.id] = node.data.override.value;
-                  }
-                }
-
-                const visuOverrides = { ...visuOverridesRef.current };
-                visuOverridesRef.current = {};
-                fetch(`${API_BASE}/pages/${page.id}/execute`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ nodes: currentPage.nodes, connections: currentPage.connections, manualOverrides, visuOverrides })
-                })
-                  .then(r => r.ok ? r.json() : null)
-                  .then(result => {
-                    if (result?.nodeValues) {
-                      setLiveValues(prev => ({ ...prev, ...result.nodeValues }));
-                    }
-                  })
-                  .catch(() => {});
-              }, interval);
+              localCycleTimers.current[page.id] = setInterval(() => executePage(page.id), interval);
             }
           }
         }

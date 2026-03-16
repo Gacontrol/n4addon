@@ -1318,14 +1318,20 @@ function App() {
                 className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors text-xs"
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`}</span>
-                {activePage.running && measuredCycleTimes[activePageId] !== undefined && (() => {
-                  const measured = measuredCycleTimes[activePageId];
-                  const ratio = measured / activePage.cycleMs;
-                  const color = ratio > 2 ? 'text-red-400' : ratio > 1.3 ? 'text-amber-400' : 'text-emerald-400';
-                  const label = measured >= 1000 ? `${(measured / 1000).toFixed(1)}s` : `${measured}ms`;
-                  return <span className={`hidden sm:inline font-mono ${color}`}>({label})</span>;
-                })()}
+                <span>{activePage.cycleMs >= 1000 ? `${activePage.cycleMs / 1000}s` : `${activePage.cycleMs}ms`}</span>
+                {activePage.running && measuredCycleTimes[activePageId] !== undefined && (
+                  <span className={`font-mono ${
+                    measuredCycleTimes[activePageId] / activePage.cycleMs > 2
+                      ? 'text-red-400'
+                      : measuredCycleTimes[activePageId] / activePage.cycleMs > 1.3
+                      ? 'text-amber-400'
+                      : 'text-emerald-400'
+                  }`}>
+                    ({measuredCycleTimes[activePageId] >= 1000
+                      ? `${(measuredCycleTimes[activePageId] / 1000).toFixed(1)}s`
+                      : `${measuredCycleTimes[activePageId]}ms`})
+                  </span>
+                )}
                 {showCycleEditor ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
               {showCycleEditor && (
