@@ -2555,6 +2555,7 @@ async function runPageCycle(pageId) {
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
 
       for (const item of pendingResets) {
+        if (item.val === item.resetVal) continue;
         const resetEntry = { val: item.resetVal, resetVal: item.resetVal, nodeId: item.nodeId, overrideKey: item.overrideKey };
         const q = impulseQueue.get(item.nodeId) || [];
         q.unshift(resetEntry);
@@ -3036,7 +3037,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
     if (isImpulse) {
       const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-      const existing = impulseQueue.get(nodeId) || [];
+      const existing = (impulseQueue.get(nodeId) || []).filter(e => e.val !== e.resetVal);
       existing.push({ val: value, resetVal: capturedResetVal, nodeId, overrideKey });
       impulseQueue.set(nodeId, existing);
     } else {
