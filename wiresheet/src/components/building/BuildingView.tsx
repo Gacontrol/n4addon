@@ -1315,6 +1315,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   </>
                 ) : selectedSlab ? (
                   <>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold pb-1 border-b border-slate-700">Bodenplatte</div>
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
                       <div className="flex items-center gap-2">
@@ -1366,6 +1367,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       <Trash2 className="w-3.5 h-3.5" />
                       Platte löschen
                     </button>
+                    {activeFloor && <div className="pt-2 border-t border-slate-700">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Stockwerk</div>
+                      <div className="mb-2"><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Name</label><input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.name} onChange={e => activeBuilding && renameFloor(activeBuilding.id, activeFloor.id, e.target.value)} /></div>
+                      <div><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Deckenhöhe (m)</label><input type="number" step="0.1" min="2" max="10" className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.height} onChange={e => activeBuilding && updateFloorHeight(activeBuilding.id, activeFloor.id, parseFloat(e.target.value) || 3)} /></div>
+                    </div>}
                   </>
                 ) : selectedWall ? (
                   <>
@@ -1559,6 +1565,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       <Trash2 className="w-3.5 h-3.5" />
                       Wand löschen
                     </button>
+                    {activeFloor && <div className="pt-2 border-t border-slate-700">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Stockwerk</div>
+                      <div className="mb-2"><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Name</label><input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.name} onChange={e => activeBuilding && renameFloor(activeBuilding.id, activeFloor.id, e.target.value)} /></div>
+                      <div><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Deckenhöhe (m)</label><input type="number" step="0.1" min="2" max="10" className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.height} onChange={e => activeBuilding && updateFloorHeight(activeBuilding.id, activeFloor.id, parseFloat(e.target.value) || 3)} /></div>
+                    </div>}
                   </>
                 ) : selectedRoom ? (
                   <>
@@ -1594,6 +1605,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       <Trash2 className="w-3.5 h-3.5" />
                       Raum löschen
                     </button>
+                    {activeFloor && <div className="pt-2 border-t border-slate-700">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold mb-2">Stockwerk</div>
+                      <div className="mb-2"><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Name</label><input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.name} onChange={e => activeBuilding && renameFloor(activeBuilding.id, activeFloor.id, e.target.value)} /></div>
+                      <div><label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Deckenhöhe (m)</label><input type="number" step="0.1" min="2" max="10" className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.height} onChange={e => activeBuilding && updateFloorHeight(activeBuilding.id, activeFloor.id, parseFloat(e.target.value) || 3)} /></div>
+                    </div>}
                   </>
                 ) : activeFloor ? (
                   <>

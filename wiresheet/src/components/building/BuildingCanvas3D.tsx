@@ -235,6 +235,57 @@ function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSel
   );
 }
 
+interface PolygonRoomMeshProps {
+  points: { x: number; y: number }[];
+  offsetX: number;
+  baseY: number;
+  height: number;
+  color: string;
+  selected: boolean;
+  faded: boolean;
+  onSelect: () => void;
+}
+
+function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, faded, onSelect }: PolygonRoomMeshProps) {
+  const baseColor = hexToThree(color);
+  const opacity = faded ? 0.08 : 0.18;
+
+  const geo = useMemo(() => {
+    if (points.length < 3) return null;
+    const shape = new THREE.Shape();
+    shape.moveTo(points[0].x, -points[0].y);
+    for (let i = 1; i < points.length; i++) shape.lineTo(points[i].x, -points[i].y);
+    shape.closePath();
+    const extGeo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+    return extGeo;
+  }, [points, height]);
+
+  if (!geo) return null;
+
+  return (
+    <mesh
+      position={[offsetX, baseY, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      castShadow
+      receiveShadow
+    >
+      <primitive object={geo} />
+      <meshStandardMaterial
+        color={baseColor}
+        roughness={0.72}
+        metalness={0.04}
+        emissive={selected ? baseColor : new THREE.Color(0x000000)}
+        emissiveIntensity={selected ? 0.15 : 0}
+        transparent
+        opacity={opacity}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 interface WallSegmentProps {
   x1: number;
   y1: number;
@@ -627,23 +678,38 @@ function BuildingScene({
       }
 
       for (const room of floor.rooms) {
-        if (room.points && room.points.length > 0) continue;
-        elements.push(
-          <RoomMesh
-            key={`room-${room.id}`}
-            x={room.x + offsetX}
-            y={room.y}
-            z={baseY}
-            width={room.width}
-            depth={room.depth}
-            height={floor.height}
-            color={room.color}
-            selected={room.id === selectedRoomId}
-            faded={faded}
-            onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
-            castShadow={lighting.shadowEnabled}
-          />
-        );
+        if (room.points && room.points.length > 2) {
+          elements.push(
+            <PolygonRoomMesh
+              key={`room-${room.id}`}
+              points={room.points}
+              offsetX={offsetX}
+              baseY={baseY}
+              height={floor.height}
+              color={room.color}
+              selected={room.id === selectedRoomId}
+              faded={faded}
+              onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
+            />
+          );
+        } else {
+          elements.push(
+            <RoomMesh
+              key={`room-${room.id}`}
+              x={room.x + offsetX}
+              y={room.y}
+              z={baseY}
+              width={room.width}
+              depth={room.depth}
+              height={floor.height}
+              color={room.color}
+              selected={room.id === selectedRoomId}
+              faded={faded}
+              onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
+              castShadow={lighting.shadowEnabled}
+            />
+          );
+        }
       }
 
       for (const wall of floor.walls) {

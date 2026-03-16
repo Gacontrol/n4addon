@@ -1830,7 +1830,7 @@ export function FloorPlanEditor({
             </div>
             <div className="flex items-center gap-1 px-2 py-1 bg-slate-800 border border-slate-600 rounded text-xs">
               <span className="text-slate-500">Skala</span>
-              <input type="range" min="0.001" max="2" step="0.001" value={bg.scale}
+              <input type="range" min="0.001" max="10" step="0.001" value={bg.scale}
                 onChange={e => onSetBackground({ ...bg, scale: parseFloat(e.target.value) })}
                 className="w-24 h-1 accent-blue-500" />
               <span className="text-slate-400 w-12">{bg.scale.toFixed(3)}</span>
