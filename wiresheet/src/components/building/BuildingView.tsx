@@ -212,6 +212,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [dropOpeningType, setDropOpeningType] = useState<WallOpeningType | null>(null);
   const [showOpeningPanel, setShowOpeningPanel] = useState(false);
   const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
+  const [sectionAxis, setSectionAxis] = useState<'xz' | 'yz'>('xz');
+  const [showAnsichtPanel, setShowAnsichtPanel] = useState(false);
   const [newWidgetType, setNewWidgetType] = useState<Widget3DType>('temperature');
   const [newWidgetDatapoint, setNewWidgetDatapoint] = useState('');
   const [newWidgetLabel, setNewWidgetLabel] = useState('');
@@ -864,28 +866,22 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 </button>
                 <div className="relative">
                   <button
-                    onClick={() => setWallsTransparent(v => !v)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-l text-xs border-l border-t border-b transition-colors ${wallsTransparent ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                    title="Wände transparent"
+                    onClick={() => setShowAnsichtPanel(p => !p)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showAnsichtPanel || wallsTransparent ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                    title="Ansicht"
                   >
                     <Box className="w-3.5 h-3.5" />
-                    X-Ray
-                  </button>
-                  <button
-                    onClick={() => setShowXrayPanel(p => !p)}
-                    className={`px-1.5 py-1 rounded-r text-xs border transition-colors ${showXrayPanel ? 'bg-cyan-600 text-white border-cyan-500' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                    title="X-Ray Einstellungen"
-                  >
+                    Ansicht
                     <ChevronDown className="w-3 h-3" />
                   </button>
-                  {showXrayPanel && (
-                    <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 z-50 min-w-[180px]">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">X-Ray Einstellungen</div>
-                      <label className="flex items-center gap-2 text-xs text-slate-300 mb-3">
-                        <input type="checkbox" checked={wallsTransparent} onChange={e => setWallsTransparent(e.target.checked)} className="rounded bg-slate-700 border-slate-600" />
-                        Aktiviert
+                  {showAnsichtPanel && (
+                    <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 z-50 min-w-[200px]" onClick={e => e.stopPropagation()}>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">Ansicht</div>
+                      <label className="flex items-center gap-2 text-xs text-slate-300 mb-2 cursor-pointer">
+                        <input type="checkbox" checked={wallsTransparent} onChange={e => setWallsTransparent(e.target.checked)} className="rounded bg-slate-700 border-slate-600 accent-cyan-500" />
+                        X-Ray aktiv
                       </label>
-                      <div className="mb-1">
+                      <div className={`transition-opacity ${wallsTransparent ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                         <div className="text-[10px] text-slate-400 mb-1">Transparenz: {Math.round(xrayOpacity * 100)}%</div>
                         <input type="range" min="5" max="60" value={xrayOpacity * 100} onChange={e => setXrayOpacity(Number(e.target.value) / 100)} className="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
                       </div>
@@ -1265,44 +1261,23 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 )}
               </div>
             ) : viewMode === 'section' && activeBuilding ? (
-              <div className="flex w-full h-full">
-                <div className="flex-1 border-r border-slate-700 min-w-0">
-                  <SectionView
-                    building={activeBuilding}
-                    ductType={ductType}
-                    ductShape={ductShape}
-                    ductWidth={ductWidth}
-                    ductHeight={ductHeight}
-                    pipeType={pipeType}
-                    pipeDiameter={pipeDiameter}
-                    tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
-                    axis="xz"
-                    label="Vorderansicht (X-Achse)"
-                    selectedDuctId={selectedDuctId}
-                    onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
-                    onDeleteDuct={(ductId, floorId) => { if (activeBuilding) { deleteDuct(activeBuilding.id, floorId, ductId); setSelectedDuctId(null); } }}
-                    onUpdateDuct={(ductId, floorId, changes) => { if (activeBuilding) updateDuct(activeBuilding.id, floorId, ductId, changes); }}
-                    onAddVerticalDuct={(duct, fromFloorId) => {
-                      if (!activeBuilding) return;
-                      addDuct(activeBuilding.id, fromFloorId, duct);
-                    }}
-                    onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
-                      if (!activeBuilding) return;
-                      addPipe(activeBuilding.id, fromFloorId, pipe);
-                      addPipe(activeBuilding.id, toFloorId, pipe);
-                    }}
-                    onUpdateVerticalDuct={(ductId, floorId, changes) => {
-                      if (!activeBuilding) return;
-                      updateDuct(activeBuilding.id, floorId, ductId, changes);
-                    }}
-                    onMergeDucts={(ductIds, floorId) => {
-                      if (!activeBuilding) return null;
-                      return mergeDucts(activeBuilding.id, floorId, ductIds);
-                    }}
-                    gridSize={gridSize}
-                  />
+              <div className="flex flex-col w-full h-full">
+                <div className="flex items-center gap-1 px-3 py-1.5 border-b border-slate-700 bg-slate-800/80 flex-shrink-0">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Achse:</span>
+                  <button
+                    onClick={() => setSectionAxis('xz')}
+                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'xz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  >
+                    Vorderansicht (X)
+                  </button>
+                  <button
+                    onClick={() => setSectionAxis('yz')}
+                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'yz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  >
+                    Seitenansicht (Y)
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 min-h-0">
                   <SectionView
                     building={activeBuilding}
                     ductType={ductType}
@@ -1312,8 +1287,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeType={pipeType}
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
-                    axis="yz"
-                    label="Seitenansicht links (Y-Achse)"
+                    axis={sectionAxis}
+                    label={sectionAxis === 'xz' ? 'Vorderansicht (X-Achse)' : 'Seitenansicht (Y-Achse)'}
                     selectedDuctId={selectedDuctId}
                     onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
                     onDeleteDuct={(ductId, floorId) => { if (activeBuilding) { deleteDuct(activeBuilding.id, floorId, ductId); setSelectedDuctId(null); } }}

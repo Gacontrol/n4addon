@@ -150,6 +150,18 @@ export function SectionView({
 
   const snapTo = useCallback((v: number) => Math.round(v / gridSize) * gridSize, [gridSize]);
 
+  const getFloorForY = useCallback((worldY: number): { floor: Floor; floorIdx: number; baseY: number; topY: number } | null => {
+    let baseY = 0;
+    for (let i = 0; i < sortedFloors.length; i++) {
+      const topY = baseY + sortedFloors[i].height;
+      if (worldY >= baseY && worldY < topY) {
+        return { floor: sortedFloors[i], floorIdx: i, baseY, topY };
+      }
+      baseY = topY;
+    }
+    return null;
+  }, [sortedFloors]);
+
   const getAllSectionDucts = useCallback((): { duct: Duct; floor: Floor; floorBaseY: number }[] => {
     const result: { duct: Duct; floor: Floor; floorBaseY: number }[] = [];
     for (let i = 0; i < sortedFloors.length; i++) {
@@ -441,6 +453,36 @@ export function SectionView({
     return { cx: e.clientX - rect.left, cy: e.clientY - rect.top };
   };
 
+  const finishVerticalDuct = useCallback((pts: { x: number; y: number }[]) => {
+    if (pts.length < 2) return;
+    const minY = Math.min(...pts.map(p => p.y));
+    const midX = pts[0].x;
+    let fromFloor: Floor | null = null;
+    let floorY = 0;
+    for (let i = 0; i < sortedFloors.length; i++) {
+      const floor = sortedFloors[i];
+      const topY = floorY + floor.height;
+      if (minY >= floorY && minY < topY) { fromFloor = floor; break; }
+      floorY = topY;
+    }
+    if (!fromFloor) fromFloor = sortedFloors[0];
+    const buildingCoords = sectionXToBuildingCoords(midX);
+    const duct: Omit<Duct, 'id'> = {
+      points: [{ x: midX, y: 0 }, { x: midX, y: 0 }],
+      shape: ductShape,
+      type: ductType,
+      width: ductWidth,
+      height: ductHeight,
+      elevation: 0,
+      insulated: false,
+      isVertical: true,
+      verticalX: buildingCoords.bx ?? midX,
+      verticalY: buildingCoords.by ?? 5,
+      verticalSectionPoints: pts,
+    };
+    onAddVerticalDuct(duct, fromFloor.id);
+  }, [sortedFloors, ductShape, ductType, ductWidth, ductHeight, onAddVerticalDuct, sectionXToBuildingCoords]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       isPanning.current = true;
@@ -455,6 +497,39 @@ export function SectionView({
       const world = toWorld(cx, cy);
       const snappedX = snapTo(world.x);
       const snappedY = snapTo(world.y);
+
+      if (tool === 'duct') {
+        setPolyline(prev => {
+          const newPts = [...prev, { x: snappedX, y: snappedY }];
+          if (newPts.length < 2) return newPts;
+
+          const firstPt = newPts[0];
+          const firstFloor = getFloorForY(firstPt.y);
+          if (!firstFloor) return newPts;
+
+          const lastPt = newPts[newPts.length - 1];
+          const lastFloorInfo = getFloorForY(lastPt.y);
+
+          if (!lastFloorInfo || lastFloorInfo.floorIdx !== firstFloor.floorIdx) {
+            const isGoingDown = lastPt.y < firstPt.y;
+            const boundaryY = isGoingDown ? firstFloor.baseY : firstFloor.topY - gridSize;
+            const cappedPts = [...newPts.slice(0, -1), { x: lastPt.x, y: boundaryY }];
+            if (cappedPts.length >= 2) {
+              finishVerticalDuct(cappedPts);
+            }
+            const nextFloorInfo = getFloorForY(isGoingDown ? firstFloor.baseY - 0.001 : firstFloor.topY);
+            if (nextFloorInfo) {
+              const connectionY = isGoingDown ? firstFloor.baseY : firstFloor.topY;
+              return [{ x: lastPt.x, y: connectionY }];
+            }
+            return [];
+          }
+
+          return newPts;
+        });
+        return;
+      }
+
       setPolyline(prev => [...prev, { x: snappedX, y: snappedY }]);
       return;
     }
@@ -490,7 +565,7 @@ export function SectionView({
       }
       setContextMenu(null);
     }
-  }, [tool, toWorld, offset, hitTestDuct, hitTestPoint, snapTo, onSelectDuct]);
+  }, [tool, toWorld, offset, hitTestDuct, hitTestPoint, snapTo, onSelectDuct, getFloorForY, finishVerticalDuct, gridSize]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning.current) {
@@ -572,40 +647,25 @@ export function SectionView({
     if (tool !== 'duct' && tool !== 'pipe') return;
 
     const pts = polyline;
-    const minY = Math.min(...pts.map(p => p.y));
     const midX = pts[0].x;
 
-    let fromFloor: Floor | null = null;
-    let toFloor: Floor | null = null;
-    let floorY = 0;
-    for (let i = 0; i < sortedFloors.length; i++) {
-      const floor = sortedFloors[i];
-      const topY = floorY + floor.height;
-      if (minY >= floorY && minY < topY) fromFloor = floor;
-      const maxY = Math.max(...pts.map(p => p.y));
-      if (maxY >= floorY && maxY < topY) toFloor = floor;
-      floorY = topY;
-    }
-    if (!fromFloor) fromFloor = sortedFloors[0];
-    if (!toFloor) toFloor = fromFloor;
-
     if (tool === 'duct') {
-      const buildingCoords = sectionXToBuildingCoords(midX);
-      const duct: Omit<Duct, 'id'> = {
-        points: [{ x: midX, y: 0 }, { x: midX, y: 0 }],
-        shape: ductShape,
-        type: ductType,
-        width: ductWidth,
-        height: ductHeight,
-        elevation: 0,
-        insulated: false,
-        isVertical: true,
-        verticalX: buildingCoords.bx ?? midX,
-        verticalY: buildingCoords.by ?? 5,
-        verticalSectionPoints: pts,
-      };
-      onAddVerticalDuct(duct, fromFloor.id);
+      finishVerticalDuct(pts);
     } else {
+      const minY = Math.min(...pts.map(p => p.y));
+      let fromFloor: Floor | null = null;
+      let toFloor: Floor | null = null;
+      let floorY = 0;
+      for (let i = 0; i < sortedFloors.length; i++) {
+        const floor = sortedFloors[i];
+        const topY = floorY + floor.height;
+        if (minY >= floorY && minY < topY) fromFloor = floor;
+        const maxY = Math.max(...pts.map(p => p.y));
+        if (maxY >= floorY && maxY < topY) toFloor = floor;
+        floorY = topY;
+      }
+      if (!fromFloor) fromFloor = sortedFloors[0];
+      if (!toFloor) toFloor = fromFloor;
       const pipe: Omit<Pipe, 'id'> = {
         points: [{ x: midX, y: 0 }, { x: midX, y: 0 }],
         type: pipeType,
@@ -616,7 +676,7 @@ export function SectionView({
       onAddVerticalPipe(pipe, fromFloor.id, toFloor.id);
     }
     setPolyline([]);
-  }, [polyline, tool, sortedFloors, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddVerticalDuct, onAddVerticalPipe, sectionXToBuildingCoords]);
+  }, [polyline, tool, sortedFloors, pipeType, pipeDiameter, onAddVerticalPipe, finishVerticalDuct]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
