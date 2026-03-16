@@ -830,9 +830,10 @@ function BuildingScene({
         elements.push(
           <RoomColorOverlay
             key={`widget3d-${widget.id}`}
-            widget={{ ...widget, x: widget.x + offsetX }}
+            widget={widget}
             baseY={floorBaseYLocal}
             floorHeight={floorH}
+            offsetX={offsetX}
             buildings={buildings}
             liveValue={liveValues[widget.datapoint]}
             alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
