@@ -1123,7 +1123,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     [duct.isTransition, duct.points, offsetX, elev, w, h, isRound]
   );
 
-  const ductOpacity = faded ? 0.12 : 1.0;
+  const ductOpacity = faded ? 0.45 : 1.0;
   const mat = (
     <meshStandardMaterial
       color={color}
@@ -1320,7 +1320,7 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: Pi
         <group key={`ps-${i}`}>
           <mesh castShadow>
             <primitive object={geo} />
-            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.12 : 1} />
+            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.45 : 1} />
           </mesh>
           {pipe.insulated && (
             <mesh castShadow>
@@ -1335,7 +1335,7 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: Pi
       {elbowGeos.map((geo, i) => (
         <mesh key={`pe-${i}`} castShadow>
           <primitive object={geo} />
-          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.12 : 1} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.45 : 1} />
         </mesh>
       ))}
       {selected && pipeGeos.map(({ start, end }, i) => {

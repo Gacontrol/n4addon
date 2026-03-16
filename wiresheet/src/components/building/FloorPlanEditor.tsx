@@ -463,6 +463,8 @@ export function FloorPlanEditor({
     return best;
   }, [floor.walls, floor.slabs, gridSize]);
 
+  const snapToGrid = useCallback((v: number) => Math.round(v / gridSize) * gridSize, [gridSize]);
+
   const drawCornerJoins = useCallback((ctx: CanvasRenderingContext2D, cellPx: number) => {
     const walls = floor.walls;
     for (const w1 of walls) {
@@ -1375,7 +1377,40 @@ export function FloorPlanEditor({
 
     if (connectMode !== null) {
       for (const duct of (floor.ducts ?? [])) {
-        if (duct.isVertical) continue;
+        if (duct.isVertical) {
+          if (duct.verticalX == null) continue;
+          const vpt = { x: duct.verticalX, y: duct.verticalY ?? duct.points[0]?.y ?? 0 };
+          const sp = toScreen(vpt.x, vpt.y);
+          const isFirst = connectMode.firstDuctId === duct.id && connectMode.firstPointIndex === 0;
+          const isHover = connectMode.hoverDuctId === duct.id && connectMode.hoverPointIndex === 0;
+          const r = isFirst ? 10 : isHover ? 9 : 8;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+          if (isFirst) {
+            ctx.fillStyle = '#22c55e';
+            ctx.strokeStyle = '#fff';
+          } else if (isHover) {
+            ctx.fillStyle = '#f59e0b';
+            ctx.strokeStyle = '#fff';
+          } else {
+            ctx.fillStyle = '#78350f';
+            ctx.strokeStyle = '#f59e0b';
+          }
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(sp.x - r * 0.5, sp.y);
+          ctx.lineTo(sp.x + r * 0.5, sp.y);
+          ctx.moveTo(sp.x, sp.y - r * 0.5);
+          ctx.lineTo(sp.x, sp.y + r * 0.5);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
         const allPoints = duct.points.map((pt, idx) => ({ pt, idx }));
         for (const { pt, idx } of allPoints) {
           const sp = toScreen(pt.x, pt.y);
@@ -1608,8 +1643,22 @@ export function FloorPlanEditor({
       let nearestDist = Infinity;
       let hitDuctId: string | null = null;
       let hitPointIndex: number | null = null;
+      let hitIsVertical = false;
       for (const duct of (floor.ducts ?? [])) {
-        if (duct.isVertical || duct.points.length < 2) continue;
+        if (duct.isVertical) {
+          if (duct.verticalX == null) continue;
+          const vx = duct.verticalX;
+          const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
+          const d = dist(world.x, world.y, vx, vy);
+          if (d < CONNECT_HIT_RADIUS && d < nearestDist) {
+            nearestDist = d;
+            hitDuctId = duct.id;
+            hitPointIndex = 0;
+            hitIsVertical = true;
+          }
+          continue;
+        }
+        if (duct.points.length < 2) continue;
         for (let idx = 0; idx < duct.points.length; idx++) {
           const pt = duct.points[idx];
           const d = dist(world.x, world.y, pt.x, pt.y);
@@ -1617,6 +1666,7 @@ export function FloorPlanEditor({
             nearestDist = d;
             hitDuctId = duct.id;
             hitPointIndex = idx;
+            hitIsVertical = false;
           }
         }
       }
@@ -1624,9 +1674,27 @@ export function FloorPlanEditor({
         if (connectMode.firstDuctId === null) {
           setConnectMode(prev => prev ? { ...prev, firstDuctId: hitDuctId, firstPointIndex: hitPointIndex } : null);
         } else if (hitDuctId !== connectMode.firstDuctId) {
-          const newId = onConnectDuctEndpoints?.(connectMode.firstDuctId, connectMode.firstPointIndex!, hitDuctId, hitPointIndex);
-          setConnectMode(null);
-          setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
+          const firstDuct = (floor.ducts ?? []).find(d => d.id === connectMode.firstDuctId);
+          const firstIsVertical = firstDuct?.isVertical ?? false;
+          if (hitIsVertical && !firstIsVertical) {
+            const vx = (floor.ducts ?? []).find(d => d.id === hitDuctId)?.verticalX ?? 0;
+            const vy = (floor.ducts ?? []).find(d => d.id === hitDuctId)?.verticalY ?? 0;
+            onMoveDuctPoint?.(connectMode.firstDuctId, connectMode.firstPointIndex!, vx, vy);
+            setConnectMode(null);
+            setMultiSel({ wallIds: [], roomIds: [], ductIds: [connectMode.firstDuctId], pipeIds: [] });
+          } else if (firstIsVertical && !hitIsVertical) {
+            const vx = firstDuct?.verticalX ?? 0;
+            const vy = firstDuct?.verticalY ?? 0;
+            onMoveDuctPoint?.(hitDuctId, hitPointIndex, vx, vy);
+            setConnectMode(null);
+            setMultiSel({ wallIds: [], roomIds: [], ductIds: [hitDuctId], pipeIds: [] });
+          } else if (!hitIsVertical && !firstIsVertical) {
+            const newId = onConnectDuctEndpoints?.(connectMode.firstDuctId, connectMode.firstPointIndex!, hitDuctId, hitPointIndex);
+            setConnectMode(null);
+            setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
+          } else {
+            setConnectMode(null);
+          }
         }
       } else {
         setConnectMode(null);
@@ -1842,7 +1910,19 @@ export function FloorPlanEditor({
       let hoverPointIndex: number | null = null;
       let nearestDist = Infinity;
       for (const duct of (floor.ducts ?? [])) {
-        if (duct.isVertical || duct.points.length < 2) continue;
+        if (duct.isVertical) {
+          if (duct.verticalX == null) continue;
+          const vx = duct.verticalX;
+          const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
+          const d = dist(world.x, world.y, vx, vy);
+          if (d < CONNECT_HOVER_RADIUS && d < nearestDist) {
+            nearestDist = d;
+            hoverDuctId = duct.id;
+            hoverPointIndex = 0;
+          }
+          continue;
+        }
+        if (duct.points.length < 2) continue;
         for (let idx = 0; idx < duct.points.length; idx++) {
           const pt = duct.points[idx];
           const d = dist(world.x, world.y, pt.x, pt.y);
@@ -1872,16 +1952,16 @@ export function FloorPlanEditor({
     } else if (dragState.current.type === 'move-room' && dragState.current.roomId) {
       const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      onMoveRoom(dragState.current.roomId, snapTo((dragState.current.origX ?? 0) + dx), snapTo((dragState.current.origY ?? 0) + dy));
+      onMoveRoom(dragState.current.roomId, snapToGrid((dragState.current.origX ?? 0) + dx), snapToGrid((dragState.current.origY ?? 0) + dy));
     } else if (dragState.current.type === 'move-wall-point' && dragState.current.wallId) {
       onMoveWallPoint(dragState.current.wallId, dragState.current.point!, snapped.x, snapped.y);
     } else if (dragState.current.type === 'move-wall' && dragState.current.wallId) {
       const ddx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const ddy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      const newX1 = snapTo((dragState.current.wallOrigX1 ?? 0) + ddx);
-      const newY1 = snapTo((dragState.current.wallOrigY1 ?? 0) + ddy);
-      const newX2 = snapTo((dragState.current.wallOrigX2 ?? 0) + ddx);
-      const newY2 = snapTo((dragState.current.wallOrigY2 ?? 0) + ddy);
+      const newX1 = snapToGrid((dragState.current.wallOrigX1 ?? 0) + ddx);
+      const newY1 = snapToGrid((dragState.current.wallOrigY1 ?? 0) + ddy);
+      const newX2 = snapToGrid((dragState.current.wallOrigX2 ?? 0) + ddx);
+      const newY2 = snapToGrid((dragState.current.wallOrigY2 ?? 0) + ddy);
       onMoveWall(dragState.current.wallId, newX1 - (dragState.current.wallOrigX1 ?? 0), newY1 - (dragState.current.wallOrigY1 ?? 0));
       dragState.current.wallOrigX1 = newX1;
       dragState.current.wallOrigY1 = newY1;
@@ -1905,8 +1985,8 @@ export function FloorPlanEditor({
     } else if (dragState.current.type === 'move-multi') {
       const origWX = dragState.current.multiOrigWX ?? world.x;
       const origWY = dragState.current.multiOrigWY ?? world.y;
-      const ddx = snapTo(world.x - origWX);
-      const ddy = snapTo(world.y - origWY);
+      const ddx = snapToGrid(world.x - origWX);
+      const ddy = snapToGrid(world.y - origWY);
       if (ddx !== 0 || ddy !== 0) {
         onMoveMultiSelection?.(multiSel, ddx, ddy);
         dragState.current.multiOrigWX = origWX + ddx;
@@ -1917,8 +1997,8 @@ export function FloorPlanEditor({
     } else if (dragState.current.type === 'move-duct' && dragState.current.ductId) {
       const ddx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const ddy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      const sdx = snapTo(ddx);
-      const sdy = snapTo(ddy);
+      const sdx = snapToGrid(ddx);
+      const sdy = snapToGrid(ddy);
       if (sdx !== 0 || sdy !== 0) {
         onMoveDuct?.(dragState.current.ductId, sdx, sdy);
         dragState.current.startX = e.clientX - (ddx - sdx) * CELL * zoom;
@@ -1929,15 +2009,15 @@ export function FloorPlanEditor({
     } else if (dragState.current.type === 'move-pipe' && dragState.current.pipeId) {
       const ddx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const ddy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      const sdx = snapTo(ddx);
-      const sdy = snapTo(ddy);
+      const sdx = snapToGrid(ddx);
+      const sdy = snapToGrid(ddy);
       if (sdx !== 0 || sdy !== 0) {
         onMovePipe?.(dragState.current.pipeId, sdx, sdy);
         dragState.current.startX = e.clientX - (ddx - sdx) * CELL * zoom;
         dragState.current.startY = e.clientY - (ddy - sdy) * CELL * zoom;
       }
     }
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe, connectMode, floor.ducts]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, snapToGrid, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe, connectMode, floor.ducts]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
@@ -1951,10 +2031,10 @@ export function FloorPlanEditor({
       }
       setDrawingWall(null);
     } else if (dragState.current?.type === 'draw-room' && drawRect) {
-      const x1 = snapTo(Math.min(drawRect.startX, drawRect.endX));
-      const y1 = snapTo(Math.min(drawRect.startY, drawRect.endY));
-      const x2 = snapTo(Math.max(drawRect.startX, drawRect.endX));
-      const y2 = snapTo(Math.max(drawRect.startY, drawRect.endY));
+      const x1 = snapToGrid(Math.min(drawRect.startX, drawRect.endX));
+      const y1 = snapToGrid(Math.min(drawRect.startY, drawRect.endY));
+      const x2 = snapToGrid(Math.max(drawRect.startX, drawRect.endX));
+      const y2 = snapToGrid(Math.max(drawRect.startY, drawRect.endY));
       if (x2 - x1 >= 1 && y2 - y1 >= 1) onAddRoom(x1, y1, x2 - x1, y2 - y1);
       setDrawRect(null);
     } else if (dragState.current?.type === 'move-bg') {
@@ -1971,7 +2051,7 @@ export function FloorPlanEditor({
       setLassoRect(null);
     }
     dragState.current = null;
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, onAddWall, onAddRoom, wallThickness, lassoRect, getLassoSelection, onSelectionChange]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, snapToGrid, onAddWall, onAddRoom, wallThickness, lassoRect, getLassoSelection, onSelectionChange]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
