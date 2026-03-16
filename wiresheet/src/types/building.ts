@@ -88,7 +88,9 @@ export type Widget3DType =
   | 'blinds'
   | 'custom'
   | 'roomcolor'
-  | 'duct';
+  | 'duct'
+  | 'fire-damper'
+  | 'boolean';
 
 export interface Widget3D {
   id: string;
@@ -101,6 +103,7 @@ export interface Widget3D {
   z: number;
   floorId: string;
   scale: number;
+  size?: number;
   color: string;
   showLabel: boolean;
   showValue: boolean;
@@ -143,6 +146,20 @@ export interface Pipe {
   color?: string;
   label?: string;
   insulated: boolean;
+}
+
+// ---- Floor Slabs ----
+
+export interface SlabPoint {
+  x: number;
+  y: number;
+}
+
+export interface Slab {
+  id: string;
+  points: SlabPoint[];
+  color?: string;
+  opacity?: number;
 }
 
 // ---- OBJ Models ----
@@ -196,6 +213,7 @@ export interface Floor {
   walls: Wall[];
   ducts: Duct[];
   pipes: Pipe[];
+  slabs: Slab[];
   backgroundImage: BackgroundImage | null;
   floorColor?: string;
 }
@@ -210,7 +228,7 @@ export interface Building {
   updatedAt: number;
 }
 
-export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe';
+export type BuildingTool = 'select' | 'room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;

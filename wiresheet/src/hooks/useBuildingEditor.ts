@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D } from '../types/building';
+import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab } from '../types/building';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -36,6 +36,7 @@ function createDefaultBuilding(): Building {
         walls: [],
         ducts: [],
         pipes: [],
+        slabs: [],
         backgroundImage: null,
       },
     ],
@@ -64,6 +65,7 @@ export function useBuildingEditor() {
       walls: (f.walls ?? []).map((w: Wall) => ({ ...w, openings: w.openings ?? [] })),
       ducts: f.ducts ?? [],
       pipes: f.pipes ?? [],
+      slabs: f.slabs ?? [],
       backgroundImage: f.backgroundImage ?? null,
     })),
   }));
@@ -191,6 +193,7 @@ export function useBuildingEditor() {
       walls: [],
       ducts: [],
       pipes: [],
+      slabs: [],
       backgroundImage: null,
     };
     const updated = buildings.map(b =>
@@ -215,6 +218,7 @@ export function useBuildingEditor() {
       walls: [],
       ducts: [],
       pipes: [],
+      slabs: [],
       backgroundImage: null,
     };
     const updated = buildings.map(b =>
@@ -494,6 +498,42 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const moveDuctPoint = useCallback((buildingId: string, floorId: string, ductId: string, pointIndex: number, x: number, y: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            ducts: (f.ducts ?? []).map(d =>
+              d.id === ductId ? { ...d, points: d.points.map((p, i) => i === pointIndex ? { ...p, x, y } : p) } : d
+            ),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const moveDuct = useCallback((buildingId: string, floorId: string, ductId: string, dx: number, dy: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            ducts: (f.ducts ?? []).map(d =>
+              d.id === ductId ? { ...d, points: d.points.map(p => ({ ...p, x: p.x + dx, y: p.y + dy })) } : d
+            ),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const deleteDuct = useCallback((buildingId: string, floorId: string, ductId: string) => {
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -541,6 +581,42 @@ export function useBuildingEditor() {
             updatedAt: Date.now(),
           }
         : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const movePipePoint = useCallback((buildingId: string, floorId: string, pipeId: string, pointIndex: number, x: number, y: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            pipes: (f.pipes ?? []).map(p =>
+              p.id === pipeId ? { ...p, points: p.points.map((pt, i) => i === pointIndex ? { ...pt, x, y } : pt) } : p
+            ),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const movePipe = useCallback((buildingId: string, floorId: string, pipeId: string, dx: number, dy: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            pipes: (f.pipes ?? []).map(p =>
+              p.id === pipeId ? { ...p, points: p.points.map(pt => ({ ...pt, x: pt.x + dx, y: pt.y + dy })) } : p
+            ),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
     );
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
@@ -646,6 +722,57 @@ export function useBuildingEditor() {
     setSelectedWidget3DId(null);
   }, [buildings, updateBuildings]);
 
+  // ---- Slab Actions ----
+
+  const addSlab = useCallback((buildingId: string, floorId: string, slab: Omit<Slab, 'id'>) => {
+    const newSlab: Slab = { ...slab, id: `slab-${Date.now()}-${Math.random().toString(36).substr(2, 6)}` };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, slabs: [...(f.slabs ?? []), newSlab] } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    return newSlab.id;
+  }, [buildings, updateBuildings]);
+
+  const updateSlab = useCallback((buildingId: string, floorId: string, slabId: string, changes: Partial<Slab>) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? { ...f, slabs: (f.slabs ?? []).map(s => s.id === slabId ? { ...s, ...changes } : s) }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const deleteSlab = useCallback((buildingId: string, floorId: string, slabId: string) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId ? { ...f, slabs: (f.slabs ?? []).filter(s => s.id !== slabId) } : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   // ---- OBJ Model Actions ----
 
   const [selectedObjModelId, setSelectedObjModelId] = useState<string | null>(null);
@@ -723,11 +850,18 @@ export function useBuildingEditor() {
     deleteWallOpening,
     addDuct,
     updateDuct,
+    moveDuctPoint,
+    moveDuct,
     deleteDuct,
     addPipe,
     updatePipe,
+    movePipePoint,
+    movePipe,
     deletePipe,
     moveMultiSelection,
+    addSlab,
+    updateSlab,
+    deleteSlab,
     selectedWidget3DId,
     setSelectedWidget3DId,
     addWidget3D,

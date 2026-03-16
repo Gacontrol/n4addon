@@ -5,39 +5,43 @@ import * as THREE from 'three';
 import { Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType } from '../../types/building';
 
 export const WIDGET_COLORS: Record<Widget3DType, string> = {
-  temperature: '#ef4444',
-  setpoint:    '#f97316',
-  humidity:    '#06b6d4',
-  alarm:       '#ef4444',
-  co2:         '#84cc16',
-  presence:    '#a855f7',
-  energy:      '#eab308',
-  valve:       '#14b8a6',
-  pump:        '#3b82f6',
-  fan:         '#6366f1',
-  light:       '#fde047',
-  blinds:      '#8b5cf6',
-  custom:      '#94a3b8',
-  roomcolor:   '#22c55e',
-  duct:        '#60a5fa',
+  temperature:  '#ef4444',
+  setpoint:     '#f97316',
+  humidity:     '#06b6d4',
+  alarm:        '#ef4444',
+  co2:          '#84cc16',
+  presence:     '#a855f7',
+  energy:       '#eab308',
+  valve:        '#14b8a6',
+  pump:         '#3b82f6',
+  fan:          '#6366f1',
+  light:        '#fde047',
+  blinds:       '#8b5cf6',
+  custom:       '#94a3b8',
+  roomcolor:    '#22c55e',
+  duct:         '#60a5fa',
+  'fire-damper':'#f43f5e',
+  boolean:      '#22d3ee',
 };
 
 export const WIDGET_LABELS: Record<Widget3DType, string> = {
-  temperature: 'Temperatur',
-  setpoint:    'Sollwert',
-  humidity:    'Feuchte',
-  alarm:       'Alarm',
-  co2:         'CO\u2082',
-  presence:    'Anwesenheit',
-  energy:      'Energie',
-  valve:       'Ventil',
-  pump:        'Pumpe',
-  fan:         'Lüfter',
-  light:       'Licht',
-  blinds:      'Jalousie',
-  custom:      'Widget',
-  roomcolor:   'Raumeinfärbung',
-  duct:        'Kanal-Sensor',
+  temperature:  'Temperatur',
+  setpoint:     'Sollwert',
+  humidity:     'Feuchte',
+  alarm:        'Alarm',
+  co2:          'CO\u2082',
+  presence:     'Anwesenheit',
+  energy:       'Energie',
+  valve:        'Ventil',
+  pump:         'Pumpe',
+  fan:          'Lüfter',
+  light:        'Licht',
+  blinds:       'Jalousie',
+  custom:       'Widget',
+  roomcolor:    'Raumeinfärbung',
+  duct:         'Kanal-Sensor',
+  'fire-damper':'Brandschutzklappe',
+  boolean:      'Boolean',
 };
 
 export const DUCT_COLORS: Record<DuctType, string> = {
@@ -129,7 +133,6 @@ interface Widget3DMeshProps {
 
 export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd }: Widget3DMeshProps) {
   const baseColor = widget.color || WIDGET_COLORS[widget.type] || '#94a3b8';
-  const scale = widget.scale || 1;
   const wx = widget.x;
   const wy = baseY + widget.z;
   const wz = widget.y;
@@ -141,6 +144,9 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const isLight = widget.type === 'light';
   const isRoomColor = widget.type === 'roomcolor';
   const isDuct = widget.type === 'duct';
+  const isFireDamper = widget.type === 'fire-damper';
+  const isBoolean = widget.type === 'boolean';
+  const displaySize = (widget.size ?? 1.0) * (widget.scale || 1);
 
   if (isRoomColor) return null;
 
@@ -156,18 +162,19 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
     startWZ: number;
     shiftKey: boolean;
     moved: boolean;
+    factor: number;
   } | null>(null);
   const didDragRef = useRef(false);
   const groupRef = useRef<THREE.Group>(null);
-  const { controls } = useThree();
+  const { controls, camera, size } = useThree();
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!dragRef.current) return;
-      const factor = 0.06;
+      const factor = dragRef.current.factor;
       const dx = (e.clientX - dragRef.current.startX) * factor;
       const dy = (e.clientY - dragRef.current.startY) * factor;
-      if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) dragRef.current.moved = true;
+      if (Math.abs(dx) > 0.02 || Math.abs(dy) > 0.02) dragRef.current.moved = true;
       if (!dragRef.current.moved || !groupRef.current) return;
       const isShift = dragRef.current.shiftKey || e.shiftKey;
       if (isShift) {
@@ -182,7 +189,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       if (controls) (controls as any).enabled = true;
       if (dragRef.current.moved && onDragEnd) {
         didDragRef.current = true;
-        const factor = 0.06;
+        const factor = dragRef.current.factor;
         const dx = (e.clientX - dragRef.current.startX) * factor;
         const dy = (e.clientY - dragRef.current.startY) * factor;
         const isShift = dragRef.current.shiftKey || e.shiftKey;
@@ -206,7 +213,6 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
     <group
       ref={groupRef}
       position={[wx, wy, wz]}
-      scale={[scale, scale, scale]}
       onClick={(e) => {
         e.stopPropagation();
         if (!didDragRef.current) onSelect();
@@ -217,6 +223,11 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         e.stopPropagation();
         didDragRef.current = false;
         if (controls) (controls as any).enabled = false;
+        const camDist = camera.position.length();
+        const fovFactor = (camera as THREE.PerspectiveCamera).fov
+          ? Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360)
+          : 0.7;
+        const factor = (camDist * fovFactor * 2) / size.height;
         dragRef.current = {
           startX: e.clientX,
           startY: e.clientY,
@@ -225,22 +236,10 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           startWZ: widget.z,
           shiftKey: e.shiftKey,
           moved: false,
+          factor,
         };
       }}
     >
-      {isDuct ? null : (
-        <>
-          <mesh position={[0, -0.4, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.06, 0.8, 8]} />
-            <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
-          </mesh>
-          <mesh position={[0, -0.82, 0]} castShadow>
-            <cylinderGeometry args={[0.18, 0.22, 0.04, 16]} />
-            <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
-          </mesh>
-        </>
-      )}
-
       {isDuct ? (
         <group position={[0, 0, 0]}>
           <mesh castShadow>
@@ -305,35 +304,73 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
             <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.3} />
           </mesh>
         </group>
+      ) : isFireDamper ? (
+        <group position={[0, 0, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.6 * displaySize, 0.6 * displaySize, 0.06]} />
+            <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]} castShadow>
+            <boxGeometry args={[0.52 * displaySize, 0.04, 0.02]} />
+            <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} castShadow>
+            <boxGeometry args={[0.52 * displaySize, 0.04, 0.02]} />
+            <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]} rotation={[0, 0, Math.PI / 4]} castShadow>
+            <boxGeometry args={[0.52 * displaySize * 1.41, 0.04, 0.02]} />
+            <meshStandardMaterial color={alarmActive ? '#ef4444' : baseColor} emissive={new THREE.Color(alarmActive ? '#ef4444' : baseColor)} emissiveIntensity={0.3} metalness={0.4} roughness={0.3} />
+          </mesh>
+        </group>
+      ) : isBoolean ? (
+        <group position={[0, 0, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.35 * displaySize, 0.35 * displaySize, 0.06]} />
+            <meshStandardMaterial color="#0f172a" metalness={0.3} roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0, 0.04]} castShadow>
+            <cylinderGeometry args={[0.1 * displaySize, 0.1 * displaySize, 0.04, 16]} />
+            <meshStandardMaterial
+              color={baseColor}
+              emissive={new THREE.Color(baseColor)}
+              emissiveIntensity={liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1' ? 1.2 : 0.05}
+              metalness={0.1}
+              roughness={0.3}
+              transparent
+              opacity={0.9}
+            />
+          </mesh>
+        </group>
       ) : (
-        <mesh position={[0, 0.1, 0]} castShadow>
-          <boxGeometry args={[0.36, 0.28, 0.1]} />
+        <mesh position={[0, 0, 0]} castShadow>
+          <boxGeometry args={[0.38 * displaySize, 0.28 * displaySize, 0.06]} />
           <meshStandardMaterial
             color={baseColor}
             emissive={alarmActive ? new THREE.Color('#ef4444') : new THREE.Color(baseColor)}
-            emissiveIntensity={alarmActive ? 0.5 : 0.1}
-            metalness={0.2}
-            roughness={0.6}
+            emissiveIntensity={alarmActive ? 0.5 : 0.08}
+            metalness={0.25}
+            roughness={0.55}
           />
         </mesh>
       )}
 
-      {(isAlarm || alarmActive) && <PulseRing color={pulseColor} radius={0.25} />}
+      {(isAlarm || alarmActive) && <PulseRing color={pulseColor} radius={0.22 * displaySize} />}
 
       {selected && (
-        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.3, 0.34, 32]} />
+        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.28 * displaySize, 0.32 * displaySize, 32]} />
           <meshBasicMaterial color="#60a5fa" side={THREE.DoubleSide} />
         </mesh>
       )}
 
-      <Html position={[0, isDuct ? 0.85 : 0.62, 0]} center distanceFactor={8} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+      <Html position={[0, isDuct ? 0.45 : 0.28 * displaySize, 0]} center distanceFactor={8} style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div style={{
           background: 'rgba(15,23,42,0.88)',
           border: `1px solid ${alarmActive ? '#ef4444' : baseColor}60`,
           borderRadius: 6,
           padding: '3px 7px',
-          minWidth: 64,
+          minWidth: 56,
           textAlign: 'center',
           backdropFilter: 'blur(4px)',
           boxShadow: alarmActive ? `0 0 8px #ef444480` : 'none',
@@ -343,13 +380,22 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
               {widget.label || WIDGET_LABELS[widget.type]}
             </div>
           )}
-          {widget.showValue !== false && (
+          {widget.showValue !== false && !isBoolean && (
             <div style={{
               fontSize: 13, fontWeight: 700,
               color: alarmActive ? '#ef4444' : baseColor,
               fontFamily: 'monospace', lineHeight: 1.2, letterSpacing: '-0.02em',
             }}>
               {displayValue}{unit ? <span style={{ fontSize: 9, color: '#64748b', marginLeft: 2 }}>{unit}</span> : null}
+            </div>
+          )}
+          {isBoolean && widget.showValue !== false && (
+            <div style={{
+              fontSize: 11, fontWeight: 700,
+              color: (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? baseColor : '#475569',
+              fontFamily: 'monospace', lineHeight: 1.2,
+            }}>
+              {(liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? 'ON' : 'OFF'}
             </div>
           )}
         </div>
@@ -421,8 +467,7 @@ interface DuctSegment {
 function computeDuctSegments(
   points: { x: number; y: number; elev?: number }[],
   offsetX: number,
-  defaultElev: number,
-  halfJoin: number = 0
+  defaultElev: number
 ): DuctSegment[] {
   const segs: DuctSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
@@ -436,21 +481,11 @@ function computeDuctSegments(
     const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
     if (len < 0.01) continue;
     const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
-
-    const shrinkStart = i > 0 ? halfJoin : 0;
-    const shrinkEnd = i < points.length - 2 ? halfJoin : 0;
-    const newLen = Math.max(0.001, len - shrinkStart - shrinkEnd);
-
-    const startX = a.x + dir.x * shrinkStart;
-    const startY = elevA + dir.y * shrinkStart;
-    const startZ = a.y + dir.z * shrinkStart;
-
-    const mx = startX + dir.x * newLen / 2 + offsetX;
-    const my = startY + dir.y * newLen / 2;
-    const mz = startZ + dir.z * newLen / 2;
-
+    const mx = a.x + dx / 2 + offsetX;
+    const my = elevA + dy / 2;
+    const mz = a.y + dz / 2;
     const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
-    segs.push({ pos: [mx, my, mz], dir, len: newLen, isVertical });
+    segs.push({ pos: [mx, my, mz], dir, len, isVertical });
   }
   return segs;
 }
@@ -485,23 +520,11 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const h = duct.height || 0.2;
   const isRound = duct.shape === 'round';
   const tex = useMemo(() => getCachedDuctTexture(color), [color]);
-  const halfJoin = isRound ? w / 2 : Math.max(w, h) / 2;
 
   const segments = useMemo(
-    () => computeDuctSegments(duct.points, offsetX, elev, halfJoin),
-    [duct.points, offsetX, elev, halfJoin]
+    () => computeDuctSegments(duct.points, offsetX, elev),
+    [duct.points, offsetX, elev]
   );
-
-  const joints = useMemo(() => {
-    const pts = duct.points;
-    const result: { pos: [number, number, number] }[] = [];
-    for (let i = 1; i < pts.length - 1; i++) {
-      const pt = pts[i];
-      const ptElev = (pt as any).elev !== undefined ? (pt as any).elev : elev;
-      result.push({ pos: [pt.x + offsetX, ptElev, pt.y] });
-    }
-    return result;
-  }, [duct.points, offsetX, elev]);
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -532,19 +555,6 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
           </group>
         );
       })}
-
-      {joints.map((jnt, i) => {
-        const jSize = isRound ? w / 2 + 0.002 : Math.max(w, h);
-        return (
-          <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
-            {isRound
-              ? <sphereGeometry args={[jSize, 12, 12]} />
-              : <boxGeometry args={[jSize, jSize, jSize]} />
-            }
-            <meshStandardMaterial color={color} map={isRound ? undefined : tex} metalness={isRound ? 0.35 : 0.3} roughness={isRound ? 0.5 : 0.45} />
-          </mesh>
-        );
-      })}
     </group>
   );
 }
@@ -564,26 +574,14 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
   const insulationRadius = radius + 0.025;
 
   const segments = useMemo(
-    () => computeDuctSegments(pipe.points, offsetX, elev, radius),
-    [pipe.points, offsetX, elev, radius]
+    () => computeDuctSegments(pipe.points, offsetX, elev),
+    [pipe.points, offsetX, elev]
   );
-
-  const joints = useMemo(() => {
-    const pts = pipe.points;
-    const result: { pos: [number, number, number] }[] = [];
-    for (let i = 1; i < pts.length - 1; i++) {
-      const pt = pts[i];
-      const ptElev = (pt as any).elev !== undefined ? (pt as any).elev : elev;
-      result.push({ pos: [pt.x + offsetX, ptElev, pt.y] });
-    }
-    return result;
-  }, [pipe.points, offsetX, elev]);
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
       {segments.map((seg, i) => {
         const quaternion = getSegmentQuaternion(seg.dir);
-
         return (
           <group key={i} position={seg.pos} quaternion={quaternion}>
             <mesh castShadow>
@@ -605,13 +603,6 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
           </group>
         );
       })}
-
-      {joints.map((jnt, i) => (
-        <mesh key={`jnt-${i}`} position={jnt.pos} castShadow>
-          <sphereGeometry args={[radius + 0.002, 12, 12]} />
-          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
-        </mesh>
-      ))}
     </group>
   );
 }

@@ -82,6 +82,8 @@ const WIDGET_TYPE_ICONS: Partial<Record<Widget3DType, React.ReactNode>> = {
   presence: <Radio className="w-3 h-3" />,
   setpoint: <ChevronsUpDown className="w-3 h-3" />,
   custom: <BoxIcon className="w-3 h-3" />,
+  'fire-damper': <Wind className="w-3 h-3" />,
+  boolean: <Activity className="w-3 h-3" />,
 };
 
 type ViewMode = '3d' | 'floor';
@@ -91,9 +93,10 @@ interface BuildingViewProps {
   haLoading?: boolean;
   onLoadHaEntities?: () => void;
   pages?: WiresheetPage[];
+  liveValues?: Record<string, string | number | boolean>;
 }
 
-export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntities, pages = [] }: BuildingViewProps) {
+export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntities, pages = [], liveValues = {} }: BuildingViewProps) {
   const {
     buildings,
     activeBuildingId,
@@ -129,10 +132,16 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     deleteWallOpening,
     addDuct,
     updateDuct,
+    moveDuctPoint,
+    moveDuct,
     deleteDuct,
     addPipe,
     updatePipe,
+    movePipePoint,
+    movePipe,
     deletePipe,
+    addSlab,
+    deleteSlab,
     moveMultiSelection,
     selectedWidget3DId,
     setSelectedWidget3DId,
@@ -156,6 +165,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
   const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
+  const [selectedSlabId, setSelectedSlabId] = useState<string | null>(null);
   const [ductType, setDuctType] = useState<DuctType>('supply');
   const [ductShape, setDuctShape] = useState<DuctShape>('rectangular');
   const [ductWidth, setDuctWidth] = useState(0.3);
@@ -573,6 +583,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   Rohr
                 </button>
                 <button
+                  onClick={() => setTool('slab')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'slab' ? 'bg-amber-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                  title="Bodenplatte zeichnen (Polygon)"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
+                  Platte
+                </button>
+                <button
                   onClick={() => setTool('delete')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${tool === 'delete' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
                   title="Löschen"
@@ -635,6 +653,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     title="Durchmesser (m)" />
                   <span className="text-xs text-slate-500">m Ø</span>
                 </div>
+              </div>
+            )}
+
+            {viewMode === 'floor' && tool === 'slab' && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-900/40 border border-amber-700 rounded text-xs text-amber-300">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
+                Klicken zum Setzen von Punkten · Rechtsklick oder ersten Punkt anklicken zum Abschliessen
               </div>
             )}
 
@@ -705,6 +730,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   highlightFloor={true}
                   bgColor={bgColor}
                   lighting={lighting}
+                  liveValues={liveValues as Record<string, string | number>}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
@@ -910,9 +936,17 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onAddDuct={handleAddDuct}
                 onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
+                onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
+                onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onAddPipe={handleAddPipe}
                 onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); if (id) setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
+                onMovePipePoint={(pipeId, ptIdx, x, y) => { if (activeBuilding && activeFloor) movePipePoint(activeBuilding.id, activeFloor.id, pipeId, ptIdx, x, y); }}
+                onMovePipe={(pipeId, dx, dy) => { if (activeBuilding && activeFloor) movePipe(activeBuilding.id, activeFloor.id, pipeId, dx, dy); }}
+                selectedSlabId={selectedSlabId}
+                onSelectSlab={id => { setSelectedSlabId(id); }}
+                onAddSlab={slab => { if (activeBuilding && activeFloor) addSlab(activeBuilding.id, activeFloor.id, slab); }}
+                onDeleteSlab={id => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, id); setSelectedSlabId(null); } }}
                 onCopySelected={handleCopySelected}
                 onPasteClipboard={handlePasteClipboard}
                 onDeleteSelected={handleDeleteSelected}
@@ -1018,12 +1052,19 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { unit: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Skalierung</label>
-                        <input type="number" step="0.1" min="0.3" max="5"
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Größe</label>
+                        <input type="number" step="0.1" min="0.2" max="10"
                           className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
-                          value={selectedWidget.scale}
-                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { scale: parseFloat(e.target.value) || 1 })} />
+                          value={selectedWidget.size ?? 1}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { size: parseFloat(e.target.value) || 1 })} />
                       </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Skalierung</label>
+                      <input type="number" step="0.1" min="0.3" max="5"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedWidget.scale}
+                        onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { scale: parseFloat(e.target.value) || 1 })} />
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {(['x', 'y', 'z'] as const).map(axis => (
