@@ -41,6 +41,7 @@ const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
 const visuControlledDps = new Map();
 const impulseResetPending = new Map();
+const impulseQueue = new Map();
 let dpValuesSaveTimeout = null;
 
 let driverConfig = {
@@ -2482,15 +2483,6 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
     clientVisuOverrides.set('global', {});
     const nodeValues = await executePageLogic(nodes, connections, manualOverrides, serverOverrides, pageId);
 
-    for (const [key, pending] of impulseResetPending) {
-      if (serverOverrides[key] !== undefined) {
-        visuControlledDps.set(key, pending.resetVal);
-        setPersistentDpValue(key, pending.resetVal);
-        nodeValues[key] = pending.resetVal;
-        impulseResetPending.delete(key);
-      }
-    }
-
     res.json({ success: true, nodeValues });
   } catch (err) {
     console.error('Execute error:', err.message);
@@ -2524,25 +2516,25 @@ async function runPageCycle(pageId) {
       const allOverrides = { ...(clientVisuOverrides.get('global') || {}) };
       clientVisuOverrides.set('global', {});
 
+      const pendingResets = [];
+      for (const [qNodeId, queue] of [...impulseQueue.entries()]) {
+        if (queue.length === 0) { impulseQueue.delete(qNodeId); continue; }
+        const item = queue.shift();
+        if (queue.length === 0) impulseQueue.delete(qNodeId);
+        allOverrides[item.nodeId] = item.val;
+        allOverrides[item.overrideKey] = item.val;
+        visuControlledDps.set(item.nodeId, item.val);
+        if (item.overrideKey !== item.nodeId) visuControlledDps.set(item.overrideKey, item.val);
+        pendingResets.push(item);
+      }
+
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
 
-      for (const [key, pending] of [...impulseResetPending.entries()]) {
-        const wasTriggered = allOverrides[key] !== undefined || allOverrides[pending.nodeId] !== undefined;
-        if (!wasTriggered) continue;
-        impulseResetPending.delete(key);
-        const resetVal = pending.resetVal;
-        const nodeIdToReset = pending.nodeId;
-        const overrideKeyToReset = key;
-        setTimeout(() => {
-          visuControlledDps.set(overrideKeyToReset, resetVal);
-          setPersistentDpValue(overrideKeyToReset, resetVal);
-          visuControlledDps.set(nodeIdToReset, resetVal);
-          setPersistentDpValue(nodeIdToReset, resetVal);
-          const cur = clientVisuOverrides.get('global') || {};
-          cur[overrideKeyToReset] = resetVal;
-          cur[nodeIdToReset] = resetVal;
-          clientVisuOverrides.set('global', cur);
-        }, pageInfo.cycleMs + 50);
+      for (const item of pendingResets) {
+        const resetEntry = { val: item.resetVal, resetVal: item.resetVal, nodeId: item.nodeId, overrideKey: item.overrideKey };
+        const q = impulseQueue.get(item.nodeId) || [];
+        q.unshift(resetEntry);
+        impulseQueue.set(item.nodeId, q);
       }
 
       lastNodeValues.set(pageId, nodeValues);
@@ -3016,58 +3008,45 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
   } else {
     const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
+    const isImpulse = req.body.impulse === true;
 
-    console.log(`[WRITE-VALUE DEBUG] Empfangen: nodeId=${nodeId}, portId=${portId}, value=${value}, type=${typeof value}`);
-    console.log(`[WRITE-VALUE DEBUG] overrideKey=${overrideKey}`);
-
-    if (!clientVisuOverrides.has('global')) {
-      clientVisuOverrides.set('global', {});
-    }
-    const overrides = clientVisuOverrides.get('global');
-
-    console.log(`[WRITE-VALUE DEBUG] Overrides VORHER:`, JSON.stringify(overrides));
-
-    for (const key of Object.keys(overrides)) {
-      if (key === nodeId || key.startsWith(`${nodeId}:`)) {
-        delete overrides[key];
+    if (isImpulse) {
+      const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
+      const existing = impulseQueue.get(nodeId) || [];
+      existing.push({ val: value, resetVal: capturedResetVal, nodeId, overrideKey });
+      impulseQueue.set(nodeId, existing);
+    } else {
+      if (!clientVisuOverrides.has('global')) {
+        clientVisuOverrides.set('global', {});
       }
-    }
+      const overrides = clientVisuOverrides.get('global');
 
-    overrides[overrideKey] = value;
-    overrides[nodeId] = value;
+      for (const key of Object.keys(overrides)) {
+        if (key === nodeId || key.startsWith(`${nodeId}:`)) {
+          delete overrides[key];
+        }
+      }
 
-    console.log(`[WRITE-VALUE DEBUG] Overrides NACHHER:`, JSON.stringify(overrides));
+      overrides[overrideKey] = value;
+      overrides[nodeId] = value;
 
-    visuControlledDps.set(nodeId, value);
-    if (overrideKey !== nodeId) {
-      visuControlledDps.set(overrideKey, value);
-    }
-    console.log(`[WRITE-VALUE DEBUG] visuControlledDps gesetzt: ${nodeId} = ${value}, overrideKey=${overrideKey}`);
-    console.log(`[WRITE-VALUE DEBUG] visuControlledDps Map:`, JSON.stringify([...visuControlledDps.entries()]));
+      visuControlledDps.set(nodeId, value);
+      if (overrideKey !== nodeId) {
+        visuControlledDps.set(overrideKey, value);
+      }
 
-    setPersistentDpValue(nodeId, value);
+      setPersistentDpValue(nodeId, value);
 
-    for (const [pageId, nodeValues] of lastNodeValues) {
-      if (nodeId in nodeValues) {
-        const updated = { ...nodeValues, [nodeId]: value };
-        if (overrideKey !== nodeId) updated[overrideKey] = value;
-        lastNodeValues.set(pageId, updated);
+      for (const [pid, nodeValues] of lastNodeValues) {
+        if (nodeId in nodeValues) {
+          const updated = { ...nodeValues, [nodeId]: value };
+          if (overrideKey !== nodeId) updated[overrideKey] = value;
+          lastNodeValues.set(pid, updated);
+        }
       }
     }
 
     broadcastSSE('state', { liveValues: getLiveSnapshot() });
-
-    const isImpulse = req.body.impulse === true;
-    if (isImpulse) {
-      const capturedNodeId = nodeId;
-      const capturedOverrideKey = overrideKey;
-      const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-      impulseResetPending.set(capturedNodeId, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey, nodeId: capturedNodeId, readInCycle: false });
-      if (capturedOverrideKey !== capturedNodeId) {
-        impulseResetPending.set(capturedOverrideKey, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey, nodeId: capturedNodeId, readInCycle: false });
-      }
-    }
-
     res.json({ success: true });
   }
 });
