@@ -135,6 +135,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addDuct,
     updateDuct,
     moveDuctPoint,
+    insertDuctPoint,
+    removeDuctPoint,
     moveDuct,
     deleteDuct,
     mergeDucts,
@@ -1147,6 +1149,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onMergeDucts={ductIds => { if (activeBuilding && activeFloor) { const newId = mergeDucts(activeBuilding.id, activeFloor.id, ductIds); setSelectedDuctId(newId); return newId; } return null; }}
                 onSplitDuct={(ductId, ptIdx) => { if (activeBuilding && activeFloor) { splitDuct(activeBuilding.id, activeFloor.id, ductId, ptIdx); setSelectedDuctId(null); } }}
+                onInsertDuctPoint={(ductId, afterIdx, x, y) => { if (activeBuilding && activeFloor) insertDuctPoint(activeBuilding.id, activeFloor.id, ductId, afterIdx, x, y); }}
+                onRemoveDuctPoint={(ductId, ptIdx) => { if (activeBuilding && activeFloor) removeDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx); }}
                 onAddPipe={handleAddPipe}
                 onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}

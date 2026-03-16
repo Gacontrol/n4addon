@@ -583,6 +583,48 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const insertDuctPoint = useCallback((buildingId: string, floorId: string, ductId: string, afterIndex: number, x: number, y: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            ducts: (f.ducts ?? []).map(d => {
+              if (d.id !== ductId) return d;
+              const pts = [...d.points];
+              pts.splice(afterIndex + 1, 0, { x, y });
+              return { ...d, points: pts };
+            }),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
+  const removeDuctPoint = useCallback((buildingId: string, floorId: string, ductId: string, pointIndex: number) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId ? {
+        ...b,
+        floors: b.floors.map(f =>
+          f.id === floorId ? {
+            ...f,
+            ducts: (f.ducts ?? []).map(d => {
+              if (d.id !== ductId) return d;
+              if (d.points.length <= 2) return d;
+              const pts = d.points.filter((_, i) => i !== pointIndex);
+              return { ...d, points: pts };
+            }),
+          } : f
+        ),
+        updatedAt: Date.now(),
+      } : b
+    );
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   const moveDuct = useCallback((buildingId: string, floorId: string, ductId: string, dx: number, dy: number) => {
     const updated = buildings.map(b =>
       b.id === buildingId ? {
@@ -1159,6 +1201,8 @@ export function useBuildingEditor() {
     addDuct,
     updateDuct,
     moveDuctPoint,
+    insertDuctPoint,
+    removeDuctPoint,
     moveDuct,
     deleteDuct,
     mergeDucts,

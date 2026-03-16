@@ -39,6 +39,8 @@ interface Props {
   onMoveDuct?: (ductId: string, dx: number, dy: number) => void;
   onMergeDucts?: (ductIds: string[]) => string | null;
   onSplitDuct?: (ductId: string, pointIndex: number) => void;
+  onInsertDuctPoint?: (ductId: string, afterIndex: number, x: number, y: number) => void;
+  onRemoveDuctPoint?: (ductId: string, pointIndex: number) => void;
   onAddPipe?: (pipe: Omit<Pipe, 'id'>) => void;
   onSelectPipe?: (id: string | null) => void;
   onDeletePipe?: (id: string) => void;
@@ -215,6 +217,9 @@ interface ContextMenu {
   targetType: 'wall' | 'duct' | 'pipe' | 'room' | 'slab' | 'canvas' | null;
   targetId: string | null;
   targetPointIndex?: number;
+  targetPointIsEndpoint?: boolean;
+  targetSegmentIndex?: number;
+  targetNearestEndpointDuctId?: string;
 }
 
 export function FloorPlanEditor({
@@ -226,7 +231,7 @@ export function FloorPlanEditor({
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
-  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onSplitDuct,
+  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
@@ -1807,20 +1812,52 @@ export function FloorPlanEditor({
     const world = toWorld(px, py);
     const hit = hitTestWorld(world.x, world.y);
 
+    const POINT_HIT_RADIUS = 0.4;
+    const ENDPOINT_HIT_RADIUS = 0.55;
+
     let targetPointIndex: number | undefined;
+    let targetPointIsEndpoint = false;
+    let targetSegmentIndex: number | undefined;
+    let targetNearestEndpointDuctId: string | undefined;
+
     if (hit?.type === 'duct') {
       const duct = (floor.ducts ?? []).find(d => d.id === hit.id);
-      if (duct && duct.points.length >= 3) {
+      if (duct) {
         let closestIdx = -1;
         let closestDist = Infinity;
-        for (let i = 1; i < duct.points.length - 1; i++) {
+        for (let i = 0; i < duct.points.length; i++) {
           const d = dist(world.x, world.y, duct.points[i].x, duct.points[i].y);
-          if (d < closestDist && d < 0.5) {
+          if (d < closestDist && d < POINT_HIT_RADIUS) {
             closestDist = d;
             closestIdx = i;
           }
         }
-        if (closestIdx >= 0) targetPointIndex = closestIdx;
+        if (closestIdx >= 0) {
+          targetPointIndex = closestIdx;
+          targetPointIsEndpoint = closestIdx === 0 || closestIdx === duct.points.length - 1;
+        } else {
+          let closestSeg = -1;
+          let closestSegDist = Infinity;
+          for (let i = 0; i < duct.points.length - 1; i++) {
+            const d = pointToSegmentDist(world.x, world.y, duct.points[i].x, duct.points[i].y, duct.points[i + 1].x, duct.points[i + 1].y);
+            if (d < closestSegDist) { closestSegDist = d; closestSeg = i; }
+          }
+          if (closestSeg >= 0) targetSegmentIndex = closestSeg;
+        }
+      }
+    }
+
+    if (!hit || hit.type !== 'duct') {
+      let nearestDist = Infinity;
+      for (const duct of (floor.ducts ?? [])) {
+        if (duct.points.length < 2) continue;
+        for (const pt of [duct.points[0], duct.points[duct.points.length - 1]]) {
+          const d = dist(world.x, world.y, pt.x, pt.y);
+          if (d < ENDPOINT_HIT_RADIUS && d < nearestDist) {
+            nearestDist = d;
+            targetNearestEndpointDuctId = duct.id;
+          }
+        }
       }
     }
 
@@ -1833,8 +1870,11 @@ export function FloorPlanEditor({
       targetType: hit?.type ?? 'canvas',
       targetId: hit?.id ?? null,
       targetPointIndex,
+      targetPointIsEndpoint,
+      targetSegmentIndex,
+      targetNearestEndpointDuctId,
     });
-  }, [tool, drawingPolyline, drawingWall, toWorld, hitTestWorld, floor.ducts, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddDuct, onAddPipe, onAddSlab]);
+  }, [tool, drawingPolyline, drawingWall, toWorld, hitTestWorld, floor.ducts, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddDuct, onAddPipe, onAddSlab, gridSize]);
 
   const bg = floor.backgroundImage;
   const totalMultiSel = multiSel.wallIds.length + multiSel.roomIds.length + multiSel.ductIds.length + multiSel.pipeIds.length;
@@ -2029,7 +2069,38 @@ export function FloorPlanEditor({
               Einfügen
             </button>
           )}
-          {contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetPointIndex != null && (
+          {contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetSegmentIndex != null && (
+            <>
+              <div className="border-t border-slate-700 my-1" />
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-emerald-900/50 text-emerald-400 flex items-center gap-2"
+                onClick={() => {
+                  const snap = (v: number) => Math.round(v / (gridSize || 0.25)) * (gridSize || 0.25);
+                  onInsertDuctPoint?.(contextMenu.targetId!, contextMenu.targetSegmentIndex!, snap(contextMenu.worldX), snap(contextMenu.worldY));
+                  setContextMenu(null);
+                }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 5v4M12 15v4M5 12h4M15 12h4"/></svg>
+                Knotenpunkt hinzufügen
+              </button>
+            </>
+          )}
+          {contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetPointIndex != null && !contextMenu.targetPointIsEndpoint && (
+            <>
+              <div className="border-t border-slate-700 my-1" />
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-red-900/50 text-red-400 flex items-center gap-2"
+                onClick={() => {
+                  onRemoveDuctPoint?.(contextMenu.targetId!, contextMenu.targetPointIndex!);
+                  setContextMenu(null);
+                }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M5 12h14"/></svg>
+                Knotenpunkt entfernen
+              </button>
+            </>
+          )}
+          {contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetPointIndex != null && !contextMenu.targetPointIsEndpoint && (
             <>
               <div className="border-t border-slate-700 my-1" />
               <button
@@ -2044,19 +2115,22 @@ export function FloorPlanEditor({
               </button>
             </>
           )}
-          {multiSel.ductIds.length >= 2 && (
+          {(multiSel.ductIds.length >= 2 || (contextMenu.targetNearestEndpointDuctId && contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetId !== contextMenu.targetNearestEndpointDuctId)) && (
             <>
               <div className="border-t border-slate-700 my-1" />
               <button
                 className="w-full text-left px-3 py-1.5 hover:bg-blue-900/50 text-blue-400 flex items-center gap-2"
                 onClick={() => {
-                  const newId = onMergeDucts?.(multiSel.ductIds);
+                  const ids = multiSel.ductIds.length >= 2
+                    ? multiSel.ductIds
+                    : [contextMenu.targetId!, contextMenu.targetNearestEndpointDuctId!];
+                  const newId = onMergeDucts?.(ids);
                   setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
                   setContextMenu(null);
                 }}
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-                Kanäle verbinden ({multiSel.ductIds.length})
+                {multiSel.ductIds.length >= 2 ? `Kanäle verbinden (${multiSel.ductIds.length})` : 'Kanäle verbinden'}
               </button>
             </>
           )}
