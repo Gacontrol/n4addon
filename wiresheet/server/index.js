@@ -2527,14 +2527,22 @@ async function runPageCycle(pageId) {
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
 
       for (const [key, pending] of [...impulseResetPending.entries()]) {
-        if (pending.readInCycle) {
-          visuControlledDps.set(key, pending.resetVal);
-          setPersistentDpValue(key, pending.resetVal);
-          nodeValues[key] = pending.resetVal;
-          impulseResetPending.delete(key);
-        } else if (allOverrides[key] !== undefined || allOverrides[pending.nodeId] !== undefined) {
-          pending.readInCycle = true;
-        }
+        const wasTriggered = allOverrides[key] !== undefined || allOverrides[pending.nodeId] !== undefined;
+        if (!wasTriggered) continue;
+        impulseResetPending.delete(key);
+        const resetVal = pending.resetVal;
+        const nodeIdToReset = pending.nodeId;
+        const overrideKeyToReset = key;
+        setTimeout(() => {
+          visuControlledDps.set(overrideKeyToReset, resetVal);
+          setPersistentDpValue(overrideKeyToReset, resetVal);
+          visuControlledDps.set(nodeIdToReset, resetVal);
+          setPersistentDpValue(nodeIdToReset, resetVal);
+          const cur = clientVisuOverrides.get('global') || {};
+          cur[overrideKeyToReset] = resetVal;
+          cur[nodeIdToReset] = resetVal;
+          clientVisuOverrides.set('global', cur);
+        }, pageInfo.cycleMs + 50);
       }
 
       lastNodeValues.set(pageId, nodeValues);
