@@ -10,11 +10,13 @@ interface Props {
   pipeType: PipeType;
   pipeDiameter: number;
   tool: 'select' | 'duct' | 'pipe';
+  axis?: 'xz' | 'yz';
   onAddVerticalDuct: (duct: Omit<Duct, 'id'>, fromFloorId: string) => void;
   onAddVerticalPipe: (pipe: Omit<Pipe, 'id'>, fromFloorId: string, toFloorId: string) => void;
   onUpdateVerticalDuct?: (ductId: string, floorId: string, changes: Partial<Duct>) => void;
   onMergeDucts?: (ductIds: string[], floorId: string) => string | null;
   gridSize: number;
+  label?: string;
 }
 
 const CELL = 40;
@@ -55,12 +57,15 @@ export function SectionView({
   pipeType,
   pipeDiameter,
   tool,
+  axis = 'xz',
   onAddVerticalDuct,
   onAddVerticalPipe,
   onUpdateVerticalDuct,
   onMergeDucts,
   gridSize,
+  label,
 }: Props) {
+  const getH = (pt: { x: number; y: number }) => axis === 'xz' ? pt.x : pt.y;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 100, y: 100 });
   const [zoom, setZoom] = useState(1.0);
@@ -77,13 +82,18 @@ export function SectionView({
   const sortedFloors = [...building.floors].sort((a, b) => a.level - b.level);
 
   const getFloorBounds = useCallback(() => {
-    let maxX = 20;
+    let maxH = 20;
     for (const floor of building.floors) {
-      for (const wall of floor.walls) maxX = Math.max(maxX, wall.x1, wall.x2);
-      for (const room of floor.rooms) maxX = Math.max(maxX, room.x + room.width);
+      if (axis === 'xz') {
+        for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
+        for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
+      } else {
+        for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
+        for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
+      }
     }
-    return { maxX };
-  }, [building]);
+    return { maxX: maxH };
+  }, [building, axis]);
 
   const getTotalHeight = useCallback(() => {
     return sortedFloors.reduce((acc, f) => acc + f.height, 0);
@@ -167,6 +177,15 @@ export function SectionView({
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
 
+    if (label) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(148,163,184,0.5)';
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, 8, 16);
+      ctx.restore();
+    }
+
     ctx.strokeStyle = 'rgba(148,163,184,0.1)';
     ctx.lineWidth = 0.5;
     const startGX = Math.floor(-offset.x / cellPx) - 1;
@@ -217,7 +236,7 @@ export function SectionView({
         for (let pi = 0; pi < duct.points.length; pi++) {
           const p = duct.points[pi];
           const elev = duct.elevation ?? 0;
-          const sp = toScreen(p.x, floorY + elev);
+          const sp = toScreen(getH(p), floorY + elev);
           if (pi === 0) ctx.moveTo(sp.x, sp.y);
           else ctx.lineTo(sp.x, sp.y);
         }
@@ -237,7 +256,7 @@ export function SectionView({
         for (let pi = 0; pi < pipe.points.length; pi++) {
           const p = pipe.points[pi];
           const elev = pipe.elevation ?? 0;
-          const sp = toScreen(p.x, floorY + elev);
+          const sp = toScreen(getH(p), floorY + elev);
           if (pi === 0) ctx.moveTo(sp.x, sp.y);
           else ctx.lineTo(sp.x, sp.y);
         }
@@ -363,7 +382,7 @@ export function SectionView({
       ctx.restore();
     }
 
-  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds, hoverPoint, dragState, snapTo]);
+  }, [building, sortedFloors, offset, zoom, polyline, mousePos, tool, ductType, pipeType, ductWidth, ductHeight, pipeDiameter, gridSize, toScreen, toWorld, getTotalHeight, getFloorBounds, getAllSectionDucts, selectedDuctIds, hoverPoint, dragState, snapTo, axis, label, getH]);
 
   const getCanvasPos = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -459,7 +478,6 @@ export function SectionView({
           );
           onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, {
             verticalSectionPoints: newPts,
-            verticalX: newPts[0].x,
           });
         }
       }

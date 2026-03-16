@@ -62,6 +62,7 @@ interface Props {
   gridSize?: number;
   forceMultiSel?: MultiSelection | null;
   layers?: FloorLayers;
+  overlayFloors?: { floor: Floor; opacity?: number }[];
 }
 
 const CELL = 40;
@@ -241,6 +242,7 @@ export function FloorPlanEditor({
   gridSize = 1,
   forceMultiSel,
   layers: layersProp,
+  overlayFloors,
 }: Props) {
   const layers: FloorLayers = { ...DEFAULT_LAYERS, ...(layersProp ?? {}) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -930,6 +932,64 @@ export function FloorPlanEditor({
       }
     }
 
+    if (overlayFloors) {
+      for (const { floor: oFloor, opacity = 0.25 } of overlayFloors) {
+        const oLayers: FloorLayers = { ...DEFAULT_LAYERS, ...(oFloor.layers ?? {}) };
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        for (const duct of (oFloor.ducts ?? [])) {
+          if (!oLayers.ducts) break;
+          if (duct.isVertical && duct.verticalX != null) {
+            const vx = duct.verticalX;
+            const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
+            const r = Math.max(duct.width * cellPx * 0.6, 10);
+            const sp = toScreen(vx, vy);
+            const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color + '33';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            continue;
+          }
+          if (duct.points.length < 2) continue;
+          const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+          ctx.strokeStyle = color;
+          ctx.lineWidth = Math.max(duct.width * cellPx, 2);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          for (let pi = 0; pi < duct.points.length; pi++) {
+            const p = duct.points[pi];
+            const sp = toScreen(p.x, p.y);
+            if (pi === 0) ctx.moveTo(sp.x, sp.y);
+            else ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.stroke();
+        }
+        for (const pipe of (oFloor.pipes ?? [])) {
+          if (!oLayers.pipes) break;
+          if (pipe.points.length < 2) continue;
+          const color = PIPE_TYPE_COLORS[pipe.type] || '#ef4444';
+          ctx.strokeStyle = color;
+          ctx.lineWidth = Math.max(pipe.diameter * cellPx, 2);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          for (let pi = 0; pi < pipe.points.length; pi++) {
+            const p = pipe.points[pi];
+            const sp = toScreen(p.x, p.y);
+            if (pi === 0) ctx.moveTo(sp.x, sp.y);
+            else ctx.lineTo(sp.x, sp.y);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
     for (const duct of (floor.ducts ?? [])) {
       if (!layers.ducts) continue;
       const isSelected = duct.id === selectedDuctId || multiSel.ductIds.includes(duct.id);
@@ -1330,7 +1390,7 @@ export function FloorPlanEditor({
     offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
     tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
     bgImg, bgDragging, bgCornerDragging, bgCalibrating, bgCalibLine, bgCalibRefLen,
-    drawCornerJoins, mouseWorld, lassoRect, layers, connectMode,
+    drawCornerJoins, mouseWorld, lassoRect, layers, connectMode, overlayFloors,
   ]);
 
   useEffect(() => { draw(); }, [draw]);

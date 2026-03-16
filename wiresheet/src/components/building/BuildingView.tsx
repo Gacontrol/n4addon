@@ -172,6 +172,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [newRoomType, setNewRoomType] = useState<RoomType>('room');
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
+  const [floorOverlays, setFloorOverlays] = useState<Record<string, boolean>>({});
   const [wallThickness, setWallThickness] = useState(0.25);
   const [gridSize, setGridSize] = useState(1);
   const [bgColor, setBgColor] = useState('#0a1020');
@@ -1117,34 +1118,72 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 )}
               </div>
             ) : viewMode === 'section' && activeBuilding ? (
-              <SectionView
-                building={activeBuilding}
-                ductType={ductType}
-                ductShape={ductShape}
-                ductWidth={ductWidth}
-                ductHeight={ductHeight}
-                pipeType={pipeType}
-                pipeDiameter={pipeDiameter}
-                tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
-                onAddVerticalDuct={(duct, fromFloorId) => {
-                  if (!activeBuilding) return;
-                  addDuct(activeBuilding.id, fromFloorId, duct);
-                }}
-                onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
-                  if (!activeBuilding) return;
-                  addPipe(activeBuilding.id, fromFloorId, pipe);
-                  addPipe(activeBuilding.id, toFloorId, pipe);
-                }}
-                onUpdateVerticalDuct={(ductId, floorId, changes) => {
-                  if (!activeBuilding) return;
-                  updateDuct(activeBuilding.id, floorId, ductId, changes);
-                }}
-                onMergeDucts={(ductIds, floorId) => {
-                  if (!activeBuilding) return null;
-                  return mergeDucts(activeBuilding.id, floorId, ductIds);
-                }}
-                gridSize={gridSize}
-              />
+              <div className="flex w-full h-full">
+                <div className="flex-1 border-r border-slate-700 min-w-0">
+                  <SectionView
+                    building={activeBuilding}
+                    ductType={ductType}
+                    ductShape={ductShape}
+                    ductWidth={ductWidth}
+                    ductHeight={ductHeight}
+                    pipeType={pipeType}
+                    pipeDiameter={pipeDiameter}
+                    tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
+                    axis="xz"
+                    label="Schnitt X/Z (von vorne)"
+                    onAddVerticalDuct={(duct, fromFloorId) => {
+                      if (!activeBuilding) return;
+                      addDuct(activeBuilding.id, fromFloorId, duct);
+                    }}
+                    onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
+                      if (!activeBuilding) return;
+                      addPipe(activeBuilding.id, fromFloorId, pipe);
+                      addPipe(activeBuilding.id, toFloorId, pipe);
+                    }}
+                    onUpdateVerticalDuct={(ductId, floorId, changes) => {
+                      if (!activeBuilding) return;
+                      updateDuct(activeBuilding.id, floorId, ductId, changes);
+                    }}
+                    onMergeDucts={(ductIds, floorId) => {
+                      if (!activeBuilding) return null;
+                      return mergeDucts(activeBuilding.id, floorId, ductIds);
+                    }}
+                    gridSize={gridSize}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <SectionView
+                    building={activeBuilding}
+                    ductType={ductType}
+                    ductShape={ductShape}
+                    ductWidth={ductWidth}
+                    ductHeight={ductHeight}
+                    pipeType={pipeType}
+                    pipeDiameter={pipeDiameter}
+                    tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
+                    axis="yz"
+                    label="Schnitt Y/Z (von der Seite)"
+                    onAddVerticalDuct={(duct, fromFloorId) => {
+                      if (!activeBuilding) return;
+                      addDuct(activeBuilding.id, fromFloorId, duct);
+                    }}
+                    onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
+                      if (!activeBuilding) return;
+                      addPipe(activeBuilding.id, fromFloorId, pipe);
+                      addPipe(activeBuilding.id, toFloorId, pipe);
+                    }}
+                    onUpdateVerticalDuct={(ductId, floorId, changes) => {
+                      if (!activeBuilding) return;
+                      updateDuct(activeBuilding.id, floorId, ductId, changes);
+                    }}
+                    onMergeDucts={(ductIds, floorId) => {
+                      if (!activeBuilding) return null;
+                      return mergeDucts(activeBuilding.id, floorId, ductIds);
+                    }}
+                    gridSize={gridSize}
+                  />
+                </div>
+              </div>
             ) : viewMode === 'floor' && activeFloor ? (
               <FloorPlanEditor
                 floor={activeFloor}
@@ -1199,6 +1238,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 gridSize={gridSize}
                 forceMultiSel={pastedMultiSel}
                 layers={activeFloor?.layers}
+                overlayFloors={activeBuilding ? activeBuilding.floors
+                  .filter(f => f.id !== activeFloorId && floorOverlays[f.id])
+                  .map(f => ({ floor: f, opacity: 0.25 })) : undefined}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">
@@ -1240,6 +1282,29 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     </button>
                   );
                 })}
+                {activeBuilding && activeBuilding.floors.filter(f => f.id !== activeFloorId).length > 0 && (
+                  <>
+                    <div className="pt-2 pb-1 px-1">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">Andere Etagen</span>
+                    </div>
+                    {[...activeBuilding.floors]
+                      .filter(f => f.id !== activeFloorId)
+                      .sort((a, b) => b.level - a.level)
+                      .map(f => {
+                        const visible = !!floorOverlays[f.id];
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => setFloorOverlays(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
+                          >
+                            {visible ? <Eye className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
+                            {f.name}
+                          </button>
+                        );
+                      })}
+                  </>
+                )}
               </div>
             </div>
           )}
