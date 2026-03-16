@@ -2470,6 +2470,12 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
 
 app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, res) => {
   const { pageId } = req.params;
+
+  if (runningPages.has(pageId) && runningPages.get(pageId).running) {
+    const nodeValues = lastNodeValues.get(pageId) || {};
+    return res.json({ success: true, nodeValues });
+  }
+
   const { nodes, connections, manualOverrides = {} } = req.body;
   try {
     const serverOverrides = { ...(clientVisuOverrides.get('global') || {}) };
@@ -2480,9 +2486,6 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
       if (serverOverrides[key] !== undefined) {
         visuControlledDps.set(key, pending.resetVal);
         setPersistentDpValue(key, pending.resetVal);
-        for (const [pgId, nodeVals] of lastNodeValues) {
-          lastNodeValues.set(pgId, { ...nodeVals, [key]: pending.resetVal });
-        }
         nodeValues[key] = pending.resetVal;
         impulseResetPending.delete(key);
       }
@@ -2523,15 +2526,14 @@ async function runPageCycle(pageId) {
 
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
 
-      for (const [key, pending] of impulseResetPending) {
-        if (allOverrides[key] !== undefined) {
+      for (const [key, pending] of [...impulseResetPending.entries()]) {
+        if (pending.readInCycle) {
           visuControlledDps.set(key, pending.resetVal);
           setPersistentDpValue(key, pending.resetVal);
-          for (const [pgId, nodeVals] of lastNodeValues) {
-            lastNodeValues.set(pgId, { ...nodeVals, [key]: pending.resetVal });
-          }
           nodeValues[key] = pending.resetVal;
           impulseResetPending.delete(key);
+        } else if (allOverrides[key] !== undefined || allOverrides[pending.nodeId] !== undefined) {
+          pending.readInCycle = true;
         }
       }
 
@@ -3052,9 +3054,9 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       const capturedNodeId = nodeId;
       const capturedOverrideKey = overrideKey;
       const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-      impulseResetPending.set(capturedNodeId, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey });
+      impulseResetPending.set(capturedNodeId, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey, nodeId: capturedNodeId, readInCycle: false });
       if (capturedOverrideKey !== capturedNodeId) {
-        impulseResetPending.set(capturedOverrideKey, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey });
+        impulseResetPending.set(capturedOverrideKey, { resetVal: capturedResetVal, overrideKey: capturedOverrideKey, nodeId: capturedNodeId, readInCycle: false });
       }
     }
 

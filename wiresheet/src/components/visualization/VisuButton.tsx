@@ -65,8 +65,7 @@ export const VisuButton: React.FC<VisuButtonProps> = ({
       onValueChange(pressVal);
       impulseTimerRef.current = setTimeout(() => {
         setImpulseActive(false);
-        onValueChange(releaseVal);
-      }, 200);
+      }, 300);
     } else if (isHoldMode) {
       onValueChange(releaseVal);
     } else {
