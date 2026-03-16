@@ -6,6 +6,7 @@ export interface MultiSelection {
   roomIds: string[];
   ductIds: string[];
   pipeIds: string[];
+  slabIds?: string[];
 }
 
 interface Props {
@@ -60,6 +61,7 @@ interface Props {
   dropFurnitureTemplate?: FurnitureTemplate | null;
   dropOpeningType?: WallOpeningType | null;
   onAddWallOpening?: (wallId: string, type: WallOpeningType, position: number, width: number, height: number, sillHeight: number) => void;
+  onUpdateWallOpening?: (wallId: string, openingId: string, updates: { position?: number; width?: number }) => void;
   onSelectionChange?: (sel: MultiSelection) => void;
   onDeleteSelected?: (sel: MultiSelection) => void;
   onCopySelected?: (sel: MultiSelection) => void;
@@ -212,7 +214,7 @@ function loadBgImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'move-bg-corner' | 'calib-draw' | 'lasso' | 'move-multi' | 'move-duct' | 'move-duct-point' | 'move-pipe' | 'move-pipe-point' | 'move-furniture';
+type DragType = 'pan' | 'draw-wall' | 'draw-room' | 'move-room' | 'move-wall-point' | 'move-wall' | 'move-bg' | 'move-bg-corner' | 'calib-draw' | 'lasso' | 'move-multi' | 'move-duct' | 'move-duct-point' | 'move-pipe' | 'move-pipe-point' | 'move-furniture' | 'move-opening';
 
 const DUCT_TYPE_COLORS: Record<string, string> = {
   supply: '#60a5fa', return: '#94a3b8', exhaust: '#fbbf24', fresh: '#34d399',
@@ -247,7 +249,7 @@ export function FloorPlanEditor({
   onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onConnectDuctEndpoints, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
-  dropOpeningType, onAddWallOpening,
+  dropOpeningType, onAddWallOpening, onUpdateWallOpening,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
   onDuplicateSelected, onPropertiesRequested, onMoveMultiSelection,
   gridSize = 1,
@@ -319,6 +321,10 @@ export function FloorPlanEditor({
     furnitureId?: string;
     furnitureOrigX?: number;
     furnitureOrigY?: number;
+    openingWallId?: string;
+    openingId?: string;
+    openingOrigPos?: number;
+    openingWallLen?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -1614,6 +1620,26 @@ export function FloorPlanEditor({
       }
     }
     for (const wall of [...floor.walls].reverse()) {
+      const wdx = wall.x2 - wall.x1;
+      const wdy = wall.y2 - wall.y1;
+      const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+      if (wallLen < 0.01) continue;
+      const ux = wdx / wallLen;
+      const uy = wdy / wallLen;
+      for (const opening of (wall.openings ?? [])) {
+        const ox = wall.x1 + ux * opening.position;
+        const oy = wall.y1 + uy * opening.position;
+        const hw = opening.width / 2;
+        const nx = -uy * (wall.thickness || 0.25) * 0.6;
+        const ny = ux * (wall.thickness || 0.25) * 0.6;
+        const dx = wx - ox;
+        const dy = wy - oy;
+        const alongWall = Math.abs(dx * ux + dy * uy);
+        const perpWall = Math.abs(dx * (-uy) + dy * ux);
+        if (alongWall <= hw + 0.1 && perpWall <= (wall.thickness || 0.25) * 0.6 + 0.1) {
+          return { type: 'opening' as const, id: wall.id, wallId: wall.id, openingId: opening.id };
+        }
+      }
       const d = pointToSegmentDist(wx, wy, wall.x1, wall.y1, wall.x2, wall.y2);
       const threshold = Math.max(wall.thickness * 0.5 + 0.15, 0.25);
       if (d < threshold) return { type: 'wall' as const, id: wall.id };
@@ -1783,6 +1809,19 @@ export function FloorPlanEditor({
           else if (hit.type === 'wall') onDeleteWall(hit.id);
           else if (hit.type === 'room') onDeleteRoom(hit.id);
           else if (hit.type === 'furniture') onDeleteFurniture?.(hit.id);
+          return;
+        }
+
+        if (hit.type === 'opening' && hit.wallId && hit.openingId && onUpdateWallOpening) {
+          const wall = floor.walls.find(w => w.id === hit.wallId);
+          const opening = (wall?.openings ?? []).find(o => o.id === hit.openingId);
+          if (wall && opening) {
+            const wdx = wall.x2 - wall.x1;
+            const wdy = wall.y2 - wall.y1;
+            const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+            dragState.current = { type: 'move-opening', startX: e.clientX, startY: e.clientY, openingWallId: wall.id, openingId: opening.id, openingOrigPos: opening.position, openingWallLen: wallLen };
+            onSelectWall(wall.id);
+          }
           return;
         }
 
@@ -2104,8 +2143,25 @@ export function FloorPlanEditor({
       const newX = snapToGrid((dragState.current.furnitureOrigX ?? 0) + ddx);
       const newY = snapToGrid((dragState.current.furnitureOrigY ?? 0) + ddy);
       onMoveFurniture?.(dragState.current.furnitureId, newX, newY);
+    } else if (dragState.current.type === 'move-opening' && dragState.current.openingWallId && dragState.current.openingId) {
+      const ddx = (e.clientX - dragState.current.startX) / (CELL * zoom);
+      const ddy = (e.clientY - dragState.current.startY) / (CELL * zoom);
+      const wall = floor.walls.find(w => w.id === dragState.current?.openingWallId);
+      if (wall) {
+        const wdx = wall.x2 - wall.x1;
+        const wdy = wall.y2 - wall.y1;
+        const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+        const ux = wdx / wallLen;
+        const uy = wdy / wallLen;
+        const projDist = ddx * ux + ddy * uy;
+        const opening = (wall.openings ?? []).find(o => o.id === dragState.current?.openingId);
+        if (opening) {
+          const newPos = Math.max(opening.width / 2, Math.min(wallLen - opening.width / 2, (dragState.current.openingOrigPos ?? 0) + projDist));
+          onUpdateWallOpening?.(wall.id, opening.id, { position: newPos });
+        }
+      }
     }
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, snapToGrid, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe, onMoveFurniture, connectMode, floor.ducts]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, snapToGrid, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe, onMoveFurniture, onUpdateWallOpening, connectMode, floor.ducts, floor.walls]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);

@@ -66,6 +66,7 @@ interface Props {
   lighting?: LightingSettings;
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
+  xrayOpacity?: number;
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -738,6 +739,7 @@ interface BuildingSceneProps {
   showGrid?: boolean;
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
+  xrayOpacity?: number;
 }
 
 function BuildingScene({
@@ -746,7 +748,7 @@ function BuildingScene({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false
+  highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -910,7 +912,7 @@ function BuildingScene({
             height={wallH}
             thickness={wall.thickness || 0.25}
             color={wall.color || '#94a3b8'}
-            opacity={wallsTransparent ? 0.18 : (wall.opacity ?? 1)}
+            opacity={wallsTransparent ? xrayOpacity : (wall.opacity ?? 1)}
             selected={wall.id === selectedWallId}
             faded={faded}
             materialType={wallsTransparent ? 'glass' : (wall.materialType || 'concrete')}
@@ -929,7 +931,44 @@ function BuildingScene({
 
       for (const duct of (floor.ducts ?? [])) {
         if (!flLayers.ducts) break;
-        if (duct.isVertical && !flLayers.verticalDucts) continue;
+        if (duct.isVertical) {
+          if (!flLayers.verticalDucts) continue;
+          if (explode && duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
+            const ys = duct.verticalSectionPoints.map(p => p.y);
+            const minDuctY = Math.min(...ys);
+            const maxDuctY = Math.max(...ys);
+            for (let fi = 0; fi < sorted.length; fi++) {
+              const segFloor = sorted[fi];
+              const segBaseY = floorBaseY[segFloor.id];
+              const segTopY = segBaseY + segFloor.height;
+              const segStartY = Math.max(minDuctY, segBaseY);
+              const segEndY = Math.min(maxDuctY, segTopY);
+              if (segEndY <= segStartY) continue;
+              const segExpOffX = floorExpOffX[segFloor.id] ?? 0;
+              const segExpOffZ = floorExpOffZ[segFloor.id] ?? 0;
+              const segDuct = {
+                ...duct,
+                verticalSectionPoints: [
+                  { x: 0, y: segStartY - segBaseY },
+                  { x: 0, y: segEndY - segBaseY }
+                ]
+              };
+              elements.push(
+                <group key={`vduct-${duct.id}-seg-${fi}`} position={[segExpOffX, 0, segExpOffZ]}>
+                  <DuctMesh
+                    duct={segDuct}
+                    offsetX={offsetX}
+                    baseY={segBaseY}
+                    selected={duct.id === selectedDuctId}
+                    faded={highlightFloor && segFloor.id !== activeFloorId}
+                    onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+                  />
+                </group>
+              );
+            }
+            continue;
+          }
+        }
         floorElements.push(
           <DuctMesh
             key={`duct-${duct.id}`}
@@ -1104,6 +1143,7 @@ export function BuildingCanvas3D({
   lighting = DEFAULT_LIGHTING,
   explosion = DEFAULT_EXPLOSION,
   wallsTransparent = false,
+  xrayOpacity = 0.2,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
@@ -1150,6 +1190,7 @@ export function BuildingCanvas3D({
             floorTransparent={floorTransparent}
             showGrid={showGrid}
             wallsTransparent={wallsTransparent}
+            xrayOpacity={xrayOpacity}
             explosion={explosion}
           />
           <Environment preset="city" />

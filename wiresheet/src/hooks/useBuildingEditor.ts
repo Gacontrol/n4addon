@@ -1141,13 +1141,15 @@ export function useBuildingEditor() {
     rooms: Room[],
     ducts: Duct[],
     pipes: Pipe[],
-    offset: number
-  ): { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[] } => {
+    offset: number,
+    slabs: Slab[] = []
+  ): { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[]; slabIds: string[] } => {
     const mkId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const newWalls = walls.map(w => ({ ...w, id: mkId('wall'), x1: w.x1 + offset, y1: w.y1 + offset, x2: w.x2 + offset, y2: w.y2 + offset }));
     const newRooms = rooms.map(r => ({ ...r, id: mkId('room'), x: r.x + offset, y: r.y + offset }));
     const newDucts = ducts.map(d => ({ ...d, id: mkId('duct'), points: d.points.map(p => ({ ...p, x: p.x + offset, y: p.y + offset })) }));
     const newPipes = pipes.map(p => ({ ...p, id: mkId('pipe'), points: p.points.map(pt => ({ ...pt, x: pt.x + offset, y: pt.y + offset })) }));
+    const newSlabs = slabs.map(s => ({ ...s, id: mkId('slab'), points: s.points.map(pt => ({ x: pt.x + offset, y: pt.y + offset })) }));
     const updated = buildings.map(b =>
       b.id === buildingId
         ? {
@@ -1160,6 +1162,7 @@ export function useBuildingEditor() {
                     rooms: [...f.rooms, ...newRooms],
                     ducts: [...(f.ducts ?? []), ...newDucts],
                     pipes: [...(f.pipes ?? []), ...newPipes],
+                    slabs: [...(f.slabs ?? []), ...newSlabs],
                   }
                 : f
             ),
@@ -1173,6 +1176,7 @@ export function useBuildingEditor() {
       roomIds: newRooms.map(r => r.id),
       ductIds: newDucts.map(d => d.id),
       pipeIds: newPipes.map(p => p.id),
+      slabIds: newSlabs.map(s => s.id),
     };
   }, [buildings, updateBuildings]);
 

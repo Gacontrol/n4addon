@@ -204,6 +204,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const [showAllFloors, setShowAllFloors] = useState(false);
   const [wallsTransparent, setWallsTransparent] = useState(false);
+  const [xrayOpacity, setXrayOpacity] = useState(0.2);
+  const [showXrayPanel, setShowXrayPanel] = useState(false);
   const [dropFurnitureTemplate, setDropFurnitureTemplate] = useState<FurnitureTemplate | null>(null);
   const [showFurniturePanel, setShowFurniturePanel] = useState(false);
   const [furnitureCategoryFilter, setFurnitureCategoryFilter] = useState<FurnitureCategory>('office');
@@ -233,7 +235,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     rooms: Room[];
     ducts: Duct[];
     pipes: Pipe[];
-  }>({ walls: [], rooms: [], ducts: [], pipes: [] });
+    slabs: Slab[];
+  }>({ walls: [], rooms: [], ducts: [], pipes: [], slabs: [] });
 
   const [pastedMultiSel, setPastedMultiSel] = useState<MultiSelection | null>(null);
 
@@ -257,13 +260,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       rooms: activeFloor.rooms.filter(r => sel.roomIds.includes(r.id)),
       ducts: (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id)),
       pipes: (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id)),
+      slabs: (activeFloor.slabs ?? []).filter(s => sel.slabIds?.includes(s.id)),
     };
   };
 
   const handlePasteClipboard = () => {
     if (!activeBuilding || !activeFloor) return;
-    const { walls, rooms, ducts, pipes } = clipboardRef.current;
-    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    const { walls, rooms, ducts, pipes, slabs } = clipboardRef.current;
+    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 0, slabs);
     setPastedMultiSel({ ...newIds });
     setTimeout(() => setPastedMultiSel(null), 50);
   };
@@ -279,7 +283,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     const rooms = activeFloor.rooms.filter(r => sel.roomIds.includes(r.id));
     const ducts = (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id));
     const pipes = (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id));
-    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    const slabs = (activeFloor.slabs ?? []).filter(s => sel.slabIds?.includes(s.id));
+    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1, slabs);
     setPastedMultiSel({ ...newIds });
     setTimeout(() => setPastedMultiSel(null), 50);
   };
@@ -857,14 +862,36 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   <Layers className="w-3.5 h-3.5" />
                   Explode
                 </button>
-                <button
-                  onClick={() => setWallsTransparent(v => !v)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${wallsTransparent ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                  title="Wände transparent"
-                >
-                  <Box className="w-3.5 h-3.5" />
-                  X-Ray
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setWallsTransparent(v => !v)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-l text-xs border-l border-t border-b transition-colors ${wallsTransparent ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                    title="Wände transparent"
+                  >
+                    <Box className="w-3.5 h-3.5" />
+                    X-Ray
+                  </button>
+                  <button
+                    onClick={() => setShowXrayPanel(p => !p)}
+                    className={`px-1.5 py-1 rounded-r text-xs border transition-colors ${showXrayPanel ? 'bg-cyan-600 text-white border-cyan-500' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                    title="X-Ray Einstellungen"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showXrayPanel && (
+                    <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl p-3 z-50 min-w-[180px]">
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">X-Ray Einstellungen</div>
+                      <label className="flex items-center gap-2 text-xs text-slate-300 mb-3">
+                        <input type="checkbox" checked={wallsTransparent} onChange={e => setWallsTransparent(e.target.checked)} className="rounded bg-slate-700 border-slate-600" />
+                        Aktiviert
+                      </label>
+                      <div className="mb-1">
+                        <div className="text-[10px] text-slate-400 mb-1">Transparenz: {Math.round(xrayOpacity * 100)}%</div>
+                        <input type="range" min="5" max="60" value={xrayOpacity * 100} onChange={e => setXrayOpacity(Number(e.target.value) / 100)} className="w-full h-1.5 bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowWidget3DPanel(p => !p)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showWidget3DPanel ? 'bg-green-700 text-white border-green-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
@@ -934,6 +961,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedFurnitureId={selectedFurnitureId}
                   onSelectFurniture={id => { setSelectedFurnitureId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                   wallsTransparent={wallsTransparent}
+                  xrayOpacity={xrayOpacity}
                   onUpdateWidget3D={(widgetId, x, y, z) => {
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
@@ -1381,6 +1409,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   addWallOpening(activeBuilding.id, activeFloor.id, wallId, { type, position, width, height, sillHeight });
                   setSelectedWallId(wallId);
                   setShowRoomPanel(true);
+                }}
+                onUpdateWallOpening={(wallId, openingId, updates) => {
+                  if (!activeBuilding || !activeFloor) return;
+                  updateWallOpening(activeBuilding.id, activeFloor.id, wallId, openingId, updates);
                 }}
               />
             ) : (
