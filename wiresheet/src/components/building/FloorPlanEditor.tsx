@@ -38,6 +38,7 @@ interface Props {
   onMoveDuctPoint?: (ductId: string, pointIndex: number, x: number, y: number) => void;
   onMoveDuct?: (ductId: string, dx: number, dy: number) => void;
   onMergeDucts?: (ductIds: string[]) => string | null;
+  onConnectDuctEndpoints?: (ductId1: string, pointIdx1: number, ductId2: string, pointIdx2: number) => string | null;
   onSplitDuct?: (ductId: string, pointIndex: number) => void;
   onInsertDuctPoint?: (ductId: string, afterIndex: number, x: number, y: number) => void;
   onRemoveDuctPoint?: (ductId: string, pointIndex: number) => void;
@@ -232,7 +233,7 @@ export function FloorPlanEditor({
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
-  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
+  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onConnectDuctEndpoints, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
@@ -260,6 +261,12 @@ export function FloorPlanEditor({
   const [lassoRect, setLassoRect] = useState<LassoRect | null>(null);
   const [multiSel, setMultiSel] = useState<MultiSelection>({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] });
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [connectMode, setConnectMode] = useState<{
+    firstDuctId: string | null;
+    firstPointIndex: number | null;
+    hoverDuctId: string | null;
+    hoverPointIndex: number | null;
+  } | null>(null);
 
   useEffect(() => {
     if (forceMultiSel) setMultiSel(forceMultiSel);
@@ -404,6 +411,7 @@ export function FloorPlanEditor({
         setMultiSel({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] });
         if (drawingWall) setDrawingWall(null);
         if (drawingPolyline.length > 0) setDrawingPolyline([]);
+        setConnectMode(null);
       }
 
       if (e.key === 'Enter' && tool === 'slab' && drawingPolyline.length >= 3) {
@@ -1257,6 +1265,53 @@ export function FloorPlanEditor({
       ctx.fill();
     }
 
+    if (connectMode !== null) {
+      for (const duct of (floor.ducts ?? [])) {
+        if (duct.isVertical) continue;
+        const endpoints = [
+          { pt: duct.points[0], idx: 0 },
+          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
+        ];
+        for (const { pt, idx } of endpoints) {
+          const sp = toScreen(pt.x, pt.y);
+          const isFirst = connectMode.firstDuctId === duct.id && connectMode.firstPointIndex === idx;
+          const isHover = connectMode.hoverDuctId === duct.id && connectMode.hoverPointIndex === idx;
+          const isSameDuct = connectMode.firstDuctId === duct.id;
+          const r = isFirst ? 10 : isHover ? 9 : 7;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+          if (isFirst) {
+            ctx.fillStyle = '#22c55e';
+            ctx.strokeStyle = '#fff';
+          } else if (isHover && !isSameDuct) {
+            ctx.fillStyle = '#3b82f6';
+            ctx.strokeStyle = '#fff';
+          } else if (isSameDuct && connectMode.firstDuctId !== null) {
+            ctx.fillStyle = '#475569';
+            ctx.strokeStyle = '#64748b';
+          } else {
+            ctx.fillStyle = '#1e40af';
+            ctx.strokeStyle = '#60a5fa';
+          }
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      ctx.save();
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      if (connectMode.firstDuctId === null) {
+        ctx.fillText('Ersten Endpunkt wählen', W / 2, 24);
+      } else {
+        ctx.fillText('Zweiten Endpunkt wählen  •  ESC = Abbrechen', W / 2, 24);
+      }
+      ctx.restore();
+    }
+
     if (mouseWorld && zoom > 0.5) {
       ctx.font = '10px Inter, sans-serif';
       ctx.fillStyle = 'rgba(148,163,184,0.5)';
@@ -1273,7 +1328,7 @@ export function FloorPlanEditor({
     offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
     tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
     bgImg, bgDragging, bgCornerDragging, bgCalibrating, bgCalibLine, bgCalibRefLen,
-    drawCornerJoins, mouseWorld, lassoRect, layers,
+    drawCornerJoins, mouseWorld, lassoRect, layers, connectMode,
   ]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -1435,6 +1490,40 @@ export function FloorPlanEditor({
         }
       }
       setDrawingPolyline(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      return;
+    }
+
+    if (connectMode !== null) {
+      const CONNECT_HIT_RADIUS = 0.5;
+      let nearestDist = Infinity;
+      let hitDuctId: string | null = null;
+      let hitPointIndex: number | null = null;
+      for (const duct of (floor.ducts ?? [])) {
+        if (duct.isVertical || duct.points.length < 2) continue;
+        const endpoints = [
+          { pt: duct.points[0], idx: 0 },
+          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
+        ];
+        for (const { pt, idx } of endpoints) {
+          const d = dist(world.x, world.y, pt.x, pt.y);
+          if (d < CONNECT_HIT_RADIUS && d < nearestDist) {
+            nearestDist = d;
+            hitDuctId = duct.id;
+            hitPointIndex = idx;
+          }
+        }
+      }
+      if (hitDuctId !== null && hitPointIndex !== null) {
+        if (connectMode.firstDuctId === null) {
+          setConnectMode(prev => prev ? { ...prev, firstDuctId: hitDuctId, firstPointIndex: hitPointIndex } : null);
+        } else if (hitDuctId !== connectMode.firstDuctId) {
+          const newId = onConnectDuctEndpoints?.(connectMode.firstDuctId, connectMode.firstPointIndex!, hitDuctId, hitPointIndex);
+          setConnectMode(null);
+          setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
+        }
+      } else {
+        setConnectMode(null);
+      }
       return;
     }
 
@@ -1625,7 +1714,8 @@ export function FloorPlanEditor({
     onSelectWall, onSelectRoom, onDeleteWall, onDeleteRoom,
     onSelectDuct, onDeleteDuct, onSelectPipe, onDeletePipe, onSelectSlab,
     drawingPolyline, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
-    onAddDuct, onAddPipe, onAddSlab, hitTestWorld, multiSel, onSelectionChange, onPropertiesRequested]);
+    onAddDuct, onAddPipe, onAddSlab, hitTestWorld, multiSel, onSelectionChange, onPropertiesRequested,
+    connectMode, onConnectDuctEndpoints]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
@@ -1637,6 +1727,30 @@ export function FloorPlanEditor({
       setSnapPoint(snapped);
     } else {
       setSnapPoint(null);
+    }
+
+    if (connectMode !== null) {
+      const CONNECT_HOVER_RADIUS = 0.5;
+      let hoverDuctId: string | null = null;
+      let hoverPointIndex: number | null = null;
+      let nearestDist = Infinity;
+      for (const duct of (floor.ducts ?? [])) {
+        if (duct.isVertical || duct.points.length < 2) continue;
+        const endpoints = [
+          { pt: duct.points[0], idx: 0 },
+          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
+        ];
+        for (const { pt, idx } of endpoints) {
+          const d = dist(world.x, world.y, pt.x, pt.y);
+          if (d < CONNECT_HOVER_RADIUS && d < nearestDist) {
+            nearestDist = d;
+            hoverDuctId = duct.id;
+            hoverPointIndex = idx;
+          }
+        }
+      }
+      setConnectMode(prev => prev ? { ...prev, hoverDuctId, hoverPointIndex } : null);
+      return;
     }
 
     if (!dragState.current) return;
@@ -1719,7 +1833,7 @@ export function FloorPlanEditor({
         dragState.current.startY = e.clientY - (ddy - sdy) * CELL * zoom;
       }
     }
-  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe]);
+  }, [drawingWall, drawRect, toWorld, getSnapPoint, zoom, onMoveRoom, onMoveWallPoint, onMoveWall, onSetBackground, floor.backgroundImage, tool, drawingPolyline, multiSel, onMoveMultiSelection, onMoveDuctPoint, onMoveDuct, onMovePipePoint, onMovePipe, connectMode, floor.ducts]);
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
     const { px, py } = getCanvasPos(e);
@@ -2134,22 +2248,18 @@ export function FloorPlanEditor({
               </button>
             </>
           )}
-          {(multiSel.ductIds.length >= 2 || (contextMenu.targetNearestEndpointDuctId && contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetId !== contextMenu.targetNearestEndpointDuctId)) && (
+          {(multiSel.ductIds.length >= 2 || contextMenu.targetType === 'duct' || contextMenu.targetNearestEndpointDuctId) && (
             <>
               <div className="border-t border-slate-700 my-1" />
               <button
                 className="w-full text-left px-3 py-1.5 hover:bg-blue-900/50 text-blue-400 flex items-center gap-2"
                 onClick={() => {
-                  const ids = multiSel.ductIds.length >= 2
-                    ? multiSel.ductIds
-                    : [contextMenu.targetId!, contextMenu.targetNearestEndpointDuctId!];
-                  const newId = onMergeDucts?.(ids);
-                  setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
                   setContextMenu(null);
+                  setConnectMode({ firstDuctId: null, firstPointIndex: null, hoverDuctId: null, hoverPointIndex: null });
                 }}
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-                {multiSel.ductIds.length >= 2 ? `Kanäle verbinden (${multiSel.ductIds.length})` : 'Kanäle verbinden'}
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M6 9v3a6 6 0 0 0 6 6h3"/></svg>
+                Kanäle verbinden
               </button>
             </>
           )}

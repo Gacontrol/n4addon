@@ -141,6 +141,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     removeDuctPoint,
     moveDuct,
     deleteDuct,
+    connectDuctEndpoints,
     mergeDucts,
     splitDuct,
     addPipe,
@@ -1158,6 +1159,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
                 onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onMergeDucts={ductIds => { if (activeBuilding && activeFloor) { const newId = mergeDucts(activeBuilding.id, activeFloor.id, ductIds); setSelectedDuctId(newId); return newId; } return null; }}
+                onConnectDuctEndpoints={(id1, pi1, id2, pi2) => { if (activeBuilding && activeFloor) { const newId = connectDuctEndpoints(activeBuilding.id, activeFloor.id, id1, pi1, id2, pi2); setSelectedDuctId(newId); return newId; } return null; }}
                 onSplitDuct={(ductId, ptIdx) => { if (activeBuilding && activeFloor) { splitDuct(activeBuilding.id, activeFloor.id, ductId, ptIdx); setSelectedDuctId(null); } }}
                 onInsertDuctPoint={(ductId, afterIdx, x, y) => { if (activeBuilding && activeFloor) insertDuctPoint(activeBuilding.id, activeFloor.id, ductId, afterIdx, x, y); }}
                 onRemoveDuctPoint={(ductId, ptIdx) => { if (activeBuilding && activeFloor) removeDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx); }}
