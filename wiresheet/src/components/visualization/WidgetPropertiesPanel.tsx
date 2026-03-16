@@ -40,7 +40,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
@@ -2701,6 +2701,97 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       type="checkbox"
                       checked={tcCfg[key] !== false && !!tcCfg[key]}
                       onChange={(e) => onUpdate({ config: { ...tcCfg, [key]: e.target.checked } })}
+                      className="rounded w-3 h-3"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-3d-building': {
+        const b3dCfg = config as Building3DWidgetConfig;
+        return (
+          <>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-400">Hintergrundfarbe</label>
+              <input
+                type="color"
+                value={b3dCfg.backgroundColor || '#0a1020'}
+                onChange={(e) => onUpdate({ config: { ...b3dCfg, backgroundColor: e.target.value } })}
+                className="w-full h-8 rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Beleuchtung</label>
+              <div>
+                <label className="text-[10px] text-slate-500">Umgebungslicht ({b3dCfg.ambientIntensity ?? 0.4})</label>
+                <input
+                  type="range"
+                  min={0} max={2} step={0.05}
+                  value={b3dCfg.ambientIntensity ?? 0.4}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, ambientIntensity: Number(e.target.value) } })}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500">Sonnenlicht ({b3dCfg.sunIntensity ?? 1.6})</label>
+                <input
+                  type="range"
+                  min={0} max={4} step={0.1}
+                  value={b3dCfg.sunIntensity ?? 1.6}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, sunIntensity: Number(e.target.value) } })}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Explosionsansicht</label>
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={b3dCfg.showExplosion ?? false}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, showExplosion: e.target.checked } })}
+                  className="rounded w-3.5 h-3.5"
+                />
+                Explosionsansicht aktivieren
+              </label>
+              {b3dCfg.showExplosion && (
+                <div>
+                  <label className="text-[10px] text-slate-500">Abstand ({b3dCfg.explosionOffset ?? 4})</label>
+                  <input
+                    type="range"
+                    min={1} max={10} step={0.5}
+                    value={b3dCfg.explosionOffset ?? 4}
+                    onChange={(e) => onUpdate({ config: { ...b3dCfg, explosionOffset: Number(e.target.value) } })}
+                    className="w-full"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Anzeigeoptionen</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([
+                  ['showAllFloors', 'Alle Etagen'],
+                  ['highlightFloor', 'Etage hervorheben'],
+                  ['showWidgets', '3D-Widgets'],
+                  ['showDucts', 'Lüftungskanäle'],
+                  ['showPipes', 'Rohrleitungen'],
+                  ['showFurniture', 'Möbel'],
+                  ['showGrid', 'Raster'],
+                ] as [keyof Building3DWidgetConfig, string][]).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={b3dCfg[key] !== false && !!b3dCfg[key]}
+                      onChange={(e) => onUpdate({ config: { ...b3dCfg, [key]: e.target.checked } })}
                       className="rounded w-3 h-3"
                     />
                     {label}

@@ -57,7 +57,8 @@ import {
   SensorWidgetConfig,
   PIDWidgetConfig,
   AlarmConsoleWidgetConfig,
-  TrendChartConfig
+  TrendChartConfig,
+  Building3DWidgetConfig
 } from '../../types/visualization';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuFrame } from './VisuFrame';
@@ -69,6 +70,7 @@ import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuAlarmConsole } from './VisuAlarmConsole';
 import { VisuTrendChart } from './VisuTrendChart';
 import { VisuImage } from './VisuImage';
+import { Visu3DBuilding } from './Visu3DBuilding';
 import { getThemeVars } from '../../utils/widgetThemes';
 import {
   VisuSwitch,
@@ -1370,6 +1372,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-3d-building': {
+        const b3dCfg = widget.config as Building3DWidgetConfig;
+        return (
+          <Visu3DBuilding
+            config={b3dCfg}
+            width={widget.size.width}
+            height={widget.size.height}
+            isEditMode={isEditMode}
+          />
+        );
+      }
+
       default:
         return <div className="text-red-400">Unbekannter Widget-Typ</div>;
     }
@@ -1397,9 +1411,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isPIDWidget = widget.type === 'visu-pid';
   const isHeatingCurveWidget = widget.type === 'visu-heating-curve';
   const isAlarmConsoleWidget = widget.type === 'visu-alarm-console';
+  const is3DBuildingWidget = widget.type === 'visu-3d-building';
   const isLineInDrawingMode = widget.type === 'visu-line' && (widget.config as { x1?: number }).x1 === undefined;
   const isPolygonInDrawingMode = widget.type === 'visu-polygon' && (!(widget.config as { points?: unknown[] }).points || (widget.config as { points?: unknown[] }).points!.length === 0);
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget;
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',

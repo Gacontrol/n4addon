@@ -1000,6 +1000,33 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: 'Trend-Diagramm mit Zeitachse, Zoom und mehreren Datenpunkten',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-3d-building',
+    label: '3D Gebäude',
+    icon: 'Building2',
+    category: 'display',
+    defaultSize: { width: 600, height: 400 },
+    defaultConfig: {
+      showAllFloors: false,
+      showWidgets: true,
+      showDucts: true,
+      showPipes: true,
+      showFurniture: true,
+      showGrid: false,
+      highlightFloor: true,
+      backgroundColor: '#0a1020',
+      autoRotate: false,
+      controlsEnabled: true,
+      showExplosion: false,
+      explosionOffset: 4,
+      ambientIntensity: 0.4,
+      sunIntensity: 1.6
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'top' },
+    description: '3D Gebäude-Viewer mit interaktiver Kamera und Live-Datenpunkten',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

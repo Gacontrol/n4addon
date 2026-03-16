@@ -65,7 +65,8 @@ export type WidgetType =
   | 'visu-pid'
   | 'visu-heating-curve'
   | 'visu-alarm-console'
-  | 'visu-trend-chart';
+  | 'visu-trend-chart'
+  | 'visu-3d-building';
 
 export interface WidgetBinding {
   nodeId: string;
@@ -405,7 +406,8 @@ export type WidgetConfig =
   | PIDWidgetConfig
   | HeatingCurveWidgetConfig
   | AlarmConsoleWidgetConfig
-  | TrendChartConfig;
+  | TrendChartConfig
+  | Building3DWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -762,6 +764,37 @@ export interface AlarmConsoleWidgetConfig {
   compactMode?: boolean;
   maxVisibleAlarms?: number;
   fontSize?: number;
+}
+
+export interface Building3DWidgetDatapointOverride {
+  datapoint: string;
+  label?: string;
+  color?: string;
+  min?: number;
+  max?: number;
+  unit?: string;
+}
+
+export interface Building3DWidgetConfig {
+  floorId?: string;
+  showAllFloors?: boolean;
+  cameraAngle?: 'isometric' | 'top' | 'front' | 'perspective';
+  showWidgets?: boolean;
+  showDucts?: boolean;
+  showPipes?: boolean;
+  showFurniture?: boolean;
+  showGrid?: boolean;
+  backgroundColor?: string;
+  autoRotate?: boolean;
+  rotateSpeed?: number;
+  zoom?: number;
+  highlightFloor?: boolean;
+  datapointOverrides?: Building3DWidgetDatapointOverride[];
+  ambientIntensity?: number;
+  sunIntensity?: number;
+  explosionOffset?: number;
+  showExplosion?: boolean;
+  controlsEnabled?: boolean;
 }
 
 export interface WidgetTemplate {
