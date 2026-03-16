@@ -173,6 +173,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showRoomPanel, setShowRoomPanel] = useState(true);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [floorOverlays, setFloorOverlays] = useState<Record<string, boolean>>({});
+  const [expanded3DFloors, setExpanded3DFloors] = useState<Record<string, boolean>>({});
   const [wallThickness, setWallThickness] = useState(0.25);
   const [gridSize, setGridSize] = useState(1);
   const [bgColor, setBgColor] = useState('#0a1020');
@@ -1276,8 +1277,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
             )}
           </div>
 
-          {showLayersPanel && activeFloor && (
-            <div className="w-48 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
+          {showLayersPanel && activeBuilding && (
+            <div className="w-52 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
                 <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5" />Layer
@@ -1287,51 +1288,112 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 </button>
               </div>
               <div className="overflow-y-auto flex-1 p-2 space-y-1">
-                {([
-                  { key: 'walls', label: 'Wände' },
-                  { key: 'rooms', label: 'Räume' },
-                  { key: 'ducts', label: 'Kanäle' },
-                  { key: 'verticalDucts', label: 'Vertikale Kanäle' },
-                  { key: 'pipes', label: 'Rohre' },
-                  { key: 'slabs', label: 'Decken' },
-                  { key: 'background', label: 'Hintergrundbild' },
-                ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
-                  const layers = { ...DEFAULT_LAYERS, ...(activeFloor.layers ?? {}) };
-                  const visible = layers[key];
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => activeBuilding && updateFloorLayers(activeBuilding.id, activeFloor.id, { [key]: !visible })}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
-                    >
-                      {visible ? <Eye className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
-                      {label}
-                    </button>
-                  );
-                })}
-                {activeBuilding && activeBuilding.floors.filter(f => f.id !== activeFloorId).length > 0 && (
+                {viewMode === '3d' ? (
+                  [...activeBuilding.floors]
+                    .sort((a, b) => b.level - a.level)
+                    .map(floor => {
+                      const isExpanded = !!expanded3DFloors[floor.id];
+                      const floorVisible = !floor.hidden;
+                      const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
+                      return (
+                        <div key={floor.id} className="rounded border border-slate-700/50 overflow-hidden">
+                          <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-750 hover:bg-slate-700/40 transition-colors">
+                            <button
+                              onClick={() => activeBuilding && updateFloorProps(activeBuilding.id, floor.id, { hidden: !floor.hidden })}
+                              className={`flex-shrink-0 transition-colors ${floorVisible ? 'text-teal-400 hover:text-teal-300' : 'text-slate-600 hover:text-slate-400'}`}
+                              title={floorVisible ? 'Etage ausblenden' : 'Etage einblenden'}
+                            >
+                              {floorVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              className="flex-1 text-left text-xs text-slate-300 font-medium truncate"
+                              onClick={() => setExpanded3DFloors(prev => ({ ...prev, [floor.id]: !prev[floor.id] }))}
+                            >
+                              {floor.name}
+                            </button>
+                            <button
+                              onClick={() => setExpanded3DFloors(prev => ({ ...prev, [floor.id]: !prev[floor.id] }))}
+                              className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
+                            >
+                              <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-2 pb-1.5 pt-1 space-y-0.5 bg-slate-800/60">
+                              {([
+                                { key: 'walls', label: 'Wände' },
+                                { key: 'rooms', label: 'Räume' },
+                                { key: 'ducts', label: 'Kanäle' },
+                                { key: 'verticalDucts', label: 'Vert. Kanäle' },
+                                { key: 'pipes', label: 'Rohre' },
+                                { key: 'slabs', label: 'Decken' },
+                              ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
+                                const visible = flLayers[key as keyof typeof flLayers];
+                                return (
+                                  <button
+                                    key={key}
+                                    onClick={() => updateFloorLayers(activeBuilding.id, floor.id, { [key]: !visible })}
+                                    className={`w-full flex items-center gap-2 px-2 py-1 rounded text-[11px] transition-colors ${visible ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-600 hover:bg-slate-700/30'}`}
+                                  >
+                                    {visible ? <Eye className="w-3 h-3 text-blue-400 flex-shrink-0" /> : <EyeOff className="w-3 h-3 flex-shrink-0" />}
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                ) : activeFloor ? (
                   <>
-                    <div className="pt-2 pb-1 px-1">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider">Andere Etagen</span>
-                    </div>
-                    {[...activeBuilding.floors]
-                      .filter(f => f.id !== activeFloorId)
-                      .sort((a, b) => b.level - a.level)
-                      .map(f => {
-                        const visible = !!floorOverlays[f.id];
-                        return (
-                          <button
-                            key={f.id}
-                            onClick={() => setFloorOverlays(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
-                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
-                          >
-                            {visible ? <Eye className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
-                            {f.name}
-                          </button>
-                        );
-                      })}
+                    {([
+                      { key: 'walls', label: 'Wände' },
+                      { key: 'rooms', label: 'Räume' },
+                      { key: 'ducts', label: 'Kanäle' },
+                      { key: 'verticalDucts', label: 'Vertikale Kanäle' },
+                      { key: 'pipes', label: 'Rohre' },
+                      { key: 'slabs', label: 'Decken' },
+                      { key: 'background', label: 'Hintergrundbild' },
+                    ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
+                      const layers = { ...DEFAULT_LAYERS, ...(activeFloor.layers ?? {}) };
+                      const visible = layers[key];
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => updateFloorLayers(activeBuilding.id, activeFloor.id, { [key]: !visible })}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
+                        >
+                          {visible ? <Eye className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {label}
+                        </button>
+                      );
+                    })}
+                    {activeBuilding.floors.filter(f => f.id !== activeFloorId).length > 0 && (
+                      <>
+                        <div className="pt-2 pb-1 px-1">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Andere Etagen</span>
+                        </div>
+                        {[...activeBuilding.floors]
+                          .filter(f => f.id !== activeFloorId)
+                          .sort((a, b) => b.level - a.level)
+                          .map(f => {
+                            const visible = !!floorOverlays[f.id];
+                            return (
+                              <button
+                                key={f.id}
+                                onClick={() => setFloorOverlays(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
+                              >
+                                {visible ? <Eye className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
+                                {f.name}
+                              </button>
+                            );
+                          })}
+                      </>
+                    )}
                   </>
-                )}
+                ) : null}
               </div>
             </div>
           )}
