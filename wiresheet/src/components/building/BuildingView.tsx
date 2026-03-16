@@ -598,13 +598,31 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
         </div>
         <div className="border-t border-slate-700 p-2">
           <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Raster</div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[0.25, 0.5, 1, 2, 5].map(sz => (
+          <div className="flex items-center gap-2">
+            <input
+              type="range" min="0.05" max="2" step="0.05"
+              value={gridSize}
+              onChange={e => setGridSize(parseFloat(e.target.value))}
+              className="flex-1 h-1 accent-blue-500"
+            />
+            <input
+              type="number" min="5" max="200" step="5"
+              value={Math.round(gridSize * 100)}
+              onChange={e => {
+                const cm = parseInt(e.target.value) || 5;
+                setGridSize(Math.max(0.05, Math.min(2, cm / 100)));
+              }}
+              className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none focus:border-blue-500"
+            />
+            <span className="text-xs text-slate-500">cm</span>
+          </div>
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            {[5, 10, 25, 50, 100].map(cm => (
               <button
-                key={sz}
-                onClick={() => setGridSize(sz)}
-                className={`px-2 py-1 rounded text-xs border ${gridSize === sz ? 'bg-blue-700 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white hover:bg-slate-600'}`}
-              >{sz}m</button>
+                key={cm}
+                onClick={() => setGridSize(cm / 100)}
+                className={`px-1.5 py-0.5 rounded text-[10px] border ${Math.round(gridSize * 100) === cm ? 'bg-blue-700 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white hover:bg-slate-600'}`}
+              >{cm}cm</button>
             ))}
           </div>
         </div>
@@ -1130,7 +1148,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis="xz"
-                    label="Schnitt X/Z (von vorne)"
+                    label="Vorderansicht (X-Achse)"
                     onAddVerticalDuct={(duct, fromFloorId) => {
                       if (!activeBuilding) return;
                       addDuct(activeBuilding.id, fromFloorId, duct);
@@ -1162,7 +1180,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis="yz"
-                    label="Schnitt Y/Z (von der Seite)"
+                    label="Seitenansicht rechts (Y-Achse)"
                     onAddVerticalDuct={(duct, fromFloorId) => {
                       if (!activeBuilding) return;
                       addDuct(activeBuilding.id, fromFloorId, duct);
@@ -1241,6 +1259,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 overlayFloors={activeBuilding ? activeBuilding.floors
                   .filter(f => f.id !== activeFloorId && floorOverlays[f.id])
                   .map(f => ({ floor: f, opacity: 0.25 })) : undefined}
+                allFloors={activeBuilding?.floors}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">

@@ -63,6 +63,7 @@ interface Props {
   forceMultiSel?: MultiSelection | null;
   layers?: FloorLayers;
   overlayFloors?: { floor: Floor; opacity?: number }[];
+  allFloors?: Floor[];
 }
 
 const CELL = 40;
@@ -243,6 +244,7 @@ export function FloorPlanEditor({
   forceMultiSel,
   layers: layersProp,
   overlayFloors,
+  allFloors,
 }: Props) {
   const layers: FloorLayers = { ...DEFAULT_LAYERS, ...(layersProp ?? {}) };
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -443,7 +445,8 @@ export function FloorPlanEditor({
   }), [offset, zoom]);
 
   const getSnapPoint = useCallback((wx: number, wy: number): { x: number; y: number } => {
-    let best = { x: snapTo(wx), y: snapTo(wy) };
+    const snapG = (v: number) => Math.round(v / gridSize) * gridSize;
+    let best = { x: snapG(wx), y: snapG(wy) };
     let bestDist = SNAP_DIST;
     for (const wall of floor.walls) {
       for (const pt of [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]) {
@@ -458,7 +461,7 @@ export function FloorPlanEditor({
       }
     }
     return best;
-  }, [floor.walls, floor.slabs]);
+  }, [floor.walls, floor.slabs, gridSize]);
 
   const drawCornerJoins = useCallback((ctx: CanvasRenderingContext2D, cellPx: number) => {
     const walls = floor.walls;
@@ -1103,6 +1106,51 @@ export function FloorPlanEditor({
       }
     }
 
+    if (allFloors && layers.verticalDucts) {
+      const sortedAll = [...allFloors].sort((a, b) => a.level - b.level);
+      let currentFloorBaseY = 0;
+      for (let fi = 0; fi < sortedAll.length; fi++) {
+        if (sortedAll[fi].id === floor.id) break;
+        currentFloorBaseY += sortedAll[fi].height;
+      }
+      const currentFloorTopY = currentFloorBaseY + floor.height;
+
+      for (const otherFloor of sortedAll) {
+        if (otherFloor.id === floor.id) continue;
+        for (const duct of (otherFloor.ducts ?? [])) {
+          if (!duct.isVertical || duct.verticalX == null) continue;
+          if (!duct.verticalSectionPoints || duct.verticalSectionPoints.length < 2) continue;
+          const minY = Math.min(...duct.verticalSectionPoints.map(p => p.y));
+          const maxY = Math.max(...duct.verticalSectionPoints.map(p => p.y));
+          if (maxY <= currentFloorBaseY || minY >= currentFloorTopY) continue;
+
+          const vx = duct.verticalX;
+          const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
+          const sp = toScreen(vx, vy);
+          const r = Math.max(duct.width * cellPx * 0.6, 10);
+          const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = color;
+          ctx.fillStyle = color + '22';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (zoom > 0.5) {
+            ctx.fillStyle = color;
+            ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+          }
+          ctx.restore();
+        }
+      }
+    }
+
     for (const pipe of (floor.pipes ?? [])) {
       if (!layers.pipes) continue;
       const isSelected = pipe.id === selectedPipeId || multiSel.pipeIds.includes(pipe.id);
@@ -1390,7 +1438,7 @@ export function FloorPlanEditor({
     offset, zoom, toScreen, drawingWall, drawRect, drawingPolyline, snapPoint,
     tool, wallThickness, ductType, ductWidth, ductHeight, pipeType, pipeDiameter,
     bgImg, bgDragging, bgCornerDragging, bgCalibrating, bgCalibLine, bgCalibRefLen,
-    drawCornerJoins, mouseWorld, lassoRect, layers, connectMode, overlayFloors,
+    drawCornerJoins, mouseWorld, lassoRect, layers, connectMode, overlayFloors, allFloors,
   ]);
 
   useEffect(() => { draw(); }, [draw]);

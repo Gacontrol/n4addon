@@ -65,7 +65,23 @@ export function SectionView({
   gridSize,
   label,
 }: Props) {
-  const getH = (pt: { x: number; y: number }) => axis === 'xz' ? pt.x : pt.y;
+  const { maxX: axisMaxH } = (() => {
+    let maxH = 20;
+    for (const floor of building.floors) {
+      if (axis === 'xz') {
+        for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
+        for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
+      } else {
+        for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
+        for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
+      }
+    }
+    return { maxX: maxH };
+  })();
+  const getH = (pt: { x: number; y: number }) => {
+    if (axis === 'xz') return pt.x;
+    return axisMaxH - pt.y;
+  };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 100, y: 100 });
   const [zoom, setZoom] = useState(1.0);
@@ -82,18 +98,8 @@ export function SectionView({
   const sortedFloors = [...building.floors].sort((a, b) => a.level - b.level);
 
   const getFloorBounds = useCallback(() => {
-    let maxH = 20;
-    for (const floor of building.floors) {
-      if (axis === 'xz') {
-        for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
-        for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
-      } else {
-        for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
-        for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
-      }
-    }
-    return { maxX: maxH };
-  }, [building, axis]);
+    return { maxX: axisMaxH };
+  }, [axisMaxH]);
 
   const getTotalHeight = useCallback(() => {
     return sortedFloors.reduce((acc, f) => acc + f.height, 0);
@@ -312,9 +318,10 @@ export function SectionView({
 
     ctx.strokeStyle = 'rgba(59,130,246,0.4)';
     ctx.lineWidth = 1;
+    const leftEdge = toScreen(0, 0);
     ctx.beginPath();
-    ctx.moveTo(offset.x, 0);
-    ctx.lineTo(offset.x, H);
+    ctx.moveTo(leftEdge.x, 0);
+    ctx.lineTo(leftEdge.x, H);
     ctx.stroke();
     const groundY = toScreen(0, 0).y;
     ctx.beginPath();
