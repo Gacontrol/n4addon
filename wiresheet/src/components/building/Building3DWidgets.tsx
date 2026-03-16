@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -149,17 +149,58 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const unit = widget.unit || '';
 
   const dragRef = useRef<{
-    dragging: boolean;
     startX: number;
     startY: number;
     startWX: number;
     startWY: number;
     startWZ: number;
     shiftKey: boolean;
+    moved: boolean;
   } | null>(null);
   const didDragRef = useRef(false);
   const groupRef = useRef<THREE.Group>(null);
   const { controls } = useThree();
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const factor = 0.06;
+      const dx = (e.clientX - dragRef.current.startX) * factor;
+      const dy = (e.clientY - dragRef.current.startY) * factor;
+      if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) dragRef.current.moved = true;
+      if (!dragRef.current.moved || !groupRef.current) return;
+      const isShift = dragRef.current.shiftKey || e.shiftKey;
+      if (isShift) {
+        groupRef.current.position.y = baseY + dragRef.current.startWZ - dy;
+      } else {
+        groupRef.current.position.x = dragRef.current.startWX + dx;
+        groupRef.current.position.z = dragRef.current.startWY + dy;
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      if (controls) (controls as any).enabled = true;
+      if (dragRef.current.moved && onDragEnd) {
+        didDragRef.current = true;
+        const factor = 0.06;
+        const dx = (e.clientX - dragRef.current.startX) * factor;
+        const dy = (e.clientY - dragRef.current.startY) * factor;
+        const isShift = dragRef.current.shiftKey || e.shiftKey;
+        if (isShift) {
+          onDragEnd(dragRef.current.startWX, dragRef.current.startWY, dragRef.current.startWZ - dy);
+        } else {
+          onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWY + dy, dragRef.current.startWZ);
+        }
+      }
+      dragRef.current = null;
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [controls, onDragEnd, baseY]);
 
   return (
     <group
@@ -175,59 +216,16 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         if (!onDragEnd) return;
         e.stopPropagation();
         didDragRef.current = false;
-        (e.nativeEvent.target as Element | null)?.setPointerCapture?.(e.pointerId);
         if (controls) (controls as any).enabled = false;
         dragRef.current = {
-          dragging: false,
           startX: e.clientX,
           startY: e.clientY,
           startWX: widget.x,
-          startWY: widget.z,
-          startWZ: widget.y,
+          startWY: widget.y,
+          startWZ: widget.z,
           shiftKey: e.shiftKey,
+          moved: false,
         };
-      }}
-      onPointerMove={(e) => {
-        if (!dragRef.current || !onDragEnd) return;
-        e.stopPropagation();
-        const factor = 0.06;
-        const rawDeltaX = (e.clientX - dragRef.current.startX) * factor;
-        const rawDeltaY = (e.clientY - dragRef.current.startY) * factor;
-        const isShift = dragRef.current.shiftKey || e.shiftKey;
-        if (Math.abs(rawDeltaX) > 0.02 || Math.abs(rawDeltaY) > 0.02) {
-          dragRef.current.dragging = true;
-        }
-        if (dragRef.current.dragging && groupRef.current) {
-          if (isShift) {
-            groupRef.current.position.y = wy - rawDeltaY;
-          } else {
-            groupRef.current.position.x = wx + rawDeltaX;
-            groupRef.current.position.z = wz + rawDeltaY;
-          }
-        }
-      }}
-      onPointerUp={(e) => {
-        if (!dragRef.current || !onDragEnd) return;
-        e.stopPropagation();
-        (e.nativeEvent.target as Element | null)?.releasePointerCapture?.(e.pointerId);
-        if (controls) (controls as any).enabled = true;
-        if (dragRef.current.dragging) {
-          didDragRef.current = true;
-          const factor = 0.06;
-          const deltaX = (e.clientX - dragRef.current.startX) * factor;
-          const deltaY = (e.clientY - dragRef.current.startY) * factor;
-          const isShift = dragRef.current.shiftKey || e.shiftKey;
-          if (isShift) {
-            onDragEnd(dragRef.current.startWX, dragRef.current.startWZ, dragRef.current.startWY - deltaY);
-          } else {
-            onDragEnd(dragRef.current.startWX + deltaX, dragRef.current.startWZ + deltaY, dragRef.current.startWY);
-          }
-        }
-        dragRef.current = null;
-      }}
-      onPointerCancel={() => {
-        if (controls) (controls as any).enabled = true;
-        dragRef.current = null;
       }}
     >
       {isDuct ? null : (
@@ -458,17 +456,17 @@ function computeDuctSegments(
 }
 
 function getSegmentQuaternion(dir: THREE.Vector3): THREE.Quaternion {
-  const q = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  if (Math.abs(dir.dot(up)) > 0.9999) {
-    if (dir.y > 0) {
-      q.identity();
-    } else {
-      q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-    }
-  } else {
-    q.setFromUnitVectors(up, dir);
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(dir.dot(worldUp)) > 0.9999) {
+    const q = new THREE.Quaternion();
+    if (dir.y < 0) q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+    return q;
   }
+  const horizontal = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+  const right = new THREE.Vector3().crossVectors(horizontal, worldUp).normalize();
+  const correctedUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+  const m = new THREE.Matrix4().makeBasis(right, dir, correctedUp);
+  const q = new THREE.Quaternion().setFromRotationMatrix(m);
   return q;
 }
 

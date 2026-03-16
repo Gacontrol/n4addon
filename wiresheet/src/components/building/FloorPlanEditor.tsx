@@ -903,21 +903,18 @@ export function FloorPlanEditor({
 
         if (hit.type === 'duct') {
           onSelectDuct?.(hit.id);
-          onSelectWall(null); onSelectRoom(null); onSelectPipe?.(null);
           onPropertiesRequested?.();
           dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
           return;
         }
         if (hit.type === 'pipe') {
           onSelectPipe?.(hit.id);
-          onSelectWall(null); onSelectRoom(null); onSelectDuct?.(null);
           onPropertiesRequested?.();
           dragState.current = { type: 'pan', startX: e.clientX, startY: e.clientY };
           return;
         }
         if (hit.type === 'wall') {
           onSelectWall(hit.id);
-          onSelectRoom(null);
           onPropertiesRequested?.();
           const wall = floor.walls.find(w => w.id === hit.id)!;
           const distToStart = dist(world.x, world.y, wall.x1, wall.y1);
