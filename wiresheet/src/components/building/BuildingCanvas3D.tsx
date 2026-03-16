@@ -1,5 +1,5 @@
-import { Suspense, useRef, useEffect, useMemo } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Suspense, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building, Slab } from '../../types/building';
@@ -37,6 +37,8 @@ interface Props {
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
   onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
+  onPlaceWidget?: (x: number, y: number, z: number, floorId: string) => void;
+  widgetPlacementMode?: boolean;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
@@ -488,6 +490,54 @@ function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: Flo
   );
 }
 
+interface WidgetPlacementHelperProps {
+  buildings: Building[];
+  activeFloorId: string | null;
+  onPlace: (x: number, y: number, z: number, floorId: string) => void;
+}
+
+function WidgetPlacementHelper({ buildings, activeFloorId, onPlace }: WidgetPlacementHelperProps) {
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    const point = e.point;
+
+    let targetFloorId = activeFloorId;
+    let baseY = 0;
+
+    for (const building of buildings) {
+      const sorted = [...building.floors].sort((a, b) => a.level - b.level);
+      let yAcc = 0;
+      for (const floor of sorted) {
+        const floorTop = yAcc + floor.height;
+        if (point.y >= yAcc && point.y < floorTop) {
+          targetFloorId = floor.id;
+          baseY = yAcc;
+          break;
+        }
+        yAcc = floorTop;
+      }
+    }
+
+    if (targetFloorId) {
+      const worldX = point.x;
+      const worldY = point.z;
+      const worldZ = point.y - baseY;
+      onPlace(worldX, worldY, worldZ, targetFloorId);
+    }
+  }, [buildings, activeFloorId, onPlace]);
+
+  return (
+    <mesh
+      position={[0, 0.002, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      onClick={handleClick}
+    >
+      <planeGeometry args={[200, 200]} />
+      <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 interface SlabMeshProps {
   slab: Slab;
   offsetX: number;
@@ -657,6 +707,8 @@ interface BuildingSceneProps {
   onSelectDuct?: (id: string | null) => void;
   onSelectPipe?: (id: string | null) => void;
   onUpdateWidget3D?: (widgetId: string, x: number, y: number, z: number) => void;
+  onPlaceWidget?: (x: number, y: number, z: number, floorId: string) => void;
+  widgetPlacementMode?: boolean;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
   highlightFloor: boolean;
@@ -669,6 +721,7 @@ function BuildingScene({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   selectedWidget3DId, selectedDuctId, selectedPipeId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
+  onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
   highlightFloor, lighting, floorTransparent, showGrid = true
 }: BuildingSceneProps) {
@@ -943,6 +996,14 @@ function BuildingScene({
       <hemisphereLight args={['#b0d0ff', '#1a2a40', 0.5]} />
 
       {elements}
+
+      {widgetPlacementMode && onPlaceWidget && (
+        <WidgetPlacementHelper
+          buildings={buildings}
+          activeFloorId={activeFloorId}
+          onPlace={onPlaceWidget}
+        />
+      )}
     </>
   );
 }
@@ -951,6 +1012,7 @@ export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   selectedWidget3DId, selectedDuctId, selectedPipeId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
+  onPlaceWidget, widgetPlacementMode,
   liveValues, alarmStates,
   highlightFloor, bgColor = '#0a1020',
   floorTransparent = false,
@@ -992,6 +1054,8 @@ export function BuildingCanvas3D({
             onSelectDuct={onSelectDuct}
             onSelectPipe={onSelectPipe}
             onUpdateWidget3D={onUpdateWidget3D}
+            onPlaceWidget={onPlaceWidget}
+            widgetPlacementMode={widgetPlacementMode}
             liveValues={liveValues}
             alarmStates={alarmStates}
             highlightFloor={highlightFloor}

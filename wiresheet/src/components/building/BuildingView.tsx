@@ -2,13 +2,14 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { MultiSelection } from './FloorPlanEditor';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
-  Layers, Box, MousePointer, Square, Settings2, X, Minus, Sun,
+  Layers, Box, MousePointer, MousePointer2, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
   Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
+import { SectionView } from './SectionView';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 import { HaEntity, WiresheetPage } from '../../types/flow';
@@ -86,7 +87,7 @@ const WIDGET_TYPE_ICONS: Partial<Record<Widget3DType, React.ReactNode>> = {
   boolean: <Activity className="w-3 h-3" />,
 };
 
-type ViewMode = '3d' | 'floor';
+type ViewMode = '3d' | 'floor' | 'section';
 
 interface BuildingViewProps {
   haEntities?: HaEntity[];
@@ -200,6 +201,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [newWidgetColorFalse, setNewWidgetColorFalse] = useState('');
   const [pickerTab, setPickerTab] = useState<'driver' | 'logic'>('driver');
   const [pickerDevice, setPickerDevice] = useState<string | null>(null);
+  const [widgetPlacementMode, setWidgetPlacementMode] = useState(false);
 
   const clipboardRef = useRef<{
     walls: Wall[];
@@ -359,16 +361,16 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addPipe(activeBuilding.id, activeFloor.id, pipeData);
   };
 
-  const handleAddWidget3D = () => {
+  const handleAddWidget3D = (placeX?: number, placeY?: number, placeZ?: number) => {
     if (!activeBuilding || !activeFloor) return;
     addWidget3D(activeBuilding.id, {
       type: newWidgetType,
       label: newWidgetLabel || WIDGET_LABELS[newWidgetType],
       datapoint: newWidgetDatapoint,
       unit: newWidgetUnit,
-      x: newWidgetX,
-      y: newWidgetY,
-      z: newWidgetZ,
+      x: placeX ?? newWidgetX,
+      y: placeY ?? newWidgetY,
+      z: placeZ ?? newWidgetZ,
       floorId: activeFloor.id,
       scale: 1,
       color: newWidgetType === 'roomcolor' ? newWidgetColor : (WIDGET_COLORS[newWidgetType] || '#94a3b8'),
@@ -384,6 +386,35 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     setNewWidgetOpacity(0.45);
     setNewWidgetColor('#22c55e');
     setNewWidgetColorFalse('');
+    setWidgetPlacementMode(false);
+  };
+
+  const handlePlaceWidget = (x: number, y: number, z: number, floorId: string) => {
+    if (!activeBuilding || !widgetPlacementMode) return;
+    addWidget3D(activeBuilding.id, {
+      type: newWidgetType,
+      label: newWidgetLabel || WIDGET_LABELS[newWidgetType],
+      datapoint: newWidgetDatapoint,
+      unit: newWidgetUnit,
+      x,
+      y,
+      z,
+      floorId,
+      scale: 1,
+      color: newWidgetType === 'roomcolor' ? newWidgetColor : (WIDGET_COLORS[newWidgetType] || '#94a3b8'),
+      showLabel: true,
+      showValue: true,
+      roomIds: newWidgetType === 'roomcolor' ? [...newWidgetRoomIds] : [],
+      opacity: newWidgetType === 'roomcolor' ? newWidgetOpacity : undefined,
+      ...(newWidgetType === 'roomcolor' && newWidgetColorFalse ? { colorFalse: newWidgetColorFalse } : {}),
+    } as any);
+    setNewWidgetDatapoint('');
+    setNewWidgetLabel('');
+    setNewWidgetRoomIds([]);
+    setNewWidgetOpacity(0.45);
+    setNewWidgetColor('#22c55e');
+    setNewWidgetColorFalse('');
+    setWidgetPlacementMode(false);
   };
 
   const logicPageGroups = useMemo(() => {
@@ -584,6 +615,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 Grundriss
               </button>
               <button
+                onClick={() => setViewMode('section')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${viewMode === 'section' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <ChevronsUpDown className="w-3.5 h-3.5" />
+                Schnitt
+              </button>
+              <button
                 onClick={() => setViewMode('3d')}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${viewMode === '3d' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
               >
@@ -592,7 +630,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </button>
             </div>
 
-            {viewMode === 'floor' && (
+            {(viewMode === 'floor' || viewMode === 'section') && (
               <div className="flex items-center gap-0.5 bg-slate-700 rounded-md p-0.5">
                 <button
                   onClick={() => setTool('select')}
@@ -601,26 +639,30 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 >
                   <MousePointer className="w-3.5 h-3.5" />
                 </button>
-                <button
-                  onClick={() => setTool('wall')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'wall' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Wand zeichnen"
-                >
-                  <Minus className="w-3.5 h-3.5 rotate-45" />
-                  Wand
-                </button>
-                <button
-                  onClick={() => setTool('room')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'room' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Raum zeichnen"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  Raum
-                </button>
+                {viewMode === 'floor' && (
+                  <>
+                    <button
+                      onClick={() => setTool('wall')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'wall' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Wand zeichnen"
+                    >
+                      <Minus className="w-3.5 h-3.5 rotate-45" />
+                      Wand
+                    </button>
+                    <button
+                      onClick={() => setTool('room')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'room' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Raum zeichnen"
+                    >
+                      <Square className="w-3.5 h-3.5" />
+                      Raum
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setTool('duct')}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'duct' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Lüftungskanal zeichnen"
+                  title={viewMode === 'section' ? 'Vertikalen Kanal zeichnen' : 'Lüftungskanal zeichnen'}
                 >
                   <Wind className="w-3.5 h-3.5" />
                   Kanal
@@ -628,34 +670,38 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 <button
                   onClick={() => setTool('pipe')}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'pipe' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Leitung zeichnen"
+                  title={viewMode === 'section' ? 'Vertikale Leitung zeichnen' : 'Leitung zeichnen'}
                 >
                   <Activity className="w-3.5 h-3.5" />
                   Rohr
                 </button>
-                <button
-                  onClick={() => setTool('slab')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'slab' ? 'bg-amber-700 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Bodenplatte zeichnen (Polygon)"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
-                  Platte
-                </button>
-                <button
-                  onClick={() => setTool('polygon-room')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'polygon-room' ? 'bg-green-700 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Raumzone zeichnen (Polygon)"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12 L8 4 L16 4 L21 12 L16 20 L8 20 Z"/></svg>
-                  Zone
-                </button>
-                <button
-                  onClick={() => setTool('delete')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${tool === 'delete' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                  title="Löschen"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {viewMode === 'floor' && (
+                  <>
+                    <button
+                      onClick={() => setTool('slab')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'slab' ? 'bg-amber-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Bodenplatte zeichnen (Polygon)"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/></svg>
+                      Platte
+                    </button>
+                    <button
+                      onClick={() => setTool('polygon-room')}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'polygon-room' ? 'bg-green-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Raumzone zeichnen (Polygon)"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12 L8 4 L16 4 L21 12 L16 20 L8 20 Z"/></svg>
+                      Zone
+                    </button>
+                    <button
+                      onClick={() => setTool('delete')}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${tool === 'delete' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                      title="Löschen"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -671,7 +717,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </select>
             )}
 
-            {viewMode === 'floor' && tool === 'duct' && (
+            {(viewMode === 'floor' || viewMode === 'section') && tool === 'duct' && (
               <div className="flex items-center gap-1.5">
                 <select value={ductType} onChange={e => setDuctType(e.target.value as DuctType)}
                   className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
@@ -697,7 +743,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
             )}
 
-            {viewMode === 'floor' && tool === 'pipe' && (
+            {(viewMode === 'floor' || viewMode === 'section') && tool === 'pipe' && (
               <div className="flex items-center gap-1.5">
                 <select value={pipeType} onChange={e => setPipeType(e.target.value as PipeType)}
                   className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
@@ -793,6 +839,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   showGrid={showGrid3D}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
+                  widgetPlacementMode={widgetPlacementMode}
+                  onPlaceWidget={handlePlaceWidget}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
@@ -993,13 +1041,28 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       ))}
                     </div>
 
-                    <button
-                      onClick={handleAddWidget3D}
-                      className="w-full flex items-center justify-center gap-1.5 px-2 py-2 bg-green-700 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Widget hinzufügen
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => handleAddWidget3D()}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 bg-green-700 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Hinzufügen
+                      </button>
+                      <button
+                        onClick={() => setWidgetPlacementMode(!widgetPlacementMode)}
+                        className={`flex items-center justify-center gap-1 px-2 py-2 rounded text-xs font-medium transition-colors ${widgetPlacementMode ? 'bg-blue-600 text-white' : 'bg-slate-600 hover:bg-slate-500 text-slate-200'}`}
+                        title="Klicken Sie in die 3D-Ansicht um das Widget zu platzieren"
+                      >
+                        <MousePointer2 className="w-3.5 h-3.5" />
+                        Platzieren
+                      </button>
+                    </div>
+                    {widgetPlacementMode && (
+                      <div className="text-[10px] text-blue-400 bg-blue-900/30 px-2 py-1.5 rounded">
+                        Klicken Sie in die 3D-Ansicht um das Widget zu platzieren
+                      </div>
+                    )}
 
                     {(activeBuilding?.widgets3d ?? []).length > 0 && (
                       <div className="pt-2 border-t border-slate-700">
@@ -1026,7 +1089,29 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   </div>
                 )}
               </div>
-            ) : activeFloor ? (
+            ) : viewMode === 'section' && activeBuilding ? (
+              <SectionView
+                building={activeBuilding}
+                ductType={ductType}
+                ductShape={ductShape}
+                ductWidth={ductWidth}
+                ductHeight={ductHeight}
+                pipeType={pipeType}
+                pipeDiameter={pipeDiameter}
+                tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
+                onAddVerticalDuct={(duct, fromFloorId, toFloorId) => {
+                  if (!activeBuilding) return;
+                  addDuct(activeBuilding.id, fromFloorId, duct);
+                  addDuct(activeBuilding.id, toFloorId, duct);
+                }}
+                onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
+                  if (!activeBuilding) return;
+                  addPipe(activeBuilding.id, fromFloorId, pipe);
+                  addPipe(activeBuilding.id, toFloorId, pipe);
+                }}
+                gridSize={gridSize}
+              />
+            ) : viewMode === 'floor' && activeFloor ? (
               <FloorPlanEditor
                 floor={activeFloor}
                 selectedRoomId={selectedRoomId}
