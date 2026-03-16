@@ -657,21 +657,33 @@ function buildCircleProfile(hw: number, hh: number, n = 12): THREE.Vector2[] {
   });
 }
 
+function getInitialProfileFrame(dirA: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(dirA.dot(worldUp)) > 0.999) {
+    const right = new THREE.Vector3(1, 0, 0);
+    const up = new THREE.Vector3().crossVectors(right, dirA).normalize();
+    return { right, up };
+  }
+  const right = new THREE.Vector3().crossVectors(worldUp, dirA).normalize();
+  const up = new THREE.Vector3().crossVectors(dirA, right).normalize();
+  return { right, up };
+}
+
 function buildElbowGeometry(
   w: number, h: number, isRound: boolean,
   cornerWorldPos: THREE.Vector3,
   dirA: THREE.Vector3,
   dirB: THREE.Vector3,
-  segments = 10
+  segments = 16
 ): THREE.BufferGeometry {
   const elbowR = getElbowRadius(w, h);
 
   const dot = Math.max(-1, Math.min(1, dirA.dot(dirB)));
   const turnAngle = Math.acos(dot);
-  if (turnAngle < 0.04) return new THREE.BufferGeometry();
+  if (turnAngle < 0.02) return new THREE.BufferGeometry();
 
   const axis = new THREE.Vector3().crossVectors(dirA, dirB);
-  if (axis.lengthSq() < 1e-8) return new THREE.BufferGeometry();
+  if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
   axis.normalize();
 
   const hw = w / 2, hh = h / 2;
@@ -681,26 +693,27 @@ function buildElbowGeometry(
   const sweepAngle = Math.PI - turnAngle;
 
   const entryPoint = cornerWorldPos.clone().addScaledVector(dirA, -elbowR);
+  const inwardDir = new THREE.Vector3().crossVectors(axis, dirA).normalize();
+  const arcCenter = entryPoint.clone().addScaledVector(inwardDir, elbowR);
 
-  const sideDir = new THREE.Vector3().crossVectors(axis, dirA).normalize();
-  const arcCenter = entryPoint.clone().addScaledVector(sideDir, elbowR);
+  const { right: initRight, up: initUp } = getInitialProfileFrame(dirA);
 
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
+  const arcLength = elbowR * sweepAngle;
+
   for (let s = 0; s <= segments; s++) {
     const t = s / segments;
     const angle = t * sweepAngle;
-
     const quat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-    const tangent = dirA.clone().applyQuaternion(quat).normalize();
 
-    const right = new THREE.Vector3().crossVectors(tangent, axis).normalize();
-    const up = new THREE.Vector3().crossVectors(right, tangent).normalize();
+    const right = initRight.clone().applyQuaternion(quat);
+    const up = initUp.clone().applyQuaternion(quat);
 
-    const radialDir = sideDir.clone().negate().applyQuaternion(quat).normalize();
-    const spinePoint = arcCenter.clone().addScaledVector(radialDir, elbowR);
+    const radialOut = inwardDir.clone().negate().applyQuaternion(quat).normalize();
+    const spinePoint = arcCenter.clone().addScaledVector(radialOut, elbowR);
 
     for (let p = 0; p < pCount; p++) {
       const pp = profile[p];
@@ -708,7 +721,7 @@ function buildElbowGeometry(
         .addScaledVector(right, pp.x)
         .addScaledVector(up, pp.y);
       positions.push(worldPt.x, worldPt.y, worldPt.z);
-      uvs.push(p / pCount, t * (elbowR * sweepAngle) / 0.4);
+      uvs.push(p / pCount, t * arcLength / 0.4);
     }
   }
 
@@ -722,32 +735,29 @@ function buildElbowGeometry(
     }
   }
 
-  const centerStartIdx = positions.length / 3;
+  const capCenterStart = positions.length / 3;
 
-  const capRings = [0, segments];
-  for (const ring of capRings) {
-    const ringOffset = ring * pCount;
+  for (const ring of [0, segments]) {
+    const base = ring * pCount;
     let cx = 0, cy = 0, cz = 0;
     for (let p = 0; p < pCount; p++) {
-      cx += positions[(ringOffset + p) * 3];
-      cy += positions[(ringOffset + p) * 3 + 1];
-      cz += positions[(ringOffset + p) * 3 + 2];
+      cx += positions[(base + p) * 3];
+      cy += positions[(base + p) * 3 + 1];
+      cz += positions[(base + p) * 3 + 2];
     }
     positions.push(cx / pCount, cy / pCount, cz / pCount);
     uvs.push(0.5, 0.5);
   }
 
-  const ci0 = centerStartIdx;
-  const ci1 = centerStartIdx + 1;
+  const ci0 = capCenterStart;
+  const ci1 = capCenterStart + 1;
+
   for (let p = 0; p < pCount; p++) {
-    const a = p;
-    const b = (p + 1) % pCount;
-    indices.push(ci0, b, a);
+    indices.push(ci0, (p + 1) % pCount, p);
   }
   for (let p = 0; p < pCount; p++) {
-    const a = segments * pCount + p;
-    const b = segments * pCount + (p + 1) % pCount;
-    indices.push(ci1, a, b);
+    const base = segments * pCount;
+    indices.push(ci1, base + p, base + (p + 1) % pCount);
   }
 
   const geo = new THREE.BufferGeometry();
