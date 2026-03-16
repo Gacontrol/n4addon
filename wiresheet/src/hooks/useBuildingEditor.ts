@@ -107,6 +107,14 @@ export function useBuildingEditor() {
           setActiveBuildingId(fromLS[0].id);
           setActiveFloorId(fromLS[0].floors[0]?.id || '');
           loaded = true;
+          try {
+            const apiBase = getApiBase();
+            await fetch(`${apiBase}/building-config`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ buildings: fromLS }),
+            });
+          } catch { }
         }
       }
 

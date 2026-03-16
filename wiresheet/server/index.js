@@ -26,6 +26,7 @@ let driverConfigFile = path.join(dataDir, 'driver-config.json');
 let alarmConfigFile = path.join(dataDir, 'alarm-config.json');
 let trendConfigFile = path.join(dataDir, 'trend-config.json');
 let trendDataDir = path.join(dataDir, 'trends');
+let buildingConfigFile = path.join(dataDir, 'building-config.json');
 
 const trendConfig = { trackedNodes: [] };
 const trendBuffers = new Map();
@@ -518,6 +519,29 @@ app.post(['/alarm-config', '/api/alarm-config'], async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Fehler beim Speichern der Alarm-Konfiguration:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get(['/building-config', '/api/building-config'], async (req, res) => {
+  try {
+    const data = await fs.readFile(buildingConfigFile, 'utf8');
+    res.json(JSON.parse(data));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      res.json({ buildings: [] });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+app.post(['/building-config', '/api/building-config'], async (req, res) => {
+  try {
+    await fs.writeFile(buildingConfigFile, JSON.stringify(req.body, null, 2));
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Fehler beim Speichern der Gebäude-Konfiguration:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -3912,6 +3936,7 @@ async function start() {
     trendConfigFile = path.join(dataDir, 'trend-config.json');
     trendDataDir = path.join(dataDir, 'trends');
     imagesDir = path.join(dataDir, 'images');
+    buildingConfigFile = path.join(dataDir, 'building-config.json');
     console.log(`=== WIRESHEET SERVER START ===`);
     console.log(`Data-Verzeichnis: ${dataDir}`);
     console.log(`Pages-Datei: ${pagesFile}`);
