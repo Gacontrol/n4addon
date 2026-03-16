@@ -9,7 +9,7 @@ import {
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
-import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape } from '../../types/building';
+import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
@@ -119,6 +119,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     renameFloor,
     updateFloorHeight,
     updateFloorColor,
+    updateFloorProps,
     deleteFloor,
     setFloorBackground,
     addWall,
@@ -246,6 +247,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const selectedWall = activeFloor?.walls.find(w => w.id === selectedWallId) ?? null;
   const selectedDuct = activeFloor?.ducts?.find(d => d.id === selectedDuctId) ?? null;
   const selectedPipe = activeFloor?.pipes?.find(p => p.id === selectedPipeId) ?? null;
+  const selectedSlab = activeFloor?.slabs?.find(s => s.id === selectedSlabId) ?? null;
   const selectedWidget = activeBuilding?.widgets3d?.find(w => w.id === selectedWidget3DId) ?? null;
 
   const filteredEntities = useMemo(() => {
@@ -362,11 +364,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       pageId: page.id,
       pageName: page.name,
       datapoints: page.nodes
-        .filter(n => n.data.entityId || n.type.startsWith('dp-'))
-        .map(n => ({
-          entityId: n.data.entityId || n.data.label || n.id,
-          label: n.data.entityLabel || n.data.label || n.data.entityId || n.id,
-        }))
+        .filter(n => n.type.startsWith('dp-') || n.data.outputs?.length > 0)
+        .flatMap(n => {
+          const baseLabel = n.data.label || n.id;
+          const outputs = n.data.outputs ?? [];
+          if (outputs.length <= 1) {
+            return [{ entityId: n.id, label: baseLabel, nodeId: n.id, port: null as string | null }];
+          }
+          return outputs.map((out, idx) => ({
+            entityId: `${n.id}:output-${idx + 1}`,
+            label: `${baseLabel} › ${out.label || `Ausgang ${idx + 1}`}`,
+            nodeId: n.id,
+            port: `output-${idx + 1}`,
+          }));
+        })
         .filter((dp, idx, arr) => arr.findIndex(d => d.entityId === dp.entityId) === idx),
     })).filter(g => g.datapoints.length > 0);
   }, [pages]);
@@ -395,6 +406,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     if (selectedWidget) return 'Widget';
     if (selectedDuct) return 'Lüftungskanal';
     if (selectedPipe) return 'Leitung';
+    if (selectedSlab) return 'Bodenplatte';
     if (selectedWall) return 'Wand';
     if (selectedRoom) return 'Raum';
     return 'Eigenschaften';
@@ -720,7 +732,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedPipeId={selectedPipeId}
                   onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
                   onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
-                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                   onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); }}
                   onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); }}
                   onUpdateWidget3D={(widgetId, x, y, z) => {
@@ -1226,6 +1238,60 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       Leitung löschen
                     </button>
                   </>
+                ) : selectedSlab ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Farbe</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color" className="w-8 h-7 rounded cursor-pointer bg-transparent border-0"
+                          value={selectedSlab.color || '#94a3b8'}
+                          onChange={e => activeBuilding && activeFloor && updateSlab(activeBuilding.id, activeFloor.id, selectedSlab.id, { color: e.target.value })} />
+                        <span className="text-xs text-slate-400">{selectedSlab.color || '#94a3b8'}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Transparenz</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min="0.05" max="1" step="0.05"
+                          value={selectedSlab.opacity ?? 0.85}
+                          onChange={e => activeBuilding && activeFloor && updateSlab(activeBuilding.id, activeFloor.id, selectedSlab.id, { opacity: parseFloat(e.target.value) })}
+                          className="flex-1 h-1 accent-blue-500" />
+                        <span className="text-xs text-slate-400 w-10 text-right">{Math.round((selectedSlab.opacity ?? 0.85) * 100)}%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Dicke (m)</label>
+                      <input type="number" step="0.05" min="0.01" max="2"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedSlab.thickness ?? 0.15}
+                        onChange={e => activeBuilding && activeFloor && updateSlab(activeBuilding.id, activeFloor.id, selectedSlab.id, { thickness: parseFloat(e.target.value) || 0.15 })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Höhenversatz (m)</label>
+                      <input type="number" step="0.05" min="-2" max="5"
+                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                        value={selectedSlab.elevation ?? 0}
+                        onChange={e => activeBuilding && activeFloor && updateSlab(activeBuilding.id, activeFloor.id, selectedSlab.id, { elevation: parseFloat(e.target.value) || 0 })} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Textur</label>
+                      <select className="w-full bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1.5 outline-none"
+                        value={selectedSlab.texture || 'none'}
+                        onChange={e => activeBuilding && activeFloor && updateSlab(activeBuilding.id, activeFloor.id, selectedSlab.id, { texture: e.target.value as Slab['texture'] })}>
+                        <option value="none">Keine</option>
+                        <option value="concrete">Beton</option>
+                        <option value="wood">Holz</option>
+                        <option value="tile">Fliesen</option>
+                        <option value="carpet">Teppich</option>
+                      </select>
+                    </div>
+                    <div className="pt-1 text-[10px] text-slate-500">{selectedSlab.points.length} Punkte</div>
+                    <button onClick={() => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, selectedSlab.id); setSelectedSlabId(null); } }}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Platte löschen
+                    </button>
+                  </>
                 ) : selectedWall ? (
                   <>
                     <div>
@@ -1464,6 +1530,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Deckenhöhe (m)</label>
                       <input type="number" step="0.1" min="2" max="10" className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500" value={activeFloor.height} onChange={e => activeBuilding && updateFloorHeight(activeBuilding.id, activeFloor.id, parseFloat(e.target.value) || 3)} />
                     </div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                      <input type="checkbox"
+                        checked={activeFloor.showFloorPlane !== false}
+                        onChange={e => activeBuilding && updateFloorProps(activeBuilding.id, activeFloor.id, { showFloorPlane: e.target.checked })}
+                        className="accent-blue-500" />
+                      Ebenenplatte anzeigen (3D)
+                    </label>
                     <div className="pt-2 border-t border-slate-700">
                       <div className="text-[10px] text-slate-500 mb-2">Wände ({activeFloor.walls.length})</div>
                       <div className="space-y-1 max-h-32 overflow-y-auto">

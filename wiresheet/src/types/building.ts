@@ -160,6 +160,9 @@ export interface Slab {
   points: SlabPoint[];
   color?: string;
   opacity?: number;
+  thickness?: number;
+  texture?: 'none' | 'concrete' | 'wood' | 'tile' | 'carpet';
+  elevation?: number;
 }
 
 // ---- OBJ Models ----
@@ -216,6 +219,7 @@ export interface Floor {
   slabs: Slab[];
   backgroundImage: BackgroundImage | null;
   floorColor?: string;
+  showFloorPlane?: boolean;
 }
 
 export interface Building {

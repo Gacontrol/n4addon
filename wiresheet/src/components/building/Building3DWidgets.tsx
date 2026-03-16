@@ -223,7 +223,8 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         e.stopPropagation();
         didDragRef.current = false;
         if (controls) (controls as any).enabled = false;
-        const camDist = camera.position.length();
+        const widgetWorldPos = new THREE.Vector3(wx, wy, wz);
+        const camDist = camera.position.distanceTo(widgetWorldPos);
         const fovFactor = (camera as THREE.PerspectiveCamera).fov
           ? Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360)
           : 0.7;
@@ -357,10 +358,10 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
 
       {(isAlarm || alarmActive) && <PulseRing color={pulseColor} radius={0.22 * displaySize} />}
 
-      {selected && (
-        <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.28 * displaySize, 0.32 * displaySize, 32]} />
-          <meshBasicMaterial color="#60a5fa" side={THREE.DoubleSide} />
+      {selected && !isRoomColor && (
+        <mesh position={[0, 0, -0.005]}>
+          <planeGeometry args={[0.52 * displaySize + 0.12, 0.52 * displaySize + 0.12]} />
+          <meshBasicMaterial color="#60a5fa" transparent opacity={0.25} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
 
@@ -555,6 +556,21 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
           </group>
         );
       })}
+      {duct.points.slice(1, -1).map((pt, i) => {
+        const ptElev = (pt as DuctPoint & { elev?: number }).elev !== undefined
+          ? baseY + ((pt as any).elev as number)
+          : elev;
+        const s = Math.max(w, h);
+        return (
+          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} castShadow>
+            {isRound
+              ? <sphereGeometry args={[w / 2 + 0.005, 12, 8]} />
+              : <boxGeometry args={[s + 0.005, s + 0.005, s + 0.005]} />
+            }
+            <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
@@ -601,6 +617,18 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
               </mesh>
             )}
           </group>
+        );
+      })}
+      {pipe.points.slice(1, -1).map((pt, i) => {
+        const ptElev = (pt as DuctPoint & { elev?: number }).elev !== undefined
+          ? baseY + ((pt as any).elev as number)
+          : elev;
+        const jointR = pipe.insulated ? insulationRadius + 0.002 : radius + 0.005;
+        return (
+          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} castShadow>
+            <sphereGeometry args={[jointR, 10, 8]} />
+            <meshStandardMaterial color={pipe.insulated ? '#e2e8f0' : color} metalness={0.5} roughness={0.35} />
+          </mesh>
         );
       })}
     </group>

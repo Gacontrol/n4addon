@@ -2,7 +2,7 @@ import { Suspense, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Building } from '../../types/building';
+import { Building, Slab } from '../../types/building';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
 
 export interface LightingSettings {
@@ -434,6 +434,59 @@ function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: Flo
   );
 }
 
+interface SlabMeshProps {
+  slab: Slab;
+  offsetX: number;
+  baseY: number;
+}
+
+function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
+  const thickness = slab.thickness ?? 0.15;
+  const elevation = slab.elevation ?? 0;
+  const opacity = slab.opacity ?? 0.85;
+  const color = slab.color || '#94a3b8';
+
+  const shape = useMemo(() => {
+    if (slab.points.length < 3) return null;
+    const s = new THREE.Shape();
+    s.moveTo(slab.points[0].x + offsetX, slab.points[0].y);
+    for (let i = 1; i < slab.points.length; i++) {
+      s.lineTo(slab.points[i].x + offsetX, slab.points[i].y);
+    }
+    s.closePath();
+    return s;
+  }, [slab.points, offsetX]);
+
+  if (!shape) return null;
+
+  const extrudeSettings = useMemo(() => ({
+    depth: thickness,
+    bevelEnabled: false,
+  }), [thickness]);
+
+  const y = baseY + elevation + thickness / 2;
+
+  return (
+    <mesh
+      position={[0, y, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      castShadow
+      receiveShadow
+    >
+      <extrudeGeometry args={[shape, extrudeSettings]} />
+      <meshStandardMaterial
+        color={color}
+        roughness={0.8}
+        metalness={0.05}
+        transparent={opacity < 1}
+        opacity={opacity}
+        depthWrite={opacity > 0.5}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 function GroundGrid({ size }: { size: number }) {
   return (
     <group>
@@ -549,19 +602,21 @@ function BuildingScene({
       const isActive = floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
 
-      elements.push(
-        <FloorPlane
-          key={`floor-${floor.id}`}
-          minX={minX + offsetX}
-          maxX={maxX + offsetX}
-          minZ={minZ}
-          maxZ={maxZ}
-          baseY={baseY}
-          color={floor.floorColor || '#1e3a5f'}
-          active={isActive}
-          faded={faded}
-        />
-      );
+      if (floor.showFloorPlane !== false) {
+        elements.push(
+          <FloorPlane
+            key={`floor-${floor.id}`}
+            minX={minX + offsetX}
+            maxX={maxX + offsetX}
+            minZ={minZ}
+            maxZ={maxZ}
+            baseY={baseY}
+            color={floor.floorColor || '#1e3a5f'}
+            active={isActive}
+            faded={faded}
+          />
+        );
+      }
 
       for (const room of floor.rooms) {
         elements.push(
@@ -667,6 +722,17 @@ function BuildingScene({
             baseY={baseY}
             selected={pipe.id === selectedPipeId}
             onSelect={() => { onSelectPipe?.(pipe.id); onSelectWall(null); onSelectRoom(null); }}
+          />
+        );
+      }
+
+      for (const slab of (floor.slabs ?? [])) {
+        elements.push(
+          <SlabMesh
+            key={`slab-${slab.id}`}
+            slab={slab}
+            offsetX={offsetX}
+            baseY={baseY}
           />
         );
       }
