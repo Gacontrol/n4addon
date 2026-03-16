@@ -558,90 +558,38 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
   );
 }
 
-interface DuctSegment {
-  pos: [number, number, number];
-  dir: THREE.Vector3;
-  len: number;
-  isVertical: boolean;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// DUCT NETWORK – node-based architecture (Revit / MagiCAD style)
+// ─────────────────────────────────────────────────────────────────────────────
 
-function getElbowRadius(w: number, h: number): number {
-  return Math.max(w, h) * 0.75;
-}
-
-function computeDuctSegments(
-  points: { x: number; y: number; elev?: number }[],
-  offsetX: number,
-  defaultElev: number,
-  w: number,
-  h: number
-): DuctSegment[] {
-  const segs: DuctSegment[] = [];
-  const elbowR = getElbowRadius(w, h);
-
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    const dx = b.x - a.x;
-    const dz = b.y - a.y;
-    const elevA = a.elev !== undefined ? a.elev : defaultElev;
-    const elevB = b.elev !== undefined ? b.elev : defaultElev;
-    const dy = elevB - elevA;
-    const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
-    if (len < 0.01) continue;
-    const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
-
-    const pullA = i > 0 ? elbowR : 0;
-    const pullB = i < points.length - 2 ? elbowR : 0;
-    const usedLen = Math.max(0.01, len - pullA - pullB);
-
-    const startX = a.x + offsetX + dir.x * pullA;
-    const startY = elevA + dir.y * pullA;
-    const startZ = a.y + dir.z * pullA;
-
-    const mx = startX + dir.x * usedLen / 2;
-    const my = startY + dir.y * usedLen / 2;
-    const mz = startZ + dir.z * usedLen / 2;
-
-    const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
-    segs.push({ pos: [mx, my, mz], dir, len: usedLen, isVertical });
-  }
-  return segs;
-}
-
-function getSegmentQuaternion(dir: THREE.Vector3): THREE.Quaternion {
-  const worldUp = new THREE.Vector3(0, 1, 0);
-  if (Math.abs(dir.dot(worldUp)) > 0.9999) {
-    const q = new THREE.Quaternion();
-    if (dir.y < 0) q.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-    return q;
-  }
-  const horizontal = new THREE.Vector3(dir.x, 0, dir.z).normalize();
-  const right = new THREE.Vector3().crossVectors(horizontal, worldUp).normalize();
-  const correctedUp = new THREE.Vector3().crossVectors(right, dir).normalize();
-  const m = new THREE.Matrix4().makeBasis(right, dir, correctedUp);
-  const q = new THREE.Quaternion().setFromRotationMatrix(m);
-  return q;
-}
-
-const FLANGE_SPACING = 1.5;
+const FLANGE_SPACING   = 1.5;
 const FLANGE_THICKNESS = 0.008;
-const FLANGE_OVERHANG = 0.035;
+const FLANGE_OVERHANG  = 0.035;
+const ELBOW_SEGMENTS   = 18;
 
-function buildRectDuctGeoSimple(w: number, h: number, len: number): THREE.BufferGeometry {
-  const geo = new THREE.BoxGeometry(w, len, h, 1, Math.max(1, Math.round(len / 0.5)), 1);
-  const uv = geo.attributes.uv as THREE.BufferAttribute;
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < uv.count; i++) {
-    const y = pos.getY(i);
-    const u = uv.getX(i);
-    uv.setXY(i, u, (y + len / 2) / len * (len / 0.5));
+// ── profile frame ──────────────────────────────────────────────────────────
+
+function profileFrame(tangent: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(tangent.dot(worldUp)) > 0.999) {
+    const right = new THREE.Vector3(1, 0, 0);
+    const up = new THREE.Vector3().crossVectors(right, tangent).normalize();
+    return { right, up };
   }
-  uv.needsUpdate = true;
-  return geo;
+  const right = new THREE.Vector3().crossVectors(worldUp, tangent).normalize();
+  const up    = new THREE.Vector3().crossVectors(tangent, right).normalize();
+  return { right, up };
 }
 
-function buildRectProfile(hw: number, hh: number): THREE.Vector2[] {
+function ductQuaternion(dir: THREE.Vector3): THREE.Quaternion {
+  const { right, up } = profileFrame(dir);
+  const m = new THREE.Matrix4().makeBasis(right, dir, up);
+  return new THREE.Quaternion().setFromRotationMatrix(m);
+}
+
+// ── rect profile (CCW, for swept geometry) ─────────────────────────────────
+
+function rectProfile(hw: number, hh: number): THREE.Vector2[] {
   return [
     new THREE.Vector2(-hw, -hh),
     new THREE.Vector2( hw, -hh),
@@ -650,82 +598,65 @@ function buildRectProfile(hw: number, hh: number): THREE.Vector2[] {
   ];
 }
 
-function buildCircleProfile(hw: number, hh: number, n = 12): THREE.Vector2[] {
+function circleProfile(r: number, n = 16): THREE.Vector2[] {
   return Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2;
-    return new THREE.Vector2(Math.cos(a) * hw, Math.sin(a) * hh);
+    return new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r);
   });
 }
 
-function getInitialProfileFrame(dirA: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
-  const worldUp = new THREE.Vector3(0, 1, 0);
-  if (Math.abs(dirA.dot(worldUp)) > 0.999) {
-    const right = new THREE.Vector3(1, 0, 0);
-    const up = new THREE.Vector3().crossVectors(right, dirA).normalize();
-    return { right, up };
-  }
-  const right = new THREE.Vector3().crossVectors(worldUp, dirA).normalize();
-  const up = new THREE.Vector3().crossVectors(dirA, right).normalize();
-  return { right, up };
-}
+// ── swept tube geometry (used for straight ducts and elbows) ───────────────
 
-function buildElbowGeometry(
-  w: number, h: number, isRound: boolean,
-  cornerWorldPos: THREE.Vector3,
-  dirA: THREE.Vector3,
-  dirB: THREE.Vector3,
-  segments = 16
+function buildSweptTube(
+  profile: THREE.Vector2[],
+  spine: THREE.Vector3[],
+  tangents: THREE.Vector3[]
 ): THREE.BufferGeometry {
-  const elbowR = getElbowRadius(w, h);
-
-  const dot = Math.max(-1, Math.min(1, dirA.dot(dirB)));
-  const turnAngle = Math.acos(dot);
-  if (turnAngle < 0.02) return new THREE.BufferGeometry();
-
-  const axis = new THREE.Vector3().crossVectors(dirA, dirB);
-  if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
-  axis.normalize();
-
-  const hw = w / 2, hh = h / 2;
-  const profile = isRound ? buildCircleProfile(hw, hh) : buildRectProfile(hw, hh);
   const pCount = profile.length;
-
-  const sweepAngle = Math.PI - turnAngle;
-
-  const entryPoint = cornerWorldPos.clone().addScaledVector(dirA, -elbowR);
-  const inwardDir = new THREE.Vector3().crossVectors(axis, dirA).normalize();
-  const arcCenter = entryPoint.clone().addScaledVector(inwardDir, elbowR);
-
-  const { right: initRight, up: initUp } = getInitialProfileFrame(dirA);
-
+  const sCount = spine.length;
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const arcLength = elbowR * sweepAngle;
+  let arcLen = 0;
+  const arcLens = [0];
+  for (let s = 1; s < sCount; s++) {
+    arcLen += spine[s].distanceTo(spine[s - 1]);
+    arcLens.push(arcLen);
+  }
 
-  for (let s = 0; s <= segments; s++) {
-    const t = s / segments;
-    const angle = t * sweepAngle;
-    const quat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+  const initFrame = profileFrame(tangents[0]);
+  let curRight = initFrame.right.clone();
+  let curUp    = initFrame.up.clone();
 
-    const right = initRight.clone().applyQuaternion(quat);
-    const up = initUp.clone().applyQuaternion(quat);
+  for (let s = 0; s < sCount; s++) {
+    if (s > 0) {
+      const axis = new THREE.Vector3().crossVectors(tangents[s - 1], tangents[s]);
+      if (axis.lengthSq() > 1e-12) {
+        const sinA = axis.length();
+        const cosA = tangents[s - 1].dot(tangents[s]);
+        const angle = Math.atan2(sinA, cosA);
+        axis.normalize();
+        const q = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        curRight.applyQuaternion(q).normalize();
+        curUp.applyQuaternion(q).normalize();
+      }
+    }
 
-    const radialOut = inwardDir.clone().negate().applyQuaternion(quat).normalize();
-    const spinePoint = arcCenter.clone().addScaledVector(radialOut, elbowR);
+    const t  = arcLens[s] / Math.max(arcLen, 0.001);
+    const pt = spine[s];
 
     for (let p = 0; p < pCount; p++) {
       const pp = profile[p];
-      const worldPt = spinePoint.clone()
-        .addScaledVector(right, pp.x)
-        .addScaledVector(up, pp.y);
-      positions.push(worldPt.x, worldPt.y, worldPt.z);
-      uvs.push(p / pCount, t * arcLength / 0.4);
+      const wx = pt.x + curRight.x * pp.x + curUp.x * pp.y;
+      const wy = pt.y + curRight.y * pp.x + curUp.y * pp.y;
+      const wz = pt.z + curRight.z * pp.x + curUp.z * pp.y;
+      positions.push(wx, wy, wz);
+      uvs.push(p / pCount, t * arcLen / 0.5);
     }
   }
 
-  for (let s = 0; s < segments; s++) {
+  for (let s = 0; s < sCount - 1; s++) {
     for (let p = 0; p < pCount; p++) {
       const a = s * pCount + p;
       const b = s * pCount + (p + 1) % pCount;
@@ -736,8 +667,7 @@ function buildElbowGeometry(
   }
 
   const capCenterStart = positions.length / 3;
-
-  for (const ring of [0, segments]) {
+  for (const ring of [0, sCount - 1]) {
     const base = ring * pCount;
     let cx = 0, cy = 0, cz = 0;
     for (let p = 0; p < pCount; p++) {
@@ -749,14 +679,10 @@ function buildElbowGeometry(
     uvs.push(0.5, 0.5);
   }
 
-  const ci0 = capCenterStart;
-  const ci1 = capCenterStart + 1;
-
+  const ci0 = capCenterStart, ci1 = capCenterStart + 1;
+  for (let p = 0; p < pCount; p++) indices.push(ci0, (p + 1) % pCount, p);
   for (let p = 0; p < pCount; p++) {
-    indices.push(ci0, (p + 1) % pCount, p);
-  }
-  for (let p = 0; p < pCount; p++) {
-    const base = segments * pCount;
+    const base = (sCount - 1) * pCount;
     indices.push(ci1, base + p, base + (p + 1) % pCount);
   }
 
@@ -768,6 +694,343 @@ function buildElbowGeometry(
   return geo;
 }
 
+// ── straight duct ─────────────────────────────────────────────────────────
+
+function createStraightDuct(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  w: number, h: number, isRound: boolean
+): THREE.BufferGeometry {
+  const dir = end.clone().sub(start).normalize();
+  const len = start.distanceTo(end);
+  const steps = Math.max(2, Math.ceil(len / 0.5) + 1);
+  const spine: THREE.Vector3[] = [];
+  const tangents: THREE.Vector3[] = [];
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    spine.push(start.clone().lerp(end, t));
+    tangents.push(dir.clone());
+  }
+  const profile = isRound ? circleProfile(w / 2) : rectProfile(w / 2, h / 2);
+  return buildSweptTube(profile, spine, tangents);
+}
+
+// ── elbow ──────────────────────────────────────────────────────────────────
+// Uses correct tangent-trim: trim = R * tan(halfAngle)
+// This produces gap-free joints at any angle.
+
+function elbowRadius(w: number, h: number): number {
+  return Math.max(w, h) * 0.75;
+}
+
+
+function createElbow(
+  nodePos: THREE.Vector3,
+  inDir: THREE.Vector3,
+  outDir: THREE.Vector3,
+  w: number, h: number, isRound: boolean
+): THREE.BufferGeometry {
+  const dot = Math.max(-1, Math.min(1, inDir.dot(outDir)));
+  const interiorAngle = Math.acos(dot);
+  if (interiorAngle < 0.02) return new THREE.BufferGeometry();
+
+  const axis = new THREE.Vector3().crossVectors(inDir, outDir);
+  if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
+  axis.normalize();
+
+  const sweepAngle = Math.PI - interiorAngle;
+  const R = elbowRadius(w, h);
+
+  const entryPoint  = nodePos.clone().addScaledVector(inDir, -R);
+  const inwardDir   = new THREE.Vector3().crossVectors(axis, inDir).normalize();
+  const arcCenter   = entryPoint.clone().addScaledVector(inwardDir, R);
+
+  const initFrame   = profileFrame(inDir);
+  let curRight      = initFrame.right.clone();
+  let curUp         = initFrame.up.clone();
+
+  const spine: THREE.Vector3[]   = [];
+  const tangents: THREE.Vector3[] = [];
+
+  for (let s = 0; s <= ELBOW_SEGMENTS; s++) {
+    const t     = s / ELBOW_SEGMENTS;
+    const angle = t * sweepAngle;
+    const quat  = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+
+    const tangent   = inDir.clone().applyQuaternion(quat).normalize();
+    const radialOut = inwardDir.clone().negate().applyQuaternion(quat).normalize();
+    const pt        = arcCenter.clone().addScaledVector(radialOut, R);
+
+    spine.push(pt);
+    tangents.push(tangent);
+
+    if (s > 0) {
+      const prevTangent = tangents[s - 1];
+      const rotAxis     = new THREE.Vector3().crossVectors(prevTangent, tangent);
+      if (rotAxis.lengthSq() > 1e-12) {
+        const sinA  = rotAxis.length();
+        const cosA  = prevTangent.dot(tangent);
+        const dAngle = Math.atan2(sinA, cosA);
+        rotAxis.normalize();
+        const dq = new THREE.Quaternion().setFromAxisAngle(rotAxis, dAngle);
+        curRight.applyQuaternion(dq).normalize();
+        curUp.applyQuaternion(dq).normalize();
+      }
+    }
+  }
+
+  const profile = isRound ? circleProfile(w / 2) : rectProfile(w / 2, h / 2);
+  return buildSweptTube(profile, spine, tangents);
+}
+
+// ── reducer ────────────────────────────────────────────────────────────────
+
+function createReducer(
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  wA: number, hA: number,
+  wB: number, hB: number,
+  isRound: boolean
+): THREE.BufferGeometry {
+  const dir    = end.clone().sub(start).normalize();
+  const steps  = 12;
+  const spine: THREE.Vector3[]   = [];
+  const tangents: THREE.Vector3[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    spine.push(start.clone().lerp(end, t));
+    tangents.push(dir.clone());
+  }
+
+  const len = start.distanceTo(end);
+  const arcLens: number[] = [];
+  for (let i = 0; i <= steps; i++) arcLens.push((i / steps) * len);
+
+  const pCount  = isRound ? 16 : 4;
+  const positions: number[] = [];
+  const uvs: number[]       = [];
+  const indices: number[]   = [];
+
+  const initFr  = profileFrame(dir);
+  const right   = initFr.right;
+  const up      = initFr.up;
+
+  for (let s = 0; s <= steps; s++) {
+    const t   = s / steps;
+    const cw  = wA + (wB - wA) * t;
+    const ch  = hA + (hB - hA) * t;
+    const pt  = spine[s];
+
+    if (isRound) {
+      const r = cw / 2;
+      for (let p = 0; p < pCount; p++) {
+        const a  = (p / pCount) * Math.PI * 2;
+        const wx = pt.x + right.x * Math.cos(a) * r + up.x * Math.sin(a) * r;
+        const wy = pt.y + right.y * Math.cos(a) * r + up.y * Math.sin(a) * r;
+        const wz = pt.z + right.z * Math.cos(a) * r + up.z * Math.sin(a) * r;
+        positions.push(wx, wy, wz);
+        uvs.push(p / pCount, arcLens[s] / len);
+      }
+    } else {
+      const hw = cw / 2, hh = ch / 2;
+      const corners = [
+        new THREE.Vector2(-hw, -hh),
+        new THREE.Vector2( hw, -hh),
+        new THREE.Vector2( hw,  hh),
+        new THREE.Vector2(-hw,  hh),
+      ];
+      for (let p = 0; p < 4; p++) {
+        const pp = corners[p];
+        positions.push(
+          pt.x + right.x * pp.x + up.x * pp.y,
+          pt.y + right.y * pp.x + up.y * pp.y,
+          pt.z + right.z * pp.x + up.z * pp.y
+        );
+        uvs.push(p / 4, arcLens[s] / len);
+      }
+    }
+  }
+
+  for (let s = 0; s < steps; s++) {
+    for (let p = 0; p < pCount; p++) {
+      const a = s * pCount + p;
+      const b = s * pCount + (p + 1) % pCount;
+      const c = (s + 1) * pCount + (p + 1) % pCount;
+      const d = (s + 1) * pCount + p;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+
+  const capStart = positions.length / 3;
+  for (const ring of [0, steps]) {
+    const base = ring * pCount;
+    let cx = 0, cy = 0, cz = 0;
+    for (let p = 0; p < pCount; p++) {
+      cx += positions[(base + p) * 3];
+      cy += positions[(base + p) * 3 + 1];
+      cz += positions[(base + p) * 3 + 2];
+    }
+    positions.push(cx / pCount, cy / pCount, cz / pCount);
+    uvs.push(0.5, 0.5);
+  }
+  const ci0 = capStart, ci1 = capStart + 1;
+  for (let p = 0; p < pCount; p++) indices.push(ci0, (p + 1) % pCount, p);
+  for (let p = 0; p < pCount; p++) {
+    const base = steps * pCount;
+    indices.push(ci1, base + p, base + (p + 1) % pCount);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// ── T-junction ─────────────────────────────────────────────────────────────
+// Generates a main-duct box with a branch elbow saddle.
+
+function createTee(
+  nodePos: THREE.Vector3,
+  mainInDir: THREE.Vector3,
+  mainOutDir: THREE.Vector3,
+  branchDir: THREE.Vector3,
+  w: number, h: number, isRound: boolean
+): THREE.BufferGeometry[] {
+  const mainLen = w * 0.6;
+
+  const mainStart = nodePos.clone().addScaledVector(mainInDir,  -mainLen / 2);
+  const mainEnd   = nodePos.clone().addScaledVector(mainOutDir,  mainLen / 2);
+  const mainGeo   = createStraightDuct(mainStart, mainEnd, w, h, isRound);
+
+  const branchStart  = nodePos.clone();
+  const branchEnd    = nodePos.clone().addScaledVector(branchDir, w * 0.8);
+  const branchGeo    = createStraightDuct(branchStart, branchEnd, w * 0.7, h, isRound);
+
+  return [mainGeo, branchGeo];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NODE-BASED DUCT NETWORK
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface DuctNetworkResult {
+  straightGeos:  { geo: THREE.BufferGeometry; start: THREE.Vector3; end: THREE.Vector3; w: number; h: number }[];
+  elbowGeos:     THREE.BufferGeometry[];
+  reducerGeos:   THREE.BufferGeometry[];
+  teeGeos:       THREE.BufferGeometry[];
+  flangePositions: { pos: THREE.Vector3; dir: THREE.Vector3; w: number; h: number }[];
+}
+
+function buildDuctNetwork(
+  points: { x: number; y: number; elev?: number }[],
+  offsetX: number,
+  defaultElev: number,
+  w: number,
+  h: number,
+  isRound: boolean
+): DuctNetworkResult {
+  const result: DuctNetworkResult = {
+    straightGeos:  [],
+    elbowGeos:     [],
+    reducerGeos:   [],
+    teeGeos:       [],
+    flangePositions: [],
+  };
+
+  if (points.length < 2) return result;
+
+  // 1. Build raw world-space points
+  const worldPts: THREE.Vector3[] = points.map(pt => new THREE.Vector3(
+    pt.x + offsetX,
+    pt.elev !== undefined ? pt.elev : defaultElev,
+    pt.y
+  ));
+
+  // 2. Build raw segment directions
+  const rawDirs: THREE.Vector3[] = [];
+  for (let i = 0; i < worldPts.length - 1; i++) {
+    const d = worldPts[i + 1].clone().sub(worldPts[i]);
+    const len = d.length();
+    if (len < 0.001) { rawDirs.push(new THREE.Vector3(1, 0, 0)); continue; }
+    rawDirs.push(d.divideScalar(len));
+  }
+
+  // 3. For each interior node compute correct tangent trim using:
+  //    trim = R * tan(halfAngle)  where angle is the exterior turn angle
+  const R = elbowRadius(w, h);
+  const trims: number[] = new Array(worldPts.length).fill(0);
+
+  for (let i = 1; i < worldPts.length - 1; i++) {
+    const dIn  = rawDirs[i - 1];
+    const dOut = rawDirs[i];
+    const dot  = Math.max(-1, Math.min(1, dIn.dot(dOut)));
+    const interiorAngle = Math.acos(dot);
+    if (interiorAngle < 0.02) continue;
+    const exteriorAngle = Math.PI - interiorAngle;
+    const halfExt       = exteriorAngle / 2;
+    const trim          = R * Math.tan(halfExt);
+    trims[i] = trim;
+  }
+
+  // 4. Generate straight segments (trimmed at both ends)
+  for (let i = 0; i < worldPts.length - 1; i++) {
+    const a        = worldPts[i];
+    const b        = worldPts[i + 1];
+    const dir      = rawDirs[i];
+    const fullLen  = a.distanceTo(b);
+    const pullA    = trims[i];
+    const pullB    = trims[i + 1];
+    const usedLen  = fullLen - pullA - pullB;
+
+    if (usedLen < 0.005) continue;
+
+    const start = a.clone().addScaledVector(dir,  pullA);
+    const end   = a.clone().addScaledVector(dir,  pullA + usedLen);
+    const geo   = createStraightDuct(start, end, w, h, isRound);
+    result.straightGeos.push({ geo, start, end, w, h });
+
+    // flanges along this segment
+    const segLen = usedLen;
+    const nFlanges = Math.max(0, Math.floor(segLen / FLANGE_SPACING) - 1);
+    for (let f = 1; f <= nFlanges; f++) {
+      const t = f / (nFlanges + 1);
+      result.flangePositions.push({
+        pos: start.clone().lerp(end, t),
+        dir: dir.clone(),
+        w, h,
+      });
+    }
+    result.flangePositions.push({
+      pos: start.clone().addScaledVector(dir, FLANGE_THICKNESS * 2),
+      dir: dir.clone(), w, h,
+    });
+    result.flangePositions.push({
+      pos: end.clone().addScaledVector(dir, -FLANGE_THICKNESS * 2),
+      dir: dir.clone(), w, h,
+    });
+  }
+
+  // 5. Generate elbows at interior nodes
+  for (let i = 1; i < worldPts.length - 1; i++) {
+    const dIn   = rawDirs[i - 1];
+    const dOut  = rawDirs[i];
+    const dot   = Math.max(-1, Math.min(1, dIn.dot(dOut)));
+    const angle = Math.acos(dot);
+    if (angle < 0.02) continue;
+
+    const nodePos = worldPts[i];
+    const geo     = createElbow(nodePos, dIn, dOut, w, h, isRound);
+    result.elbowGeos.push(geo);
+  }
+
+  return result;
+}
+
+// ── flanges ────────────────────────────────────────────────────────────────
+
 function FlangeRect({ w, h, tex }: { w: number; h: number; tex: THREE.CanvasTexture }) {
   const fw = w + FLANGE_OVERHANG * 2;
   const fh = h + FLANGE_OVERHANG * 2;
@@ -778,11 +1041,11 @@ function FlangeRect({ w, h, tex }: { w: number; h: number; tex: THREE.CanvasText
         <boxGeometry args={[fw, ft, fh]} />
         <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
       </mesh>
-      <mesh castShadow position={[0, 0, 0]}>
+      <mesh castShadow>
         <boxGeometry args={[fw + ft * 2, ft * 2.5, ft * 2]} />
         <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
       </mesh>
-      <mesh castShadow position={[0, 0, 0]}>
+      <mesh castShadow>
         <boxGeometry args={[ft * 2, ft * 2.5, fh + ft * 2]} />
         <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
       </mesh>
@@ -800,6 +1063,8 @@ function FlangeRound({ r, tex }: { r: number; tex: THREE.CanvasTexture }) {
   );
 }
 
+// ── DuctMesh ───────────────────────────────────────────────────────────────
+
 interface DuctMeshProps {
   duct: Duct;
   offsetX: number;
@@ -809,11 +1074,12 @@ interface DuctMeshProps {
 }
 
 export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshProps) {
-  const color = duct.color || DUCT_COLORS[duct.type] || '#60a5fa';
-  const elev = baseY + (duct.elevation ?? 2.4);
-  const w = duct.width || 0.3;
-  const h = duct.height || 0.2;
-  const isRound = duct.shape === 'round';
+  const color    = duct.color || DUCT_COLORS[duct.type] || '#60a5fa';
+  const elev     = baseY + (duct.elevation ?? 2.4);
+  const w        = duct.width  || 0.3;
+  const h        = duct.height || 0.2;
+  const isRound  = duct.shape === 'round';
+
   const tex = useMemo(() => {
     const t = getCachedDuctTexture(color);
     t.repeat.set(1, 1);
@@ -821,97 +1087,76 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   }, [color]);
   const flangeTex = useMemo(() => getCachedFlangeTexture(), []);
 
-  const segments = useMemo(
-    () => computeDuctSegments(duct.points, offsetX, elev, w, h),
-    [duct.points, offsetX, elev, w, h]
+  const network = useMemo(
+    () => buildDuctNetwork(duct.points, offsetX, elev, w, h, isRound),
+    [duct.points, offsetX, elev, w, h, isRound]
   );
 
-  const flangePositionsPerSeg = useMemo(() => {
-    return segments.map(seg => {
-      const positions: number[] = [];
-      const count = Math.floor(seg.len / FLANGE_SPACING);
-      const step = seg.len / Math.max(count + 1, 2);
-      for (let k = 1; k <= count; k++) {
-        positions.push(-seg.len / 2 + step * k);
-      }
-      positions.push(-seg.len / 2 + FLANGE_THICKNESS * 2);
-      positions.push(seg.len / 2 - FLANGE_THICKNESS * 2);
-      return positions;
-    });
-  }, [segments]);
-
-  const elbowData = useMemo(() => {
-    const result: { geo: THREE.BufferGeometry }[] = [];
-    const pts = duct.points;
-    for (let i = 1; i < pts.length - 1; i++) {
-      const prev = pts[i - 1];
-      const cur  = pts[i];
-      const next = pts[i + 1];
-      const elevCur  = (cur  as any).elev !== undefined ? baseY + (cur  as any).elev : elev;
-      const elevPrev = (prev as any).elev !== undefined ? baseY + (prev as any).elev : elev;
-      const elevNext = (next as any).elev !== undefined ? baseY + (next as any).elev : elev;
-
-      const dxA = cur.x - prev.x, dyA = elevCur - elevPrev, dzA = cur.y - prev.y;
-      const dxB = next.x - cur.x, dyB = elevNext - elevCur, dzB = next.y - cur.y;
-      const lenA = Math.sqrt(dxA*dxA + dyA*dyA + dzA*dzA) || 1;
-      const lenB = Math.sqrt(dxB*dxB + dyB*dyB + dzB*dzB) || 1;
-      const dirA = new THREE.Vector3(dxA/lenA, dyA/lenA, dzA/lenA);
-      const dirB = new THREE.Vector3(dxB/lenB, dyB/lenB, dzB/lenB);
-
-      const cornerWorldPos = new THREE.Vector3(cur.x + offsetX, elevCur, cur.y);
-      const geo = buildElbowGeometry(w, h, isRound, cornerWorldPos, dirA, dirB);
-      result.push({ geo });
-    }
-    return result;
-  }, [duct.points, offsetX, elev, w, h, isRound, baseY]);
+  const mat = (
+    <meshStandardMaterial
+      color={color}
+      map={tex}
+      metalness={0.65}
+      roughness={0.38}
+      envMapIntensity={0.8}
+    />
+  );
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-      {segments.map((seg, i) => {
-        const quaternion = getSegmentQuaternion(seg.dir);
 
+      {network.straightGeos.map(({ geo, start, end, w: sw, h: sh }, i) => {
+        const mid = start.clone().lerp(end, 0.5);
+        const len = start.distanceTo(end);
         return (
-          <group key={i} position={seg.pos} quaternion={quaternion}>
-            {isRound ? (
-              <mesh castShadow>
-                <cylinderGeometry args={[w / 2, w / 2, seg.len, 14, Math.max(1, Math.round(seg.len / 0.5))]} />
-                <meshStandardMaterial color={color} map={tex} metalness={0.65} roughness={0.35} envMapIntensity={0.8} />
-              </mesh>
-            ) : (
-              <mesh castShadow>
-                <primitive object={buildRectDuctGeoSimple(w, h, seg.len)} />
-                <meshStandardMaterial color={color} map={tex} metalness={0.6} roughness={0.38} envMapIntensity={0.8} />
-              </mesh>
-            )}
-
-            {flangePositionsPerSeg[i]?.map((fp, fi) => (
-              <group key={`fl-${fi}`} position={[0, fp, 0]}>
-                {isRound
-                  ? <FlangeRound r={w / 2} tex={flangeTex} />
-                  : <FlangeRect w={w} h={h} tex={flangeTex} />
-                }
-              </group>
-            ))}
-
+          <group key={`str-${i}`}>
+            <mesh castShadow>
+              <primitive object={geo} />
+              {mat}
+            </mesh>
             {selected && (
-              <mesh>
-                {isRound
-                  ? <cylinderGeometry args={[w / 2 + 0.025, w / 2 + 0.025, seg.len + 0.03, 14]} />
-                  : <boxGeometry args={[w + 0.03, seg.len + 0.03, h + 0.03]} />
-                }
-                <meshBasicMaterial color="#60a5fa" wireframe opacity={0.6} transparent />
+              <mesh position={mid.toArray()}>
+                <boxGeometry args={[sw + 0.03, len + 0.03, sh + 0.03]} />
+                <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
               </mesh>
             )}
           </group>
         );
       })}
 
-      {elbowData.map((eb, i) => (
+      {network.elbowGeos.map((geo, i) => (
         <mesh key={`elbow-${i}`} castShadow>
-          <primitive object={eb.geo} />
-          <meshStandardMaterial color={color} map={tex} metalness={0.6} roughness={0.38} />
+          <primitive object={geo} />
+          {mat}
         </mesh>
       ))}
+
+      {network.reducerGeos.map((geo, i) => (
+        <mesh key={`red-${i}`} castShadow>
+          <primitive object={geo} />
+          {mat}
+        </mesh>
+      ))}
+
+      {network.teeGeos.map((geo, i) => (
+        <mesh key={`tee-${i}`} castShadow>
+          <primitive object={geo} />
+          {mat}
+        </mesh>
+      ))}
+
+      {network.flangePositions.map((fl, i) => {
+        const q = ductQuaternion(fl.dir);
+        return (
+          <group key={`fl-${i}`} position={fl.pos.toArray()} quaternion={q}>
+            {isRound
+              ? <FlangeRound r={fl.w / 2} tex={flangeTex} />
+              : <FlangeRect  w={fl.w}    h={fl.h} tex={flangeTex} />
+            }
+          </group>
+        );
+      })}
+
     </group>
   );
 }
@@ -926,49 +1171,98 @@ interface PipeMeshProps {
 
 export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshProps) {
   const color = pipe.color || PIPE_COLORS[pipe.type] || '#ef4444';
-  const elev = baseY + (pipe.elevation ?? 2.2);
-  const radius = (pipe.diameter || 0.05) / 2;
-  const insulationRadius = radius + 0.025;
+  const elev  = baseY + (pipe.elevation ?? 2.2);
+  const r     = (pipe.diameter || 0.05) / 2;
+  const ir    = r + 0.025;
 
-  const segments = useMemo(
-    () => computeDuctSegments(pipe.points, offsetX, elev),
-    [pipe.points, offsetX, elev]
-  );
+  const pipeGeos = useMemo(() => {
+    const geos: { geo: THREE.BufferGeometry; start: THREE.Vector3; end: THREE.Vector3}[] = [];
+    if (pipe.points.length < 2) return geos;
+    const worldPts = pipe.points.map(pt => new THREE.Vector3(
+      pt.x + offsetX,
+      (pt as any).elev !== undefined ? baseY + (pt as any).elev : elev,
+      pt.y
+    ));
+    const R = r * 1.5;
+    const rawDirs: THREE.Vector3[] = [];
+    for (let i = 0; i < worldPts.length - 1; i++) {
+      const d = worldPts[i + 1].clone().sub(worldPts[i]);
+      const l = d.length();
+      rawDirs.push(l < 0.001 ? new THREE.Vector3(1, 0, 0) : d.divideScalar(l));
+    }
+    const trims: number[] = new Array(worldPts.length).fill(0);
+    for (let i = 1; i < worldPts.length - 1; i++) {
+      const dot = Math.max(-1, Math.min(1, rawDirs[i - 1].dot(rawDirs[i])));
+      const extAngle = Math.PI - Math.acos(dot);
+      if (extAngle < 0.02) continue;
+      trims[i] = R * Math.tan(extAngle / 2);
+    }
+    for (let i = 0; i < worldPts.length - 1; i++) {
+      const dir     = rawDirs[i];
+      const fullLen = worldPts[i].distanceTo(worldPts[i + 1]);
+      const usedLen = fullLen - trims[i] - trims[i + 1];
+      if (usedLen < 0.005) continue;
+      const start = worldPts[i].clone().addScaledVector(dir, trims[i]);
+      const end   = worldPts[i].clone().addScaledVector(dir, trims[i] + usedLen);
+      geos.push({ geo: createStraightDuct(start, end, r * 2, r * 2, true), start, end });
+    }
+    return geos;
+  }, [pipe.points, offsetX, elev, r, baseY]);
+
+  const elbowGeos = useMemo(() => {
+    const geos: THREE.BufferGeometry[] = [];
+    if (pipe.points.length < 3) return geos;
+    const worldPts = pipe.points.map(pt => new THREE.Vector3(
+      pt.x + offsetX,
+      (pt as any).elev !== undefined ? baseY + (pt as any).elev : elev,
+      pt.y
+    ));
+    const rawDirs: THREE.Vector3[] = [];
+    for (let i = 0; i < worldPts.length - 1; i++) {
+      const d = worldPts[i + 1].clone().sub(worldPts[i]);
+      const l = d.length();
+      rawDirs.push(l < 0.001 ? new THREE.Vector3(1, 0, 0) : d.divideScalar(l));
+    }
+    for (let i = 1; i < worldPts.length - 1; i++) {
+      const dot   = Math.max(-1, Math.min(1, rawDirs[i - 1].dot(rawDirs[i])));
+      const angle = Math.acos(dot);
+      if (angle < 0.02) continue;
+      geos.push(createElbow(worldPts[i], rawDirs[i - 1], rawDirs[i], r * 2, r * 2, true));
+    }
+    return geos;
+  }, [pipe.points, offsetX, elev, r, baseY]);
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-      {segments.map((seg, i) => {
-        const quaternion = getSegmentQuaternion(seg.dir);
-        return (
-          <group key={i} position={seg.pos} quaternion={quaternion}>
+      {pipeGeos.map(({ geo }, i) => (
+        <group key={`ps-${i}`}>
+          <mesh castShadow>
+            <primitive object={geo} />
+            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+          </mesh>
+          {pipe.insulated && (
             <mesh castShadow>
-              <cylinderGeometry args={[radius, radius, seg.len, 10]} />
-              <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+              <primitive object={createStraightDuct(
+                pipeGeos[i].start, pipeGeos[i].end, ir * 2, ir * 2, true
+              )} />
+              <meshStandardMaterial color="#e2e8f0" transparent opacity={0.35} side={THREE.FrontSide} />
             </mesh>
-            {pipe.insulated && (
-              <mesh>
-                <cylinderGeometry args={[insulationRadius, insulationRadius, seg.len, 10]} />
-                <meshStandardMaterial color="#e2e8f0" transparent opacity={0.35} side={THREE.FrontSide} />
-              </mesh>
-            )}
-            {selected && (
-              <mesh>
-                <cylinderGeometry args={[insulationRadius + 0.02, insulationRadius + 0.02, seg.len + 0.04, 10]} />
-                <meshBasicMaterial color="#60a5fa" wireframe />
-              </mesh>
-            )}
-          </group>
-        );
-      })}
-      {pipe.points.slice(1, -1).map((pt, i) => {
-        const ptElev = (pt as DuctPoint & { elev?: number }).elev !== undefined
-          ? baseY + ((pt as any).elev as number)
-          : elev;
-        const jointR = pipe.insulated ? insulationRadius + 0.002 : radius + 0.005;
+          )}
+        </group>
+      ))}
+      {elbowGeos.map((geo, i) => (
+        <mesh key={`pe-${i}`} castShadow>
+          <primitive object={geo} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+        </mesh>
+      ))}
+      {selected && pipeGeos.map(({ start, end }, i) => {
+        const mid = start.clone().lerp(end, 0.5);
+        const len = start.distanceTo(end);
         return (
-          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} castShadow>
-            <sphereGeometry args={[jointR, 10, 8]} />
-            <meshStandardMaterial color={pipe.insulated ? '#e2e8f0' : color} metalness={0.5} roughness={0.35} />
+          <mesh key={`psel-${i}`} position={mid.toArray()}>
+            <sphereGeometry args={[ir + 0.02, 8, 6]} />
+            <meshBasicMaterial color="#60a5fa" wireframe />
           </mesh>
         );
       })}
