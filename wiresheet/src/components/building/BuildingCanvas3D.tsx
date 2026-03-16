@@ -896,6 +896,7 @@ function BuildingScene({
             selected={duct.id === selectedDuctId}
             faded={faded}
             onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+            allDucts={floor.ducts ?? []}
           />
         );
       }
