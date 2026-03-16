@@ -8,7 +8,7 @@ import {
   Eye, EyeOff
 } from 'lucide-react';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
-import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING } from './BuildingCanvas3D';
+import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING, ExplosionSettings, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers } from '../../types/building';
@@ -162,6 +162,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     deleteWidget3D,
     ROOM_COLORS,
     undo,
+    deleteMultiSelection,
   } = useBuildingEditor();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
@@ -182,6 +183,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showGrid3D, setShowGrid3D] = useState(true);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
+  const [explosion, setExplosion] = useState<ExplosionSettings>(DEFAULT_EXPLOSION);
+  const [showExplosionPanel, setShowExplosionPanel] = useState(false);
 
   const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
   const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
@@ -193,6 +196,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [pipeType, setPipeType] = useState<PipeType>('supply');
   const [pipeDiameter, setPipeDiameter] = useState(0.05);
 
+  const [showAllFloors, setShowAllFloors] = useState(false);
   const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
   const [newWidgetType, setNewWidgetType] = useState<Widget3DType>('temperature');
   const [newWidgetDatapoint, setNewWidgetDatapoint] = useState('');
@@ -254,10 +258,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const handleDeleteSelected = (sel: MultiSelection) => {
     if (!activeBuilding || !activeFloor) return;
-    for (const id of sel.wallIds) deleteWall(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.roomIds) deleteRoom(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.ductIds) deleteDuct(activeBuilding.id, activeFloor.id, id);
-    for (const id of sel.pipeIds) deletePipe(activeBuilding.id, activeFloor.id, id);
+    deleteMultiSelection(activeBuilding.id, activeFloor.id, sel);
   };
 
   const handleDuplicateSelected = (sel: MultiSelection) => {
@@ -503,6 +504,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onClick={() => {
                   setActiveBuildingId(building.id);
                   setActiveFloorId(building.floors[0]?.id || '');
+                  setShowAllFloors(true);
                   building.floors.forEach(f => {
                     if (f.hidden) updateFloorProps(building.id, f.id, { hidden: false });
                   });
@@ -533,7 +535,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     <div
                       key={floor.id}
                       className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer group ${floor.id === activeFloorId ? 'bg-slate-600 rounded-r' : 'hover:bg-slate-700 rounded-r'} ${floor.hidden ? 'opacity-50' : ''}`}
-                      onClick={() => setActiveFloorId(floor.id)}
+                      onClick={() => { setActiveFloorId(floor.id); setShowAllFloors(false); }}
                     >
                       <Layers className={`w-3 h-3 flex-shrink-0 ${floor.id === activeFloorId ? 'text-blue-400' : 'text-slate-500'}`} />
                       {editingFloorId === floor.id ? (
@@ -831,6 +833,17 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   <Sun className="w-3.5 h-3.5" />
                 </button>
                 <button
+                  onClick={() => {
+                    setExplosion(e => ({ ...e, enabled: !e.enabled }));
+                    setShowExplosionPanel(p => !p);
+                  }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${explosion.enabled ? 'bg-sky-700 text-white border-sky-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Explosionsansicht"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Explode
+                </button>
+                <button
                   onClick={() => setShowWidget3DPanel(p => !p)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showWidget3DPanel ? 'bg-green-700 text-white border-green-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
                   title="3D Widgets"
@@ -879,7 +892,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
                   }}
-                  highlightFloor={true}
+                  highlightFloor={!showAllFloors}
                   bgColor={bgColor}
                   floorTransparent={floorTransparent}
                   bgTransparent={bgTransparent}
@@ -888,6 +901,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   liveValues={liveValues as Record<string, string | number>}
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
+                  explosion={explosion}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
@@ -953,6 +967,46 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       </div>
                     </div>
                     <button onClick={() => setLighting(DEFAULT_LIGHTING)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
+                      Zurücksetzen
+                    </button>
+                  </div>
+                )}
+
+                {showExplosionPanel && (
+                  <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-56 space-y-2.5" style={{ top: showLightingPanel ? 'auto' : 40, marginTop: showLightingPanel ? 4 : 0 }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-sky-400" />
+                        Explosionsansicht
+                      </span>
+                      <button onClick={() => setShowExplosionPanel(false)} className="text-slate-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">Aktiv</span>
+                      <button
+                        onClick={() => setExplosion(e => ({ ...e, enabled: !e.enabled }))}
+                        className={`w-8 h-4 rounded-full transition-colors ${explosion.enabled ? 'bg-sky-500' : 'bg-slate-600'} relative`}
+                      >
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${explosion.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                    {[
+                      { key: 'offsetZ', label: 'Abstand Z (vertikal)', min: 0, max: 20, step: 0.5 },
+                      { key: 'offsetX', label: 'Versatz X', min: -20, max: 20, step: 0.5 },
+                      { key: 'offsetY', label: 'Versatz Y (Tiefe)', min: -20, max: 20, step: 0.5 },
+                    ].map(({ key, label, min, max, step }) => (
+                      <div key={key}>
+                        <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                          <span>{label}</span>
+                          <span>{explosion[key as keyof ExplosionSettings]}</span>
+                        </div>
+                        <input type="range" min={min} max={max} step={step}
+                          value={explosion[key as keyof ExplosionSettings] as number}
+                          onChange={e => setExplosion(ex => ({ ...ex, [key]: parseFloat(e.target.value) }))}
+                          className="w-full h-1 accent-sky-500" />
+                      </div>
+                    ))}
+                    <button onClick={() => setExplosion(DEFAULT_EXPLOSION)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
                       Zurücksetzen
                     </button>
                   </div>

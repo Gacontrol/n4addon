@@ -23,6 +23,20 @@ export const DEFAULT_LIGHTING: LightingSettings = {
   fillIntensity: 0.35,
 };
 
+export interface ExplosionSettings {
+  enabled: boolean;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+}
+
+export const DEFAULT_EXPLOSION: ExplosionSettings = {
+  enabled: false,
+  offsetX: 0,
+  offsetY: 0,
+  offsetZ: 4,
+};
+
 interface Props {
   buildings: Building[];
   activeFloorId: string | null;
@@ -47,6 +61,7 @@ interface Props {
   bgTransparent?: boolean;
   showGrid?: boolean;
   lighting?: LightingSettings;
+  explosion?: ExplosionSettings;
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -715,6 +730,7 @@ interface BuildingSceneProps {
   lighting: LightingSettings;
   floorTransparent?: boolean;
   showGrid?: boolean;
+  explosion?: ExplosionSettings;
 }
 
 function BuildingScene({
@@ -723,7 +739,7 @@ function BuildingScene({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true
+  highlightFloor, lighting, floorTransparent, showGrid = true, explosion
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -732,6 +748,11 @@ function BuildingScene({
   const sunDist = 30;
   const sunX = Math.cos(sunAngleRad) * sunDist;
   const sunZ = Math.sin(sunAngleRad) * sunDist;
+
+  const explode = explosion?.enabled ?? false;
+  const expOffX = explosion?.offsetX ?? 0;
+  const expOffY = explosion?.offsetY ?? 0;
+  const expOffZ = explosion?.offsetZ ?? 4;
 
   let bldOffX = 0;
   for (const building of buildings) {
@@ -755,19 +776,34 @@ function BuildingScene({
     allSize = Math.max(allSize, Math.max(bldW, maxZ - minZ) * 2 + 20);
 
     const floorBaseY: Record<string, number> = {};
+    const floorExpOffX: Record<string, number> = {};
+    const floorExpOffZ: Record<string, number> = {};
     let yAcc = 0;
-    for (const fl of sorted) { floorBaseY[fl.id] = yAcc; yAcc += fl.height; }
+    sorted.forEach((fl, idx) => {
+      floorBaseY[fl.id] = yAcc;
+      floorExpOffX[fl.id] = explode ? idx * expOffX : 0;
+      floorExpOffZ[fl.id] = explode ? idx * expOffY : 0;
+      yAcc += fl.height + (explode ? expOffZ : 0);
+    });
+    if (!explode) {
+      let yAcc2 = 0;
+      for (const fl of sorted) { floorBaseY[fl.id] = yAcc2; yAcc2 += fl.height; }
+    }
 
     const offsetX = bldOffX - minX;
 
     for (const floor of sorted) {
       if (floor.hidden) continue;
       const baseY = floorBaseY[floor.id];
+      const floorOffX = floorExpOffX[floor.id] ?? 0;
+      const floorOffZ = floorExpOffZ[floor.id] ?? 0;
       const isActive = floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
 
+      const floorElements: JSX.Element[] = [];
+
       if (floor.showFloorPlane !== false) {
-        elements.push(
+        floorElements.push(
           <FloorPlane
             key={`floor-${floor.id}`}
             minX={minX + offsetX}
@@ -787,7 +823,7 @@ function BuildingScene({
       for (const room of floor.rooms) {
         if (!flLayers.rooms) break;
         if (room.points && room.points.length > 2) {
-          elements.push(
+          floorElements.push(
             <PolygonRoomMesh
               key={`room-${room.id}`}
               points={room.points}
@@ -801,7 +837,7 @@ function BuildingScene({
             />
           );
         } else {
-          elements.push(
+          floorElements.push(
             <RoomMesh
               key={`room-${room.id}`}
               x={room.x + offsetX}
@@ -856,7 +892,7 @@ function BuildingScene({
           }
         }
 
-        elements.push(
+        floorElements.push(
           <WallSegment
             key={`wall-${wall.id}`}
             x1={adjX1 - (dx / len) * extStart}
@@ -887,7 +923,7 @@ function BuildingScene({
       for (const duct of (floor.ducts ?? [])) {
         if (!flLayers.ducts) break;
         if (duct.isVertical && !flLayers.verticalDucts) continue;
-        elements.push(
+        floorElements.push(
           <DuctMesh
             key={`duct-${duct.id}`}
             duct={duct}
@@ -902,7 +938,7 @@ function BuildingScene({
 
       for (const pipe of (floor.pipes ?? [])) {
         if (!flLayers.pipes) break;
-        elements.push(
+        floorElements.push(
           <PipeMesh
             key={`pipe-${pipe.id}`}
             pipe={pipe}
@@ -917,7 +953,7 @@ function BuildingScene({
 
       for (const slab of (floor.slabs ?? [])) {
         if (!flLayers.slabs) break;
-        elements.push(
+        floorElements.push(
           <SlabMesh
             key={`slab-${slab.id}`}
             slab={slab}
@@ -926,10 +962,17 @@ function BuildingScene({
           />
         );
       }
+
+      elements.push(
+        <group key={`floorgroup-${floor.id}`} position={[floorOffX, 0, floorOffZ]}>
+          {floorElements}
+        </group>
+      );
     }
 
     for (const widget of (building.widgets3d ?? [])) {
-      const floorBaseYLocal = (() => {
+      const widgetFloorIdx = sorted.findIndex(fl => fl.id === widget.floorId);
+      const floorBaseYLocal = floorBaseY[widget.floorId] ?? (() => {
         const sorted2 = [...building.floors].sort((a, b) => a.level - b.level);
         let acc = 0;
         for (const fl of sorted2) {
@@ -938,37 +981,43 @@ function BuildingScene({
         }
         return 0;
       })();
+      const widOffX = explode && widgetFloorIdx >= 0 ? widgetFloorIdx * expOffX : 0;
+      const widOffZ = explode && widgetFloorIdx >= 0 ? widgetFloorIdx * expOffY : 0;
       const floorForWidget = building.floors.find(f => f.id === widget.floorId);
       const floorH = floorForWidget?.height ?? 3;
 
       if (widget.type === 'roomcolor') {
         elements.push(
-          <RoomColorOverlay
-            key={`widget3d-${widget.id}`}
-            widget={widget}
-            baseY={floorBaseYLocal}
-            floorHeight={floorH}
-            offsetX={offsetX}
-            buildings={buildings}
-            liveValue={liveValues[widget.datapoint]}
-            alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
-            selected={widget.id === selectedWidget3DId}
-            onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
-          />
+          <group key={`widget3d-group-${widget.id}`} position={[widOffX, 0, widOffZ]}>
+            <RoomColorOverlay
+              key={`widget3d-${widget.id}`}
+              widget={widget}
+              baseY={floorBaseYLocal}
+              floorHeight={floorH}
+              offsetX={offsetX}
+              buildings={buildings}
+              liveValue={liveValues[widget.datapoint]}
+              alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
+              selected={widget.id === selectedWidget3DId}
+              onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+            />
+          </group>
         );
       } else {
         const wid = widget;
         elements.push(
-          <Widget3DMesh
-            key={`widget3d-${wid.id}`}
-            widget={{ ...wid, x: wid.x + offsetX }}
-            liveValue={liveValues[wid.datapoint]}
-            alarmActive={wid.alarmDatapoint ? alarmStates[wid.alarmDatapoint] : undefined}
-            selected={wid.id === selectedWidget3DId}
-            onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
-            baseY={floorBaseYLocal}
-            onDragEnd={(nx, ny, nz) => onUpdateWidget3D?.(wid.id, nx - offsetX, ny, nz)}
-          />
+          <group key={`widget3d-group-${wid.id}`} position={[widOffX, 0, widOffZ]}>
+            <Widget3DMesh
+              key={`widget3d-${wid.id}`}
+              widget={{ ...wid, x: wid.x + offsetX }}
+              liveValue={liveValues[wid.datapoint]}
+              alarmActive={wid.alarmDatapoint ? alarmStates[wid.alarmDatapoint] : undefined}
+              selected={wid.id === selectedWidget3DId}
+              onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
+              baseY={floorBaseYLocal}
+              onDragEnd={(nx, ny, nz) => onUpdateWidget3D?.(wid.id, nx - offsetX, ny, nz)}
+            />
+          </group>
         );
       }
     }
@@ -1030,6 +1079,7 @@ export function BuildingCanvas3D({
   bgTransparent = false,
   showGrid = true,
   lighting = DEFAULT_LIGHTING,
+  explosion = DEFAULT_EXPLOSION,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
@@ -1073,6 +1123,7 @@ export function BuildingCanvas3D({
             lighting={lighting}
             floorTransparent={floorTransparent}
             showGrid={showGrid}
+            explosion={explosion}
           />
           <Environment preset="city" />
         </Suspense>

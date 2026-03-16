@@ -1310,6 +1310,35 @@ export function useBuildingEditor() {
     setSelectedObjModelId(null);
   }, [buildings, updateBuildings]);
 
+  const deleteMultiSelection = useCallback((
+    buildingId: string,
+    floorId: string,
+    sel: { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[] }
+  ) => {
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    walls: f.walls.filter(w => !sel.wallIds.includes(w.id)),
+                    rooms: f.rooms.filter(r => !sel.roomIds.includes(r.id)),
+                    ducts: (f.ducts ?? []).filter(d => !sel.ductIds.includes(d.id)),
+                    pipes: (f.pipes ?? []).filter(p => !sel.pipeIds.includes(p.id)),
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    setSelectedWallId(null);
+    setSelectedRoomId(null);
+  }, [buildings, updateBuildings]);
+
   return {
     buildings,
     activeBuildingId,
@@ -1378,6 +1407,7 @@ export function useBuildingEditor() {
     addObjModel,
     updateObjModel,
     deleteObjModel,
+    deleteMultiSelection,
     ROOM_COLORS,
   };
 }
