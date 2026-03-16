@@ -75,14 +75,17 @@ import { getThemeVars } from '../../utils/widgetThemes';
 
 class Widget3DErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean; retryKey: number }
+  { hasError: boolean; retryKey: number; errorMsg: string }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, retryKey: 0 };
+    this.state = { hasError: false, retryKey: 0, errorMsg: '' };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMsg: error?.message || String(error) };
+  }
+  componentDidCatch(error: Error) {
+    console.error('[3D Widget Error]', error);
   }
   render() {
     if (this.state.hasError) {
@@ -93,9 +96,12 @@ class Widget3DErrorBoundary extends React.Component<
               <span className="text-slate-500 text-xs">3D</span>
             </div>
             <p className="text-xs text-slate-400">3D nicht verfugbar</p>
+            {this.state.errorMsg && (
+              <p className="text-[9px] text-slate-600 max-w-[160px] break-words">{this.state.errorMsg}</p>
+            )}
             <button
               className="text-[10px] text-blue-400 hover:text-blue-300"
-              onClick={() => this.setState(s => ({ hasError: false, retryKey: s.retryKey + 1 }))}
+              onClick={() => this.setState(s => ({ hasError: false, retryKey: s.retryKey + 1, errorMsg: '' }))}
             >
               Neu laden
             </button>

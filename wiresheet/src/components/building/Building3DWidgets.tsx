@@ -205,8 +205,6 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const isBoolean = widget.type === 'boolean';
   const displaySize = (widget.size ?? 1.0) * (widget.scale || 1);
 
-  if (isRoomColor) return null;
-
   const pulseColor = alarmActive ? '#ef4444' : (isAlarm ? '#fbbf24' : baseColor);
   const displayValue = liveValue != null ? String(liveValue) : '–';
   const unit = widget.unit || '';
@@ -226,6 +224,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const { controls, camera, size } = useThree();
 
   useEffect(() => {
+    if (isRoomColor) return;
     const onMove = (e: PointerEvent) => {
       if (!dragRef.current) return;
       const factor = dragRef.current.factor;
@@ -264,7 +263,9 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [controls, onDragEnd, baseY]);
+  }, [controls, onDragEnd, baseY, isRoomColor]);
+
+  if (isRoomColor) return null;
 
   return (
     <group
