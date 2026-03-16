@@ -843,7 +843,8 @@ function createTee(
   branchDir: THREE.Vector3,
   w: number, h: number, isRound: boolean
 ): THREE.BufferGeometry[] {
-  const mainLen  = Math.max(w, h) * 1.5;
+  const trimR    = elbowRadius(w, h);
+  const mainLen  = trimR * 2;
 
   // Main duct passes straight through the node
   const mainStart = nodePos.clone().addScaledVector(mainInDir,  -mainLen / 2);
@@ -947,6 +948,18 @@ function buildDuctNetwork(
     if (!hasCornerAtEnd && !(isLastSeg && lastIsVertConn)) {
       result.flangePositions.push({ pos: end.clone().addScaledVector(dir, -FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
     }
+  }
+
+  // 6. Generate sharp miter corners at interior nodes where the direction changes
+  for (let i = 1; i < worldPts.length - 1; i++) {
+    const dIn   = rawDirs[i - 1];
+    const dOut  = rawDirs[i];
+    const dot   = Math.max(-1, Math.min(1, dIn.dot(dOut)));
+    const angle = Math.acos(dot);
+    if (angle < 0.02) continue;
+
+    const geo = createMiterCorner(worldPts[i], dIn, dOut, w, h, isRound);
+    result.elbowGeos.push(geo);
   }
 
   // 6. Reducer: insert when adjacent segments have different cross-sections.
