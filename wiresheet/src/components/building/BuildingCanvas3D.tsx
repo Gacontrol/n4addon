@@ -761,6 +761,7 @@ function BuildingScene({
     const offsetX = bldOffX - minX;
 
     for (const floor of sorted) {
+      if (floor.hidden) continue;
       const baseY = floorBaseY[floor.id];
       const isActive = floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
@@ -885,6 +886,7 @@ function BuildingScene({
 
       for (const duct of (floor.ducts ?? [])) {
         if (!flLayers.ducts) break;
+        if (duct.isVertical && !flLayers.verticalDucts) continue;
         elements.push(
           <DuctMesh
             key={`duct-${duct.id}`}
@@ -892,6 +894,7 @@ function BuildingScene({
             offsetX={offsetX}
             baseY={baseY}
             selected={duct.id === selectedDuctId}
+            faded={faded}
             onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
           />
         );
@@ -906,6 +909,7 @@ function BuildingScene({
             offsetX={offsetX}
             baseY={baseY}
             selected={pipe.id === selectedPipeId}
+            faded={faded}
             onSelect={() => { onSelectPipe?.(pipe.id); onSelectWall(null); onSelectRoom(null); }}
           />
         );

@@ -224,6 +224,7 @@ export interface FloorLayers {
   background: boolean;
   rooms: boolean;
   slabs: boolean;
+  verticalDucts: boolean;
 }
 
 export const DEFAULT_LAYERS: FloorLayers = {
@@ -233,6 +234,7 @@ export const DEFAULT_LAYERS: FloorLayers = {
   background: true,
   rooms: true,
   slabs: true,
+  verticalDucts: true,
 };
 
 export interface Floor {
@@ -249,6 +251,7 @@ export interface Floor {
   floorColor?: string;
   showFloorPlane?: boolean;
   layers?: FloorLayers;
+  hidden?: boolean;
 }
 
 export interface Building {

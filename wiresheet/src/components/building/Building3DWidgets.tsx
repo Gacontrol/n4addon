@@ -1088,10 +1088,11 @@ interface DuctMeshProps {
   offsetX: number;
   baseY: number;
   selected: boolean;
+  faded?: boolean;
   onSelect: () => void;
 }
 
-export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshProps) {
+export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: DuctMeshProps) {
   const color    = duct.color || DUCT_COLORS[duct.type] || '#60a5fa';
   const elev     = baseY + (duct.elevation ?? 2.4);
   const w        = duct.width  || 0.3;
@@ -1122,13 +1123,16 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
     [duct.isTransition, duct.points, offsetX, elev, w, h, isRound]
   );
 
+  const ductOpacity = faded ? 0.12 : 1.0;
   const mat = (
     <meshStandardMaterial
       color={color}
-      map={tex}
+      map={faded ? undefined : tex}
       metalness={0.65}
       roughness={0.38}
       envMapIntensity={0.8}
+      transparent={faded}
+      opacity={ductOpacity}
     />
   );
 
@@ -1243,10 +1247,11 @@ interface PipeMeshProps {
   offsetX: number;
   baseY: number;
   selected: boolean;
+  faded?: boolean;
   onSelect: () => void;
 }
 
-export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshProps) {
+export function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: PipeMeshProps) {
   const color = pipe.color || PIPE_COLORS[pipe.type] || '#ef4444';
   const elev  = baseY + (pipe.elevation ?? 2.2);
   const r     = (pipe.diameter || 0.05) / 2;
@@ -1315,14 +1320,14 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
         <group key={`ps-${i}`}>
           <mesh castShadow>
             <primitive object={geo} />
-            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+            <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.12 : 1} />
           </mesh>
           {pipe.insulated && (
             <mesh castShadow>
               <primitive object={createStraightDuct(
                 pipeGeos[i].start, pipeGeos[i].end, ir * 2, ir * 2, true
               )} />
-              <meshStandardMaterial color="#e2e8f0" transparent opacity={0.35} side={THREE.FrontSide} />
+              <meshStandardMaterial color="#e2e8f0" transparent opacity={faded ? 0.08 : 0.35} side={THREE.FrontSide} />
             </mesh>
           )}
         </group>
@@ -1330,7 +1335,7 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, onSelect }: PipeMeshP
       {elbowGeos.map((geo, i) => (
         <mesh key={`pe-${i}`} castShadow>
           <primitive object={geo} />
-          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.35} transparent={faded} opacity={faded ? 0.12 : 1} />
         </mesh>
       ))}
       {selected && pipeGeos.map(({ start, end }, i) => {

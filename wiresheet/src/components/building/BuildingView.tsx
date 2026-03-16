@@ -498,7 +498,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
             <div key={building.id}>
               <div
                 className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer group ${building.id === activeBuildingId ? 'bg-slate-700' : 'hover:bg-slate-750'}`}
-                onClick={() => { setActiveBuildingId(building.id); setActiveFloorId(building.floors[0]?.id || ''); }}
+                onClick={() => {
+                  setActiveBuildingId(building.id);
+                  setActiveFloorId(building.floors[0]?.id || '');
+                  building.floors.forEach(f => {
+                    if (f.hidden) updateFloorProps(building.id, f.id, { hidden: false });
+                  });
+                }}
               >
                 <Building2 className={`w-3.5 h-3.5 flex-shrink-0 ${building.id === activeBuildingId ? 'text-blue-400' : 'text-slate-500'}`} />
                 {editingBuildingId === building.id ? (
@@ -524,7 +530,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   {[...building.floors].sort((a, b) => b.level - a.level).map(floor => (
                     <div
                       key={floor.id}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer group ${floor.id === activeFloorId ? 'bg-slate-600 rounded-r' : 'hover:bg-slate-700 rounded-r'}`}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer group ${floor.id === activeFloorId ? 'bg-slate-600 rounded-r' : 'hover:bg-slate-700 rounded-r'} ${floor.hidden ? 'opacity-50' : ''}`}
                       onClick={() => setActiveFloorId(floor.id)}
                     >
                       <Layers className={`w-3 h-3 flex-shrink-0 ${floor.id === activeFloorId ? 'text-blue-400' : 'text-slate-500'}`} />
@@ -541,6 +547,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         <span className="flex-1 text-xs text-slate-300 truncate">{floor.name}</span>
                       )}
                       <span className="text-[10px] text-slate-500 shrink-0">{floor.level >= 0 ? `+${floor.level}` : floor.level}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); updateFloorProps(building.id, floor.id, { hidden: !floor.hidden }); }}
+                        className={`w-4 h-4 flex-shrink-0 flex items-center justify-center transition-colors ${floor.hidden ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-white opacity-0 group-hover:opacity-100'}`}
+                        title={floor.hidden ? 'Etage einblenden' : 'Etage ausblenden'}
+                      >
+                        {floor.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </button>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
                         <button onClick={e => { e.stopPropagation(); setEditingFloorId(floor.id); setEditingFloorName(floor.name); }} className="w-4 h-4 hover:text-white text-slate-500 flex items-center justify-center"><Pencil className="w-2.5 h-2.5" /></button>
                         {building.floors.length > 1 && <button onClick={e => { e.stopPropagation(); deleteFloor(building.id, floor.id); }} className="w-4 h-4 hover:text-red-400 text-slate-500 flex items-center justify-center"><Trash2 className="w-2.5 h-2.5" /></button>}
@@ -1209,6 +1222,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   { key: 'walls', label: 'Wände' },
                   { key: 'rooms', label: 'Räume' },
                   { key: 'ducts', label: 'Kanäle' },
+                  { key: 'verticalDucts', label: 'Vertikale Kanäle' },
                   { key: 'pipes', label: 'Rohre' },
                   { key: 'slabs', label: 'Decken' },
                   { key: 'background', label: 'Hintergrundbild' },
