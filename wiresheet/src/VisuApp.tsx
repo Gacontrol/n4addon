@@ -474,12 +474,13 @@ export function VisuApp() {
 
   const dual = isDualLayer(currentEffect);
 
+  const needsPerspective = transitioning && (currentEffect === 'cube-left' || currentEffect === 'cube-right' || currentEffect === 'flip');
+
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden">
       <div
         className="flex-1 overflow-hidden relative"
         style={{
-          perspective: '1200px',
           background: transitioning && bgTransparent ? 'transparent' : undefined,
         }}
       >
@@ -489,32 +490,45 @@ export function VisuApp() {
           </div>
         )}
 
-        {transitioning && dual && outgoingPage && (
+        {transitioning && dual && (
           <div
             style={{
-              ...getLayerStyle(currentEffect, 'outgoing', transitionPhase, currentDuration),
-              zIndex: 1,
-              overflow: 'hidden',
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              perspective: needsPerspective ? '1200px' : undefined,
             }}
           >
-            <VisuCanvas page={outgoingPage} {...sharedCanvasProps} />
-          </div>
-        )}
-
-        {transitioning && dual && incomingPage && (
-          <div
-            style={{
-              ...getLayerStyle(currentEffect, 'incoming', transitionPhase, currentDuration),
-              zIndex: 2,
-              overflow: 'hidden',
-            }}
-          >
-            <VisuCanvas page={incomingPage} {...sharedCanvasProps} />
+            {outgoingPage && (
+              <div
+                style={{
+                  ...getLayerStyle(currentEffect, 'outgoing', transitionPhase, currentDuration),
+                  zIndex: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                <VisuCanvas page={outgoingPage} {...sharedCanvasProps} />
+              </div>
+            )}
+            {incomingPage && (
+              <div
+                style={{
+                  ...getLayerStyle(currentEffect, 'incoming', transitionPhase, currentDuration),
+                  zIndex: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <VisuCanvas page={incomingPage} {...sharedCanvasProps} />
+              </div>
+            )}
           </div>
         )}
 
         {transitioning && !dual && (
-          <>
+          <div
+            style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              perspective: needsPerspective ? '1200px' : undefined,
+            }}
+          >
             {outgoingPage && transitionPhase === 'exit' && (
               <div
                 style={{
@@ -537,7 +551,7 @@ export function VisuApp() {
                 <VisuCanvas page={incomingPage} {...sharedCanvasProps} />
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

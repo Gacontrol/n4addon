@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Building3DWidgetConfig } from '../../types/visualization';
 import { Building } from '../../types/building';
 import { BuildingCanvas3D, DEFAULT_LIGHTING, DEFAULT_EXPLOSION, LightingSettings, ExplosionSettings } from '../building/BuildingCanvas3D';

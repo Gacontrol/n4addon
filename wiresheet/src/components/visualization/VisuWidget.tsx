@@ -72,6 +72,40 @@ import { VisuTrendChart } from './VisuTrendChart';
 import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
 import { getThemeVars } from '../../utils/widgetThemes';
+
+class Widget3DErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded">
+          <div className="flex flex-col items-center gap-2 text-center px-4">
+            <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center">
+              <span className="text-slate-500 text-xs">3D</span>
+            </div>
+            <p className="text-xs text-slate-400">3D nicht verfugbar</p>
+            <button
+              className="text-[10px] text-blue-400 hover:text-blue-300"
+              onClick={() => this.setState({ hasError: false })}
+            >
+              Neu laden
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import {
   VisuSwitch,
   VisuButton,
@@ -1375,12 +1409,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       case 'visu-3d-building': {
         const b3dCfg = widget.config as Building3DWidgetConfig;
         return (
-          <Visu3DBuilding
-            config={b3dCfg}
-            width={widget.size.width}
-            height={widget.size.height}
-            isEditMode={isEditMode}
-          />
+          <Widget3DErrorBoundary>
+            <Visu3DBuilding
+              config={b3dCfg}
+              width={widget.size.width}
+              height={widget.size.height}
+              isEditMode={isEditMode}
+            />
+          </Widget3DErrorBoundary>
         );
       }
 
