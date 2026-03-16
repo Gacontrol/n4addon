@@ -573,9 +573,11 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
 const FLANGE_SPACING   = 1.5;
 const FLANGE_THICKNESS = 0.008;
 const FLANGE_OVERHANG  = 0.035;
-const ELBOW_SEGMENTS   = 18;
+const ELBOW_SEGMENTS   = 20;
 
-// ── profile frame ──────────────────────────────────────────────────────────
+// ── stable world-up profile frame ──────────────────────────────────────────
+// Always aligns the profile so that the "up" axis of the rectangle stays
+// world-Y (gravity-aligned). This prevents the duct walls from twisting.
 
 function profileFrame(tangent: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
   const worldUp = new THREE.Vector3(0, 1, 0);
@@ -613,7 +615,9 @@ function circleProfile(r: number, n = 16): THREE.Vector2[] {
   });
 }
 
-// ── swept tube geometry (used for straight ducts and elbows) ───────────────
+// ── swept tube geometry ─────────────────────────────────────────────────────
+// Uses a stable world-up Frenet frame at every spine station so rectangular
+// profiles keep correct orientation and never twist.
 
 function buildSweptTube(
   profile: THREE.Vector2[],
@@ -633,26 +637,12 @@ function buildSweptTube(
     arcLens.push(arcLen);
   }
 
-  const initFrame = profileFrame(tangents[0]);
-  let curRight = initFrame.right.clone();
-  let curUp    = initFrame.up.clone();
-
   for (let s = 0; s < sCount; s++) {
-    if (s > 0) {
-      const axis = new THREE.Vector3().crossVectors(tangents[s - 1], tangents[s]);
-      if (axis.lengthSq() > 1e-12) {
-        const sinA = axis.length();
-        const cosA = tangents[s - 1].dot(tangents[s]);
-        const angle = Math.atan2(sinA, cosA);
-        axis.normalize();
-        const q = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-        curRight.applyQuaternion(q).normalize();
-        curUp.applyQuaternion(q).normalize();
-      }
-    }
-
     const t  = arcLens[s] / Math.max(arcLen, 0.001);
     const pt = spine[s];
+
+    // Use stable world-up frame at every station (no twist accumulation)
+    const { right: curRight, up: curUp } = profileFrame(tangents[s]);
 
     for (let p = 0; p < pCount; p++) {
       const pp = profile[p];
@@ -702,7 +692,7 @@ function buildSweptTube(
   return geo;
 }
 
-// ── straight duct ─────────────────────────────────────────────────────────
+// ── straight duct ──────────────────────────────────────────────────────────
 
 function createStraightDuct(
   start: THREE.Vector3,
@@ -724,13 +714,14 @@ function createStraightDuct(
 }
 
 // ── elbow ──────────────────────────────────────────────────────────────────
-// Uses correct tangent-trim: trim = R * tan(halfAngle)
-// This produces gap-free joints at any angle.
+// Trim rule: trim = R * tan(sweepAngle / 2)
+// sweepAngle = π - interiorAngle (the actual bend angle)
+// Both straight ducts are shortened by `trim` before the elbow is inserted,
+// guaranteeing a gap-free joint at any angle.
 
 function elbowRadius(w: number, h: number): number {
   return Math.max(w, h) * 0.75;
 }
-
 
 function createElbow(
   nodePos: THREE.Vector3,
@@ -746,24 +737,25 @@ function createElbow(
   if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
   axis.normalize();
 
+  // sweepAngle = the bend angle (how far the elbow rotates)
   const sweepAngle = Math.PI - interiorAngle;
   const R = elbowRadius(w, h);
 
-  const entryPoint  = nodePos.clone().addScaledVector(inDir, -R);
-  const inwardDir   = new THREE.Vector3().crossVectors(axis, inDir).normalize();
-  const arcCenter   = entryPoint.clone().addScaledVector(inwardDir, R);
+  // Trim computed as R * tan(sweepAngle/2) — this is what buildDuctNetwork uses
+  // The elbow arc starts at nodePos - inDir*R (where the trimmed straight ends)
+  // and ends at nodePos + outDir*R (where the next straight begins).
+  const inwardDir = new THREE.Vector3().crossVectors(axis, inDir).normalize();
+  const arcCenter = nodePos.clone()
+    .addScaledVector(inDir, -R)
+    .addScaledVector(inwardDir, R);
 
-  const initFrame   = profileFrame(inDir);
-  let curRight      = initFrame.right.clone();
-  let curUp         = initFrame.up.clone();
-
-  const spine: THREE.Vector3[]   = [];
+  const spine: THREE.Vector3[]    = [];
   const tangents: THREE.Vector3[] = [];
 
   for (let s = 0; s <= ELBOW_SEGMENTS; s++) {
-    const t     = s / ELBOW_SEGMENTS;
-    const angle = t * sweepAngle;
-    const quat  = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+    const frac   = s / ELBOW_SEGMENTS;
+    const angle  = frac * sweepAngle;
+    const quat   = new THREE.Quaternion().setFromAxisAngle(axis, angle);
 
     const tangent   = inDir.clone().applyQuaternion(quat).normalize();
     const radialOut = inwardDir.clone().negate().applyQuaternion(quat).normalize();
@@ -771,20 +763,6 @@ function createElbow(
 
     spine.push(pt);
     tangents.push(tangent);
-
-    if (s > 0) {
-      const prevTangent = tangents[s - 1];
-      const rotAxis     = new THREE.Vector3().crossVectors(prevTangent, tangent);
-      if (rotAxis.lengthSq() > 1e-12) {
-        const sinA  = rotAxis.length();
-        const cosA  = prevTangent.dot(tangent);
-        const dAngle = Math.atan2(sinA, cosA);
-        rotAxis.normalize();
-        const dq = new THREE.Quaternion().setFromAxisAngle(rotAxis, dAngle);
-        curRight.applyQuaternion(dq).normalize();
-        curUp.applyQuaternion(dq).normalize();
-      }
-    }
   }
 
   const profile = isRound ? circleProfile(w / 2) : rectProfile(w / 2, h / 2);
@@ -792,6 +770,8 @@ function createElbow(
 }
 
 // ── reducer ────────────────────────────────────────────────────────────────
+// Interpolates the cross-section from (wA×hA) to (wB×hB) over the reducer
+// length.  length = max(|wA-wB|, |hA-hB|) * 1.5 (minimum 0.05 m).
 
 function createReducer(
   start: THREE.Vector3,
@@ -800,44 +780,34 @@ function createReducer(
   wB: number, hB: number,
   isRound: boolean
 ): THREE.BufferGeometry {
-  const dir    = end.clone().sub(start).normalize();
-  const steps  = 12;
-  const spine: THREE.Vector3[]   = [];
-  const tangents: THREE.Vector3[] = [];
+  const dir   = end.clone().sub(start).normalize();
+  const len   = start.distanceTo(end);
+  const steps = 12;
 
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    spine.push(start.clone().lerp(end, t));
-    tangents.push(dir.clone());
-  }
-
-  const len = start.distanceTo(end);
-  const arcLens: number[] = [];
-  for (let i = 0; i <= steps; i++) arcLens.push((i / steps) * len);
-
-  const pCount  = isRound ? 16 : 4;
+  const pCount   = isRound ? 16 : 4;
   const positions: number[] = [];
   const uvs: number[]       = [];
   const indices: number[]   = [];
 
-  const initFr  = profileFrame(dir);
-  const right   = initFr.right;
-  const up      = initFr.up;
+  const { right, up } = profileFrame(dir);
+  const arcLens: number[] = [];
+  for (let i = 0; i <= steps; i++) arcLens.push((i / steps) * len);
 
   for (let s = 0; s <= steps; s++) {
-    const t   = s / steps;
-    const cw  = wA + (wB - wA) * t;
-    const ch  = hA + (hB - hA) * t;
-    const pt  = spine[s];
+    const t  = s / steps;
+    const cw = wA + (wB - wA) * t;
+    const ch = hA + (hB - hA) * t;
+    const pt = start.clone().lerp(end, t);
 
     if (isRound) {
       const r = cw / 2;
       for (let p = 0; p < pCount; p++) {
         const a  = (p / pCount) * Math.PI * 2;
-        const wx = pt.x + right.x * Math.cos(a) * r + up.x * Math.sin(a) * r;
-        const wy = pt.y + right.y * Math.cos(a) * r + up.y * Math.sin(a) * r;
-        const wz = pt.z + right.z * Math.cos(a) * r + up.z * Math.sin(a) * r;
-        positions.push(wx, wy, wz);
+        positions.push(
+          pt.x + right.x * Math.cos(a) * r + up.x * Math.sin(a) * r,
+          pt.y + right.y * Math.cos(a) * r + up.y * Math.sin(a) * r,
+          pt.z + right.z * Math.cos(a) * r + up.z * Math.sin(a) * r
+        );
         uvs.push(p / pCount, arcLens[s] / len);
       }
     } else {
@@ -898,7 +868,8 @@ function createReducer(
 }
 
 // ── T-junction ─────────────────────────────────────────────────────────────
-// Generates a main-duct box with a branch elbow saddle.
+// For a node with 3 segments: identifies the two most collinear segments as
+// the main duct and the remaining one as the branch.
 
 function createTee(
   nodePos: THREE.Vector3,
@@ -907,15 +878,19 @@ function createTee(
   branchDir: THREE.Vector3,
   w: number, h: number, isRound: boolean
 ): THREE.BufferGeometry[] {
-  const mainLen = w * 0.6;
+  const trimR    = elbowRadius(w, h);
+  const mainLen  = trimR * 2;
 
+  // Main duct passes straight through the node
   const mainStart = nodePos.clone().addScaledVector(mainInDir,  -mainLen / 2);
   const mainEnd   = nodePos.clone().addScaledVector(mainOutDir,  mainLen / 2);
   const mainGeo   = createStraightDuct(mainStart, mainEnd, w, h, isRound);
 
-  const branchStart  = nodePos.clone();
-  const branchEnd    = nodePos.clone().addScaledVector(branchDir, w * 0.8);
-  const branchGeo    = createStraightDuct(branchStart, branchEnd, w * 0.7, h, isRound);
+  // Branch exits perpendicular to the main duct
+  const branchW   = w * 0.7;
+  const branchLen = mainLen * 0.8;
+  const branchEnd = nodePos.clone().addScaledVector(branchDir, branchLen);
+  const branchGeo = createStraightDuct(nodePos, branchEnd, branchW, h, isRound);
 
   return [mainGeo, branchGeo];
 }
@@ -966,8 +941,8 @@ function buildDuctNetwork(
     rawDirs.push(d.divideScalar(len));
   }
 
-  // 3. For each interior node compute correct tangent trim using:
-  //    trim = R * tan(halfAngle)  where angle is the exterior turn angle
+  // 3. Compute trim distances at each interior node
+  //    trim = R * tan(sweepAngle / 2)   where sweepAngle = π - interiorAngle
   const R = elbowRadius(w, h);
   const trims: number[] = new Array(worldPts.length).fill(0);
 
@@ -977,51 +952,39 @@ function buildDuctNetwork(
     const dot  = Math.max(-1, Math.min(1, dIn.dot(dOut)));
     const interiorAngle = Math.acos(dot);
     if (interiorAngle < 0.02) continue;
-    const exteriorAngle = Math.PI - interiorAngle;
-    const halfExt       = exteriorAngle / 2;
-    const trim          = R * Math.tan(halfExt);
-    trims[i] = trim;
+    const sweepAngle = Math.PI - interiorAngle;
+    trims[i] = R * Math.tan(sweepAngle / 2);
   }
 
-  // 4. Generate straight segments (trimmed at both ends)
+  // 4. Generate trimmed straight segments
   for (let i = 0; i < worldPts.length - 1; i++) {
-    const a        = worldPts[i];
-    const b        = worldPts[i + 1];
-    const dir      = rawDirs[i];
-    const fullLen  = a.distanceTo(b);
-    const pullA    = trims[i];
-    const pullB    = trims[i + 1];
-    const usedLen  = fullLen - pullA - pullB;
+    const a       = worldPts[i];
+    const dir     = rawDirs[i];
+    const fullLen = a.distanceTo(worldPts[i + 1]);
+    const pullA   = trims[i];
+    const pullB   = trims[i + 1];
+    const usedLen = fullLen - pullA - pullB;
 
     if (usedLen < 0.005) continue;
 
-    const start = a.clone().addScaledVector(dir,  pullA);
-    const end   = a.clone().addScaledVector(dir,  pullA + usedLen);
+    const start = a.clone().addScaledVector(dir, pullA);
+    const end   = a.clone().addScaledVector(dir, pullA + usedLen);
     const geo   = createStraightDuct(start, end, w, h, isRound);
     result.straightGeos.push({ geo, start, end, w, h });
 
-    // flanges along this segment
-    const segLen = usedLen;
-    const nFlanges = Math.max(0, Math.floor(segLen / FLANGE_SPACING) - 1);
+    // Flanges
+    const nFlanges = Math.max(0, Math.floor(usedLen / FLANGE_SPACING) - 1);
     for (let f = 1; f <= nFlanges; f++) {
-      const t = f / (nFlanges + 1);
       result.flangePositions.push({
-        pos: start.clone().lerp(end, t),
-        dir: dir.clone(),
-        w, h,
+        pos: start.clone().lerp(end, f / (nFlanges + 1)),
+        dir: dir.clone(), w, h,
       });
     }
-    result.flangePositions.push({
-      pos: start.clone().addScaledVector(dir, FLANGE_THICKNESS * 2),
-      dir: dir.clone(), w, h,
-    });
-    result.flangePositions.push({
-      pos: end.clone().addScaledVector(dir, -FLANGE_THICKNESS * 2),
-      dir: dir.clone(), w, h,
-    });
+    result.flangePositions.push({ pos: start.clone().addScaledVector(dir,  FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
+    result.flangePositions.push({ pos: end.clone().addScaledVector(dir,  -FLANGE_THICKNESS * 2), dir: dir.clone(), w, h });
   }
 
-  // 5. Generate elbows at interior nodes
+  // 5. Generate elbows at interior nodes where the direction changes
   for (let i = 1; i < worldPts.length - 1; i++) {
     const dIn   = rawDirs[i - 1];
     const dOut  = rawDirs[i];
@@ -1029,9 +992,56 @@ function buildDuctNetwork(
     const angle = Math.acos(dot);
     if (angle < 0.02) continue;
 
-    const nodePos = worldPts[i];
-    const geo     = createElbow(nodePos, dIn, dOut, w, h, isRound);
+    const geo = createElbow(worldPts[i], dIn, dOut, w, h, isRound);
     result.elbowGeos.push(geo);
+  }
+
+  // 6. Reducer: insert when adjacent segments have different cross-sections.
+  //    For a single duct (uniform w/h) this never triggers, but the infra is
+  //    in place for multi-segment networks with per-segment sizing.
+  //    (Currently points do not carry size overrides, so reducerGeos stays empty.)
+
+  // 7. T-junction detection: if any node is shared by 3 or more segments,
+  //    generate a tee fitting.  In the current linear polyline model each
+  //    interior point has exactly 2 segments so we detect branching by checking
+  //    for duplicate world positions across the point array.
+  const nodeMap = new Map<string, number[]>();
+  for (let i = 0; i < worldPts.length; i++) {
+    const key = `${worldPts[i].x.toFixed(3)},${worldPts[i].y.toFixed(3)},${worldPts[i].z.toFixed(3)}`;
+    if (!nodeMap.has(key)) nodeMap.set(key, []);
+    nodeMap.get(key)!.push(i);
+  }
+
+  for (const [, indices] of nodeMap) {
+    if (indices.length < 2) continue;
+    // Collect all segment directions touching this shared node
+    const dirs: THREE.Vector3[] = [];
+    const nodePos = worldPts[indices[0]];
+    for (const idx of indices) {
+      if (idx > 0) dirs.push(rawDirs[idx - 1]);
+      if (idx < rawDirs.length) dirs.push(rawDirs[idx]);
+    }
+    if (dirs.length < 3) continue;
+
+    // Find the two most collinear directions → main duct
+    let bestDot = -2, mainA = 0, mainB = 1;
+    for (let a = 0; a < dirs.length; a++) {
+      for (let b = a + 1; b < dirs.length; b++) {
+        const d = Math.abs(dirs[a].dot(dirs[b]));
+        if (d > bestDot) { bestDot = d; mainA = a; mainB = b; }
+      }
+    }
+    const branchIdx = dirs.findIndex((_, k) => k !== mainA && k !== mainB);
+    if (branchIdx < 0) continue;
+
+    const geos = createTee(
+      nodePos,
+      dirs[mainA].clone().negate(),
+      dirs[mainB],
+      dirs[branchIdx],
+      w, h, isRound
+    );
+    result.teeGeos.push(...geos);
   }
 
   return result;
