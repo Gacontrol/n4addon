@@ -5,49 +5,97 @@ import { FlowNode } from './types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
 import { Monitor } from 'lucide-react';
 
-function getTransitionStyles(effect: PageTransitionEffect, phase: 'enter' | 'exit', durationMs: number): React.CSSProperties {
-  const d = `${durationMs}ms`;
-  const base: React.CSSProperties = { transition: `all ${d} ease-in-out`, position: 'absolute', inset: 0, width: '100%', height: '100%' };
-  if (effect === 'none') return base;
-  if (effect === 'fade') {
-    return { ...base, opacity: phase === 'enter' ? 1 : 0 };
-  }
-  if (effect === 'slide-left') {
-    return { ...base, transform: phase === 'enter' ? 'translateX(0)' : 'translateX(-100%)' };
-  }
-  if (effect === 'slide-right') {
-    return { ...base, transform: phase === 'enter' ? 'translateX(0)' : 'translateX(100%)' };
-  }
-  if (effect === 'slide-up') {
-    return { ...base, transform: phase === 'enter' ? 'translateY(0)' : 'translateY(-100%)' };
-  }
-  if (effect === 'slide-down') {
-    return { ...base, transform: phase === 'enter' ? 'translateY(0)' : 'translateY(100%)' };
-  }
-  if (effect === 'zoom-in') {
-    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(0.8)', opacity: phase === 'enter' ? 1 : 0 };
-  }
-  if (effect === 'zoom-out') {
-    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(1.2)', opacity: phase === 'enter' ? 1 : 0 };
-  }
-  if (effect === 'flip') {
-    return { ...base, transform: phase === 'enter' ? 'rotateY(0deg)' : 'rotateY(90deg)', opacity: phase === 'enter' ? 1 : 0, transformOrigin: 'center' };
-  }
-  return base;
+const DUAL_LAYER_EFFECTS: PageTransitionEffect[] = ['slide-left', 'slide-right', 'slide-up', 'slide-down', 'cube-left', 'cube-right', 'zoom-in-out', 'zoom-out-in'];
+
+function isDualLayer(effect: PageTransitionEffect): boolean {
+  return DUAL_LAYER_EFFECTS.includes(effect);
 }
 
-function getInitialTransitionStyles(effect: PageTransitionEffect, durationMs: number): React.CSSProperties {
+type TransitionLayerRole = 'outgoing' | 'incoming';
+
+function getLayerStyle(
+  effect: PageTransitionEffect,
+  role: TransitionLayerRole,
+  phase: 'exit' | 'enter',
+  durationMs: number
+): React.CSSProperties {
   const d = `${durationMs}ms`;
-  const base: React.CSSProperties = { transition: `all ${d} ease-in-out`, position: 'absolute', inset: 0, width: '100%', height: '100%' };
+  const base: React.CSSProperties = {
+    transition: `all ${d} cubic-bezier(0.4,0,0.2,1)`,
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    backfaceVisibility: 'hidden',
+    willChange: 'transform, opacity',
+  };
+
   if (effect === 'none') return base;
-  if (effect === 'fade') return { ...base, opacity: 0 };
-  if (effect === 'slide-left') return { ...base, transform: 'translateX(100%)' };
-  if (effect === 'slide-right') return { ...base, transform: 'translateX(-100%)' };
-  if (effect === 'slide-up') return { ...base, transform: 'translateY(100%)' };
-  if (effect === 'slide-down') return { ...base, transform: 'translateY(-100%)' };
-  if (effect === 'zoom-in') return { ...base, transform: 'scale(1.2)', opacity: 0 };
-  if (effect === 'zoom-out') return { ...base, transform: 'scale(0.8)', opacity: 0 };
-  if (effect === 'flip') return { ...base, transform: 'rotateY(-90deg)', opacity: 0, transformOrigin: 'center' };
+
+  if (effect === 'fade') {
+    if (role === 'outgoing') return { ...base, opacity: phase === 'exit' ? 1 : 0 };
+    return { ...base, opacity: phase === 'enter' ? 1 : 0 };
+  }
+
+  if (effect === 'slide-left') {
+    if (role === 'outgoing') return { ...base, transform: phase === 'exit' ? 'translateX(0)' : 'translateX(-100%)' };
+    return { ...base, transform: phase === 'enter' ? 'translateX(0)' : 'translateX(100%)' };
+  }
+  if (effect === 'slide-right') {
+    if (role === 'outgoing') return { ...base, transform: phase === 'exit' ? 'translateX(0)' : 'translateX(100%)' };
+    return { ...base, transform: phase === 'enter' ? 'translateX(0)' : 'translateX(-100%)' };
+  }
+  if (effect === 'slide-up') {
+    if (role === 'outgoing') return { ...base, transform: phase === 'exit' ? 'translateY(0)' : 'translateY(-100%)' };
+    return { ...base, transform: phase === 'enter' ? 'translateY(0)' : 'translateY(100%)' };
+  }
+  if (effect === 'slide-down') {
+    if (role === 'outgoing') return { ...base, transform: phase === 'exit' ? 'translateY(0)' : 'translateY(100%)' };
+    return { ...base, transform: phase === 'enter' ? 'translateY(0)' : 'translateY(-100%)' };
+  }
+
+  if (effect === 'zoom-in') {
+    if (role === 'outgoing') return { ...base, opacity: phase === 'exit' ? 1 : 0, transform: 'scale(1)' };
+    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(1.15)', opacity: phase === 'enter' ? 1 : 0 };
+  }
+  if (effect === 'zoom-out') {
+    if (role === 'outgoing') return { ...base, opacity: phase === 'exit' ? 1 : 0, transform: 'scale(1)' };
+    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(0.85)', opacity: phase === 'enter' ? 1 : 0 };
+  }
+
+  if (effect === 'flip') {
+    if (role === 'outgoing') {
+      return { ...base, transform: phase === 'exit' ? 'rotateY(0deg)' : 'rotateY(90deg)', opacity: phase === 'exit' ? 1 : 0, transformOrigin: 'center' };
+    }
+    return { ...base, transform: phase === 'enter' ? 'rotateY(0deg)' : 'rotateY(-90deg)', opacity: phase === 'enter' ? 1 : 0, transformOrigin: 'center' };
+  }
+
+  if (effect === 'cube-left') {
+    if (role === 'outgoing') {
+      return { ...base, transform: phase === 'exit' ? 'translateX(0) rotateY(0deg)' : 'translateX(-50%) rotateY(-90deg)', transformOrigin: 'right center', opacity: 1 };
+    }
+    return { ...base, transform: phase === 'enter' ? 'translateX(0) rotateY(0deg)' : 'translateX(50%) rotateY(90deg)', transformOrigin: 'left center', opacity: 1 };
+  }
+  if (effect === 'cube-right') {
+    if (role === 'outgoing') {
+      return { ...base, transform: phase === 'exit' ? 'translateX(0) rotateY(0deg)' : 'translateX(50%) rotateY(90deg)', transformOrigin: 'left center', opacity: 1 };
+    }
+    return { ...base, transform: phase === 'enter' ? 'translateX(0) rotateY(0deg)' : 'translateX(-50%) rotateY(-90deg)', transformOrigin: 'right center', opacity: 1 };
+  }
+
+  if (effect === 'zoom-in-out') {
+    if (role === 'outgoing') {
+      return { ...base, transform: phase === 'exit' ? 'scale(1)' : 'scale(0)', opacity: phase === 'exit' ? 1 : 0 };
+    }
+    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(2)', opacity: phase === 'enter' ? 1 : 0 };
+  }
+  if (effect === 'zoom-out-in') {
+    if (role === 'outgoing') {
+      return { ...base, transform: phase === 'exit' ? 'scale(1)' : 'scale(2)', opacity: phase === 'exit' ? 1 : 0 };
+    }
+    return { ...base, transform: phase === 'enter' ? 'scale(1)' : 'scale(0)', opacity: phase === 'enter' ? 1 : 0 };
+  }
+
   return base;
 }
 
@@ -68,9 +116,12 @@ export function VisuApp() {
   const [activeAlarms, setActiveAlarms] = useState<ActiveAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
-  const [transitionPhase, setTransitionPhase] = useState<'enter' | 'exit'>('enter');
-  const [pendingPageId, setPendingPageId] = useState<string | null>(null);
+  const [transitionPhase, setTransitionPhase] = useState<'exit' | 'enter'>('exit');
+  const [outgoingPageId, setOutgoingPageId] = useState<string | null>(null);
+  const [incomingPageId, setIncomingPageId] = useState<string | null>(null);
   const [displayedPageId, setDisplayedPageId] = useState<string>('');
+  const transitionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const displayedPageIdRef = useRef<string>('');
   const pageHistoryRef = useRef<string[]>([]);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const lastWriteRef = useRef<Map<string, { time: number; value: unknown }>>(new Map());
@@ -79,6 +130,7 @@ export function VisuApp() {
 
   visuPagesRef.current = visuPages;
   logicNodesRef.current = logicNodes;
+  displayedPageIdRef.current = displayedPageId;
 
   const applyNodeConfigs = useCallback((nodeConfigs: Record<string, Record<string, unknown>>) => {
     setLogicNodes(prev => prev.map(n => {
@@ -213,26 +265,62 @@ export function VisuApp() {
     const effect: PageTransitionEffect = targetPage?.transitionEffect || 'none';
     const duration = targetPage?.transitionDuration ?? 300;
 
-    if (effect === 'none' || transitioning) {
+    transitionTimersRef.current.forEach(clearTimeout);
+    transitionTimersRef.current = [];
+
+    if (effect === 'none') {
       setActivePageId(pageId);
       setDisplayedPageId(pageId);
+      setTransitioning(false);
+      setOutgoingPageId(null);
+      setIncomingPageId(null);
       return;
     }
 
-    setTransitioning(true);
-    setTransitionPhase('exit');
-    setPendingPageId(pageId);
+    const currentId = displayedPageIdRef.current;
+    const dual = isDualLayer(effect);
 
-    setTimeout(() => {
-      setActivePageId(pageId);
-      setDisplayedPageId(pageId);
-      setTransitionPhase('enter');
-      setTimeout(() => {
-        setTransitioning(false);
-        setPendingPageId(null);
+    if (dual) {
+      setOutgoingPageId(currentId);
+      setIncomingPageId(pageId);
+      setTransitioning(true);
+      setTransitionPhase('exit');
+
+      const t1 = setTimeout(() => {
+        setTransitionPhase('enter');
+        setActivePageId(pageId);
+        setDisplayedPageId(pageId);
+
+        const t2 = setTimeout(() => {
+          setTransitioning(false);
+          setOutgoingPageId(null);
+          setIncomingPageId(null);
+        }, duration + 50);
+        transitionTimersRef.current.push(t2);
+      }, 16);
+      transitionTimersRef.current.push(t1);
+    } else {
+      setOutgoingPageId(currentId);
+      setIncomingPageId(null);
+      setTransitioning(true);
+      setTransitionPhase('exit');
+
+      const t1 = setTimeout(() => {
+        setActivePageId(pageId);
+        setDisplayedPageId(pageId);
+        setOutgoingPageId(null);
+        setIncomingPageId(pageId);
+        setTransitionPhase('enter');
+
+        const t2 = setTimeout(() => {
+          setTransitioning(false);
+          setIncomingPageId(null);
+        }, duration + 50);
+        transitionTimersRef.current.push(t2);
       }, duration);
-    }, duration / 2);
-  }, [transitioning]);
+      transitionTimersRef.current.push(t1);
+    }
+  }, []);
 
   const handleNavigateTo = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
@@ -323,14 +411,43 @@ export function VisuApp() {
 
   const activePage = visuPages.find(p => p.id === activePageId) || visuPages[0];
   const displayedPage = visuPages.find(p => p.id === displayedPageId) || activePage;
-  const currentEffect: PageTransitionEffect = activePage?.transitionEffect || 'none';
-  const currentDuration = activePage?.transitionDuration ?? 300;
+  const outgoingPage = outgoingPageId ? visuPages.find(p => p.id === outgoingPageId) : null;
+  const incomingPage = incomingPageId ? visuPages.find(p => p.id === incomingPageId) : null;
 
-  const canvasStyle: React.CSSProperties = transitioning
-    ? (transitionPhase === 'exit'
-      ? getTransitionStyles(currentEffect, 'exit', currentDuration / 2)
-      : getInitialTransitionStyles(currentEffect, currentDuration / 2))
-    : { position: 'absolute', inset: 0, width: '100%', height: '100%' };
+  const transitionTargetPage = activePage;
+  const currentEffect: PageTransitionEffect = transitionTargetPage?.transitionEffect || 'none';
+  const currentDuration = transitionTargetPage?.transitionDuration ?? 300;
+  const bgTransparent = transitionTargetPage?.transitionBgTransparent ?? false;
+
+  const sharedCanvasProps = {
+    liveValues,
+    logicNodes,
+    isEditMode: false as const,
+    selectedWidgetId: null,
+    clipboard: null,
+    onSelectWidget: () => {},
+    onUpdateWidget: () => {},
+    onDeleteWidget: () => {},
+    onDuplicateWidget: () => {},
+    onCopyWidget: () => {},
+    onPasteWidget: () => {},
+    onWidgetValueChange: handleWidgetValueChange,
+    onEditWidgetProperties: () => {},
+    onNavigateToPage: handleNavigateTo,
+    onNavigateBack: handleNavigateBack,
+    onNavigateHome: handleNavigateHome,
+    onBringToFront: () => {},
+    onBringForward: () => {},
+    onSendBackward: () => {},
+    onSendToBack: () => {},
+    alarmClasses,
+    alarmConsoles,
+    activeAlarms,
+    onAcknowledgeAlarm: handleAcknowledgeAlarm,
+    onAcknowledgeAll: handleAcknowledgeAll,
+    onClearAlarm: handleClearAlarm,
+    onShelveAlarm: handleShelveAlarm,
+  };
 
   if (loading) {
     return (
@@ -355,41 +472,73 @@ export function VisuApp() {
     );
   }
 
+  const dual = isDualLayer(currentEffect);
+
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden">
-      <div className="flex-1 overflow-hidden relative" style={{ perspective: '1000px' }}>
-        <div style={canvasStyle}>
-        <VisuCanvas
-          page={displayedPage}
-          liveValues={liveValues}
-          logicNodes={logicNodes}
-          isEditMode={false}
-          selectedWidgetId={null}
-          clipboard={null}
-          onSelectWidget={() => {}}
-          onUpdateWidget={() => {}}
-          onDeleteWidget={() => {}}
-          onDuplicateWidget={() => {}}
-          onCopyWidget={() => {}}
-          onPasteWidget={() => {}}
-          onWidgetValueChange={handleWidgetValueChange}
-          onEditWidgetProperties={() => {}}
-          onNavigateToPage={handleNavigateTo}
-          onNavigateBack={handleNavigateBack}
-          onNavigateHome={handleNavigateHome}
-          onBringToFront={() => {}}
-          onBringForward={() => {}}
-          onSendBackward={() => {}}
-          onSendToBack={() => {}}
-          alarmClasses={alarmClasses}
-          alarmConsoles={alarmConsoles}
-          activeAlarms={activeAlarms}
-          onAcknowledgeAlarm={handleAcknowledgeAlarm}
-          onAcknowledgeAll={handleAcknowledgeAll}
-          onClearAlarm={handleClearAlarm}
-          onShelveAlarm={handleShelveAlarm}
-        />
-        </div>
+      <div
+        className="flex-1 overflow-hidden relative"
+        style={{
+          perspective: '1200px',
+          background: transitioning && bgTransparent ? 'transparent' : undefined,
+        }}
+      >
+        {!transitioning && (
+          <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+            <VisuCanvas page={displayedPage} {...sharedCanvasProps} />
+          </div>
+        )}
+
+        {transitioning && dual && outgoingPage && (
+          <div
+            style={{
+              ...getLayerStyle(currentEffect, 'outgoing', transitionPhase, currentDuration),
+              zIndex: 1,
+              overflow: 'hidden',
+            }}
+          >
+            <VisuCanvas page={outgoingPage} {...sharedCanvasProps} />
+          </div>
+        )}
+
+        {transitioning && dual && incomingPage && (
+          <div
+            style={{
+              ...getLayerStyle(currentEffect, 'incoming', transitionPhase, currentDuration),
+              zIndex: 2,
+              overflow: 'hidden',
+            }}
+          >
+            <VisuCanvas page={incomingPage} {...sharedCanvasProps} />
+          </div>
+        )}
+
+        {transitioning && !dual && (
+          <>
+            {outgoingPage && transitionPhase === 'exit' && (
+              <div
+                style={{
+                  ...getLayerStyle(currentEffect, 'outgoing', 'exit', currentDuration),
+                  zIndex: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                <VisuCanvas page={outgoingPage} {...sharedCanvasProps} />
+              </div>
+            )}
+            {incomingPage && transitionPhase === 'enter' && (
+              <div
+                style={{
+                  ...getLayerStyle(currentEffect, 'incoming', 'enter', currentDuration),
+                  zIndex: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <VisuCanvas page={incomingPage} {...sharedCanvasProps} />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

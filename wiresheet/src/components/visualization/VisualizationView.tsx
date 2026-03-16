@@ -533,6 +533,10 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               <option value="zoom-in">Zoom Rein</option>
               <option value="zoom-out">Zoom Raus</option>
               <option value="flip">Umdrehen</option>
+              <option value="cube-left">Wurfel Links</option>
+              <option value="cube-right">Wurfel Rechts</option>
+              <option value="zoom-in-out">Zoom In-Out</option>
+              <option value="zoom-out-in">Zoom Out-In</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -545,6 +549,15 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               value={activePage.transitionDuration ?? 300}
               onChange={(e) => onUpdateVisuPage(activePage.id, { transitionDuration: parseInt(e.target.value) || 300 })}
               className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-slate-400">Transparenter Hintergrund:</label>
+            <input
+              type="checkbox"
+              checked={activePage.transitionBgTransparent ?? false}
+              onChange={(e) => onUpdateVisuPage(activePage.id, { transitionBgTransparent: e.target.checked })}
+              className="w-4 h-4 rounded accent-blue-500 cursor-pointer"
             />
           </div>
           <div className="w-px h-4 bg-slate-600" />

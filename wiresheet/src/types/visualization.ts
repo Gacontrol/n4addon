@@ -423,7 +423,7 @@ export interface VisuWidget {
   zIndex?: number;
 }
 
-export type PageTransitionEffect = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out' | 'flip';
+export type PageTransitionEffect = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'zoom-in' | 'zoom-out' | 'flip' | 'cube-left' | 'cube-right' | 'zoom-in-out' | 'zoom-out-in';
 
 export interface VisuPage {
   id: string;
@@ -436,6 +436,7 @@ export interface VisuPage {
   canvasHeight?: number;
   transitionEffect?: PageTransitionEffect;
   transitionDuration?: number;
+  transitionBgTransparent?: boolean;
 }
 
 export interface ModernSwitchConfig {
