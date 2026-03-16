@@ -1,4 +1,31 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
+
+class Canvas3DErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-400 gap-3">
+          <div className="text-slate-300 font-medium">3D-Ansicht konnte nicht geladen werden</div>
+          <div className="text-xs text-slate-500 max-w-xs text-center">{this.state.error.message}</div>
+          <button
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded"
+            onClick={() => this.setState({ error: null })}
+          >
+            Neu laden
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import type { MultiSelection } from './FloorPlanEditor';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
@@ -892,6 +919,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
           <div className="flex-1 overflow-hidden">
             {viewMode === '3d' ? (
               <div className="relative w-full h-full">
+                <Canvas3DErrorBoundary>
                 <BuildingCanvas3D
                   buildings={buildings}
                   activeFloorId={activeFloorId}
@@ -922,6 +950,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
                 />
+                </Canvas3DErrorBoundary>
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
                     <div className="flex items-center justify-between mb-1">

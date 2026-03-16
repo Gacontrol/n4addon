@@ -950,18 +950,6 @@ function buildDuctNetwork(
     }
   }
 
-  // 6. Generate sharp miter corners at interior nodes where the direction changes
-  for (let i = 1; i < worldPts.length - 1; i++) {
-    const dIn   = rawDirs[i - 1];
-    const dOut  = rawDirs[i];
-    const dot   = Math.max(-1, Math.min(1, dIn.dot(dOut)));
-    const angle = Math.acos(dot);
-    if (angle < 0.02) continue;
-
-    const geo = createMiterCorner(worldPts[i], dIn, dOut, w, h, isRound);
-    result.elbowGeos.push(geo);
-  }
-
   // 6. Reducer: insert when adjacent segments have different cross-sections.
   //    For a single duct (uniform w/h) this never triggers, but the infra is
   //    in place for multi-segment networks with per-segment sizing.
