@@ -180,9 +180,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [floorTransparent, setFloorTransparent] = useState(false);
   const [bgTransparent, setBgTransparent] = useState(false);
   const [showGrid3D, setShowGrid3D] = useState(true);
-  const [globalWallOpacity, setGlobalWallOpacity] = useState(1);
-  const [exposureMode, setExposureMode] = useState(false);
-  const [exposureMaxLevel, setExposureMaxLevel] = useState<number>(999);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
 
@@ -220,8 +217,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     rooms: Room[];
     ducts: Duct[];
     pipes: Pipe[];
-    sourceFloorId: string | null;
-  }>({ walls: [], rooms: [], ducts: [], pipes: [], sourceFloorId: null });
+  }>({ walls: [], rooms: [], ducts: [], pipes: [] });
 
   const [pastedMultiSel, setPastedMultiSel] = useState<MultiSelection | null>(null);
 
@@ -245,15 +241,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
       rooms: activeFloor.rooms.filter(r => sel.roomIds.includes(r.id)),
       ducts: (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id)),
       pipes: (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id)),
-      sourceFloorId: activeFloor.id,
     };
   };
 
   const handlePasteClipboard = () => {
     if (!activeBuilding || !activeFloor) return;
-    const { walls, rooms, ducts, pipes, sourceFloorId } = clipboardRef.current;
-    const sameFloor = sourceFloorId === activeFloor.id;
-    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, sameFloor ? 1 : 0);
+    const { walls, rooms, ducts, pipes } = clipboardRef.current;
+    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
     setPastedMultiSel({ ...newIds });
     setTimeout(() => setPastedMultiSel(null), 50);
   };
@@ -844,39 +838,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   <Thermometer className="w-3.5 h-3.5" />
                   Widgets
                 </button>
-                <button
-                  onClick={() => {
-                    const newMode = !exposureMode;
-                    setExposureMode(newMode);
-                    if (newMode && activeBuilding) {
-                      const maxLvl = Math.max(...activeBuilding.floors.map(f => f.level));
-                      setExposureMaxLevel(maxLvl);
-                    }
-                  }}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${exposureMode ? 'bg-teal-700 text-white border-teal-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                  title="Etagen-Exposition"
-                >
-                  <ChevronsUpDown className="w-3.5 h-3.5" />
-                  Exposition
-                </button>
-                {exposureMode && activeBuilding && (() => {
-                  const sortedLevels = [...new Set(activeBuilding.floors.map(f => f.level))].sort((a, b) => a - b);
-                  const floorsByLevel = sortedLevels.map(lvl => activeBuilding.floors.find(f => f.level === lvl)!);
-                  return (
-                    <div className="flex items-center gap-1 bg-slate-800 border border-teal-700 rounded px-2 py-0.5">
-                      {floorsByLevel.map(fl => (
-                        <button
-                          key={fl.id}
-                          onClick={() => setExposureMaxLevel(fl.level)}
-                          className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${exposureMaxLevel >= fl.level ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-500'}`}
-                          title={fl.name}
-                        >
-                          {fl.level + 1}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })()}
               </div>
             )}
 
@@ -923,8 +884,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   floorTransparent={floorTransparent}
                   bgTransparent={bgTransparent}
                   showGrid={showGrid3D}
-                  globalWallOpacity={globalWallOpacity}
-                  exposureMaxLevel={exposureMode ? exposureMaxLevel : undefined}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
                   widgetPlacementMode={widgetPlacementMode}
@@ -973,16 +932,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         >
                           <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showGrid3D ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </button>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
-                          <span>Wand-Transparenz</span>
-                          <span>{Math.round(globalWallOpacity * 100)}%</span>
-                        </div>
-                        <input type="range" min="0.05" max="1" step="0.05"
-                          value={globalWallOpacity}
-                          onChange={e => setGlobalWallOpacity(parseFloat(e.target.value))}
-                          className="w-full h-1 accent-blue-500" />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">Boden transparent</span>
@@ -1378,7 +1327,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                                 { key: 'verticalDucts', label: 'Vert. Kanäle' },
                                 { key: 'pipes', label: 'Rohre' },
                                 { key: 'slabs', label: 'Decken' },
-                                { key: 'widgets', label: '3D Widgets' },
                               ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
                                 const visible = flLayers[key as keyof typeof flLayers];
                                 return (

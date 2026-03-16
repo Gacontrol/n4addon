@@ -1090,64 +1090,9 @@ interface DuctMeshProps {
   selected: boolean;
   faded?: boolean;
   onSelect: () => void;
-  allDucts?: Duct[];
 }
 
-function findVerticalDuctAt(allDucts: Duct[], x2d: number, z2d: number, offsetX: number, tol = 0.25): Duct | null {
-  for (const d of allDucts) {
-    if (!d.isVertical || d.verticalX == null) continue;
-    const vx = d.verticalX;
-    const vz = d.verticalY ?? 0;
-    if (Math.abs(vx - x2d) < tol && Math.abs(vz - z2d) < tol) return d;
-  }
-  return null;
-}
-
-function verticalConnectPoint(
-  pt: { x: number; y: number },
-  vDuct: Duct,
-  baseY: number,
-  elev: number,
-): { x: number; y: number; elev: number } {
-  let vertMinY: number;
-  let vertMaxY: number;
-  if (vDuct.verticalSectionPoints && vDuct.verticalSectionPoints.length >= 2) {
-    const ys = vDuct.verticalSectionPoints.map(p => p.y);
-    vertMinY = Math.min(...ys);
-    vertMaxY = Math.max(...ys);
-  } else {
-    const ductH = Math.max(0.1, (vDuct.elevation ?? 2.4) * 0.5);
-    vertMaxY = baseY + (vDuct.elevation ?? 2.4);
-    vertMinY = vertMaxY - ductH;
-  }
-  const connectY = elev <= (vertMinY + vertMaxY) / 2 ? vertMinY : vertMaxY;
-  return { x: pt.x, y: pt.y, elev: connectY };
-}
-
-function augmentPointsForVerticals(
-  points: { x: number; y: number; elev?: number }[],
-  allDucts: Duct[],
-  offsetX: number,
-  baseY: number,
-  elev: number,
-): { x: number; y: number; elev?: number }[] {
-  if (points.length < 2) return points;
-
-  const first = points[0];
-  const last  = points[points.length - 1];
-
-  const vStart = findVerticalDuctAt(allDucts, first.x, first.y, offsetX);
-  const vEnd   = findVerticalDuctAt(allDucts, last.x,  last.y,  offsetX);
-
-  let pts: { x: number; y: number; elev?: number }[] = [...points];
-
-  if (vEnd)   pts = [...pts, verticalConnectPoint(last,  vEnd,   baseY, elev)];
-  if (vStart) pts = [verticalConnectPoint(first, vStart, baseY, elev), ...pts];
-
-  return pts;
-}
-
-export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect, allDucts }: DuctMeshProps) {
+export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: DuctMeshProps) {
   const color    = duct.color || DUCT_COLORS[duct.type] || '#60a5fa';
   const elev     = baseY + (duct.elevation ?? 2.4);
   const w        = duct.width  || 0.3;
@@ -1173,14 +1118,9 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect, allD
     return createReducer(start, end, w, h, toW, toH, isRound || toRound);
   }, [duct.isTransition, duct.points, duct.transitionToWidth, duct.transitionToHeight, duct.transitionToShape, offsetX, elev, w, h, isRound]);
 
-  const augmentedPoints = useMemo(() => {
-    if (duct.isVertical || duct.isTransition || !allDucts) return duct.points;
-    return augmentPointsForVerticals(duct.points, allDucts, offsetX, baseY, elev);
-  }, [duct.isVertical, duct.isTransition, duct.points, allDucts, offsetX, baseY, elev]);
-
   const network = useMemo(
-    () => duct.isTransition ? { straightGeos: [], elbowGeos: [], reducerGeos: [], teeGeos: [], flangePositions: [] } : buildDuctNetwork(augmentedPoints, offsetX, elev, w, h, isRound),
-    [duct.isTransition, augmentedPoints, offsetX, elev, w, h, isRound]
+    () => duct.isTransition ? { straightGeos: [], elbowGeos: [], reducerGeos: [], teeGeos: [], flangePositions: [] } : buildDuctNetwork(duct.points, offsetX, elev, w, h, isRound),
+    [duct.isTransition, duct.points, offsetX, elev, w, h, isRound]
   );
 
   const ductOpacity = faded ? 0.45 : 1.0;
