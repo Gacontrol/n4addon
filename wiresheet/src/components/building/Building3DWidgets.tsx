@@ -175,8 +175,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         if (!onDragEnd) return;
         e.stopPropagation();
         didDragRef.current = false;
-        const nativeTarget = e.nativeEvent?.target as Element | undefined;
-        nativeTarget?.setPointerCapture?.(e.pointerId);
+        (e.nativeEvent.target as Element | null)?.setPointerCapture?.(e.pointerId);
         if (controls) (controls as any).enabled = false;
         dragRef.current = {
           dragging: false,
@@ -190,42 +189,43 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       }}
       onPointerMove={(e) => {
         if (!dragRef.current || !onDragEnd) return;
-        const rawDelta = (e.clientY - dragRef.current.startY) * 0.02;
-        const rawDeltaX = (e.clientX - dragRef.current.startX) * 0.02;
+        e.stopPropagation();
+        const factor = 0.06;
+        const rawDeltaX = (e.clientX - dragRef.current.startX) * factor;
+        const rawDeltaY = (e.clientY - dragRef.current.startY) * factor;
         const isShift = dragRef.current.shiftKey || e.shiftKey;
-        if (Math.abs(rawDeltaX) > 0.05 || Math.abs(rawDelta) > 0.05) {
+        if (Math.abs(rawDeltaX) > 0.02 || Math.abs(rawDeltaY) > 0.02) {
           dragRef.current.dragging = true;
         }
         if (dragRef.current.dragging && groupRef.current) {
-          e.stopPropagation();
           if (isShift) {
-            groupRef.current.position.y = wy - rawDelta;
+            groupRef.current.position.y = wy - rawDeltaY;
           } else {
             groupRef.current.position.x = wx + rawDeltaX;
-            groupRef.current.position.z = wz + rawDelta;
+            groupRef.current.position.z = wz + rawDeltaY;
           }
         }
       }}
       onPointerUp={(e) => {
         if (!dragRef.current || !onDragEnd) return;
         e.stopPropagation();
+        (e.nativeEvent.target as Element | null)?.releasePointerCapture?.(e.pointerId);
         if (controls) (controls as any).enabled = true;
         if (dragRef.current.dragging) {
           didDragRef.current = true;
-          const deltaX = (e.clientX - dragRef.current.startX) * 0.02;
-          const deltaY = (e.clientY - dragRef.current.startY) * 0.02;
+          const factor = 0.06;
+          const deltaX = (e.clientX - dragRef.current.startX) * factor;
+          const deltaY = (e.clientY - dragRef.current.startY) * factor;
           const isShift = dragRef.current.shiftKey || e.shiftKey;
           if (isShift) {
             onDragEnd(dragRef.current.startWX, dragRef.current.startWZ, dragRef.current.startWY - deltaY);
           } else {
             onDragEnd(dragRef.current.startWX + deltaX, dragRef.current.startWZ + deltaY, dragRef.current.startWY);
           }
-        } else if (controls) {
-          (controls as any).enabled = true;
         }
         dragRef.current = null;
       }}
-      onPointerLeave={() => {
+      onPointerCancel={() => {
         if (controls) (controls as any).enabled = true;
         dragRef.current = null;
       }}

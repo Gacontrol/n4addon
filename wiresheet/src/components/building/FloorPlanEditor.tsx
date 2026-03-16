@@ -282,9 +282,11 @@ export function FloorPlanEditor({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const W = canvas.width;
-    const H = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
 
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
@@ -767,8 +769,8 @@ export function FloorPlanEditor({
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     return {
-      px: (e.clientX - rect.left) * (canvas.width / rect.width),
-      py: (e.clientY - rect.top) * (canvas.height / rect.height),
+      px: e.clientX - rect.left,
+      py: e.clientY - rect.top,
     };
   };
 
