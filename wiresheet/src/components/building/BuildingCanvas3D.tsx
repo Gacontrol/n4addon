@@ -43,6 +43,7 @@ interface Props {
   bgColor?: string;
   floorTransparent?: boolean;
   bgTransparent?: boolean;
+  showGrid?: boolean;
   lighting?: LightingSettings;
 }
 
@@ -489,7 +490,8 @@ function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
   );
 }
 
-function GroundGrid({ size, transparent }: { size: number; transparent?: boolean }) {
+function GroundGrid({ size, transparent, showGrid = true }: { size: number; transparent?: boolean; showGrid?: boolean }) {
+  if (!showGrid) return null;
   return (
     <group>
       {!transparent && (
@@ -558,6 +560,7 @@ interface BuildingSceneProps {
   highlightFloor: boolean;
   lighting: LightingSettings;
   floorTransparent?: boolean;
+  showGrid?: boolean;
 }
 
 function BuildingScene({
@@ -565,7 +568,7 @@ function BuildingScene({
   selectedWidget3DId, selectedDuctId, selectedPipeId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent
+  highlightFloor, lighting, floorTransparent, showGrid = true
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -792,7 +795,7 @@ function BuildingScene({
 
   return (
     <>
-      <GroundGrid size={allSize} transparent={floorTransparent} />
+      <GroundGrid size={allSize} transparent={floorTransparent} showGrid={showGrid} />
 
       <ambientLight intensity={lighting.ambientIntensity} color="#c8d8f0" />
 
@@ -833,6 +836,7 @@ export function BuildingCanvas3D({
   highlightFloor, bgColor = '#0a1020',
   floorTransparent = false,
   bgTransparent = false,
+  showGrid = true,
   lighting = DEFAULT_LIGHTING,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
@@ -874,6 +878,7 @@ export function BuildingCanvas3D({
             highlightFloor={highlightFloor}
             lighting={lighting}
             floorTransparent={floorTransparent}
+            showGrid={showGrid}
           />
           <Environment preset="city" />
         </Suspense>

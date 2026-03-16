@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { MultiSelection } from './FloorPlanEditor';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
@@ -152,6 +152,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     updateWidget3D,
     deleteWidget3D,
     ROOM_COLORS,
+    undo,
   } = useBuildingEditor();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
@@ -166,6 +167,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [bgColor, setBgColor] = useState('#0a1020');
   const [floorTransparent, setFloorTransparent] = useState(false);
   const [bgTransparent, setBgTransparent] = useState(false);
+  const [showGrid3D, setShowGrid3D] = useState(true);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showLightingPanel, setShowLightingPanel] = useState(false);
 
@@ -201,6 +203,21 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     pipes: Pipe[];
   }>({ walls: [], rooms: [], ducts: [], pipes: [] });
 
+  const [pastedMultiSel, setPastedMultiSel] = useState<MultiSelection | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo]);
+
   const handleCopySelected = (sel: MultiSelection) => {
     if (!activeFloor) return;
     clipboardRef.current = {
@@ -214,7 +231,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const handlePasteClipboard = () => {
     if (!activeBuilding || !activeFloor) return;
     const { walls, rooms, ducts, pipes } = clipboardRef.current;
-    pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    setPastedMultiSel({ ...newIds });
+    setTimeout(() => setPastedMultiSel(null), 50);
   };
 
   const handleDeleteSelected = (sel: MultiSelection) => {
@@ -231,7 +250,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     const rooms = activeFloor.rooms.filter(r => sel.roomIds.includes(r.id));
     const ducts = (activeFloor.ducts ?? []).filter(d => sel.ductIds.includes(d.id));
     const pipes = (activeFloor.pipes ?? []).filter(p => sel.pipeIds.includes(p.id));
-    pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    const newIds = pasteComponents(activeBuilding.id, activeFloor.id, walls, rooms, ducts, pipes, 1);
+    setPastedMultiSel({ ...newIds });
+    setTimeout(() => setPastedMultiSel(null), 50);
   };
 
   const handleMoveMultiSelection = (sel: MultiSelection, dx: number, dy: number) => {
@@ -751,6 +772,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   bgColor={bgColor}
                   floorTransparent={floorTransparent}
                   bgTransparent={bgTransparent}
+                  showGrid={showGrid3D}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
                 />
@@ -789,6 +811,15 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     </div>
                     <div className="border-t border-slate-700 pt-2 mt-1 space-y-1.5">
                       <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Ansicht</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">Raster</span>
+                        <button
+                          onClick={() => setShowGrid3D(v => !v)}
+                          className={`w-8 h-4 rounded-full transition-colors ${showGrid3D ? 'bg-blue-500' : 'bg-slate-600'} relative`}
+                        >
+                          <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showGrid3D ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </button>
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-slate-400">Boden transparent</span>
                         <button
@@ -997,6 +1028,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onMoveMultiSelection={handleMoveMultiSelection}
                 onPropertiesRequested={() => setShowRoomPanel(true)}
                 gridSize={gridSize}
+                forceMultiSel={pastedMultiSel}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-slate-500">

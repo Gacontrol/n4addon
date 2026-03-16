@@ -54,6 +54,7 @@ interface Props {
   onPropertiesRequested?: () => void;
   onMoveMultiSelection?: (sel: MultiSelection, dx: number, dy: number) => void;
   gridSize?: number;
+  forceMultiSel?: MultiSelection | null;
 }
 
 const CELL = 40;
@@ -227,6 +228,7 @@ export function FloorPlanEditor({
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
   onDuplicateSelected, onPropertiesRequested, onMoveMultiSelection,
   gridSize = 1,
+  forceMultiSel,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 80, y: 80 });
@@ -246,6 +248,10 @@ export function FloorPlanEditor({
   const [lassoRect, setLassoRect] = useState<LassoRect | null>(null);
   const [multiSel, setMultiSel] = useState<MultiSelection>({ wallIds: [], roomIds: [], ductIds: [], pipeIds: [] });
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+
+  useEffect(() => {
+    if (forceMultiSel) setMultiSel(forceMultiSel);
+  }, [forceMultiSel]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dragState = useRef<{
@@ -855,7 +861,7 @@ export function FloorPlanEditor({
       const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
       const pts = duct.points;
       if (pts.length < 2) continue;
-      const halfW = duct.width * cellPx / 2;
+      const halfW = duct.width / 2;
       if (duct.shape === 'round') {
         ctx.save();
         ctx.strokeStyle = isSelected ? '#fff' : color;

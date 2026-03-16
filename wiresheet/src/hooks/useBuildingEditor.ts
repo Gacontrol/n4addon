@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab } from '../types/building';
 
 function getApiBase(): string {
@@ -127,6 +127,9 @@ export function useBuildingEditor() {
     }
   }, [buildings, activeBuildingId]);
 
+  const historyRef = useRef<Building[][]>([]);
+  const isUndoingRef = useRef(false);
+
   const saveConfig = useCallback(async (updated: Building[]) => {
     const payload = JSON.stringify({ buildings: updated });
     try {
@@ -145,8 +148,25 @@ export function useBuildingEditor() {
   }, []);
 
   const updateBuildings = useCallback((updated: Building[]) => {
-    setBuildings(updated);
+    if (!isUndoingRef.current) {
+      setBuildings(prev => {
+        historyRef.current = [...historyRef.current.slice(-49), prev];
+        return updated;
+      });
+    } else {
+      setBuildings(updated);
+    }
     saveConfig(updated);
+  }, [saveConfig]);
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    const prev = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    isUndoingRef.current = true;
+    setBuildings(prev);
+    saveConfig(prev);
+    isUndoingRef.current = false;
   }, [saveConfig]);
 
   const activeBuilding = buildings.find(b => b.id === activeBuildingId) || buildings[0];
@@ -696,7 +716,7 @@ export function useBuildingEditor() {
     ducts: Duct[],
     pipes: Pipe[],
     offset: number
-  ) => {
+  ): { wallIds: string[]; roomIds: string[]; ductIds: string[]; pipeIds: string[] } => {
     const mkId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const newWalls = walls.map(w => ({ ...w, id: mkId('wall'), x1: w.x1 + offset, y1: w.y1 + offset, x2: w.x2 + offset, y2: w.y2 + offset }));
     const newRooms = rooms.map(r => ({ ...r, id: mkId('room'), x: r.x + offset, y: r.y + offset }));
@@ -722,6 +742,12 @@ export function useBuildingEditor() {
         : b
     );
     updateBuildings(updated);
+    return {
+      wallIds: newWalls.map(w => w.id),
+      roomIds: newRooms.map(r => r.id),
+      ductIds: newDucts.map(d => d.id),
+      pipeIds: newPipes.map(p => p.id),
+    };
   }, [buildings, updateBuildings]);
 
   // ---- Widget3D Actions ----
@@ -869,6 +895,7 @@ export function useBuildingEditor() {
     selectedWallId,
     tool,
     isLoaded,
+    undo,
     setActiveBuildingId,
     setActiveFloorId,
     setSelectedRoomId,
