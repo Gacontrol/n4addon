@@ -62,23 +62,74 @@ export const PIPE_COLORS: Record<PipeType, string> = {
 
 function makeDuctTexture(color: string): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
   const c = new THREE.Color(color);
-  const hex = '#' + c.getHexString();
-  ctx.fillStyle = hex;
-  ctx.fillRect(0, 0, 128, 128);
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+
+  const r = Math.round(c.r * 255);
+  const g = Math.round(c.g * 255);
+  const b = Math.round(c.b * 255);
+
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, 256, 256);
+
+  const grad = ctx.createLinearGradient(0, 0, 256, 256);
+  grad.addColorStop(0,   `rgba(255,255,255,0.18)`);
+  grad.addColorStop(0.3, `rgba(255,255,255,0.04)`);
+  grad.addColorStop(0.6, `rgba(0,0,0,0.08)`);
+  grad.addColorStop(1,   `rgba(0,0,0,0.22)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+
+  ctx.strokeStyle = `rgba(255,255,255,0.12)`;
+  ctx.lineWidth = 1;
+  for (let y = 0; y < 256; y += 4) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(256, y + (Math.random() - 0.5) * 1.5);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = `rgba(0,0,0,0.25)`;
+  ctx.lineWidth = 1.5;
+  for (let x = 0; x < 256; x += 32) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+  }
+
+  ctx.strokeStyle = `rgba(255,255,255,0.35)`;
   ctx.lineWidth = 2;
-  for (let i = 0; i < 128; i += 16) {
-    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(128, i); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 128); ctx.stroke();
+  for (let x = 2; x < 256; x += 32) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeFlangeTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#7a8a99';
+  ctx.fillRect(0, 0, 64, 64);
+  const grad = ctx.createLinearGradient(0, 0, 64, 0);
+  grad.addColorStop(0, 'rgba(255,255,255,0.3)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.2)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 64; i += 8) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 64); ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(4, 1);
   return tex;
 }
 
@@ -86,6 +137,12 @@ const ductTextureCache = new Map<string, THREE.CanvasTexture>();
 function getCachedDuctTexture(color: string): THREE.CanvasTexture {
   if (!ductTextureCache.has(color)) ductTextureCache.set(color, makeDuctTexture(color));
   return ductTextureCache.get(color)!;
+}
+
+let _flangeTexture: THREE.CanvasTexture | null = null;
+function getCachedFlangeTexture(): THREE.CanvasTexture {
+  if (!_flangeTexture) _flangeTexture = makeFlangeTexture();
+  return _flangeTexture;
 }
 
 function PulseRing({ color, radius }: { color: string; radius: number }) {
@@ -541,6 +598,128 @@ function getSegmentQuaternion(dir: THREE.Vector3): THREE.Quaternion {
   return q;
 }
 
+const FLANGE_SPACING = 1.5;
+const FLANGE_THICKNESS = 0.008;
+const FLANGE_OVERHANG = 0.035;
+
+
+function buildRectDuctGeoSimple(w: number, h: number, len: number): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(w, len, h, 1, Math.max(1, Math.round(len / 0.5)), 1);
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) {
+    const y = pos.getY(i);
+    const u = uv.getX(i);
+    uv.setXY(i, u, (y + len / 2) / len * (len / 0.5));
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
+
+function buildElbowGeometry(
+  w: number, h: number, isRound: boolean,
+  dirA: THREE.Vector3, dirB: THREE.Vector3,
+  segments = 8
+): THREE.BufferGeometry {
+  const radius = Math.max(w, h) * 0.6;
+  const angle = Math.acos(Math.max(-1, Math.min(1, -dirA.dot(dirB))));
+  if (angle < 0.05) return new THREE.BufferGeometry();
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  const axis = new THREE.Vector3().crossVectors(dirA, dirB).normalize();
+  if (axis.length() < 0.001) return new THREE.BufferGeometry();
+
+  const hw = w / 2, hh = h / 2;
+  const profilePoints = isRound
+    ? Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2;
+        return new THREE.Vector2(Math.cos(a) * hw, Math.sin(a) * hh);
+      })
+    : [
+        new THREE.Vector2(-hw, -hh), new THREE.Vector2(hw, -hh),
+        new THREE.Vector2(hw, hh), new THREE.Vector2(-hw, hh),
+      ];
+  const pCount = profilePoints.length;
+
+  const elbowCenter = new THREE.Vector3(0, 0, 0);
+
+  for (let s = 0; s <= segments; s++) {
+    const t = s / segments;
+    const sweepAngle = t * angle;
+    const quat = new THREE.Quaternion().setFromAxisAngle(axis, sweepAngle);
+    const sweepDir = dirA.clone().negate().applyQuaternion(quat).normalize();
+    const right = new THREE.Vector3().crossVectors(sweepDir, axis).normalize();
+    const up = new THREE.Vector3().crossVectors(right, sweepDir).normalize();
+
+    const arcPoint = elbowCenter.clone().addScaledVector(sweepDir, radius);
+
+    for (let p = 0; p < pCount; p++) {
+      const pp = profilePoints[p];
+      const worldPt = arcPoint.clone()
+        .addScaledVector(right, pp.x)
+        .addScaledVector(up, pp.y);
+      positions.push(worldPt.x, worldPt.y, worldPt.z);
+      const n = right.clone().multiplyScalar(pp.x / hw).add(up.clone().multiplyScalar(pp.y / hh)).normalize();
+      normals.push(n.x, n.y, n.z);
+      uvs.push(p / pCount, t * (radius * angle) / 0.3);
+    }
+  }
+
+  for (let s = 0; s < segments; s++) {
+    for (let p = 0; p < pCount; p++) {
+      const a = s * pCount + p;
+      const b = s * pCount + (p + 1) % pCount;
+      const c = (s + 1) * pCount + (p + 1) % pCount;
+      const d = (s + 1) * pCount + p;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function FlangeRect({ w, h, tex }: { w: number; h: number; tex: THREE.CanvasTexture }) {
+  const fw = w + FLANGE_OVERHANG * 2;
+  const fh = h + FLANGE_OVERHANG * 2;
+  const ft = FLANGE_THICKNESS;
+  return (
+    <group>
+      <mesh castShadow>
+        <boxGeometry args={[fw, ft, fh]} />
+        <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
+      </mesh>
+      <mesh castShadow position={[0, 0, 0]}>
+        <boxGeometry args={[fw + ft * 2, ft * 2.5, ft * 2]} />
+        <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
+      </mesh>
+      <mesh castShadow position={[0, 0, 0]}>
+        <boxGeometry args={[ft * 2, ft * 2.5, fh + ft * 2]} />
+        <meshStandardMaterial color="#7a8a99" metalness={0.8} roughness={0.35} />
+      </mesh>
+    </group>
+  );
+}
+
+function FlangeRound({ r, tex }: { r: number; tex: THREE.CanvasTexture }) {
+  const fr = r + FLANGE_OVERHANG;
+  return (
+    <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+      <cylinderGeometry args={[fr, fr, FLANGE_THICKNESS * 3, 16, 1, false]} />
+      <meshStandardMaterial map={tex} color="#8fa0b0" metalness={0.75} roughness={0.4} />
+    </mesh>
+  );
+}
+
 interface DuctMeshProps {
   duct: Duct;
   offsetX: number;
@@ -556,70 +735,108 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const h = duct.height || 0.2;
   const isRound = duct.shape === 'round';
   const halfSize = Math.max(w, h) / 2;
-  const tex = useMemo(() => getCachedDuctTexture(color), [color]);
+  const tex = useMemo(() => {
+    const t = getCachedDuctTexture(color);
+    t.repeat.set(1, 1);
+    return t;
+  }, [color]);
+  const flangeTex = useMemo(() => getCachedFlangeTexture(), []);
 
   const segments = useMemo(
     () => computeDuctSegments(duct.points, offsetX, elev, halfSize),
     [duct.points, offsetX, elev, halfSize]
   );
 
+  const flangePositionsPerSeg = useMemo(() => {
+    return segments.map(seg => {
+      const positions: number[] = [];
+      const count = Math.floor(seg.len / FLANGE_SPACING);
+      if (count < 1) return positions;
+      const step = seg.len / (count + 1);
+      for (let k = 1; k <= count; k++) {
+        positions.push(-seg.len / 2 + step * k);
+      }
+      positions.push(-seg.len / 2 + 0.004);
+      positions.push(seg.len / 2 - 0.004);
+      return positions;
+    });
+  }, [segments]);
+
+  const elbowData = useMemo(() => {
+    const result: { pos: [number,number,number]; geo: THREE.BufferGeometry; quat: THREE.Quaternion }[] = [];
+    const pts = duct.points;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const prev = pts[i - 1];
+      const cur  = pts[i];
+      const next = pts[i + 1];
+      const elevCur  = (cur  as any).elev !== undefined ? baseY + (cur  as any).elev : elev;
+      const elevPrev = (prev as any).elev !== undefined ? baseY + (prev as any).elev : elev;
+      const elevNext = (next as any).elev !== undefined ? baseY + (next as any).elev : elev;
+
+      const dxA = cur.x - prev.x, dyA = elevCur - elevPrev, dzA = cur.y - prev.y;
+      const dxB = next.x - cur.x, dyB = elevNext - elevCur, dzB = next.y - cur.y;
+      const lenA = Math.sqrt(dxA*dxA + dyA*dyA + dzA*dzA) || 1;
+      const lenB = Math.sqrt(dxB*dxB + dyB*dyB + dzB*dzB) || 1;
+      const dirA = new THREE.Vector3(dxA/lenA, dyA/lenA, dzA/lenA);
+      const dirB = new THREE.Vector3(dxB/lenB, dyB/lenB, dzB/lenB);
+
+      const dot = Math.max(-1, Math.min(1, dirA.dot(dirB)));
+      if (Math.acos(dot) < 0.05) continue;
+
+      const geo = buildElbowGeometry(w, h, isRound, dirA, dirB);
+      const q = new THREE.Quaternion();
+      result.push({ pos: [cur.x + offsetX, elevCur, cur.y], geo, quat: q });
+    }
+    return result;
+  }, [duct.points, offsetX, elev, w, h, isRound, baseY]);
+
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
       {segments.map((seg, i) => {
         const quaternion = getSegmentQuaternion(seg.dir);
+
         return (
           <group key={i} position={seg.pos} quaternion={quaternion}>
             {isRound ? (
               <mesh castShadow>
-                <cylinderGeometry args={[w / 2, w / 2, seg.len, 12]} />
-                <meshStandardMaterial color={color} map={tex} metalness={0.35} roughness={0.5} />
+                <cylinderGeometry args={[w / 2, w / 2, seg.len, 14, Math.max(1, Math.round(seg.len / 0.5))]} />
+                <meshStandardMaterial color={color} map={tex} metalness={0.65} roughness={0.35} envMapIntensity={0.8} />
               </mesh>
             ) : (
               <mesh castShadow>
-                <boxGeometry args={[w, seg.len, h]} />
-                <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
+                <primitive object={buildRectDuctGeoSimple(w, h, seg.len)} />
+                <meshStandardMaterial color={color} map={tex} metalness={0.6} roughness={0.38} envMapIntensity={0.8} />
               </mesh>
             )}
+
+            {flangePositionsPerSeg[i]?.map((fp, fi) => (
+              <group key={`fl-${fi}`} position={[0, fp, 0]}>
+                {isRound
+                  ? <FlangeRound r={w / 2} tex={flangeTex} />
+                  : <FlangeRect w={w} h={h} tex={flangeTex} />
+                }
+              </group>
+            ))}
+
             {selected && (
               <mesh>
                 {isRound
-                  ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, seg.len + 0.04, 12]} />
-                  : <boxGeometry args={[w + 0.04, seg.len + 0.04, h + 0.04]} />
+                  ? <cylinderGeometry args={[w / 2 + 0.025, w / 2 + 0.025, seg.len + 0.03, 14]} />
+                  : <boxGeometry args={[w + 0.03, seg.len + 0.03, h + 0.03]} />
                 }
-                <meshBasicMaterial color="#60a5fa" wireframe />
+                <meshBasicMaterial color="#60a5fa" wireframe opacity={0.6} transparent />
               </mesh>
             )}
           </group>
         );
       })}
-      {duct.points.slice(1, -1).map((pt, i) => {
-        const ptElev = (pt as DuctPoint & { elev?: number }).elev !== undefined
-          ? baseY + ((pt as any).elev as number)
-          : elev;
-        const prevPt = duct.points[i];
-        const nextPt = duct.points[i + 2];
-        const ax = pt.x - prevPt.x, az = pt.y - prevPt.y;
-        const bx = nextPt.x - pt.x, bz = nextPt.y - pt.y;
-        const aLen = Math.sqrt(ax * ax + az * az) || 1;
-        const bLen = Math.sqrt(bx * bx + bz * bz) || 1;
-        const adx = ax / aLen, adz = az / aLen;
-        const bdx = bx / bLen, bdz = bz / bLen;
-        const bisectX = adx + bdx, bisectZ = adz + bdz;
-        const bisectLen = Math.sqrt(bisectX * bisectX + bisectZ * bisectZ) || 1;
-        const nbx = bisectX / bisectLen, nbz = bisectZ / bisectLen;
-        const sinHalf = Math.max(0.2, Math.abs(adx * bdz - adz * bdx));
-        const cornerDepth = halfSize / sinHalf * 2;
-        const bisectAngle = Math.atan2(nbx, nbz);
-        return (
-          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} rotation={[0, bisectAngle, 0]} castShadow>
-            {isRound
-              ? <sphereGeometry args={[w / 2 + 0.005, 12, 8]} />
-              : <boxGeometry args={[w, h, Math.min(cornerDepth, halfSize * 4)]} />
-            }
-            <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
-          </mesh>
-        );
-      })}
+
+      {elbowData.map((eb, i) => (
+        <mesh key={`elbow-${i}`} position={eb.pos} castShadow>
+          <primitive object={eb.geo} />
+          <meshStandardMaterial color={color} map={tex} metalness={0.6} roughness={0.38} />
+        </mesh>
+      ))}
     </group>
   );
 }
