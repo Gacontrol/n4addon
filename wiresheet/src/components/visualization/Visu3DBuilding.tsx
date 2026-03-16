@@ -133,6 +133,23 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     );
   }
 
+  const handleFloorClick = useCallback((
+    floorId: string,
+    cx: number,
+    baseY: number,
+    cz: number,
+    floorHeight: number,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number
+  ) => {
+    setActiveFloorId(floorId);
+    window.dispatchEvent(new CustomEvent('focus-floor', {
+      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ }
+    }));
+  }, []);
+
   return (
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgColor }}>
       <BuildingCanvas3D
@@ -148,6 +165,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         showGrid={config.showGrid ?? false}
         lighting={lighting}
         explosion={explosion}
+        onFloorClick={config.showAllFloors ? undefined : handleFloorClick}
       />
 
       {floors.length > 1 && !config.showAllFloors && (

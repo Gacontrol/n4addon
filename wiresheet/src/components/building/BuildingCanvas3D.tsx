@@ -67,6 +67,7 @@ interface Props {
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
   xrayOpacity?: number;
+  onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -468,9 +469,10 @@ interface FloorPlaneProps {
   color: string;
   active: boolean;
   faded: boolean;
+  onClick?: () => void;
 }
 
-function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: FloorPlaneProps) {
+function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded, onClick }: FloorPlaneProps) {
   const w = maxX - minX;
   const d = maxZ - minZ;
   if (w < 0.1 || d < 0.1) return null;
@@ -495,6 +497,7 @@ function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded }: Flo
       position={[cx, floorY, cz]}
       rotation={[-Math.PI / 2, 0, 0]}
       receiveShadow
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
     >
       <shapeGeometry args={[shape]} />
       <meshStandardMaterial
@@ -626,6 +629,63 @@ function GroundGrid({ size, transparent, showGrid = true }: { size: number; tran
   );
 }
 
+interface FocusFloorDetail {
+  cx: number;
+  baseY: number;
+  cz: number;
+  floorHeight: number;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+function CameraFocusFloor() {
+  const { camera, controls } = useThree();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ } = (e as CustomEvent<FocusFloorDetail>).detail;
+      const floorCenterY = baseY + floorHeight / 2;
+      const spanX = maxX - minX;
+      const spanZ = maxZ - minZ;
+      const span = Math.max(spanX, spanZ, 4);
+      const dist = span * 0.85;
+      const camY = floorCenterY + dist;
+      const targetX = cx;
+      const targetZ = cz;
+
+      const startPos = camera.position.clone();
+      const endPos = new THREE.Vector3(targetX, camY, targetZ + 0.001);
+      const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
+      const endTarget = new THREE.Vector3(targetX, floorCenterY, targetZ);
+
+      let t = 0;
+      const duration = 600;
+      const startTime = performance.now();
+
+      const animate = (now: number) => {
+        t = Math.min((now - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        camera.position.lerpVectors(startPos, endPos, ease);
+        camera.lookAt(endTarget.x, endTarget.y, endTarget.z);
+        if (controls && (controls as any).target) {
+          (controls as any).target.lerpVectors(startTarget, endTarget, ease);
+          (controls as any).update?.();
+        }
+        if (t < 1) requestAnimationFrame(animate);
+      };
+
+      requestAnimationFrame(animate);
+    };
+
+    window.addEventListener('focus-floor', handler);
+    return () => window.removeEventListener('focus-floor', handler);
+  }, [camera, controls]);
+
+  return null;
+}
+
 function CameraAutoFit({ buildings }: { buildings: Building[] }) {
   const { camera, controls } = useThree();
   const fitted = useRef(false);
@@ -740,6 +800,7 @@ interface BuildingSceneProps {
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
   xrayOpacity?: number;
+  onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
 }
 
 function BuildingScene({
@@ -748,7 +809,8 @@ function BuildingScene({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2
+  highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
+  onFloorClick
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -812,17 +874,22 @@ function BuildingScene({
       const floorElements: JSX.Element[] = [];
 
       if (floor.showFloorPlane !== false) {
+        const fpMinX = minX + offsetX;
+        const fpMaxX = maxX + offsetX;
+        const fpCX = (fpMinX + fpMaxX) / 2;
+        const fpCZ = (minZ + maxZ) / 2;
         floorElements.push(
           <FloorPlane
             key={`floor-${floor.id}`}
-            minX={minX + offsetX}
-            maxX={maxX + offsetX}
+            minX={fpMinX}
+            maxX={fpMaxX}
             minZ={minZ}
             maxZ={maxZ}
             baseY={baseY}
             color={floor.floorColor || '#1e3a5f'}
             active={isActive}
             faded={faded}
+            onClick={onFloorClick ? () => onFloorClick(floor.id, fpCX, baseY, fpCZ, floor.height, fpMinX, fpMaxX, minZ, maxZ) : undefined}
           />
         );
       }
@@ -1144,6 +1211,7 @@ export function BuildingCanvas3D({
   explosion = DEFAULT_EXPLOSION,
   wallsTransparent = false,
   xrayOpacity = 0.2,
+  onFloorClick,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
@@ -1192,11 +1260,13 @@ export function BuildingCanvas3D({
             wallsTransparent={wallsTransparent}
             xrayOpacity={xrayOpacity}
             explosion={explosion}
+            onFloorClick={onFloorClick}
           />
           <Environment preset="city" />
         </Suspense>
 
         <CameraAutoFit buildings={buildings} />
+        <CameraFocusFloor />
         <DynamicOrbitTarget />
 
         <OrbitControls
