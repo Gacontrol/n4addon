@@ -1268,16 +1268,15 @@ export function FloorPlanEditor({
     if (connectMode !== null) {
       for (const duct of (floor.ducts ?? [])) {
         if (duct.isVertical) continue;
-        const endpoints = [
-          { pt: duct.points[0], idx: 0 },
-          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
-        ];
-        for (const { pt, idx } of endpoints) {
+        const allPoints = duct.points.map((pt, idx) => ({ pt, idx }));
+        for (const { pt, idx } of allPoints) {
           const sp = toScreen(pt.x, pt.y);
           const isFirst = connectMode.firstDuctId === duct.id && connectMode.firstPointIndex === idx;
           const isHover = connectMode.hoverDuctId === duct.id && connectMode.hoverPointIndex === idx;
           const isSameDuct = connectMode.firstDuctId === duct.id;
-          const r = isFirst ? 10 : isHover ? 9 : 7;
+          const isEndpoint = idx === 0 || idx === duct.points.length - 1;
+          const baseR = isEndpoint ? 7 : 5;
+          const r = isFirst ? 10 : isHover ? 9 : baseR;
           ctx.save();
           ctx.beginPath();
           ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
@@ -1290,6 +1289,9 @@ export function FloorPlanEditor({
           } else if (isSameDuct && connectMode.firstDuctId !== null) {
             ctx.fillStyle = '#475569';
             ctx.strokeStyle = '#64748b';
+          } else if (!isEndpoint) {
+            ctx.fillStyle = '#0f766e';
+            ctx.strokeStyle = '#2dd4bf';
           } else {
             ctx.fillStyle = '#1e40af';
             ctx.strokeStyle = '#60a5fa';
@@ -1305,9 +1307,9 @@ export function FloorPlanEditor({
       ctx.font = 'bold 12px Inter, sans-serif';
       ctx.textAlign = 'center';
       if (connectMode.firstDuctId === null) {
-        ctx.fillText('Ersten Endpunkt wählen', W / 2, 24);
+        ctx.fillText('Ersten Knotenpunkt wählen', W / 2, 24);
       } else {
-        ctx.fillText('Zweiten Endpunkt wählen  •  ESC = Abbrechen', W / 2, 24);
+        ctx.fillText('Zweiten Knotenpunkt wählen  •  ESC = Abbrechen', W / 2, 24);
       }
       ctx.restore();
     }
@@ -1500,11 +1502,8 @@ export function FloorPlanEditor({
       let hitPointIndex: number | null = null;
       for (const duct of (floor.ducts ?? [])) {
         if (duct.isVertical || duct.points.length < 2) continue;
-        const endpoints = [
-          { pt: duct.points[0], idx: 0 },
-          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
-        ];
-        for (const { pt, idx } of endpoints) {
+        for (let idx = 0; idx < duct.points.length; idx++) {
+          const pt = duct.points[idx];
           const d = dist(world.x, world.y, pt.x, pt.y);
           if (d < CONNECT_HIT_RADIUS && d < nearestDist) {
             nearestDist = d;
@@ -1736,11 +1735,8 @@ export function FloorPlanEditor({
       let nearestDist = Infinity;
       for (const duct of (floor.ducts ?? [])) {
         if (duct.isVertical || duct.points.length < 2) continue;
-        const endpoints = [
-          { pt: duct.points[0], idx: 0 },
-          { pt: duct.points[duct.points.length - 1], idx: duct.points.length - 1 },
-        ];
-        for (const { pt, idx } of endpoints) {
+        for (let idx = 0; idx < duct.points.length; idx++) {
+          const pt = duct.points[idx];
           const d = dist(world.x, world.y, pt.x, pt.y);
           if (d < CONNECT_HOVER_RADIUS && d < nearestDist) {
             nearestDist = d;
