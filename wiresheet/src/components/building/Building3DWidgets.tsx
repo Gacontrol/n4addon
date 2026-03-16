@@ -476,7 +476,8 @@ interface DuctSegment {
 function computeDuctSegments(
   points: { x: number; y: number; elev?: number }[],
   offsetX: number,
-  defaultElev: number
+  defaultElev: number,
+  halfSize = 0
 ): DuctSegment[] {
   const segs: DuctSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
@@ -490,11 +491,17 @@ function computeDuctSegments(
     const len = Math.sqrt(dx * dx + dz * dz + dy * dy);
     if (len < 0.01) continue;
     const dir = new THREE.Vector3(dx / len, dy / len, dz / len);
-    const mx = a.x + dx / 2 + offsetX;
-    const my = elevA + dy / 2;
-    const mz = a.y + dz / 2;
+    const pullA = (i > 0 && halfSize > 0) ? halfSize : 0;
+    const pullB = (i < points.length - 2 && halfSize > 0) ? halfSize : 0;
+    const usedLen = Math.max(0.01, len - pullA - pullB);
+    const ax = a.x + dir.x * pullA;
+    const ay = elevA + dir.y * pullA;
+    const az = a.y + dir.z * pullA;
+    const mx = ax + dir.x * usedLen / 2 + offsetX;
+    const my = ay + dir.y * usedLen / 2;
+    const mz = az + dir.z * usedLen / 2;
     const isVertical = Math.sqrt(dx * dx + dz * dz) < 0.01;
-    segs.push({ pos: [mx, my, mz], dir, len, isVertical });
+    segs.push({ pos: [mx, my, mz], dir, len: usedLen, isVertical });
   }
   return segs;
 }
@@ -528,11 +535,12 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   const w = duct.width || 0.3;
   const h = duct.height || 0.2;
   const isRound = duct.shape === 'round';
+  const halfSize = Math.max(w, h) / 2;
   const tex = useMemo(() => getCachedDuctTexture(color), [color]);
 
   const segments = useMemo(
-    () => computeDuctSegments(duct.points, offsetX, elev),
-    [duct.points, offsetX, elev]
+    () => computeDuctSegments(duct.points, offsetX, elev, halfSize),
+    [duct.points, offsetX, elev, halfSize]
   );
 
   return (
@@ -568,12 +576,25 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
         const ptElev = (pt as DuctPoint & { elev?: number }).elev !== undefined
           ? baseY + ((pt as any).elev as number)
           : elev;
-        const s = Math.max(w, h);
+        const prevPt = duct.points[i];
+        const nextPt = duct.points[i + 2];
+        const ax = pt.x - prevPt.x, az = pt.y - prevPt.y;
+        const bx = nextPt.x - pt.x, bz = nextPt.y - pt.y;
+        const aLen = Math.sqrt(ax * ax + az * az) || 1;
+        const bLen = Math.sqrt(bx * bx + bz * bz) || 1;
+        const adx = ax / aLen, adz = az / aLen;
+        const bdx = bx / bLen, bdz = bz / bLen;
+        const bisectX = adx + bdx, bisectZ = adz + bdz;
+        const bisectLen = Math.sqrt(bisectX * bisectX + bisectZ * bisectZ) || 1;
+        const nbx = bisectX / bisectLen, nbz = bisectZ / bisectLen;
+        const sinHalf = Math.max(0.2, Math.abs(adx * bdz - adz * bdx));
+        const cornerDepth = halfSize / sinHalf * 2;
+        const bisectAngle = Math.atan2(nbx, nbz);
         return (
-          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} castShadow>
+          <mesh key={`corner-${i}`} position={[pt.x + offsetX, ptElev, pt.y]} rotation={[0, bisectAngle, 0]} castShadow>
             {isRound
               ? <sphereGeometry args={[w / 2 + 0.005, 12, 8]} />
-              : <boxGeometry args={[s + 0.005, s + 0.005, s + 0.005]} />
+              : <boxGeometry args={[w, h, Math.min(cornerDepth, halfSize * 4)]} />
             }
             <meshStandardMaterial color={color} map={tex} metalness={0.3} roughness={0.45} />
           </mesh>
