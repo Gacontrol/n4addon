@@ -37,6 +37,7 @@ interface Props {
   onDeleteDuct?: (id: string) => void;
   onMoveDuctPoint?: (ductId: string, pointIndex: number, x: number, y: number) => void;
   onMoveDuct?: (ductId: string, dx: number, dy: number) => void;
+  onMergeDucts?: (ductIds: string[]) => string | null;
   onAddPipe?: (pipe: Omit<Pipe, 'id'>) => void;
   onSelectPipe?: (id: string | null) => void;
   onDeletePipe?: (id: string) => void;
@@ -223,7 +224,7 @@ export function FloorPlanEditor({
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
-  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct,
+  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
@@ -1949,6 +1950,22 @@ export function FloorPlanEditor({
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
               Einfügen
             </button>
+          )}
+          {multiSel.ductIds.length >= 2 && (
+            <>
+              <div className="border-t border-slate-700 my-1" />
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-blue-900/50 text-blue-400 flex items-center gap-2"
+                onClick={() => {
+                  const newId = onMergeDucts?.(multiSel.ductIds);
+                  setMultiSel({ wallIds: [], roomIds: [], ductIds: newId ? [newId] : [], pipeIds: [] });
+                  setContextMenu(null);
+                }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                Kanäle verbinden ({multiSel.ductIds.length})
+              </button>
+            </>
           )}
           {totalMultiSel > 0 && (
             <>

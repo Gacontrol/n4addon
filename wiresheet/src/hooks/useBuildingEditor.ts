@@ -616,6 +616,87 @@ export function useBuildingEditor() {
     updateBuildings(updated);
   }, [buildings, updateBuildings]);
 
+  const mergeDucts = useCallback((buildingId: string, floorId: string, ductIds: string[]): string | null => {
+    if (ductIds.length < 2) return null;
+
+    const building = buildings.find(b => b.id === buildingId);
+    const floor = building?.floors.find(f => f.id === floorId);
+    if (!floor) return null;
+
+    const ductsToMerge = (floor.ducts ?? []).filter(d => ductIds.includes(d.id));
+    if (ductsToMerge.length < 2) return null;
+
+    const baseDuct = ductsToMerge[0];
+    const otherDucts = ductsToMerge.slice(1);
+
+    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+    let mergedPoints = [...baseDuct.points];
+
+    for (const duct of otherDucts) {
+      const pts = duct.points;
+      if (pts.length < 2) continue;
+
+      const mergedStart = mergedPoints[0];
+      const mergedEnd = mergedPoints[mergedPoints.length - 1];
+      const ductStart = pts[0];
+      const ductEnd = pts[pts.length - 1];
+
+      const connections = [
+        { d: dist(mergedEnd, ductStart), type: 'end-start' as const },
+        { d: dist(mergedEnd, ductEnd), type: 'end-end' as const },
+        { d: dist(mergedStart, ductStart), type: 'start-start' as const },
+        { d: dist(mergedStart, ductEnd), type: 'start-end' as const },
+      ];
+
+      const best = connections.reduce((a, b) => (a.d < b.d ? a : b));
+
+      switch (best.type) {
+        case 'end-start':
+          mergedPoints = [...mergedPoints, ...pts.slice(1)];
+          break;
+        case 'end-end':
+          mergedPoints = [...mergedPoints, ...[...pts].reverse().slice(1)];
+          break;
+        case 'start-start':
+          mergedPoints = [[...pts].reverse().slice(0, -1), mergedPoints].flat();
+          break;
+        case 'start-end':
+          mergedPoints = [pts.slice(0, -1), mergedPoints].flat();
+          break;
+      }
+    }
+
+    const mergedDuct: Duct = {
+      ...baseDuct,
+      id: `duct-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      points: mergedPoints,
+    };
+
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    ducts: [
+                      ...(f.ducts ?? []).filter(d => !ductIds.includes(d.id)),
+                      mergedDuct,
+                    ],
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    return mergedDuct.id;
+  }, [buildings, updateBuildings]);
+
   // ---- Pipe Actions ----
 
   const addPipe = useCallback((buildingId: string, floorId: string, pipe: Omit<Pipe, 'id'>) => {
@@ -965,6 +1046,7 @@ export function useBuildingEditor() {
     moveDuctPoint,
     moveDuct,
     deleteDuct,
+    mergeDucts,
     addPipe,
     updatePipe,
     movePipePoint,
