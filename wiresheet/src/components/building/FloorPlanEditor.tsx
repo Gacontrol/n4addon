@@ -1039,8 +1039,8 @@ export function FloorPlanEditor({
         ctx.save();
         ctx.strokeStyle = isSelected ? '#fff' : color;
         ctx.lineWidth = isSelected ? duct.width * cellPx + 3 : duct.width * cellPx;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
         ctx.globalAlpha = 0.75;
         ctx.beginPath();
         const sp0r = toScreen(pts[0].x, pts[0].y);

@@ -325,8 +325,8 @@ export function SectionView({
       ctx.save();
       ctx.strokeStyle = isSelected ? '#ffffff' : color;
       ctx.lineWidth = duct.width * cellPx;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      ctx.lineCap = 'square';
+      ctx.lineJoin = 'miter';
       ctx.globalAlpha = isSelected ? 0.9 : 0.75;
       ctx.beginPath();
       for (let pi = 0; pi < pts.length; pi++) {

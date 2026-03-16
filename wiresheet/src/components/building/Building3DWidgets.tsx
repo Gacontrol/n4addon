@@ -1145,8 +1145,8 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
 
     if (duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
       const ys = duct.verticalSectionPoints.map(p => p.y);
-      minY = Math.min(...ys);
-      maxY = Math.max(...ys);
+      minY = Math.min(...ys) - h / 2;
+      maxY = Math.max(...ys) + h / 2;
     } else {
       const ductH = Math.max(0.1, (duct.elevation ?? 2.4) * 0.5);
       maxY = baseY + (duct.elevation ?? 2.4);
@@ -1156,10 +1156,6 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     const vertStart = new THREE.Vector3(vx, minY, vz);
     const vertEnd   = new THREE.Vector3(vx, maxY, vz);
     const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
-    const upDir     = new THREE.Vector3(0, 1, 0);
-    const downDir   = new THREE.Vector3(0, -1, 0);
-    const qUp       = ductQuaternion(upDir);
-    const qDown     = ductQuaternion(downDir);
 
     return (
       <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -1167,18 +1163,6 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
           <primitive object={vertGeo} />
           {mat}
         </mesh>
-        <group position={vertStart.toArray()} quaternion={qDown}>
-          {isRound
-            ? <FlangeRound r={w / 2} tex={flangeTex} />
-            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
-          }
-        </group>
-        <group position={vertEnd.toArray()} quaternion={qUp}>
-          {isRound
-            ? <FlangeRound r={w / 2} tex={flangeTex} />
-            : <FlangeRect  w={w}     h={h}           tex={flangeTex} />
-          }
-        </group>
         {selected && (
           <mesh position={[(minY + maxY) / 2 === 0 ? vx : vx, (minY + maxY) / 2, vz]}>
             {isRound
