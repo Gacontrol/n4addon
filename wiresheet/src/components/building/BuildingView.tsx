@@ -768,11 +768,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedWidget3DId={selectedWidget3DId}
                   selectedDuctId={selectedDuctId}
                   selectedPipeId={selectedPipeId}
-                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
-                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
-                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
-                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); }}
-                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); }}
+                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                   onUpdateWidget3D={(widgetId, x, y, z) => {
                     if (!activeBuilding) return;
                     updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
@@ -1007,27 +1007,27 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 pipeType={pipeType}
                 pipeDiameter={pipeDiameter}
                 onAddWall={handleAddWall}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                 onMoveWallPoint={handleMoveWallPoint}
                 onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                 onMoveRoom={handleMoveRoom}
                 onDeleteWall={handleDeleteWall}
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
                 onAddDuct={handleAddDuct}
-                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
+                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
                 onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
                 onMoveDuct={(ductId, dx, dy) => { if (activeBuilding && activeFloor) moveDuct(activeBuilding.id, activeFloor.id, ductId, dx, dy); }}
                 onAddPipe={handleAddPipe}
-                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); }}
+                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
                 onMovePipePoint={(pipeId, ptIdx, x, y) => { if (activeBuilding && activeFloor) movePipePoint(activeBuilding.id, activeFloor.id, pipeId, ptIdx, x, y); }}
                 onMovePipe={(pipeId, dx, dy) => { if (activeBuilding && activeFloor) movePipe(activeBuilding.id, activeFloor.id, pipeId, dx, dy); }}
                 selectedSlabId={selectedSlabId}
-                onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); if (id) setShowRoomPanel(true); else if (!selectedRoomId && !selectedWallId && !selectedDuctId && !selectedPipeId && !selectedWidget3DId) setShowRoomPanel(false); }}
+                onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                 onAddSlab={slab => { if (activeBuilding && activeFloor) addSlab(activeBuilding.id, activeFloor.id, slab); }}
                 onAddPolygonRoom={points => { if (activeBuilding && activeFloor) addPolygonRoom(activeBuilding.id, activeFloor.id, points, newRoomType); }}
                 onDeleteSlab={id => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, id); setSelectedSlabId(null); } }}
