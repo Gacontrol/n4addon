@@ -530,7 +530,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             const start = getPortCenter(conn.source, conn.sourcePort);
             const end = getPortCenter(conn.target, conn.targetPort);
             if (!start || !end) return null;
-            const connValue = liveValues[conn.source];
+            const portKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
+            const connValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[conn.source];
             const isSelected = selectedConnection === conn.id;
             return (
               <ConnectionLine
@@ -592,7 +593,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             for (const input of node.data.inputs) {
               const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
               if (conn) {
-                const srcVal = liveValues[conn.source];
+                const srcPortKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
+                const srcVal = (srcPortKey && liveValues[srcPortKey] !== undefined) ? liveValues[srcPortKey] : liveValues[conn.source];
                 if (srcVal !== undefined && srcVal !== null) {
                   portValues[input.id] = srcVal;
                 }
@@ -655,7 +657,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             for (const input of node.data.inputs) {
               const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
               if (conn) {
-                const srcVal = liveValues[conn.source];
+                const srcPortKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
+                const srcVal = (srcPortKey && liveValues[srcPortKey] !== undefined) ? liveValues[srcPortKey] : liveValues[conn.source];
                 if (srcVal !== undefined && srcVal !== null) {
                   portValues[input.id] = srcVal;
                 }

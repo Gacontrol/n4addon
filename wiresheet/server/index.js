@@ -1280,8 +1280,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
     const incomingConns = connections.filter(c => c.target === nodeId);
 
     const getInputValue = (conn) => {
-      const sourceNode = nodes.find(n => n.id === conn.source);
-      if (sourceNode && (sourceNode.type === 'python-script' || sourceNode.type === 'modbus-device-input')) {
+      if (conn.sourcePort) {
         const portKey = `${conn.source}:${conn.sourcePort}`;
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
@@ -2993,6 +2992,25 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
 
     broadcastSSE('state', { liveValues: getLiveSnapshot() });
+
+    const isImpulse = req.body.impulse === true;
+    if (isImpulse && value) {
+      const resetDelay = 200;
+      setTimeout(() => {
+        const resetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
+        visuControlledDps.set(nodeId, resetVal);
+        if (overrideKey !== nodeId) visuControlledDps.set(overrideKey, resetVal);
+        for (const [pageId, nodeValues] of lastNodeValues) {
+          if (nodeId in nodeValues) {
+            const updated = { ...nodeValues, [nodeId]: resetVal };
+            if (overrideKey !== nodeId) updated[overrideKey] = resetVal;
+            lastNodeValues.set(pageId, updated);
+          }
+        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot() });
+      }, resetDelay);
+    }
+
     res.json({ success: true });
   }
 });

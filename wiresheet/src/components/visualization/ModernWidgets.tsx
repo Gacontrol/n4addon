@@ -74,24 +74,33 @@ export const ModernButton: React.FC<ModernButtonProps> = ({ onValueChange, confi
   const [pressed, setPressed] = useState(false);
   const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const pressedRef = useRef(false);
   const color = config.color ?? '#3b82f6';
   const showLabel = style.showLabel !== false;
+  const isHoldMode = config.holdMode === true;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     setPressed(true);
+    pressedRef.current = true;
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect) {
       setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: Date.now() });
     }
-    onValueChange(config.pressValue ?? true);
+    if (isHoldMode) {
+      onValueChange(config.pressValue ?? true);
+    }
   };
 
   const handlePointerUp = () => {
     if (disabled) return;
+    if (!pressedRef.current) return;
+    pressedRef.current = false;
     setPressed(false);
-    if (!config.holdMode) {
+    if (isHoldMode) {
       onValueChange(config.releaseValue ?? false);
+    } else {
+      onValueChange(config.pressValue ?? true);
     }
     setTimeout(() => setRipple(null), 600);
   };
@@ -106,7 +115,7 @@ export const ModernButton: React.FC<ModernButtonProps> = ({ onValueChange, confi
         disabled={disabled}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerLeave={() => { if (isHoldMode && pressedRef.current) { pressedRef.current = false; setPressed(false); onValueChange(config.releaseValue ?? false); } else if (pressedRef.current) { pressedRef.current = false; setPressed(false); } }}
         className="relative w-full overflow-hidden rounded-lg font-semibold text-white text-sm transition-transform duration-100 select-none focus:outline-none"
         style={{
           height: 36,
