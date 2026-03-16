@@ -629,11 +629,16 @@ export function useBuildingEditor() {
     const baseDuct = ductsToMerge[0];
     const otherDucts = ductsToMerge.slice(1);
 
-    const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    const ptDist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
       Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 
-    let mergedPoints = [...baseDuct.points];
+    const TRANSITION_LENGTH = 0.6;
 
+    let mergedPoints = [...baseDuct.points];
+    let currentWidth = baseDuct.width;
+    let currentHeight = baseDuct.height;
+    let currentShape = baseDuct.shape;
+    const newDucts: Duct[] = [];
     for (const duct of otherDucts) {
       const pts = duct.points;
       if (pts.length < 2) continue;
@@ -644,13 +649,68 @@ export function useBuildingEditor() {
       const ductEnd = pts[pts.length - 1];
 
       const connections = [
-        { d: dist(mergedEnd, ductStart), type: 'end-start' as const },
-        { d: dist(mergedEnd, ductEnd), type: 'end-end' as const },
-        { d: dist(mergedStart, ductStart), type: 'start-start' as const },
-        { d: dist(mergedStart, ductEnd), type: 'start-end' as const },
+        { d: ptDist(mergedEnd, ductStart), type: 'end-start' as const },
+        { d: ptDist(mergedEnd, ductEnd), type: 'end-end' as const },
+        { d: ptDist(mergedStart, ductStart), type: 'start-start' as const },
+        { d: ptDist(mergedStart, ductEnd), type: 'start-end' as const },
       ];
 
       const best = connections.reduce((a, b) => (a.d < b.d ? a : b));
+
+      const sizeMismatch =
+        Math.abs(duct.width - currentWidth) > 0.001 ||
+        Math.abs(duct.height - currentHeight) > 0.001 ||
+        duct.shape !== currentShape;
+
+      if (sizeMismatch) {
+        const getJoinPoint = () => {
+          switch (best.type) {
+            case 'end-start': return mergedEnd;
+            case 'end-end': return mergedEnd;
+            case 'start-start': return mergedStart;
+            case 'start-end': return mergedStart;
+          }
+        };
+        const joinPt = getJoinPoint();
+
+        const getIncomingDir = () => {
+          if (best.type === 'end-start' || best.type === 'end-end') {
+            const prev = mergedPoints[mergedPoints.length - 2];
+            const dx = joinPt.x - prev.x;
+            const dy = joinPt.y - prev.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            return { x: dx / len, y: dy / len };
+          } else {
+            const next = mergedPoints[1];
+            const dx = joinPt.x - next.x;
+            const dy = joinPt.y - next.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            return { x: dx / len, y: dy / len };
+          }
+        };
+        const dir = getIncomingDir();
+        const transStart = { x: joinPt.x - dir.x * (TRANSITION_LENGTH / 2), y: joinPt.y - dir.y * (TRANSITION_LENGTH / 2) };
+        const transEnd = { x: joinPt.x + dir.x * (TRANSITION_LENGTH / 2), y: joinPt.y + dir.y * (TRANSITION_LENGTH / 2) };
+
+        const transitionDuct: Duct = {
+          id: `duct-${Date.now()}-trans-${Math.random().toString(36).substr(2, 6)}`,
+          points: [transStart, transEnd],
+          shape: currentShape,
+          type: baseDuct.type,
+          width: currentWidth,
+          height: currentHeight,
+          elevation: baseDuct.elevation,
+          color: baseDuct.color,
+          label: 'Übergang',
+          insulated: baseDuct.insulated,
+          isTransition: true,
+          transitionToWidth: duct.width,
+          transitionToHeight: duct.height,
+          transitionToShape: duct.shape,
+        };
+
+        newDucts.push(transitionDuct);
+      }
 
       switch (best.type) {
         case 'end-start':
@@ -665,6 +725,12 @@ export function useBuildingEditor() {
         case 'start-end':
           mergedPoints = [pts.slice(0, -1), mergedPoints].flat();
           break;
+      }
+
+      if (sizeMismatch) {
+        currentWidth = duct.width;
+        currentHeight = duct.height;
+        currentShape = duct.shape;
       }
     }
 
@@ -685,6 +751,7 @@ export function useBuildingEditor() {
                     ducts: [
                       ...(f.ducts ?? []).filter(d => !ductIds.includes(d.id)),
                       mergedDuct,
+                      ...newDucts,
                     ],
                   }
                 : f
@@ -695,6 +762,50 @@ export function useBuildingEditor() {
     );
     updateBuildings(updated);
     return mergedDuct.id;
+  }, [buildings, updateBuildings]);
+
+  const splitDuct = useCallback((buildingId: string, floorId: string, ductId: string, pointIndex: number): [string, string] | null => {
+    const building = buildings.find(b => b.id === buildingId);
+    const floor = building?.floors.find(f => f.id === floorId);
+    if (!floor) return null;
+
+    const duct = (floor.ducts ?? []).find(d => d.id === ductId);
+    if (!duct || duct.points.length < 3) return null;
+    if (pointIndex <= 0 || pointIndex >= duct.points.length - 1) return null;
+
+    const firstHalf: Duct = {
+      ...duct,
+      id: `duct-${Date.now()}-a-${Math.random().toString(36).substr(2, 6)}`,
+      points: duct.points.slice(0, pointIndex + 1),
+    };
+    const secondHalf: Duct = {
+      ...duct,
+      id: `duct-${Date.now()}-b-${Math.random().toString(36).substr(2, 6)}`,
+      points: duct.points.slice(pointIndex),
+    };
+
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? {
+            ...b,
+            floors: b.floors.map(f =>
+              f.id === floorId
+                ? {
+                    ...f,
+                    ducts: [
+                      ...(f.ducts ?? []).filter(d => d.id !== ductId),
+                      firstHalf,
+                      secondHalf,
+                    ],
+                  }
+                : f
+            ),
+            updatedAt: Date.now(),
+          }
+        : b
+    );
+    updateBuildings(updated);
+    return [firstHalf.id, secondHalf.id];
   }, [buildings, updateBuildings]);
 
   // ---- Pipe Actions ----
@@ -1047,6 +1158,7 @@ export function useBuildingEditor() {
     moveDuct,
     deleteDuct,
     mergeDucts,
+    splitDuct,
     addPipe,
     updatePipe,
     movePipePoint,

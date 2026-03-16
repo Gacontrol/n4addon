@@ -38,6 +38,7 @@ interface Props {
   onMoveDuctPoint?: (ductId: string, pointIndex: number, x: number, y: number) => void;
   onMoveDuct?: (ductId: string, dx: number, dy: number) => void;
   onMergeDucts?: (ductIds: string[]) => string | null;
+  onSplitDuct?: (ductId: string, pointIndex: number) => void;
   onAddPipe?: (pipe: Omit<Pipe, 'id'>) => void;
   onSelectPipe?: (id: string | null) => void;
   onDeletePipe?: (id: string) => void;
@@ -213,6 +214,7 @@ interface ContextMenu {
   worldY: number;
   targetType: 'wall' | 'duct' | 'pipe' | 'room' | 'slab' | 'canvas' | null;
   targetId: string | null;
+  targetPointIndex?: number;
 }
 
 export function FloorPlanEditor({
@@ -224,7 +226,7 @@ export function FloorPlanEditor({
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
-  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts,
+  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onSplitDuct,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
   onSelectionChange, onDeleteSelected, onCopySelected, onPasteClipboard,
@@ -944,7 +946,30 @@ export function FloorPlanEditor({
       } else {
         drawDuctWithMiters(ctx, pts, halfW, color, 0.75, isSelected, toScreen);
       }
-      if (zoom > 0.5 && duct.label) {
+
+      if (duct.isTransition) {
+        const sp0t = toScreen(pts[0].x, pts[0].y);
+        const sp1t = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        const cx = (sp0t.x + sp1t.x) / 2;
+        const cy = (sp0t.y + sp1t.y) / 2;
+        const transW = Math.max(duct.width, duct.transitionToWidth ?? duct.width) * cellPx;
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = '#f97316';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, transW * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#f97316';
+        ctx.font = `bold ${Math.max(8, 8 * zoom)}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('⇄', cx, cy + 4);
+        ctx.restore();
+      }
+
+      if (zoom > 0.5 && duct.label && !duct.isTransition) {
         const mid = toScreen((pts[0].x + pts[pts.length - 1].x) / 2, (pts[0].y + pts[pts.length - 1].y) / 2);
         ctx.font = `${Math.max(9, 9 * zoom)}px Inter, sans-serif`;
         ctx.fillStyle = color;
@@ -1749,6 +1774,23 @@ export function FloorPlanEditor({
     const world = toWorld(px, py);
     const hit = hitTestWorld(world.x, world.y);
 
+    let targetPointIndex: number | undefined;
+    if (hit?.type === 'duct') {
+      const duct = (floor.ducts ?? []).find(d => d.id === hit.id);
+      if (duct && duct.points.length >= 3) {
+        let closestIdx = -1;
+        let closestDist = Infinity;
+        for (let i = 1; i < duct.points.length - 1; i++) {
+          const d = dist(world.x, world.y, duct.points[i].x, duct.points[i].y);
+          if (d < closestDist && d < 0.5) {
+            closestDist = d;
+            closestIdx = i;
+          }
+        }
+        if (closestIdx >= 0) targetPointIndex = closestIdx;
+      }
+    }
+
     const canvasRect = canvasRef.current!.getBoundingClientRect();
     setContextMenu({
       x: e.clientX - canvasRect.left,
@@ -1757,8 +1799,9 @@ export function FloorPlanEditor({
       worldY: world.y,
       targetType: hit?.type ?? 'canvas',
       targetId: hit?.id ?? null,
+      targetPointIndex,
     });
-  }, [tool, drawingPolyline, drawingWall, toWorld, hitTestWorld, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddDuct, onAddPipe, onAddSlab]);
+  }, [tool, drawingPolyline, drawingWall, toWorld, hitTestWorld, floor.ducts, ductShape, ductType, ductWidth, ductHeight, pipeType, pipeDiameter, onAddDuct, onAddPipe, onAddSlab]);
 
   const bg = floor.backgroundImage;
   const totalMultiSel = multiSel.wallIds.length + multiSel.roomIds.length + multiSel.ductIds.length + multiSel.pipeIds.length;
@@ -1952,6 +1995,21 @@ export function FloorPlanEditor({
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
               Einfügen
             </button>
+          )}
+          {contextMenu.targetType === 'duct' && contextMenu.targetId && contextMenu.targetPointIndex != null && (
+            <>
+              <div className="border-t border-slate-700 my-1" />
+              <button
+                className="w-full text-left px-3 py-1.5 hover:bg-orange-900/50 text-orange-400 flex items-center gap-2"
+                onClick={() => {
+                  onSplitDuct?.(contextMenu.targetId!, contextMenu.targetPointIndex!);
+                  setContextMenu(null);
+                }}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="3"/></svg>
+                Kanal trennen (Punkt {contextMenu.targetPointIndex})
+              </button>
+            </>
           )}
           {multiSel.ductIds.length >= 2 && (
             <>

@@ -137,6 +137,10 @@ export interface Duct {
   color?: string;
   label?: string;
   insulated: boolean;
+  isTransition?: boolean;
+  transitionToWidth?: number;
+  transitionToHeight?: number;
+  transitionToShape?: DuctShape;
 }
 
 export interface Pipe {

@@ -1105,9 +1105,21 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
   }, [color]);
   const flangeTex = useMemo(() => getCachedFlangeTexture(), []);
 
+  const transitionGeo = useMemo(() => {
+    if (!duct.isTransition || duct.points.length < 2) return null;
+    const p0 = duct.points[0];
+    const p1 = duct.points[duct.points.length - 1];
+    const start = new THREE.Vector3(p0.x + offsetX, elev, p0.y);
+    const end   = new THREE.Vector3(p1.x + offsetX, elev, p1.y);
+    const toW = duct.transitionToWidth  ?? w;
+    const toH = duct.transitionToHeight ?? h;
+    const toRound = (duct.transitionToShape ?? duct.shape) === 'round';
+    return createReducer(start, end, w, h, toW, toH, isRound || toRound);
+  }, [duct.isTransition, duct.points, duct.transitionToWidth, duct.transitionToHeight, duct.transitionToShape, offsetX, elev, w, h, isRound]);
+
   const network = useMemo(
-    () => buildDuctNetwork(duct.points, offsetX, elev, w, h, isRound),
-    [duct.points, offsetX, elev, w, h, isRound]
+    () => duct.isTransition ? { straightGeos: [], elbowGeos: [], reducerGeos: [], teeGeos: [], flangePositions: [] } : buildDuctNetwork(duct.points, offsetX, elev, w, h, isRound),
+    [duct.isTransition, duct.points, offsetX, elev, w, h, isRound]
   );
 
   const mat = (
@@ -1122,6 +1134,18 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
 
   return (
     <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+
+      {transitionGeo && (
+        <mesh castShadow>
+          <primitive object={transitionGeo} />
+          <meshStandardMaterial
+            color="#f97316"
+            metalness={0.5}
+            roughness={0.5}
+            envMapIntensity={0.8}
+          />
+        </mesh>
+      )}
 
       {network.straightGeos.map(({ geo, start, end, w: sw, h: sh }, i) => {
         const mid = start.clone().lerp(end, 0.5);
