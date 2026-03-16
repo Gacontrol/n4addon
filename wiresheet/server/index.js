@@ -3009,24 +3009,22 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     if (isImpulse) {
       const capturedNodeId = nodeId;
       const capturedOverrideKey = overrideKey;
-      const resetDelay = 300;
+      const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
       setTimeout(() => {
-        const resetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-        visuControlledDps.set(capturedNodeId, resetVal);
-        if (capturedOverrideKey !== capturedNodeId) visuControlledDps.set(capturedOverrideKey, resetVal);
-        setPersistentDpValue(capturedNodeId, resetVal);
-        const globalOverrides = clientVisuOverrides.get('global');
-        if (globalOverrides) {
-          globalOverrides[capturedNodeId] = resetVal;
-          if (capturedOverrideKey !== capturedNodeId) globalOverrides[capturedOverrideKey] = resetVal;
-        }
+        visuControlledDps.set(capturedNodeId, capturedResetVal);
+        if (capturedOverrideKey !== capturedNodeId) visuControlledDps.set(capturedOverrideKey, capturedResetVal);
+        setPersistentDpValue(capturedNodeId, capturedResetVal);
+        if (!clientVisuOverrides.has('global')) clientVisuOverrides.set('global', {});
+        const freshOverrides = clientVisuOverrides.get('global');
+        freshOverrides[capturedNodeId] = capturedResetVal;
+        if (capturedOverrideKey !== capturedNodeId) freshOverrides[capturedOverrideKey] = capturedResetVal;
         for (const [pgId, nodeVals] of lastNodeValues) {
-          const updated = { ...nodeVals, [capturedNodeId]: resetVal };
-          if (capturedOverrideKey !== capturedNodeId) updated[capturedOverrideKey] = resetVal;
+          const updated = { ...nodeVals, [capturedNodeId]: capturedResetVal };
+          if (capturedOverrideKey !== capturedNodeId) updated[capturedOverrideKey] = capturedResetVal;
           lastNodeValues.set(pgId, updated);
         }
         broadcastSSE('state', { liveValues: getLiveSnapshot() });
-      }, resetDelay);
+      }, 300);
     }
 
     res.json({ success: true });
