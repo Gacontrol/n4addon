@@ -1100,15 +1100,18 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 pipeType={pipeType}
                 pipeDiameter={pipeDiameter}
                 tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
-                onAddVerticalDuct={(duct, fromFloorId, toFloorId) => {
+                onAddVerticalDuct={(duct, fromFloorId) => {
                   if (!activeBuilding) return;
                   addDuct(activeBuilding.id, fromFloorId, duct);
-                  addDuct(activeBuilding.id, toFloorId, duct);
                 }}
                 onAddVerticalPipe={(pipe, fromFloorId, toFloorId) => {
                   if (!activeBuilding) return;
                   addPipe(activeBuilding.id, fromFloorId, pipe);
                   addPipe(activeBuilding.id, toFloorId, pipe);
+                }}
+                onMergeDucts={(ductIds, floorId) => {
+                  if (!activeBuilding) return null;
+                  return mergeDucts(activeBuilding.id, floorId, ductIds);
                 }}
                 gridSize={gridSize}
               />

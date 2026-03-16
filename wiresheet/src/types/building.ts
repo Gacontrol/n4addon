@@ -141,6 +141,9 @@ export interface Duct {
   transitionToWidth?: number;
   transitionToHeight?: number;
   transitionToShape?: DuctShape;
+  isVertical?: boolean;
+  verticalX?: number;
+  verticalSectionPoints?: DuctPoint[];
 }
 
 export interface Pipe {

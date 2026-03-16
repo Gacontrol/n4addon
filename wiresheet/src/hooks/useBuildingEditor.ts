@@ -634,28 +634,18 @@ export function useBuildingEditor() {
 
     const TRANSITION_LENGTH = 0.6;
 
-    let mergedPoints = [...baseDuct.points];
+    const transitionDucts: Duct[] = [];
+    const idsToRemove: string[] = [];
+    const mergedGroups: { ducts: Duct[]; baseDuct: Duct }[] = [];
+
+    let currentGroup: Duct[] = [baseDuct];
     let currentWidth = baseDuct.width;
     let currentHeight = baseDuct.height;
     let currentShape = baseDuct.shape;
-    const newDucts: Duct[] = [];
+
     for (const duct of otherDucts) {
       const pts = duct.points;
       if (pts.length < 2) continue;
-
-      const mergedStart = mergedPoints[0];
-      const mergedEnd = mergedPoints[mergedPoints.length - 1];
-      const ductStart = pts[0];
-      const ductEnd = pts[pts.length - 1];
-
-      const connections = [
-        { d: ptDist(mergedEnd, ductStart), type: 'end-start' as const },
-        { d: ptDist(mergedEnd, ductEnd), type: 'end-end' as const },
-        { d: ptDist(mergedStart, ductStart), type: 'start-start' as const },
-        { d: ptDist(mergedStart, ductEnd), type: 'start-end' as const },
-      ];
-
-      const best = connections.reduce((a, b) => (a.d < b.d ? a : b));
 
       const sizeMismatch =
         Math.abs(duct.width - currentWidth) > 0.001 ||
@@ -663,82 +653,96 @@ export function useBuildingEditor() {
         duct.shape !== currentShape;
 
       if (sizeMismatch) {
-        const getJoinPoint = () => {
-          switch (best.type) {
-            case 'end-start': return mergedEnd;
-            case 'end-end': return mergedEnd;
-            case 'start-start': return mergedStart;
-            case 'start-end': return mergedStart;
-          }
-        };
-        const joinPt = getJoinPoint();
+        mergedGroups.push({ ducts: currentGroup, baseDuct: currentGroup[0] });
+        currentGroup = [duct];
+        currentWidth = duct.width;
+        currentHeight = duct.height;
+        currentShape = duct.shape;
 
-        const getIncomingDir = () => {
-          if (best.type === 'end-start' || best.type === 'end-end') {
-            const prev = mergedPoints[mergedPoints.length - 2];
-            const dx = joinPt.x - prev.x;
-            const dy = joinPt.y - prev.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            return { x: dx / len, y: dy / len };
-          } else {
-            const next = mergedPoints[1];
-            const dx = joinPt.x - next.x;
-            const dy = joinPt.y - next.y;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            return { x: dx / len, y: dy / len };
-          }
-        };
-        const dir = getIncomingDir();
+        const prevGroupLast = mergedGroups[mergedGroups.length - 1].ducts;
+        const prevBase = prevGroupLast[prevGroupLast.length - 1];
+        const prevPts = prevBase.points;
+        const prevEnd = prevPts[prevPts.length - 1];
+        const ductStart = pts[0];
+        const ductEnd = pts[pts.length - 1];
+        const d0 = ptDist(prevEnd, ductStart);
+        const d1 = ptDist(prevEnd, ductEnd);
+        const joinPt = prevEnd;
+        const nextPt = d0 <= d1 ? ductStart : ductEnd;
+
+        const dx = nextPt.x - joinPt.x;
+        const dy = nextPt.y - joinPt.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const dir = { x: dx / len, y: dy / len };
         const transStart = { x: joinPt.x - dir.x * (TRANSITION_LENGTH / 2), y: joinPt.y - dir.y * (TRANSITION_LENGTH / 2) };
         const transEnd = { x: joinPt.x + dir.x * (TRANSITION_LENGTH / 2), y: joinPt.y + dir.y * (TRANSITION_LENGTH / 2) };
 
-        const transitionDuct: Duct = {
+        const prevDuct = prevGroupLast[0];
+        transitionDucts.push({
           id: `duct-${Date.now()}-trans-${Math.random().toString(36).substr(2, 6)}`,
           points: [transStart, transEnd],
-          shape: currentShape,
-          type: baseDuct.type,
-          width: currentWidth,
-          height: currentHeight,
-          elevation: baseDuct.elevation,
-          color: baseDuct.color,
+          shape: prevDuct.shape,
+          type: prevDuct.type,
+          width: prevDuct.width,
+          height: prevDuct.height,
+          elevation: prevDuct.elevation,
+          color: prevDuct.color,
           label: 'Übergang',
-          insulated: baseDuct.insulated,
+          insulated: prevDuct.insulated,
           isTransition: true,
           transitionToWidth: duct.width,
           transitionToHeight: duct.height,
           transitionToShape: duct.shape,
-        };
-
-        newDucts.push(transitionDuct);
-      }
-
-      switch (best.type) {
-        case 'end-start':
-          mergedPoints = [...mergedPoints, ...pts.slice(1)];
-          break;
-        case 'end-end':
-          mergedPoints = [...mergedPoints, ...[...pts].reverse().slice(1)];
-          break;
-        case 'start-start':
-          mergedPoints = [[...pts].reverse().slice(0, -1), mergedPoints].flat();
-          break;
-        case 'start-end':
-          mergedPoints = [pts.slice(0, -1), mergedPoints].flat();
-          break;
-      }
-
-      if (sizeMismatch) {
-        currentWidth = duct.width;
-        currentHeight = duct.height;
-        currentShape = duct.shape;
+        });
+      } else {
+        currentGroup.push(duct);
       }
     }
+    mergedGroups.push({ ducts: currentGroup, baseDuct: currentGroup[0] });
 
-    const mergedDuct: Duct = {
-      ...baseDuct,
-      id: `duct-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      points: mergedPoints,
-    };
+    const resultDucts: Duct[] = [];
+
+    for (const group of mergedGroups) {
+      if (group.ducts.length === 1) {
+        resultDucts.push(group.ducts[0]);
+        continue;
+      }
+
+      idsToRemove.push(...group.ducts.map(d => d.id));
+
+      const base = group.ducts[0];
+      let mergedPoints = [...base.points];
+
+      for (const duct of group.ducts.slice(1)) {
+        const pts = duct.points;
+        if (pts.length < 2) continue;
+        const mergedStart = mergedPoints[0];
+        const mergedEnd = mergedPoints[mergedPoints.length - 1];
+        const ductStart = pts[0];
+        const ductEnd = pts[pts.length - 1];
+        const connections = [
+          { d: ptDist(mergedEnd, ductStart), type: 'end-start' as const },
+          { d: ptDist(mergedEnd, ductEnd), type: 'end-end' as const },
+          { d: ptDist(mergedStart, ductStart), type: 'start-start' as const },
+          { d: ptDist(mergedStart, ductEnd), type: 'start-end' as const },
+        ];
+        const best = connections.reduce((a, b) => (a.d < b.d ? a : b));
+        switch (best.type) {
+          case 'end-start': mergedPoints = [...mergedPoints, ...pts.slice(1)]; break;
+          case 'end-end': mergedPoints = [...mergedPoints, ...[...pts].reverse().slice(1)]; break;
+          case 'start-start': mergedPoints = [[...pts].reverse().slice(0, -1), mergedPoints].flat(); break;
+          case 'start-end': mergedPoints = [pts.slice(0, -1), mergedPoints].flat(); break;
+        }
+      }
+
+      resultDucts.push({
+        ...base,
+        id: `duct-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        points: mergedPoints,
+      });
+    }
+
+    const selectedDuctIdSet = new Set(ductIds);
 
     const updated = buildings.map(b =>
       b.id === buildingId
@@ -749,9 +753,9 @@ export function useBuildingEditor() {
                 ? {
                     ...f,
                     ducts: [
-                      ...(f.ducts ?? []).filter(d => !ductIds.includes(d.id)),
-                      mergedDuct,
-                      ...newDucts,
+                      ...(f.ducts ?? []).filter(d => !selectedDuctIdSet.has(d.id)),
+                      ...resultDucts,
+                      ...transitionDucts,
                     ],
                   }
                 : f
@@ -761,7 +765,7 @@ export function useBuildingEditor() {
         : b
     );
     updateBuildings(updated);
-    return mergedDuct.id;
+    return resultDucts[0]?.id ?? null;
   }, [buildings, updateBuildings]);
 
   const splitDuct = useCallback((buildingId: string, floorId: string, ductId: string, pointIndex: number): [string, string] | null => {

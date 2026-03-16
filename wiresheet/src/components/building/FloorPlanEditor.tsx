@@ -917,6 +917,39 @@ export function FloorPlanEditor({
       const pts = duct.points;
       if (pts.length < 2) continue;
       const halfW = duct.width / 2;
+
+      if (duct.isVertical && duct.verticalX != null) {
+        const vx = duct.verticalX;
+        const vy = pts[0].y;
+        const sp = toScreen(vx, vy);
+        const r = Math.max(duct.width * cellPx * 0.6, 10);
+        ctx.save();
+        ctx.globalAlpha = isSelected ? 1 : 0.8;
+        ctx.strokeStyle = isSelected ? '#fff' : color;
+        ctx.fillStyle = color + '33';
+        ctx.lineWidth = isSelected ? 2.5 : 1.5;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = isSelected ? '#fff' : color;
+        ctx.lineWidth = isSelected ? 2 : 1.5;
+        const a = r * 0.55;
+        ctx.beginPath(); ctx.moveTo(sp.x - a, sp.y); ctx.lineTo(sp.x + a, sp.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x, sp.y + a); ctx.stroke();
+        const ar = a * 0.4;
+        ctx.beginPath(); ctx.moveTo(sp.x + a, sp.y); ctx.lineTo(sp.x + a - ar, sp.y - ar); ctx.moveTo(sp.x + a, sp.y); ctx.lineTo(sp.x + a - ar, sp.y + ar); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x - ar, sp.y - a + ar); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x + ar, sp.y - a + ar); ctx.stroke();
+        if (zoom > 0.5) {
+          ctx.fillStyle = color;
+          ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+        }
+        ctx.restore();
+        continue;
+      }
+
       if (duct.shape === 'round') {
         ctx.save();
         ctx.strokeStyle = isSelected ? '#fff' : color;
@@ -954,15 +987,15 @@ export function FloorPlanEditor({
         const cy = (sp0t.y + sp1t.y) / 2;
         const transW = Math.max(duct.width, duct.transitionToWidth ?? duct.width) * cellPx;
         ctx.save();
-        ctx.globalAlpha = 0.6;
-        ctx.strokeStyle = '#f97316';
+        ctx.globalAlpha = 0.65;
+        ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
         ctx.arc(cx, cy, transW * 0.55, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = '#f97316';
+        ctx.fillStyle = color;
         ctx.font = `bold ${Math.max(8, 8 * zoom)}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText('⇄', cx, cy + 4);

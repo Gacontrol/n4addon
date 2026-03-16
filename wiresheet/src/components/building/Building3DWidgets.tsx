@@ -1138,12 +1138,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, onSelect }: DuctMeshP
       {transitionGeo && (
         <mesh castShadow>
           <primitive object={transitionGeo} />
-          <meshStandardMaterial
-            color="#f97316"
-            metalness={0.5}
-            roughness={0.5}
-            envMapIntensity={0.8}
-          />
+          {mat}
         </mesh>
       )}
 
