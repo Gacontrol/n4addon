@@ -29,7 +29,7 @@ interface Props {
   onMoveWall: (wallId: string, dx: number, dy: number) => void;
   onAddRoom: (x: number, y: number, width: number, depth: number) => void;
   onSelectRoom: (id: string | null) => void;
-  onMoveRoom: (roomId: string, x: number, y: number) => void;
+  onMoveRoom: (roomId: string, x: number, y: number, origX: number, origY: number, origPoints?: { x: number; y: number }[]) => void;
   onDeleteWall: (wallId: string) => void;
   onDeleteRoom: (roomId: string) => void;
   onSetBackground: (bg: BackgroundImage | null) => void;
@@ -325,6 +325,7 @@ export function FloorPlanEditor({
     openingId?: string;
     openingOrigPos?: number;
     openingWallLen?: number;
+    origPoints?: { x: number; y: number }[];
   } | null>(null);
 
   useEffect(() => {
@@ -1645,7 +1646,11 @@ export function FloorPlanEditor({
       if (d < threshold) return { type: 'wall' as const, id: wall.id };
     }
     for (const room of [...floor.rooms].reverse()) {
-      if (wx >= room.x && wx <= room.x + room.width && wy >= room.y && wy <= room.y + room.depth) {
+      if (room.points && room.points.length >= 3) {
+        if (pointInPolygon(wx, wy, room.points)) {
+          return { type: 'room' as const, id: room.id };
+        }
+      } else if (wx >= room.x && wx <= room.x + room.width && wy >= room.y && wy <= room.y + room.depth) {
         return { type: 'room' as const, id: room.id };
       }
     }
@@ -1936,7 +1941,7 @@ export function FloorPlanEditor({
           onSelectWall(null);
           onPropertiesRequested?.();
           const room = floor.rooms.find(r => r.id === hit.id)!;
-          dragState.current = { type: 'move-room', startX: e.clientX, startY: e.clientY, roomId: hit.id, origX: room.x, origY: room.y };
+          dragState.current = { type: 'move-room', startX: e.clientX, startY: e.clientY, roomId: hit.id, origX: room.x, origY: room.y, origPoints: room.points ? [...room.points] : undefined };
           return;
         }
         if (hit.type === 'slab') {
@@ -2073,7 +2078,7 @@ export function FloorPlanEditor({
     } else if (dragState.current.type === 'move-room' && dragState.current.roomId) {
       const dx = (e.clientX - dragState.current.startX) / (CELL * zoom);
       const dy = (e.clientY - dragState.current.startY) / (CELL * zoom);
-      onMoveRoom(dragState.current.roomId, snapToGrid((dragState.current.origX ?? 0) + dx), snapToGrid((dragState.current.origY ?? 0) + dy));
+      onMoveRoom(dragState.current.roomId, snapToGrid((dragState.current.origX ?? 0) + dx), snapToGrid((dragState.current.origY ?? 0) + dy), dragState.current.origX ?? 0, dragState.current.origY ?? 0, dragState.current.origPoints);
     } else if (dragState.current.type === 'move-wall-point' && dragState.current.wallId) {
       onMoveWallPoint(dragState.current.wallId, dragState.current.point!, snapped.x, snapped.y);
     } else if (dragState.current.type === 'move-wall' && dragState.current.wallId) {

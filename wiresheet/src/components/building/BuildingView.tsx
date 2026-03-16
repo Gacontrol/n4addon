@@ -351,9 +351,19 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addRoom(activeBuilding.id, activeFloor.id, x, y, w, d, newRoomType);
   };
 
-  const handleMoveRoom = (roomId: string, x: number, y: number) => {
+  const handleMoveRoom = (roomId: string, x: number, y: number, origX: number, origY: number, origPoints?: { x: number; y: number }[]) => {
     if (!activeBuilding || !activeFloor) return;
-    updateRoom(activeBuilding.id, activeFloor.id, roomId, { x, y });
+    if (origPoints && origPoints.length >= 3) {
+      const dx = x - origX;
+      const dy = y - origY;
+      updateRoom(activeBuilding.id, activeFloor.id, roomId, {
+        x,
+        y,
+        points: origPoints.map(p => ({ x: p.x + dx, y: p.y + dy })),
+      });
+    } else {
+      updateRoom(activeBuilding.id, activeFloor.id, roomId, { x, y });
+    }
   };
 
   const handleDeleteWall = (wallId: string) => {
