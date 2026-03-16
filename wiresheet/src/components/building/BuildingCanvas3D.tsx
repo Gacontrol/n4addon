@@ -557,7 +557,7 @@ function GroundGrid({ size, transparent, showGrid = true }: { size: number; tran
 }
 
 function CameraAutoFit({ buildings }: { buildings: Building[] }) {
-  const { camera } = useThree();
+  const { camera, controls } = useThree();
   const fitted = useRef(false);
 
   useEffect(() => {
@@ -581,13 +581,20 @@ function CameraAutoFit({ buildings }: { buildings: Building[] }) {
     const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
     const cx = (minX + maxX) / 2;
     const cz = (minZ + maxZ) / 2;
+    const targetY = totalH * 0.4;
     const diag = Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10;
 
     const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
     camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
-    camera.lookAt(cx, totalH * 0.4, cz);
+    camera.lookAt(cx, targetY, cz);
+
+    if (controls && (controls as any).target) {
+      (controls as any).target.set(cx, targetY, cz);
+      (controls as any).update?.();
+    }
+
     fitted.current = true;
-  }, [buildings, camera]);
+  }, [buildings, camera, controls]);
 
   return null;
 }
@@ -964,6 +971,7 @@ export function BuildingCanvas3D({
           panSpeed={0.8}
           rotateSpeed={0.6}
           zoomSpeed={1.0}
+          zoomToCursor
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,
             MIDDLE: THREE.MOUSE.DOLLY,

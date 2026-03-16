@@ -724,16 +724,16 @@ function createElbow(
   if (axis.lengthSq() < 1e-10) return new THREE.BufferGeometry();
   axis.normalize();
 
-  // sweepAngle = the bend angle (how far the elbow rotates)
-  const sweepAngle = Math.PI - interiorAngle;
+  // sweepAngle = the actual bend/deflection angle between the two duct directions
+  const sweepAngle = interiorAngle;
   const R = elbowRadius(w, h);
+  const trim = R * Math.tan(sweepAngle / 2);
 
-  // Trim computed as R * tan(sweepAngle/2) — this is what buildDuctNetwork uses
-  // The elbow arc starts at nodePos - inDir*R (where the trimmed straight ends)
-  // and ends at nodePos + outDir*R (where the next straight begins).
+  // Arc starts at nodePos - inDir*trim (where the trimmed straight ends).
+  // Arc center is perpendicular (inward) at distance R from the start point.
   const inwardDir = new THREE.Vector3().crossVectors(axis, inDir).normalize();
   const arcCenter = nodePos.clone()
-    .addScaledVector(inDir, -R)
+    .addScaledVector(inDir, -trim)
     .addScaledVector(inwardDir, R);
 
   const spine: THREE.Vector3[]    = [];
@@ -929,7 +929,7 @@ function buildDuctNetwork(
   }
 
   // 3. Compute trim distances at each interior node
-  //    trim = R * tan(sweepAngle / 2)   where sweepAngle = π - interiorAngle
+  //    trim = R * tan(sweepAngle / 2)   where sweepAngle = actual deflection angle
   const R = elbowRadius(w, h);
   const trims: number[] = new Array(worldPts.length).fill(0);
 
@@ -937,9 +937,8 @@ function buildDuctNetwork(
     const dIn  = rawDirs[i - 1];
     const dOut = rawDirs[i];
     const dot  = Math.max(-1, Math.min(1, dIn.dot(dOut)));
-    const interiorAngle = Math.acos(dot);
-    if (interiorAngle < 0.02) continue;
-    const sweepAngle = Math.PI - interiorAngle;
+    const sweepAngle = Math.acos(dot);
+    if (sweepAngle < 0.02) continue;
     trims[i] = R * Math.tan(sweepAngle / 2);
   }
 
