@@ -46,6 +46,8 @@ interface Props {
   floorTransparent?: boolean;
   bgTransparent?: boolean;
   showGrid?: boolean;
+  globalWallOpacity?: number;
+  exposureMaxLevel?: number;
   lighting?: LightingSettings;
 }
 
@@ -715,6 +717,8 @@ interface BuildingSceneProps {
   lighting: LightingSettings;
   floorTransparent?: boolean;
   showGrid?: boolean;
+  globalWallOpacity?: number;
+  exposureMaxLevel?: number;
 }
 
 function BuildingScene({
@@ -723,7 +727,7 @@ function BuildingScene({
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
-  highlightFloor, lighting, floorTransparent, showGrid = true
+  highlightFloor, lighting, floorTransparent, showGrid = true, globalWallOpacity = 1, exposureMaxLevel
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -762,6 +766,7 @@ function BuildingScene({
 
     for (const floor of sorted) {
       if (floor.hidden) continue;
+      if (exposureMaxLevel !== undefined && floor.level > exposureMaxLevel) continue;
       const baseY = floorBaseY[floor.id];
       const isActive = floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
@@ -867,7 +872,7 @@ function BuildingScene({
             height={wallH}
             thickness={wall.thickness || 0.25}
             color={wall.color || '#94a3b8'}
-            opacity={wall.opacity ?? 1}
+            opacity={Math.min(wall.opacity ?? 1, globalWallOpacity)}
             selected={wall.id === selectedWallId}
             faded={faded}
             materialType={wall.materialType || 'concrete'}
@@ -941,6 +946,8 @@ function BuildingScene({
       })();
       const floorForWidget = building.floors.find(f => f.id === widget.floorId);
       const floorH = floorForWidget?.height ?? 3;
+      const widgetFloorLayers = { ...DEFAULT_LAYERS, ...(floorForWidget?.layers ?? {}) };
+      if (!widgetFloorLayers.widgets) continue;
 
       if (widget.type === 'roomcolor') {
         elements.push(
@@ -1030,6 +1037,8 @@ export function BuildingCanvas3D({
   floorTransparent = false,
   bgTransparent = false,
   showGrid = true,
+  globalWallOpacity = 1,
+  exposureMaxLevel,
   lighting = DEFAULT_LIGHTING,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
@@ -1074,6 +1083,8 @@ export function BuildingCanvas3D({
             lighting={lighting}
             floorTransparent={floorTransparent}
             showGrid={showGrid}
+            globalWallOpacity={globalWallOpacity}
+            exposureMaxLevel={exposureMaxLevel}
           />
           <Environment preset="city" />
         </Suspense>

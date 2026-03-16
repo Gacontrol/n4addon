@@ -225,6 +225,7 @@ export interface FloorLayers {
   rooms: boolean;
   slabs: boolean;
   verticalDucts: boolean;
+  widgets: boolean;
 }
 
 export const DEFAULT_LAYERS: FloorLayers = {
@@ -235,6 +236,7 @@ export const DEFAULT_LAYERS: FloorLayers = {
   rooms: true,
   slabs: true,
   verticalDucts: true,
+  widgets: true,
 };
 
 export interface Floor {
