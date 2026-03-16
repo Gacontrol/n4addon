@@ -898,20 +898,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 pipeType={pipeType}
                 pipeDiameter={pipeDiameter}
                 onAddWall={handleAddWall}
-                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                 onMoveWallPoint={handleMoveWallPoint}
                 onMoveWall={handleMoveWall}
                 onAddRoom={handleAddRoom}
-                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); }}
+                onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                 onMoveRoom={handleMoveRoom}
                 onDeleteWall={handleDeleteWall}
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
                 onAddDuct={handleAddDuct}
-                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); }}
+                onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); if (id) setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
                 onAddPipe={handleAddPipe}
-                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); }}
+                onSelectPipe={id => { setSelectedPipeId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); if (id) setShowRoomPanel(true); }}
                 onDeletePipe={id => { if (activeBuilding && activeFloor) deletePipe(activeBuilding.id, activeFloor.id, id); setSelectedPipeId(null); }}
                 onCopySelected={handleCopySelected}
                 onPasteClipboard={handlePasteClipboard}

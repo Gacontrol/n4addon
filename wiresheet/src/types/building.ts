@@ -87,7 +87,8 @@ export type Widget3DType =
   | 'light'
   | 'blinds'
   | 'custom'
-  | 'roomcolor';
+  | 'roomcolor'
+  | 'duct';
 
 export interface Widget3D {
   id: string;

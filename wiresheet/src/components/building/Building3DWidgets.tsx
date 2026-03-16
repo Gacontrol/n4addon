@@ -1,5 +1,5 @@
 import { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType } from '../../types/building';
@@ -19,6 +19,7 @@ export const WIDGET_COLORS: Record<Widget3DType, string> = {
   blinds:      '#8b5cf6',
   custom:      '#94a3b8',
   roomcolor:   '#22c55e',
+  duct:        '#60a5fa',
 };
 
 export const WIDGET_LABELS: Record<Widget3DType, string> = {
@@ -36,6 +37,7 @@ export const WIDGET_LABELS: Record<Widget3DType, string> = {
   blinds:      'Jalousie',
   custom:      'Widget',
   roomcolor:   'Raumeinfärbung',
+  duct:        'Kanal-Sensor',
 };
 
 export const DUCT_COLORS: Record<DuctType, string> = {
@@ -138,6 +140,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const isValve = widget.type === 'valve';
   const isLight = widget.type === 'light';
   const isRoomColor = widget.type === 'roomcolor';
+  const isDuct = widget.type === 'duct';
 
   if (isRoomColor) return null;
 
@@ -145,9 +148,18 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const displayValue = liveValue != null ? String(liveValue) : '–';
   const unit = widget.unit || '';
 
-  const dragRef = useRef<{ dragging: boolean; startX: number; startY: number; startWX: number; startWZ: number } | null>(null);
+  const dragRef = useRef<{
+    dragging: boolean;
+    startX: number;
+    startY: number;
+    startWX: number;
+    startWY: number;
+    startWZ: number;
+    shiftKey: boolean;
+  } | null>(null);
   const didDragRef = useRef(false);
   const groupRef = useRef<THREE.Group>(null);
+  const { controls } = useThree();
 
   return (
     <group
@@ -165,44 +177,100 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         didDragRef.current = false;
         const nativeTarget = e.nativeEvent?.target as Element | undefined;
         nativeTarget?.setPointerCapture?.(e.pointerId);
-        dragRef.current = { dragging: false, startX: e.clientX, startY: e.clientY, startWX: widget.x, startWZ: widget.y };
+        if (controls) (controls as any).enabled = false;
+        dragRef.current = {
+          dragging: false,
+          startX: e.clientX,
+          startY: e.clientY,
+          startWX: widget.x,
+          startWY: widget.z,
+          startWZ: widget.y,
+          shiftKey: e.shiftKey,
+        };
       }}
       onPointerMove={(e) => {
         if (!dragRef.current || !onDragEnd) return;
-        const dx = (e.clientX - dragRef.current.startX) * 0.02;
-        const dz = (e.clientY - dragRef.current.startY) * 0.02;
-        if (Math.abs(dx) > 0.05 || Math.abs(dz) > 0.05) {
+        const rawDelta = (e.clientY - dragRef.current.startY) * 0.02;
+        const rawDeltaX = (e.clientX - dragRef.current.startX) * 0.02;
+        const isShift = dragRef.current.shiftKey || e.shiftKey;
+        if (Math.abs(rawDeltaX) > 0.05 || Math.abs(rawDelta) > 0.05) {
           dragRef.current.dragging = true;
         }
         if (dragRef.current.dragging && groupRef.current) {
           e.stopPropagation();
-          groupRef.current.position.x = wx + dx;
-          groupRef.current.position.z = wz + dz;
+          if (isShift) {
+            groupRef.current.position.y = wy - rawDelta;
+          } else {
+            groupRef.current.position.x = wx + rawDeltaX;
+            groupRef.current.position.z = wz + rawDelta;
+          }
         }
       }}
       onPointerUp={(e) => {
         if (!dragRef.current || !onDragEnd) return;
         e.stopPropagation();
+        if (controls) (controls as any).enabled = true;
         if (dragRef.current.dragging) {
           didDragRef.current = true;
-          const dx = (e.clientX - dragRef.current.startX) * 0.02;
-          const dz = (e.clientY - dragRef.current.startY) * 0.02;
-          onDragEnd(dragRef.current.startWX + dx, dragRef.current.startWZ + dz, widget.z);
+          const deltaX = (e.clientX - dragRef.current.startX) * 0.02;
+          const deltaY = (e.clientY - dragRef.current.startY) * 0.02;
+          const isShift = dragRef.current.shiftKey || e.shiftKey;
+          if (isShift) {
+            onDragEnd(dragRef.current.startWX, dragRef.current.startWZ, dragRef.current.startWY - deltaY);
+          } else {
+            onDragEnd(dragRef.current.startWX + deltaX, dragRef.current.startWZ + deltaY, dragRef.current.startWY);
+          }
+        } else if (controls) {
+          (controls as any).enabled = true;
         }
         dragRef.current = null;
       }}
+      onPointerLeave={() => {
+        if (controls) (controls as any).enabled = true;
+        dragRef.current = null;
+      }}
     >
-      <mesh position={[0, -0.4, 0]} castShadow>
-        <cylinderGeometry args={[0.04, 0.06, 0.8, 8]} />
-        <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
-      </mesh>
+      {isDuct ? null : (
+        <>
+          <mesh position={[0, -0.4, 0]} castShadow>
+            <cylinderGeometry args={[0.04, 0.06, 0.8, 8]} />
+            <meshStandardMaterial color="#475569" metalness={0.6} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, -0.82, 0]} castShadow>
+            <cylinderGeometry args={[0.18, 0.22, 0.04, 16]} />
+            <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
+          </mesh>
+        </>
+      )}
 
-      <mesh position={[0, -0.82, 0]} castShadow>
-        <cylinderGeometry args={[0.18, 0.22, 0.04, 16]} />
-        <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.5} />
-      </mesh>
-
-      {isLight ? (
+      {isDuct ? (
+        <group position={[0, 0, 0]}>
+          <mesh castShadow>
+            <boxGeometry args={[1.2, 0.35, 0.55]} />
+            <meshStandardMaterial color={baseColor} metalness={0.4} roughness={0.45} transparent opacity={0.92} />
+          </mesh>
+          <mesh castShadow>
+            <boxGeometry args={[1.22, 0.37, 0.57]} />
+            <meshStandardMaterial color={baseColor} wireframe opacity={0.15} transparent />
+          </mesh>
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <cylinderGeometry args={[0.025, 0.025, 0.4, 8]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0.52, 0]} castShadow>
+            <boxGeometry args={[0.12, 0.06, 0.08]} />
+            <meshStandardMaterial color="#1e293b" metalness={0.3} roughness={0.6} />
+          </mesh>
+          <mesh position={[0, 0.1, 0.29]} castShadow>
+            <boxGeometry args={[1.22, 0.02, 0.02]} />
+            <meshStandardMaterial color={baseColor} metalness={0.6} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, -0.1, 0.29]} castShadow>
+            <boxGeometry args={[1.22, 0.02, 0.02]} />
+            <meshStandardMaterial color={baseColor} metalness={0.6} roughness={0.3} />
+          </mesh>
+        </group>
+      ) : isLight ? (
         <>
           <mesh position={[0, 0.1, 0]} castShadow>
             <sphereGeometry args={[0.22, 16, 16]} />
@@ -261,7 +329,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         </mesh>
       )}
 
-      <Html position={[0, 0.62, 0]} center distanceFactor={8} style={{ pointerEvents: 'none', userSelect: 'none' }}>
+      <Html position={[0, isDuct ? 0.85 : 0.62, 0]} center distanceFactor={8} style={{ pointerEvents: 'none', userSelect: 'none' }}>
         <div style={{
           background: 'rgba(15,23,42,0.88)',
           border: `1px solid ${alarmActive ? '#ef4444' : baseColor}60`,
