@@ -1022,23 +1022,6 @@ function BuildingScene({
         );
       }
 
-      if (onFloorClick && !shouldIsolate && isActive) {
-        const fw = fpMaxX - fpMinX;
-        const fd = maxZ - minZ;
-        if (fw > 0.1 && fd > 0.1) {
-          floorElements.push(
-            <mesh
-              key={`floor-hitbox-${floor.id}`}
-              position={[fpCX, baseY + floor.height / 2, fpCZ]}
-              onClick={(e) => { e.stopPropagation(); handleFloorZoom?.(); }}
-            >
-              <boxGeometry args={[fw, floor.height, fd]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-          );
-        }
-      }
-
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
         const roomCX = room.x + offsetX + room.width / 2;
@@ -1245,8 +1228,15 @@ function BuildingScene({
         }
       }
 
+      const floorGroupClick = (!shouldIsolate && onFloorClick && floor.id !== activeFloorId)
+        ? (e: import('@react-three/fiber').ThreeEvent<MouseEvent>) => {
+            e.stopPropagation();
+            onFloorClick(floor.id, fpCX + floorOffX, baseY, fpCZ + floorOffZ, floor.height, fpMinX + floorOffX, fpMaxX + floorOffX, minZ + floorOffZ, maxZ + floorOffZ);
+          }
+        : undefined;
+
       elements.push(
-        <group key={`floorgroup-${floor.id}`} position={[floorOffX, 0, floorOffZ]}>
+        <group key={`floorgroup-${floor.id}`} position={[floorOffX, 0, floorOffZ]} onClick={floorGroupClick}>
           {floorElements}
         </group>
       );

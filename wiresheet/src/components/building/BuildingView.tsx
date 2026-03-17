@@ -982,6 +982,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
                   explosion={explosion}
+                  onFloorClick={(floorId, cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ) => {
+                    setActiveFloorId(floorId);
+                    setShowAllFloors(false);
+                    window.dispatchEvent(new CustomEvent('focus-floor', {
+                      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration: 700 }
+                    }));
+                  }}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
