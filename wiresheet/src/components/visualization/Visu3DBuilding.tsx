@@ -28,11 +28,14 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
   const [showFloorSelector, setShowFloorSelector] = useState(false);
+  const [floorIsolated, setFloorIsolated] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initializedRef = useRef(false);
 
   const applyBuildingList = useCallback((buildingList: Building[]) => {
     setBuildings(buildingList);
-    if (buildingList.length > 0) {
+    if (!initializedRef.current && buildingList.length > 0) {
+      initializedRef.current = true;
       const selectedBuilding = config.buildingId
         ? (buildingList.find(b => b.id === config.buildingId) || buildingList[0])
         : buildingList[0];
@@ -136,8 +139,6 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const bgTransparent = config.transparentBackground ?? false;
   const bgColor = config.backgroundColor || '#0a1020';
 
-  const [floorIsolated, setFloorIsolated] = useState(false);
-
   const handleFloorClick = useCallback((
     floorId: string,
     cx: number,
@@ -224,8 +225,8 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         onSelectRoom={() => {}}
         onSelectWall={() => {}}
         liveValues={liveValues}
-        highlightFloor={!floorIsolated && !config.showAllFloors && (config.highlightFloor ?? true)}
-        isolateActiveFloor={floorIsolated && !config.showAllFloors}
+        highlightFloor={!floorIsolated && !config.showAllFloors && activeFloorId !== null && (config.highlightFloor ?? true)}
+        isolateActiveFloor={floorIsolated && !config.showAllFloors && activeFloorId !== null}
         bgColor={bgColor}
         bgTransparent={bgTransparent}
         showGrid={config.showGrid ?? false}
@@ -236,8 +237,8 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
         wallsTransparent={config.wallsTransparent ?? false}
         xrayOpacity={config.xrayOpacity ?? 0.2}
-        onFloorClick={config.showAllFloors ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
-        onRoomZoom={floorIsolated ? handleRoomZoom : undefined}
+        onFloorClick={config.showAllFloors || activeFloorId === null ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
+        onRoomZoom={floorIsolated && activeFloorId !== null ? handleRoomZoom : undefined}
       />
       {floorIsolated && (
         <button
@@ -251,7 +252,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         </button>
       )}
 
-      {floors.length > 1 && !config.showAllFloors && (
+      {floors.length > 0 && !config.showAllFloors && (
         <div className="absolute bottom-8 left-2 z-10">
           <div className="relative">
             <button
@@ -259,26 +260,24 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
               onMouseDown={(e) => e.stopPropagation()}
               className="flex items-center gap-1.5 px-2 py-1 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700 rounded text-xs text-slate-300 transition-colors backdrop-blur-sm"
             >
-              <span>{activeFloor?.name || 'Alle Etagen'}</span>
+              <span>{activeFloorId === null ? 'Ganzes Gebäude' : (activeFloor?.name || 'Etage')}</span>
               <ChevronDown className="w-3 h-3" />
             </button>
             {showFloorSelector && (
               <div
-                className="absolute bottom-full mb-1 left-0 bg-slate-900/95 border border-slate-700 rounded shadow-xl backdrop-blur-sm min-w-[120px]"
+                className="absolute bottom-full mb-1 left-0 bg-slate-900/95 border border-slate-700 rounded shadow-xl backdrop-blur-sm min-w-[130px]"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                {config.showAllFloors !== false && (
-                  <button
-                    onClick={() => { setActiveFloorId(null); setShowFloorSelector(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${activeFloorId === null ? 'text-blue-400 bg-blue-900/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
-                  >
-                    Alle Etagen
-                  </button>
-                )}
+                <button
+                  onClick={() => { setActiveFloorId(null); setFloorIsolated(false); setShowFloorSelector(false); window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D' } })); }}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${activeFloorId === null ? 'text-blue-400 bg-blue-900/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+                >
+                  Ganzes Gebäude
+                </button>
                 {[...floors].reverse().map(floor => (
                   <button
                     key={floor.id}
-                    onClick={() => { setActiveFloorId(floor.id); setShowFloorSelector(false); }}
+                    onClick={() => { setActiveFloorId(floor.id); setFloorIsolated(false); setShowFloorSelector(false); }}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${activeFloorId === floor.id ? 'text-blue-400 bg-blue-900/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
                   >
                     {floor.name}
