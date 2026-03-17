@@ -133,6 +133,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     offsetZ: config.explosionOffset ?? DEFAULT_EXPLOSION.offsetZ,
   };
 
+  const bgTransparent = config.transparentBackground ?? false;
   const bgColor = config.backgroundColor || '#0a1020';
 
   const handleFloorClick = useCallback((
@@ -162,7 +163,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     return (
       <div
         className="w-full h-full flex items-center justify-center"
-        style={{ backgroundColor: bgColor }}
+        style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}
       >
         <div className="flex flex-col items-center gap-2">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -176,7 +177,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     return (
       <div
         className="w-full h-full flex items-center justify-center"
-        style={{ backgroundColor: bgColor }}
+        style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}
       >
         <div className="flex flex-col items-center gap-2 text-center px-4">
           <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
@@ -197,7 +198,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   }
 
   return (
-    <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgColor }}>
+    <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={buildings}
         activeFloorId={config.showAllFloors ? null : activeFloorId}
@@ -208,6 +209,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         liveValues={liveValues}
         highlightFloor={config.highlightFloor ?? true}
         bgColor={bgColor}
+        bgTransparent={bgTransparent}
         showGrid={config.showGrid ?? false}
         lighting={lighting}
         explosion={explosion}

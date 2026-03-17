@@ -787,6 +787,7 @@ export interface Building3DWidgetConfig {
   showFurniture?: boolean;
   showGrid?: boolean;
   backgroundColor?: string;
+  transparentBackground?: boolean;
   autoRotate?: boolean;
   rotateSpeed?: number;
   zoom?: number;

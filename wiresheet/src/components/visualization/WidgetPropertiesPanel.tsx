@@ -2771,13 +2771,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
-              <label className="text-xs font-medium text-slate-400">Hintergrundfarbe</label>
-              <input
-                type="color"
-                value={b3dCfg.backgroundColor || '#0a1020'}
-                onChange={(e) => onUpdate({ config: { ...b3dCfg, backgroundColor: e.target.value } })}
-                className="w-full h-8 rounded cursor-pointer"
-              />
+              <label className="text-xs font-medium text-slate-400">Hintergrund</label>
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={b3dCfg.transparentBackground ?? false}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, transparentBackground: e.target.checked } })}
+                  className="rounded w-3.5 h-3.5"
+                />
+                Transparent
+              </label>
+              {!b3dCfg.transparentBackground && (
+                <input
+                  type="color"
+                  value={b3dCfg.backgroundColor || '#0a1020'}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, backgroundColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              )}
             </div>
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
