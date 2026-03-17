@@ -1022,22 +1022,6 @@ function BuildingScene({
         );
       }
 
-      if (onFloorClick && !shouldIsolate) {
-        const fw = fpMaxX - fpMinX;
-        const fd = maxZ - minZ;
-        if (fw > 0.1 && fd > 0.1) {
-          floorElements.push(
-            <mesh
-              key={`floor-hitbox-${floor.id}`}
-              position={[fpCX, baseY + floor.height / 2, fpCZ]}
-              onClick={(e) => { e.stopPropagation(); handleFloorZoom?.(); }}
-            >
-              <boxGeometry args={[fw, floor.height, fd]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-            </mesh>
-          );
-        }
-      }
 
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
@@ -1048,8 +1032,6 @@ function BuildingScene({
               onSelectRoom(room.id);
               onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
             }
-          : !shouldIsolate && onFloorClick && handleFloorZoom
-          ? () => { onSelectRoom(room.id); onSelectWall(null); handleFloorZoom(); }
           : () => { onSelectRoom(room.id); onSelectWall(null); };
 
         if (room.points && room.points.length > 2) {
@@ -1144,9 +1126,7 @@ function BuildingScene({
               height: o.height,
               sillHeight: o.sillHeight || 0,
             }))}
-            onSelect={!shouldIsolate && onFloorClick && handleFloorZoom
-              ? () => { onSelectWall(wall.id); onSelectRoom(null); handleFloorZoom(); }
-              : () => { onSelectWall(wall.id); onSelectRoom(null); }}
+            onSelect={() => { onSelectWall(wall.id); onSelectRoom(null); }}
             castShadow={lighting.shadowEnabled && !wallsTransparent}
           />
         );
