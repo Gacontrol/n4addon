@@ -1,5 +1,5 @@
 import { Suspense, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
+import { Canvas, useThree, useFrame, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
@@ -824,6 +824,21 @@ function CameraAutoFit({ buildings }: { buildings: Building[] }) {
     fitted.current = true;
   }, [buildings, camera, controls]);
 
+  useFrame(() => {
+    if (fitted.current) return;
+    const bounds = computeBuildingBounds(buildings);
+    if (!bounds) return;
+    if (!controls || !(controls as any).target) return;
+
+    const { cx, cz, targetY, totalH, diag } = bounds;
+    const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+    camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
+    camera.lookAt(cx, targetY, cz);
+    (controls as any).target.set(cx, targetY, cz);
+    (controls as any).update?.();
+    fitted.current = true;
+  });
+
   return null;
 }
 
@@ -1361,11 +1376,20 @@ export function BuildingCanvas3D({
   onRoomZoom,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
+
+  const initialBounds = computeBuildingBounds(buildings);
+  let initCamPos: [number, number, number] = [14, 18, 20];
+  if (initialBounds) {
+    const { cx, cz, totalH, diag } = initialBounds;
+    const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+    initCamPos = [cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7];
+  }
+
   return (
     <div className="relative w-full h-full select-none" style={bgTransparent ? { background: 'transparent' } : undefined}>
       <Canvas
         shadows={lighting.shadowEnabled ? 'soft' : false}
-        camera={{ position: [14, 18, 20], fov: 45, near: 0.1, far: 1000 }}
+        camera={{ position: initCamPos, fov: 45, near: 0.1, far: 1000 }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
@@ -1435,6 +1459,7 @@ export function BuildingCanvas3D({
           zoomToCursor
           autoRotate={autoRotate}
           autoRotateSpeed={autoRotateSpeed}
+          target={initialBounds ? [initialBounds.cx, initialBounds.targetY, initialBounds.cz] : [0, 0, 0]}
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,
             MIDDLE: THREE.MOUSE.DOLLY,
