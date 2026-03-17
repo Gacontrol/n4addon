@@ -68,7 +68,7 @@ export const useWiresheetPages = () => {
 
           for (const page of data) {
             if (page.running && !localCycleTimers.current[page.id]) {
-              const interval = Math.max(200, page.cycleMs || 1000);
+              const interval = Math.max(200, page.cycleMs || 250);
               localCycleTimers.current[page.id] = setInterval(() => executePage(page.id), interval);
             }
           }
