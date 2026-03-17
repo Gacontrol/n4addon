@@ -135,6 +135,23 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
 
   const bgColor = config.backgroundColor || '#0a1020';
 
+  const handleFloorClick = useCallback((
+    floorId: string,
+    cx: number,
+    baseY: number,
+    cz: number,
+    floorHeight: number,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number
+  ) => {
+    setActiveFloorId(floorId);
+    window.dispatchEvent(new CustomEvent('focus-floor', {
+      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ }
+    }));
+  }, []);
+
   const activeBuilding = config.buildingId
     ? (buildings.find(b => b.id === config.buildingId) || buildings[0])
     : buildings[0];
@@ -178,23 +195,6 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
       </div>
     );
   }
-
-  const handleFloorClick = useCallback((
-    floorId: string,
-    cx: number,
-    baseY: number,
-    cz: number,
-    floorHeight: number,
-    minX: number,
-    maxX: number,
-    minZ: number,
-    maxZ: number
-  ) => {
-    setActiveFloorId(floorId);
-    window.dispatchEvent(new CustomEvent('focus-floor', {
-      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ }
-    }));
-  }, []);
 
   return (
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgColor }}>
