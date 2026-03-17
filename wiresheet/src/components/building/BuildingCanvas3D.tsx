@@ -584,12 +584,12 @@ function SlabMesh({ slab, offsetX, baseY }: SlabMeshProps) {
     return s;
   }, [slab.points]);
 
-  if (!shape) return null;
-
   const extrudeSettings = useMemo(() => ({
     depth: thickness,
     bevelEnabled: false,
   }), [thickness]);
+
+  if (!shape) return null;
 
   const y = baseY + elevation;
 

@@ -19,7 +19,7 @@ const API_BASE = getApiBase();
 const defaultPage = (): WiresheetPage => ({
   id: `page-${Date.now()}`,
   name: 'Seite 1',
-  cycleMs: 1000,
+  cycleMs: 250,
   running: false,
   nodes: [],
   connections: []
