@@ -158,6 +158,25 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     }));
   }, [config.floorZoomDuration]);
 
+  const handleAnyFloorClick = useCallback((
+    floorId: string,
+    cx: number,
+    baseY: number,
+    cz: number,
+    floorHeight: number,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number
+  ) => {
+    setActiveFloorId(floorId);
+    setFloorIsolated(true);
+    const duration = (config.floorZoomDuration ?? 700);
+    window.dispatchEvent(new CustomEvent('focus-floor', {
+      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration }
+    }));
+  }, [config.floorZoomDuration]);
+
   const handleRoomZoom = useCallback((cx: number, baseY: number, cz: number, w: number, d: number, h: number) => {
     window.dispatchEvent(new CustomEvent('focus-room', {
       detail: { cx, baseY, cz, w, d, h }
@@ -219,14 +238,14 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={buildings}
-        activeFloorId={config.showAllFloors ? null : activeFloorId}
+        activeFloorId={config.showAllFloors && !floorIsolated ? null : activeFloorId}
         selectedRoomId={null}
         selectedWallId={null}
         onSelectRoom={() => {}}
         onSelectWall={() => {}}
         liveValues={liveValues}
-        highlightFloor={!floorIsolated && !config.showAllFloors && activeFloorId !== null && (config.highlightFloor ?? true)}
-        isolateActiveFloor={floorIsolated && !config.showAllFloors && activeFloorId !== null}
+        highlightFloor={!floorIsolated && activeFloorId !== null && (config.highlightFloor ?? true)}
+        isolateActiveFloor={floorIsolated && activeFloorId !== null}
         bgColor={bgColor}
         bgTransparent={bgTransparent}
         showGrid={config.showGrid ?? false}
@@ -237,7 +256,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
         wallsTransparent={config.wallsTransparent ?? false}
         xrayOpacity={config.xrayOpacity ?? 0.2}
-        onFloorClick={config.showAllFloors || activeFloorId === null ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
+        onFloorClick={!floorIsolated ? handleAnyFloorClick : undefined}
         onRoomZoom={floorIsolated && activeFloorId !== null ? handleRoomZoom : undefined}
       />
       {floorIsolated && (

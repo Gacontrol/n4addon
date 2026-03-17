@@ -702,9 +702,9 @@ function CameraFocusFloor() {
       const spanZ = maxZ - minZ;
       const span = Math.max(spanX, spanZ, 4);
 
-      const camHeight = baseY + floorHeight + span * 1.2;
+      const camHeight = baseY + floorHeight + span * 1.6;
       const startPos = camera.position.clone();
-      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
+      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.01);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
       const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
@@ -1228,7 +1228,7 @@ function BuildingScene({
         }
       }
 
-      const floorGroupClick = (!shouldIsolate && onFloorClick && floor.id !== activeFloorId)
+      const floorGroupClick = (onFloorClick && !shouldIsolate)
         ? (e: import('@react-three/fiber').ThreeEvent<MouseEvent>) => {
             e.stopPropagation();
             onFloorClick(floor.id, fpCX + floorOffX, baseY, fpCZ + floorOffZ, floor.height, fpMinX + floorOffX, fpMaxX + floorOffX, minZ + floorOffZ, maxZ + floorOffZ);
