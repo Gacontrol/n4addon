@@ -843,46 +843,30 @@ function CameraAutoFit({ buildings }: { buildings: Building[] }) {
   return null;
 }
 
-function DynamicOrbitTarget() {
-  const { camera, controls, scene, gl } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-  const groundPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+function DynamicOrbitTarget({ buildings, autoRotate }: { buildings: Building[]; autoRotate?: boolean }) {
+  const { controls } = useThree();
+
+  const buildingCenter = useMemo(() => {
+    return computeBuildingBounds(buildings);
+  }, [buildings]);
 
   useEffect(() => {
-    const canvas = gl.domElement;
+    if (!buildingCenter || !controls || !(controls as any).target) return;
+    const { cx, cz, targetY } = buildingCenter;
+    (controls as any).target.set(cx, targetY, cz);
+    (controls as any).update?.();
+  }, [buildingCenter, controls]);
 
-    const updateTargetToScreenCenter = () => {
-      if (!controls || !(controls as any).target) return;
-
-      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-      const intersects = raycaster.intersectObjects(scene.children, true);
-      const validHit = intersects.find(i => i.object.visible && i.distance > 0.1);
-
-      if (validHit) {
-        (controls as any).target.copy(validHit.point);
-      } else {
-        const planeHit = new THREE.Vector3();
-        if (raycaster.ray.intersectPlane(groundPlane, planeHit)) {
-          (controls as any).target.copy(planeHit);
-        } else {
-          const dir = raycaster.ray.direction.clone();
-          const fallbackDist = camera.position.length() * 0.5 || 10;
-          const fallbackPoint = camera.position.clone().add(dir.multiplyScalar(fallbackDist));
-          (controls as any).target.copy(fallbackPoint);
-        }
-      }
-    };
-
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button === 0) {
-        updateTargetToScreenCenter();
-      }
-    };
-
-    canvas.addEventListener('pointerdown', onPointerDown);
-    return () => canvas.removeEventListener('pointerdown', onPointerDown);
-  }, [camera, controls, scene, gl, raycaster, groundPlane]);
+  useFrame(() => {
+    if (!autoRotate) return;
+    if (!buildingCenter || !controls || !(controls as any).target) return;
+    const { cx, cz, targetY } = buildingCenter;
+    const t = (controls as any).target as THREE.Vector3;
+    if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
+      t.lerp(new THREE.Vector3(cx, targetY, cz), 0.05);
+      (controls as any).update?.();
+    }
+  });
 
   return null;
 }
@@ -1448,7 +1432,7 @@ export function BuildingCanvas3D({
         <CameraFocusFloor />
         <CameraFocusRoom />
         <CameraSetPos buildings={buildings} />
-        <DynamicOrbitTarget />
+        <DynamicOrbitTarget buildings={buildings} autoRotate={autoRotate} />
 
         <OrbitControls
           makeDefault
@@ -1461,7 +1445,6 @@ export function BuildingCanvas3D({
           panSpeed={0.8}
           rotateSpeed={0.6}
           zoomSpeed={1.0}
-          zoomToCursor
           autoRotate={autoRotate}
           autoRotateSpeed={autoRotateSpeed}
           target={initialBounds ? [initialBounds.cx, initialBounds.targetY, initialBounds.cz] : [0, 0, 0]}
