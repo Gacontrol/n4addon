@@ -954,14 +954,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     const scaleX = containerSize.width / canvasW;
     const scaleY = containerSize.height / canvasH;
-    return Math.min(scaleX, scaleY, 1);
+    return Math.min(scaleX, scaleY);
   }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight, widgetsBounds]);
 
-  const shouldScale = !isEditMode && responsiveScale < 1;
+  const shouldScale = !isEditMode && responsiveScale !== 1;
 
   if (!isEditMode) {
     const canvasW = hasFixedSize ? page.canvasWidth! : widgetsBounds.maxX;
     const canvasH = hasFixedSize ? page.canvasHeight! : widgetsBounds.maxY;
+
+    const scaledWidth = canvasW * responsiveScale;
+    const scaledHeight = canvasH * responsiveScale;
 
     return (
       <div
@@ -970,13 +973,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         style={{ backgroundColor: page.backgroundColor || '#0f172a' }}
       >
         <div
+          style={{
+            width: scaledWidth,
+            height: scaledHeight,
+            position: 'relative',
+            flexShrink: 0,
+          }}
+        >
+        <div
           ref={canvasRef}
           className="relative"
           style={{
             width: canvasW,
             height: canvasH,
             transform: shouldScale ? `scale(${responsiveScale})` : undefined,
-            transformOrigin: 'center center',
+            transformOrigin: 'top left',
             backgroundColor: page.backgroundColor || '#0f172a',
           }}
           onClick={handleCanvasClick}
@@ -1014,6 +1025,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               onShelveAlarm={onShelveAlarm}
             />
           ))}
+        </div>
         </div>
       </div>
     );

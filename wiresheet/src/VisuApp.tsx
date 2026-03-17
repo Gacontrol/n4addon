@@ -477,7 +477,7 @@ export function VisuApp() {
   const needsPerspective = transitioning && (currentEffect === 'cube-left' || currentEffect === 'cube-right' || currentEffect === 'flip');
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden" style={{ touchAction: 'none' }}>
       <div
         className="flex-1 overflow-hidden relative"
         style={{
