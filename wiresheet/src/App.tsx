@@ -1706,7 +1706,9 @@ function App() {
           pages={pages}
           liveValues={liveValues}
         />
-      ) : mainView === 'building' ? null : (
+      ) : mainView === 'building' ? (
+        <BuildingView haEntities={haEntities} haLoading={haLoading} onLoadHaEntities={loadHaEntities} pages={pages} liveValues={liveValues} />
+      ) : (
         <VisualizationView
           visuPages={visuPages}
           activeVisuPageId={activeVisuPageId}
@@ -1729,61 +1731,28 @@ function App() {
         />
       )}
 
-      <div
-        className="absolute inset-0"
-        style={{ display: mainView === 'building' ? 'flex' : 'none', zIndex: 1 }}
-      >
-        <BuildingView haEntities={haEntities} haLoading={haLoading} onLoadHaEntities={loadHaEntities} pages={pages} liveValues={liveValues} />
-      </div>
-
-      {showBackupModal && (() => {
-        let currentBuildings: import('./types/building').Building[] = [];
-        try {
-          const stored = localStorage.getItem('wiresheet_building_config');
-          if (stored) {
-            const data = JSON.parse(stored);
-            if (data.buildings?.length > 0) currentBuildings = data.buildings;
-          }
-        } catch {}
-        const apiBase = (() => {
-          const p = window.location.pathname;
-          const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
-          return m ? `${m[1]}/api` : '/api';
-        })();
-        return (
-          <BackupModal
-            wiresheets={pages}
-            visuPages={visuPages}
-            customBlocks={customBlocks}
-            modbusDevices={modbusDevices}
-            modbusDriverEnabled={modbusDriverEnabled}
-            driverBindings={driverBindings}
-            buildings={currentBuildings}
-            onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig, importedBuildings) => {
-              setAllPages(newWiresheets as WiresheetPage[]);
-              setAllVisuPages(newVisuPages as VisuPage[]);
-              importBlocks(newBlocks as CustomBlockDefinition[]);
-              if (importedDriverConfig) {
-                setModbusDevicesState(importedDriverConfig.modbusDevices);
-                setModbusDriverEnabledState(importedDriverConfig.modbusDriverEnabled);
-                setDriverBindings(importedDriverConfig.driverBindings);
-                saveDriverConfig(importedDriverConfig.modbusDevices, importedDriverConfig.modbusDriverEnabled, importedDriverConfig.driverBindings, haDriverEnabled);
-              }
-              if (importedBuildings && importedBuildings.length > 0) {
-                const payload = JSON.stringify({ buildings: importedBuildings });
-                localStorage.setItem('wiresheet_building_config', payload);
-                fetch(`${apiBase}/building-config`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: payload,
-                }).catch(() => {});
-                window.dispatchEvent(new CustomEvent('wiresheet-building-updated', { detail: { buildings: importedBuildings } }));
-              }
-            }}
-            onClose={() => setShowBackupModal(false)}
-          />
-        );
-      })()}
+      {showBackupModal && (
+        <BackupModal
+          wiresheets={pages}
+          visuPages={visuPages}
+          customBlocks={customBlocks}
+          modbusDevices={modbusDevices}
+          modbusDriverEnabled={modbusDriverEnabled}
+          driverBindings={driverBindings}
+          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig) => {
+            setAllPages(newWiresheets as WiresheetPage[]);
+            setAllVisuPages(newVisuPages as VisuPage[]);
+            importBlocks(newBlocks as CustomBlockDefinition[]);
+            if (importedDriverConfig) {
+              setModbusDevicesState(importedDriverConfig.modbusDevices);
+              setModbusDriverEnabledState(importedDriverConfig.modbusDriverEnabled);
+              setDriverBindings(importedDriverConfig.driverBindings);
+              saveDriverConfig(importedDriverConfig.modbusDevices, importedDriverConfig.modbusDriverEnabled, importedDriverConfig.driverBindings, haDriverEnabled);
+            }
+          }}
+          onClose={() => setShowBackupModal(false)}
+        />
+      )}
 
       {errorToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 pointer-events-none">

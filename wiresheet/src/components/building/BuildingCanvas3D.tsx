@@ -702,9 +702,9 @@ function CameraFocusFloor() {
       const spanZ = maxZ - minZ;
       const span = Math.max(spanX, spanZ, 4);
 
-      const camHeight = baseY + floorHeight + span * 1.6;
+      const camHeight = baseY + floorHeight + span * 1.2;
       const startPos = camera.position.clone();
-      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.01);
+      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
       const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
@@ -1022,6 +1022,23 @@ function BuildingScene({
         );
       }
 
+      if (onFloorClick && !shouldIsolate) {
+        const fw = fpMaxX - fpMinX;
+        const fd = maxZ - minZ;
+        if (fw > 0.1 && fd > 0.1) {
+          floorElements.push(
+            <mesh
+              key={`floor-hitbox-${floor.id}`}
+              position={[fpCX, baseY + floor.height / 2, fpCZ]}
+              onClick={(e) => { e.stopPropagation(); handleFloorZoom?.(); }}
+            >
+              <boxGeometry args={[fw, floor.height, fd]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          );
+        }
+      }
+
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
         const roomCX = room.x + offsetX + room.width / 2;
@@ -1031,6 +1048,8 @@ function BuildingScene({
               onSelectRoom(room.id);
               onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
             }
+          : !shouldIsolate && onFloorClick && handleFloorZoom
+          ? () => { onSelectRoom(room.id); onSelectWall(null); handleFloorZoom(); }
           : () => { onSelectRoom(room.id); onSelectWall(null); };
 
         if (room.points && room.points.length > 2) {
@@ -1125,7 +1144,9 @@ function BuildingScene({
               height: o.height,
               sillHeight: o.sillHeight || 0,
             }))}
-            onSelect={() => { onSelectWall(wall.id); onSelectRoom(null); }}
+            onSelect={!shouldIsolate && onFloorClick && handleFloorZoom
+              ? () => { onSelectWall(wall.id); onSelectRoom(null); handleFloorZoom(); }
+              : () => { onSelectWall(wall.id); onSelectRoom(null); }}
             castShadow={lighting.shadowEnabled && !wallsTransparent}
           />
         );
@@ -1228,15 +1249,8 @@ function BuildingScene({
         }
       }
 
-      const floorGroupClick = (onFloorClick && !shouldIsolate)
-        ? (e: import('@react-three/fiber').ThreeEvent<MouseEvent>) => {
-            e.stopPropagation();
-            onFloorClick(floor.id, fpCX + floorOffX, baseY, fpCZ + floorOffZ, floor.height, fpMinX + floorOffX, fpMaxX + floorOffX, minZ + floorOffZ, maxZ + floorOffZ);
-          }
-        : undefined;
-
       elements.push(
-        <group key={`floorgroup-${floor.id}`} position={[floorOffX, 0, floorOffZ]} onClick={floorGroupClick}>
+        <group key={`floorgroup-${floor.id}`} position={[floorOffX, 0, floorOffZ]}>
           {floorElements}
         </group>
       );

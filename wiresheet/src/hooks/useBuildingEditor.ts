@@ -48,7 +48,7 @@ function createDefaultBuilding(): Building {
 }
 
 export function useBuildingEditor() {
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [buildings, setBuildings] = useState<Building[]>([createDefaultBuilding()]);
   const [activeBuildingId, setActiveBuildingId] = useState<string>('');
   const [activeFloorId, setActiveFloorId] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);

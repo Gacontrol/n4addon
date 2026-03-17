@@ -109,7 +109,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     selectedRoomId,
     selectedWallId,
     tool,
-    isLoaded,
     setActiveBuildingId,
     setActiveFloorId,
     setSelectedRoomId,
@@ -511,17 +510,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     if (selectedRoom) return 'Raum';
     return 'Eigenschaften';
   };
-
-  if (!isLoaded) {
-    return (
-      <div className="flex h-full items-center justify-center bg-slate-900">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-slate-600 border-t-teal-400 rounded-full animate-spin" />
-          <span className="text-xs text-slate-500">Gebäude wird geladen...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-full overflow-hidden bg-slate-900 text-slate-100">
@@ -994,13 +982,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
                   explosion={explosion}
-                  onFloorClick={(floorId, cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ) => {
-                    setActiveFloorId(floorId);
-                    setShowAllFloors(false);
-                    window.dispatchEvent(new CustomEvent('focus-floor', {
-                      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration: 700 }
-                    }));
-                  }}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">

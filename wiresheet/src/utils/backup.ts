@@ -1,9 +1,8 @@
 import { WiresheetPage, ModbusDevice, DriverBinding } from '../types/flow';
 import { VisuPage } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
-import { Building } from '../types/building';
 
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 3;
 
 export interface BackupImage {
   filename: string;
@@ -35,7 +34,6 @@ export interface WiresheetBackup {
   customBlocks: CustomBlockDefinition[];
   images?: BackupImage[];
   driverConfig?: DriverConfig;
-  buildings?: Building[];
 }
 
 function getApiBase(): string {
@@ -103,7 +101,6 @@ export interface BackupImportSelection {
   customLibrary: string[];
   includeBindings: boolean;
   includeImages: boolean;
-  includeBuildings: boolean;
 }
 
 export interface BackupExportSelection {
@@ -114,7 +111,6 @@ export interface BackupExportSelection {
   customLibrary: string[];
   includeBindings: boolean;
   includeImages: boolean;
-  includeBuildings: boolean;
 }
 
 export function createBackup(
@@ -122,8 +118,7 @@ export function createBackup(
   visuPages: VisuPage[],
   customBlocks: CustomBlockDefinition[],
   images?: BackupImage[],
-  driverConfig?: DriverConfig,
-  buildings?: Building[]
+  driverConfig?: DriverConfig
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -133,8 +128,7 @@ export function createBackup(
     visuPages,
     customBlocks,
     images: images || [],
-    driverConfig,
-    buildings: buildings || []
+    driverConfig
   };
 }
 
@@ -163,14 +157,11 @@ function migrateBackup(raw: Record<string, unknown>): WiresheetBackup {
       wiresheets: Array.isArray(raw.wiresheets) ? (raw.wiresheets as WiresheetPage[]) :
                  Array.isArray(raw.pages) ? (raw.pages as WiresheetPage[]) : [],
       visuPages: Array.isArray(raw.visuPages) ? (raw.visuPages as VisuPage[]) : [],
-      customBlocks: Array.isArray(raw.customBlocks) ? (raw.customBlocks as CustomBlockDefinition[]) : [],
-      buildings: []
+      customBlocks: Array.isArray(raw.customBlocks) ? (raw.customBlocks as CustomBlockDefinition[]) : []
     };
   }
 
-  const result = raw as unknown as WiresheetBackup;
-  if (!result.buildings) result.buildings = [];
-  return result;
+  return raw as unknown as WiresheetBackup;
 }
 
 export function parseBackupFile(text: string): { backup: WiresheetBackup | null; error: string | null } {
@@ -196,14 +187,12 @@ export function applyImport(
   currentVisuPages: VisuPage[],
   currentBlocks: CustomBlockDefinition[],
   mode: 'merge' | 'replace',
-  currentDriverConfig?: DriverConfig,
-  currentBuildings?: Building[]
+  currentDriverConfig?: DriverConfig
 ): {
   wiresheets: WiresheetPage[];
   visuPages: VisuPage[];
   customBlocks: CustomBlockDefinition[];
   driverConfig?: DriverConfig;
-  buildings?: Building[];
 } {
   const now = Date.now();
 
@@ -211,15 +200,10 @@ export function applyImport(
   const importedVisuPages = backup.visuPages.filter(v => selection.visuPages.includes(v.id));
   const importedBlocks = backup.customBlocks.filter(b => selection.customBlocks.includes(b.id));
 
-  const importedBuildings = selection.includeBuildings && backup.buildings && backup.buildings.length > 0
-    ? backup.buildings
-    : undefined;
-
   if (mode === 'replace') {
     const newWiresheets = importedWiresheets.length > 0 ? importedWiresheets : currentWiresheets;
     const newVisuPages = importedVisuPages.length > 0 ? importedVisuPages : currentVisuPages;
     const newBlocks = importedBlocks.length > 0 ? importedBlocks : currentBlocks;
-    const newBuildings = importedBuildings ?? currentBuildings;
 
     let finalDriverConfig: DriverConfig | undefined = currentDriverConfig;
     if (backup.driverConfig) {
@@ -233,7 +217,7 @@ export function applyImport(
       };
     }
 
-    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig, buildings: newBuildings };
+    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig };
   }
 
   const existingWiresheetIds = new Set(currentWiresheets.map(w => w.id));
@@ -315,7 +299,5 @@ export function applyImport(
     };
   }
 
-  const mergedBuildings = importedBuildings ?? currentBuildings;
-
-  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig, buildings: mergedBuildings };
+  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };
 }

@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Download, Upload, Check, AlertCircle, ChevronDown, ChevronRight,
   FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen, Image as ImageIcon,
-  Server, Library, Link2, Building2
+  Server, Library, Link2
 } from 'lucide-react';
 import { WiresheetPage } from '../types/flow';
 import { VisuPage, } from '../types/visualization';
@@ -21,7 +21,6 @@ import {
   CustomLibraryDevice
 } from '../utils/backup';
 import { ModbusDevice, DriverBinding } from '../types/flow';
-import { Building } from '../types/building';
 
 interface BackupModalProps {
   wiresheets: WiresheetPage[];
@@ -30,13 +29,11 @@ interface BackupModalProps {
   modbusDevices: ModbusDevice[];
   modbusDriverEnabled: boolean;
   driverBindings: DriverBinding[];
-  buildings: Building[];
   onImport: (
     wiresheets: WiresheetPage[],
     visuPages: VisuPage[],
     customBlocks: CustomBlockDefinition[],
-    driverConfig?: DriverConfig,
-    buildings?: Building[]
+    driverConfig?: DriverConfig
   ) => void;
   onClose: () => void;
 }
@@ -50,7 +47,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   modbusDevices,
   modbusDriverEnabled,
   driverBindings,
-  buildings,
   onImport,
   onClose
 }) => {
@@ -67,8 +63,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     modbusDevices: [],
     customLibrary: [],
     includeBindings: true,
-    includeImages: true,
-    includeBuildings: true
+    includeImages: true
   });
   const customLibrary: CustomLibraryDevice[] = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
   const [exportSelection, setExportSelection] = useState<BackupExportSelection>({
@@ -78,8 +73,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     modbusDevices: modbusDevices.map(d => d.id),
     customLibrary: customLibrary.map(l => l.id),
     includeBindings: true,
-    includeImages: true,
-    includeBuildings: true
+    includeImages: true
   });
   const [importDone, setImportDone] = useState(false);
   const [wiresheetsOpen, setWiresheetsOpen] = useState(true);
@@ -110,8 +104,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         modbusDevices: backup.driverConfig?.modbusDevices.map(d => d.id) || [],
         customLibrary: backup.driverConfig?.customModbusLibrary.map(l => l.id) || [],
         includeBindings: true,
-        includeImages: true,
-        includeBuildings: !!(backup.buildings && backup.buildings.length > 0)
+        includeImages: true
       });
       setView('import-select');
     };
@@ -134,7 +127,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleExportFlag = (key: 'includeBindings' | 'includeImages' | 'includeBuildings') => {
+  const toggleExportFlag = (key: 'includeBindings' | 'includeImages') => {
     setExportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -153,7 +146,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleImportFlag = (key: 'includeBindings' | 'includeImages' | 'includeBuildings') => {
+  const toggleImportFlag = (key: 'includeBindings' | 'includeImages') => {
     setImportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -172,8 +165,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         driverBindings: exportSelection.includeBindings ? driverBindings : [],
         customModbusLibrary: selectedLibrary
       };
-      const exportedBuildings = exportSelection.includeBuildings ? buildings : [];
-      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig, exportedBuildings);
+      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig);
       downloadBackup(backup);
       onClose();
     } finally {
@@ -201,13 +193,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         visuPages,
         customBlocks,
         importMode,
-        currentDriverConfig,
-        buildings
+        currentDriverConfig
       );
       if (result.driverConfig?.customModbusLibrary) {
         localStorage.setItem('wiresheet-custom-modbus-library', JSON.stringify(result.driverConfig.customModbusLibrary));
       }
-      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig, result.buildings);
+      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig);
       setImportDone(true);
       setTimeout(() => onClose(), 1200);
     } finally {
@@ -222,8 +213,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     importSelection.modbusDevices.length +
     importSelection.customLibrary.length +
     (importSelection.includeBindings ? 1 : 0) +
-    (importSelection.includeImages ? 1 : 0) +
-    (importSelection.includeBuildings ? 1 : 0);
+    (importSelection.includeImages ? 1 : 0);
 
   const totalExportSelected =
     exportSelection.wiresheets.length +
@@ -232,8 +222,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     exportSelection.modbusDevices.length +
     exportSelection.customLibrary.length +
     (exportSelection.includeBindings ? 1 : 0) +
-    (exportSelection.includeImages ? 1 : 0) +
-    (exportSelection.includeBuildings ? 1 : 0);
+    (exportSelection.includeImages ? 1 : 0);
 
   return (
     <div
@@ -295,7 +284,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-white">Backup erstellen</div>
-                  <div className="text-xs text-slate-400 mt-0.5">Wiresheets, Visus, Gebäude und Bausteine als JSON exportieren</div>
+                  <div className="text-xs text-slate-400 mt-0.5">Wiresheets, Visus und Bausteine als JSON exportieren</div>
                 </div>
               </button>
 
@@ -442,14 +431,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 </div>
                 <div className="divide-y divide-white/[0.04]">
                   <CheckItem
-                    label="Gebäude"
-                    sublabel={`${buildings.length} Gebäude mit allen Etagen, Räumen und Leitungen`}
-                    checked={exportSelection.includeBuildings}
-                    onChange={() => toggleExportFlag('includeBuildings')}
-                    accent="#14b8a6"
-                    icon={<Building2 className="w-3 h-3" />}
-                  />
-                  <CheckItem
                     label="Treiber-Verbindungen"
                     sublabel="Verbindungen zwischen Datenpunkten und Modbus"
                     checked={exportSelection.includeBindings}
@@ -475,9 +456,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     {loadedBackup.wiresheets.length} Wiresheets &nbsp;·&nbsp;
                     {loadedBackup.visuPages.length} Visus &nbsp;·&nbsp;
                     {loadedBackup.customBlocks.length} Bausteine
-                    {loadedBackup.buildings && loadedBackup.buildings.length > 0 && (
-                      <> &nbsp;·&nbsp; {loadedBackup.buildings.length} Gebäude</>
-                    )}
                     {loadedBackup.driverConfig && loadedBackup.driverConfig.modbusDevices.length > 0 && (
                       <> &nbsp;·&nbsp; {loadedBackup.driverConfig.modbusDevices.length} Geraete</>
                     )}
@@ -647,16 +625,6 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                   Optionen
                 </div>
                 <div className="divide-y divide-white/[0.04]">
-                  {loadedBackup.buildings && loadedBackup.buildings.length > 0 && (
-                    <CheckItem
-                      label="Gebäude"
-                      sublabel={`${loadedBackup.buildings.length} Gebäude mit allen Etagen, Räumen und Leitungen`}
-                      checked={importSelection.includeBuildings}
-                      onChange={() => toggleImportFlag('includeBuildings')}
-                      accent="#14b8a6"
-                      icon={<Building2 className="w-3 h-3" />}
-                    />
-                  )}
                   {loadedBackup.driverConfig && loadedBackup.driverConfig.driverBindings.length > 0 && (
                     <CheckItem
                       label="Treiber-Verbindungen"
@@ -685,10 +653,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
               </div>
               <p className="text-sm font-semibold text-white">Import abgeschlossen</p>
               <p className="text-xs text-slate-400 text-center">
-                {importSelection.wiresheets.length} Wiresheets, {importSelection.visuPages.length} Visus, {importSelection.customBlocks.length} Bausteine
-                {importSelection.includeBuildings && loadedBackup?.buildings && loadedBackup.buildings.length > 0 && (
-                  `, ${loadedBackup.buildings.length} Gebäude`
-                )} importiert
+                {importSelection.wiresheets.length} Wiresheets, {importSelection.visuPages.length} Visus, {importSelection.customBlocks.length} Bausteine importiert
               </p>
             </div>
           )}
@@ -806,23 +771,20 @@ interface CheckItemProps {
   sublabel?: string;
   checked: boolean;
   onChange: () => void;
-  accent?: string;
-  icon?: React.ReactNode;
 }
 
-const CheckItem: React.FC<CheckItemProps> = ({ label, sublabel, checked, onChange, accent, icon }) => (
+const CheckItem: React.FC<CheckItemProps> = ({ label, sublabel, checked, onChange }) => (
   <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-white/[0.02] transition-colors">
     <div
       onClick={onChange}
       className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all cursor-pointer"
       style={{
-        backgroundColor: checked ? (accent || '#3b82f6') : 'rgba(255,255,255,0.06)',
-        border: checked ? `1px solid ${accent || '#3b82f6'}` : '1px solid rgba(255,255,255,0.12)'
+        backgroundColor: checked ? '#3b82f6' : 'rgba(255,255,255,0.06)',
+        border: checked ? '1px solid #3b82f6' : '1px solid rgba(255,255,255,0.12)'
       }}
     >
       {checked && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
     </div>
-    {icon && <span style={{ color: accent || '#94a3b8' }}>{icon}</span>}
     <div className="flex-1 min-w-0">
       <div className="text-xs text-slate-200 truncate">{label}</div>
       {sublabel && <div className="text-[10px] text-slate-500 truncate">{sublabel}</div>}
