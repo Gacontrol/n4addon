@@ -426,7 +426,7 @@ app.get(['/pages', '/api/pages'], async (req, res) => {
     if (err.code === 'ENOENT') {
       console.log('Keine Seiten-Datei gefunden, verwende Standard');
       const defaultPages = [
-        { id: 'page-1', name: 'Seite 1', cycleMs: 1000, running: true, nodes: [], connections: [] }
+        { id: 'page-1', name: 'Seite 1', cycleMs: 250, running: true, nodes: [], connections: [] }
       ];
       res.json(defaultPages);
     } else {
@@ -2594,7 +2594,7 @@ function startPage(pageId, cycleMs) {
 
   const pageInfo = {
     running: true,
-    cycleMs: Math.max(20, cycleMs || 1000),
+    cycleMs: Math.max(20, cycleMs || 250),
     lastRun: null,
     cycleCount: 0,
     timeout: null
@@ -2633,7 +2633,7 @@ app.post(['/pages/:pageId/start', '/api/pages/:pageId/start'], async (req, res) 
       return res.status(404).json({ error: 'Seite nicht gefunden' });
     }
 
-    const actualCycleMs = cycleMs || page.cycleMs || 1000;
+    const actualCycleMs = cycleMs || page.cycleMs || 250;
     startPage(pageId, actualCycleMs);
 
     page.running = true;
@@ -3694,7 +3694,7 @@ async function restoreRunningPages() {
     let restoredCount = 0;
     for (const page of pages) {
       if (page.running) {
-        startPage(page.id, page.cycleMs || 1000);
+        startPage(page.id, page.cycleMs || 250);
         restoredCount++;
       }
     }
@@ -3704,7 +3704,7 @@ async function restoreRunningPages() {
     }
   } catch (err) {
     if (err.code === 'ENOENT') {
-      startPage('page-1', 1000);
+      startPage('page-1', 250);
       console.log('Neue Installation: Seite 1 automatisch gestartet');
     } else {
       console.error('Fehler beim Wiederherstellen:', err.message);
