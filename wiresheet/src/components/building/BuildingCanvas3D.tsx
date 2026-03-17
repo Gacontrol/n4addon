@@ -780,26 +780,42 @@ function CameraSetPos({ buildings }: { buildings: Building[] }) {
 }
 
 function computeBuildingBounds(buildings: Building[]) {
-  const allX: number[] = [];
-  const allZ: number[] = [];
+  const worldX: number[] = [];
+  const worldZ: number[] = [];
   let totalH = 0;
+
+  let bldOffX = 0;
   for (const b of buildings) {
+    const localX: number[] = [];
+    const localZ: number[] = [];
     for (const fl of b.floors) {
-      for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
-      for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
+      for (const w of fl.walls) { localX.push(w.x1, w.x2); localZ.push(w.y1, w.y2); }
+      for (const r of fl.rooms) { localX.push(r.x, r.x + r.width); localZ.push(r.y, r.y + r.depth); }
     }
+    if (localX.length === 0) { bldOffX += 12; continue; }
+
+    const minX = Math.min(...localX);
+    const maxX = Math.max(...localX);
+    const bldW = maxX - minX + 2;
+    const offsetX = bldOffX - minX;
+
+    worldX.push(minX + offsetX, maxX + offsetX);
+    for (const z of localZ) worldZ.push(z);
+
     const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
-    totalH = sorted.reduce((acc, f) => acc + f.height, 0);
+    totalH = Math.max(totalH, sorted.reduce((acc, f) => acc + f.height, 0));
+    bldOffX += bldW + 3;
   }
-  if (allX.length < 2) return null;
-  const minX = Math.min(...allX), maxX = Math.max(...allX);
-  const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
+
+  if (worldX.length < 2) return null;
+  const minWX = Math.min(...worldX), maxWX = Math.max(...worldX);
+  const minWZ = Math.min(...worldZ), maxWZ = Math.max(...worldZ);
   return {
-    cx: (minX + maxX) / 2,
-    cz: (minZ + maxZ) / 2,
+    cx: (minWX + maxWX) / 2,
+    cz: (minWZ + maxWZ) / 2,
     targetY: totalH * 0.4,
     totalH,
-    diag: Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10,
+    diag: Math.sqrt((maxWX - minWX) ** 2 + (maxWZ - minWZ) ** 2) || 10,
   };
 }
 

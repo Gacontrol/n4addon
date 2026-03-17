@@ -914,23 +914,33 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   const isMultiSelected = (widgetId: string) => selectedWidgetIds.includes(widgetId);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>(
+    () => ({ width: window.innerWidth, height: window.innerHeight })
+  );
 
   useEffect(() => {
     if (isEditMode) return;
 
-    const container = containerRef.current;
-    if (!container) return;
-
     const updateSize = () => {
-      const rect = container.getBoundingClientRect();
-      setContainerSize({ width: rect.width, height: rect.height });
+      const container = containerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setContainerSize({ width: rect.width, height: rect.height });
+        }
+      } else {
+        setContainerSize({ width: window.innerWidth, height: window.innerHeight });
+      }
     };
 
     updateSize();
     const observer = new ResizeObserver(updateSize);
-    observer.observe(container);
-    return () => observer.disconnect();
+    if (containerRef.current) observer.observe(containerRef.current);
+    window.addEventListener('resize', updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, [isEditMode]);
 
   const widgetsBounds = useMemo(() => {
@@ -947,7 +957,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [page.widgets]);
 
   const responsiveScale = useMemo(() => {
-    if (isEditMode || !containerSize) return 1;
+    if (isEditMode) return 1;
 
     const canvasW = hasFixedSize ? page.canvasWidth! : widgetsBounds.maxX;
     const canvasH = hasFixedSize ? page.canvasHeight! : widgetsBounds.maxY;
