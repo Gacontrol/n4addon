@@ -1022,6 +1022,22 @@ function BuildingScene({
         );
       }
 
+      if (onFloorClick && !shouldIsolate && isActive) {
+        const fw = fpMaxX - fpMinX;
+        const fd = maxZ - minZ;
+        if (fw > 0.1 && fd > 0.1) {
+          floorElements.push(
+            <mesh
+              key={`floor-hitbox-${floor.id}`}
+              position={[fpCX, baseY + floor.height / 2, fpCZ]}
+              onClick={(e) => { e.stopPropagation(); handleFloorZoom?.(); }}
+            >
+              <boxGeometry args={[fw, floor.height, fd]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          );
+        }
+      }
 
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
