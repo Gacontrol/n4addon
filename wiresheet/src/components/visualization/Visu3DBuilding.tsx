@@ -234,6 +234,8 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         visibleLayers={visibleLayers}
         autoRotate={config.autoRotate ?? false}
         autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
+        wallsTransparent={config.wallsTransparent ?? false}
+        xrayOpacity={config.xrayOpacity ?? 0.2}
         onFloorClick={config.showAllFloors ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
         onRoomZoom={floorIsolated ? handleRoomZoom : undefined}
       />

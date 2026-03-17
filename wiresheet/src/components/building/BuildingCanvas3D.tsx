@@ -350,7 +350,8 @@ function WallSegment({
 
   const wallColor = hexToThree(color || '#94a3b8');
   const isGlass = materialType === 'glass';
-  const effectiveOpacity = faded ? 0.12 : (isGlass ? 0.3 : wallOpacity);
+  const isXray = isGlass && wallOpacity < 1.0;
+  const effectiveOpacity = faded ? 0.12 : (isXray ? wallOpacity : (isGlass ? 0.3 : wallOpacity));
   const transparent = faded || isGlass || wallOpacity < 1.0;
 
   let roughness = 0.85;
@@ -1047,6 +1048,8 @@ function BuildingScene({
               onSelectRoom(room.id);
               onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
             }
+          : !shouldIsolate && onFloorClick && handleFloorZoom
+          ? () => { onSelectRoom(room.id); onSelectWall(null); handleFloorZoom(); }
           : () => { onSelectRoom(room.id); onSelectWall(null); };
 
         if (room.points && room.points.length > 2) {
@@ -1141,7 +1144,9 @@ function BuildingScene({
               height: o.height,
               sillHeight: o.sillHeight || 0,
             }))}
-            onSelect={() => { onSelectWall(wall.id); onSelectRoom(null); }}
+            onSelect={!shouldIsolate && onFloorClick && handleFloorZoom
+              ? () => { onSelectWall(wall.id); onSelectRoom(null); handleFloorZoom(); }
+              : () => { onSelectWall(wall.id); onSelectRoom(null); }}
             castShadow={lighting.shadowEnabled && !wallsTransparent}
           />
         );
