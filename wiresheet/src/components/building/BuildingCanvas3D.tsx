@@ -71,6 +71,9 @@ interface Props {
   xrayOpacity?: number;
   floorZoomDuration?: number;
   visibleLayers?: VisibleLayer[];
+  isolateActiveFloor?: boolean;
+  autoRotate?: boolean;
+  autoRotateSpeed?: number;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -740,24 +743,7 @@ function CameraSetPos({ buildings }: { buildings: Building[] }) {
   const { camera, controls } = useThree();
 
   const getBuildingCenter = useCallback(() => {
-    const allX: number[] = [];
-    const allZ: number[] = [];
-    let totalH = 0;
-    for (const b of buildings) {
-      for (const fl of b.floors) {
-        for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
-        for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
-      }
-      const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
-      totalH = sorted.reduce((acc, f) => acc + f.height, 0);
-    }
-    if (allX.length === 0) return { cx: 0, cz: 0, targetY: 0, totalH: 0, diag: 10 };
-    const minX = Math.min(...allX), maxX = Math.max(...allX);
-    const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const diag = Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10;
-    return { cx, cz, targetY: totalH * 0.4, totalH, diag };
+    return computeBuildingBounds(buildings) ?? { cx: 0, cz: 0, targetY: 0, totalH: 0, diag: 10 };
   }, [buildings]);
 
   useEffect(() => {
@@ -792,34 +778,40 @@ function CameraSetPos({ buildings }: { buildings: Building[] }) {
   return null;
 }
 
+function computeBuildingBounds(buildings: Building[]) {
+  const allX: number[] = [];
+  const allZ: number[] = [];
+  let totalH = 0;
+  for (const b of buildings) {
+    for (const fl of b.floors) {
+      for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
+      for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
+    }
+    const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
+    totalH = sorted.reduce((acc, f) => acc + f.height, 0);
+  }
+  if (allX.length < 2) return null;
+  const minX = Math.min(...allX), maxX = Math.max(...allX);
+  const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
+  return {
+    cx: (minX + maxX) / 2,
+    cz: (minZ + maxZ) / 2,
+    targetY: totalH * 0.4,
+    totalH,
+    diag: Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10,
+  };
+}
+
 function CameraAutoFit({ buildings }: { buildings: Building[] }) {
   const { camera, controls } = useThree();
   const fitted = useRef(false);
 
   useEffect(() => {
     if (fitted.current) return;
-    const allX: number[] = [];
-    const allZ: number[] = [];
-    let totalH = 0;
+    const bounds = computeBuildingBounds(buildings);
+    if (!bounds) return;
 
-    for (const b of buildings) {
-      for (const fl of b.floors) {
-        for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
-        for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
-      }
-      const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
-      totalH = sorted.reduce((acc, f) => acc + f.height, 0);
-    }
-
-    if (allX.length < 2) return;
-
-    const minX = Math.min(...allX), maxX = Math.max(...allX);
-    const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-    const targetY = totalH * 0.4;
-    const diag = Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10;
-
+    const { cx, cz, targetY, totalH, diag } = bounds;
     const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
     camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
     camera.lookAt(cx, targetY, cz);
@@ -907,6 +899,7 @@ interface BuildingSceneProps {
   wallsTransparent?: boolean;
   xrayOpacity?: number;
   visibleLayers?: VisibleLayer[];
+  isolateActiveFloor?: boolean;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -918,7 +911,7 @@ function BuildingScene({
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
   highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
-  visibleLayers, onFloorClick, onRoomZoom
+  visibleLayers, isolateActiveFloor = false, onFloorClick, onRoomZoom
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -971,15 +964,15 @@ function BuildingScene({
 
     const offsetX = bldOffX - minX;
 
-    const hasActiveFloor = !!activeFloorId;
+    const shouldIsolate = isolateActiveFloor && !!activeFloorId;
 
     for (const floor of sorted) {
       if (floor.hidden) continue;
-      if (hasActiveFloor && floor.id !== activeFloorId) continue;
+      if (shouldIsolate && floor.id !== activeFloorId) continue;
       const baseY = floorBaseY[floor.id];
       const floorOffX = floorExpOffX[floor.id] ?? 0;
       const floorOffZ = floorExpOffZ[floor.id] ?? 0;
-      const isActive = !hasActiveFloor || floor.id === activeFloorId;
+      const isActive = !activeFloorId || floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
 
       const floorElements: JSX.Element[] = [];
@@ -992,7 +985,11 @@ function BuildingScene({
         ? () => onFloorClick(floor.id, fpCX, baseY, fpCZ, floor.height, fpMinX, fpMaxX, minZ, maxZ)
         : undefined;
 
-      if (floor.showFloorPlane !== false) {
+      const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
+      const layerEnabled = (layer: VisibleLayer) =>
+        !visibleLayers || visibleLayers.includes(layer);
+
+      if (floor.showFloorPlane !== false && flLayers.floorPlane !== false) {
         floorElements.push(
           <FloorPlane
             key={`floor-${floor.id}`}
@@ -1009,7 +1006,7 @@ function BuildingScene({
         );
       }
 
-      if (onFloorClick && !hasActiveFloor) {
+      if (onFloorClick && !shouldIsolate) {
         const fw = fpMaxX - fpMinX;
         const fd = maxZ - minZ;
         if (fw > 0.1 && fd > 0.1) {
@@ -1026,15 +1023,11 @@ function BuildingScene({
         }
       }
 
-      const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
-      const layerEnabled = (layer: VisibleLayer) =>
-        !visibleLayers || visibleLayers.includes(layer);
-
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
         const roomCX = room.x + offsetX + room.width / 2;
         const roomCZ = room.y + room.depth / 2;
-        const handleRoomClick = hasActiveFloor && onRoomZoom
+        const handleRoomClick = shouldIsolate && onRoomZoom
           ? () => {
               onSelectRoom(room.id);
               onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
@@ -1140,7 +1133,6 @@ function BuildingScene({
       }
 
       for (const duct of (floor.ducts ?? [])) {
-        if (!flLayers.ducts || !layerEnabled('ducts')) break;
         if (duct.isVertical) {
           if (!flLayers.verticalDucts) continue;
           if (explode && duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
@@ -1178,6 +1170,8 @@ function BuildingScene({
             }
             continue;
           }
+        } else {
+          if (!flLayers.ducts || !layerEnabled('ducts')) continue;
         }
         floorElements.push(
           <DuctMesh
@@ -1243,6 +1237,12 @@ function BuildingScene({
     }
 
     for (const widget of (building.widgets3d ?? [])) {
+      const floorForWidget = building.floors.find(f => f.id === widget.floorId);
+      const flLayers3D = { ...DEFAULT_LAYERS, ...(floorForWidget?.layers ?? {}) };
+      if (!flLayers3D.widgets3d) continue;
+      if (shouldIsolate && widget.floorId !== activeFloorId) continue;
+      if (visibleLayers && !visibleLayers.includes('widgets')) continue;
+
       const widgetFloorIdx = sorted.findIndex(fl => fl.id === widget.floorId);
       const floorBaseYLocal = floorBaseY[widget.floorId] ?? (() => {
         const sorted2 = [...building.floors].sort((a, b) => a.level - b.level);
@@ -1255,7 +1255,6 @@ function BuildingScene({
       })();
       const widOffX = explode && widgetFloorIdx >= 0 ? widgetFloorIdx * expOffX : 0;
       const widOffZ = explode && widgetFloorIdx >= 0 ? widgetFloorIdx * expOffY : 0;
-      const floorForWidget = building.floors.find(f => f.id === widget.floorId);
       const floorH = floorForWidget?.height ?? 3;
 
       if (widget.type === 'roomcolor') {
@@ -1355,6 +1354,9 @@ export function BuildingCanvas3D({
   wallsTransparent = false,
   xrayOpacity = 0.2,
   visibleLayers,
+  isolateActiveFloor = false,
+  autoRotate = false,
+  autoRotateSpeed = 1.0,
   onFloorClick,
   onRoomZoom,
 }: Props) {
@@ -1405,6 +1407,7 @@ export function BuildingCanvas3D({
             wallsTransparent={wallsTransparent}
             xrayOpacity={xrayOpacity}
             visibleLayers={visibleLayers}
+            isolateActiveFloor={isolateActiveFloor}
             explosion={explosion}
             onFloorClick={onFloorClick}
             onRoomZoom={onRoomZoom}
@@ -1430,6 +1433,8 @@ export function BuildingCanvas3D({
           rotateSpeed={0.6}
           zoomSpeed={1.0}
           zoomToCursor
+          autoRotate={autoRotate}
+          autoRotateSpeed={autoRotateSpeed}
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,
             MIDDLE: THREE.MOUSE.DOLLY,

@@ -2816,6 +2816,32 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Auto-Rotation</label>
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={b3dCfg.autoRotate ?? false}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, autoRotate: e.target.checked } })}
+                  className="rounded w-3.5 h-3.5"
+                />
+                Automatisch drehen
+              </label>
+              {b3dCfg.autoRotate && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 w-20">Geschwindigkeit</span>
+                  <input
+                    type="range"
+                    min={0.2} max={5} step={0.2}
+                    value={b3dCfg.autoRotateSpeed ?? 1.0}
+                    onChange={(e) => onUpdate({ config: { ...b3dCfg, autoRotateSpeed: Number(e.target.value) } })}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px] text-slate-500 w-8 text-right">{(b3dCfg.autoRotateSpeed ?? 1.0).toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
               <label className="text-xs font-medium text-slate-400">Etagenklick - Zoom-Dauer</label>
               <div className="flex items-center gap-2">
                 <input

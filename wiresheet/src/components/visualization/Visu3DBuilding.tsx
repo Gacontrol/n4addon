@@ -218,19 +218,22 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={buildings}
-        activeFloorId={config.showAllFloors ? null : (floorIsolated ? activeFloorId : null)}
+        activeFloorId={config.showAllFloors ? null : activeFloorId}
         selectedRoomId={null}
         selectedWallId={null}
         onSelectRoom={() => {}}
         onSelectWall={() => {}}
         liveValues={liveValues}
-        highlightFloor={!floorIsolated && (config.highlightFloor ?? true)}
+        highlightFloor={!floorIsolated && !config.showAllFloors && (config.highlightFloor ?? true)}
+        isolateActiveFloor={floorIsolated && !config.showAllFloors}
         bgColor={bgColor}
         bgTransparent={bgTransparent}
         showGrid={config.showGrid ?? false}
         lighting={lighting}
         explosion={explosion}
         visibleLayers={visibleLayers}
+        autoRotate={config.autoRotate ?? false}
+        autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
         onFloorClick={config.showAllFloors ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
         onRoomZoom={floorIsolated ? handleRoomZoom : undefined}
       />

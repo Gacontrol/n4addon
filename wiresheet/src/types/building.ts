@@ -226,6 +226,8 @@ export interface FloorLayers {
   slabs: boolean;
   verticalDucts: boolean;
   furniture: boolean;
+  widgets3d: boolean;
+  floorPlane: boolean;
 }
 
 export const DEFAULT_LAYERS: FloorLayers = {
@@ -237,6 +239,8 @@ export const DEFAULT_LAYERS: FloorLayers = {
   slabs: true,
   verticalDucts: true,
   furniture: true,
+  widgets3d: true,
+  floorPlane: true,
 };
 
 export interface Floor {

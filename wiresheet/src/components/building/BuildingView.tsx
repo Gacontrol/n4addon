@@ -1549,11 +1549,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                               {([
                                 { key: 'walls', label: 'Wände' },
                                 { key: 'rooms', label: 'Räume' },
+                                { key: 'floorPlane', label: 'Boden' },
                                 { key: 'ducts', label: 'Kanäle' },
                                 { key: 'verticalDucts', label: 'Vert. Kanäle' },
                                 { key: 'pipes', label: 'Rohre' },
                                 { key: 'slabs', label: 'Decken' },
                                 { key: 'furniture', label: 'Mobiliar' },
+                                { key: 'widgets3d', label: '3D Widgets' },
                               ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
                                 const visible = flLayers[key as keyof typeof flLayers];
                                 return (
@@ -1577,11 +1579,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     {([
                       { key: 'walls', label: 'Wände' },
                       { key: 'rooms', label: 'Räume' },
+                      { key: 'floorPlane', label: 'Boden' },
                       { key: 'ducts', label: 'Kanäle' },
                       { key: 'verticalDucts', label: 'Vertikale Kanäle' },
                       { key: 'pipes', label: 'Rohre' },
                       { key: 'slabs', label: 'Decken' },
                       { key: 'furniture', label: 'Mobiliar' },
+                      { key: 'widgets3d', label: '3D Widgets' },
                       { key: 'background', label: 'Hintergrundbild' },
                     ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
                       const layers = { ...DEFAULT_LAYERS, ...(activeFloor.layers ?? {}) };

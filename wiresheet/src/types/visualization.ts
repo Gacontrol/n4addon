@@ -802,6 +802,8 @@ export interface Building3DWidgetConfig {
   controlsEnabled?: boolean;
   floorZoomDuration?: number;
   visibleLayers?: VisuLayerKey[];
+  autoRotate?: boolean;
+  autoRotateSpeed?: number;
 }
 
 export interface WidgetTemplate {
