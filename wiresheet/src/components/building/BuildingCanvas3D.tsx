@@ -650,22 +650,20 @@ function CameraFocusFloor() {
       const spanX = maxX - minX;
       const spanZ = maxZ - minZ;
       const span = Math.max(spanX, spanZ, 4);
-      const dist = span * 0.85;
-      const camY = floorCenterY + dist;
-      const targetX = cx;
-      const targetZ = cz;
+
+      const camHeight = floorCenterY + span * 1.1;
+      const tiltOffset = span * 0.08;
 
       const startPos = camera.position.clone();
-      const endPos = new THREE.Vector3(targetX, camY, targetZ + 0.001);
+      const endPos = new THREE.Vector3(cx, camHeight, cz + tiltOffset);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
-      const endTarget = new THREE.Vector3(targetX, floorCenterY, targetZ);
+      const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
-      let t = 0;
-      const duration = 600;
+      const duration = 700;
       const startTime = performance.now();
 
       const animate = (now: number) => {
-        t = Math.min((now - startTime) / duration, 1);
+        const t = Math.min((now - startTime) / duration, 1);
         const ease = 1 - Math.pow(1 - t, 3);
         camera.position.lerpVectors(startPos, endPos, ease);
         camera.lookAt(endTarget.x, endTarget.y, endTarget.z);
@@ -873,11 +871,15 @@ function BuildingScene({
 
       const floorElements: JSX.Element[] = [];
 
+      const fpMinX = minX + offsetX;
+      const fpMaxX = maxX + offsetX;
+      const fpCX = (fpMinX + fpMaxX) / 2;
+      const fpCZ = (minZ + maxZ) / 2;
+      const handleFloorZoom = onFloorClick
+        ? () => onFloorClick(floor.id, fpCX, baseY, fpCZ, floor.height, fpMinX, fpMaxX, minZ, maxZ)
+        : undefined;
+
       if (floor.showFloorPlane !== false) {
-        const fpMinX = minX + offsetX;
-        const fpMaxX = maxX + offsetX;
-        const fpCX = (fpMinX + fpMaxX) / 2;
-        const fpCZ = (minZ + maxZ) / 2;
         floorElements.push(
           <FloorPlane
             key={`floor-${floor.id}`}
@@ -889,9 +891,26 @@ function BuildingScene({
             color={floor.floorColor || '#1e3a5f'}
             active={isActive}
             faded={faded}
-            onClick={onFloorClick ? () => onFloorClick(floor.id, fpCX, baseY, fpCZ, floor.height, fpMinX, fpMaxX, minZ, maxZ) : undefined}
+            onClick={handleFloorZoom}
           />
         );
+      }
+
+      if (onFloorClick) {
+        const fw = fpMaxX - fpMinX;
+        const fd = maxZ - minZ;
+        if (fw > 0.1 && fd > 0.1) {
+          floorElements.push(
+            <mesh
+              key={`floor-hitbox-${floor.id}`}
+              position={[fpCX, baseY + floor.height / 2, fpCZ]}
+              onClick={(e) => { e.stopPropagation(); handleFloorZoom?.(); }}
+            >
+              <boxGeometry args={[fw, floor.height, fd]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
+          );
+        }
       }
 
       const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
