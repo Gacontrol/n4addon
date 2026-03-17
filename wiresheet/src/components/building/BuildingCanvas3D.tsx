@@ -38,6 +38,8 @@ export const DEFAULT_EXPLOSION: ExplosionSettings = {
   offsetZ: 4,
 };
 
+export type VisibleLayer = 'rooms' | 'walls' | 'ducts' | 'pipes' | 'slabs' | 'furniture' | 'widgets';
+
 interface Props {
   buildings: Building[];
   activeFloorId: string | null;
@@ -67,7 +69,10 @@ interface Props {
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
   xrayOpacity?: number;
+  floorZoomDuration?: number;
+  visibleLayers?: VisibleLayer[];
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
+  onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -638,6 +643,48 @@ interface FocusFloorDetail {
   maxX: number;
   minZ: number;
   maxZ: number;
+  duration?: number;
+}
+
+interface FocusRoomDetail {
+  cx: number;
+  baseY: number;
+  cz: number;
+  w: number;
+  d: number;
+  h: number;
+}
+
+interface SetCameraPosDetail {
+  pos: [number, number, number];
+  buildingCx: number;
+  buildingCz: number;
+  buildingTargetY: number;
+}
+
+function animateCamera(
+  camera: THREE.Camera,
+  controls: unknown,
+  startPos: THREE.Vector3,
+  endPos: THREE.Vector3,
+  startTarget: THREE.Vector3,
+  endTarget: THREE.Vector3,
+  duration: number
+) {
+  const startTime = performance.now();
+  const animate = (now: number) => {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    camera.position.lerpVectors(startPos, endPos, ease);
+    if (controls && (controls as any).target) {
+      (controls as any).target.lerpVectors(startTarget, endTarget, ease);
+      (controls as any).update?.();
+    } else {
+      camera.lookAt(endTarget.x, endTarget.y, endTarget.z);
+    }
+    if (t < 1) requestAnimationFrame(animate);
+  };
+  requestAnimationFrame(animate);
 }
 
 function CameraFocusFloor() {
@@ -645,41 +692,102 @@ function CameraFocusFloor() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ } = (e as CustomEvent<FocusFloorDetail>).detail;
+      const { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration = 700 } = (e as CustomEvent<FocusFloorDetail>).detail;
       const floorCenterY = baseY + floorHeight / 2;
       const spanX = maxX - minX;
       const spanZ = maxZ - minZ;
       const span = Math.max(spanX, spanZ, 4);
 
-      const camHeight = floorCenterY + span * 1.1;
-      const tiltOffset = span * 0.08;
-
+      const camHeight = baseY + floorHeight + span * 1.2;
       const startPos = camera.position.clone();
-      const endPos = new THREE.Vector3(cx, camHeight, cz + tiltOffset);
+      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
       const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
-      const duration = 700;
-      const startTime = performance.now();
-
-      const animate = (now: number) => {
-        const t = Math.min((now - startTime) / duration, 1);
-        const ease = 1 - Math.pow(1 - t, 3);
-        camera.position.lerpVectors(startPos, endPos, ease);
-        camera.lookAt(endTarget.x, endTarget.y, endTarget.z);
-        if (controls && (controls as any).target) {
-          (controls as any).target.lerpVectors(startTarget, endTarget, ease);
-          (controls as any).update?.();
-        }
-        if (t < 1) requestAnimationFrame(animate);
-      };
-
-      requestAnimationFrame(animate);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, duration);
     };
 
     window.addEventListener('focus-floor', handler);
     return () => window.removeEventListener('focus-floor', handler);
   }, [camera, controls]);
+
+  return null;
+}
+
+function CameraFocusRoom() {
+  const { camera, controls } = useThree();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { cx, baseY, cz, w, d, h } = (e as CustomEvent<FocusRoomDetail>).detail;
+      const span = Math.max(w, d, 3);
+      const camHeight = baseY + h + span * 1.0;
+      const startPos = camera.position.clone();
+      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
+      const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, baseY + h / 2, cz);
+      const endTarget = new THREE.Vector3(cx, baseY + h / 2, cz);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 500);
+    };
+
+    window.addEventListener('focus-room', handler);
+    return () => window.removeEventListener('focus-room', handler);
+  }, [camera, controls]);
+
+  return null;
+}
+
+function CameraSetPos({ buildings }: { buildings: Building[] }) {
+  const { camera, controls } = useThree();
+
+  const getBuildingCenter = useCallback(() => {
+    const allX: number[] = [];
+    const allZ: number[] = [];
+    let totalH = 0;
+    for (const b of buildings) {
+      for (const fl of b.floors) {
+        for (const w of fl.walls) { allX.push(w.x1, w.x2); allZ.push(w.y1, w.y2); }
+        for (const r of fl.rooms) { allX.push(r.x, r.x + r.width); allZ.push(r.y, r.y + r.depth); }
+      }
+      const sorted = [...b.floors].sort((a, bv) => a.level - bv.level);
+      totalH = sorted.reduce((acc, f) => acc + f.height, 0);
+    }
+    if (allX.length === 0) return { cx: 0, cz: 0, targetY: 0, totalH: 0, diag: 10 };
+    const minX = Math.min(...allX), maxX = Math.max(...allX);
+    const minZ = Math.min(...allZ), maxZ = Math.max(...allZ);
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const diag = Math.sqrt((maxX - minX) ** 2 + (maxZ - minZ) ** 2) || 10;
+    return { cx, cz, targetY: totalH * 0.4, totalH, diag };
+  }, [buildings]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<SetCameraPosDetail>).detail;
+      const { cx, cz, targetY, totalH, diag } = getBuildingCenter();
+      const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+
+      let endPos: THREE.Vector3;
+      const label = (e as CustomEvent<any>).detail?.label as string;
+
+      if (label === 'Vorne') {
+        endPos = new THREE.Vector3(cx, totalH * 0.5, cz + dist * 1.5);
+      } else if (label === 'Seite') {
+        endPos = new THREE.Vector3(cx + dist * 1.5, totalH * 0.5, cz);
+      } else if (label === 'Oben') {
+        endPos = new THREE.Vector3(cx, totalH + dist * 1.2, cz + 0.001);
+      } else {
+        endPos = new THREE.Vector3(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
+      }
+
+      const startPos = camera.position.clone();
+      const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, targetY, cz);
+      const endTarget = new THREE.Vector3(cx, targetY, cz);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600);
+    };
+
+    window.addEventListener('set-camera-pos', handler);
+    return () => window.removeEventListener('set-camera-pos', handler);
+  }, [camera, controls, getBuildingCenter]);
 
   return null;
 }
@@ -798,7 +906,9 @@ interface BuildingSceneProps {
   explosion?: ExplosionSettings;
   wallsTransparent?: boolean;
   xrayOpacity?: number;
+  visibleLayers?: VisibleLayer[];
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
+  onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
 
 function BuildingScene({
@@ -808,7 +918,7 @@ function BuildingScene({
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {},
   highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
-  onFloorClick
+  visibleLayers, onFloorClick, onRoomZoom
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -861,12 +971,15 @@ function BuildingScene({
 
     const offsetX = bldOffX - minX;
 
+    const hasActiveFloor = !!activeFloorId;
+
     for (const floor of sorted) {
       if (floor.hidden) continue;
+      if (hasActiveFloor && floor.id !== activeFloorId) continue;
       const baseY = floorBaseY[floor.id];
       const floorOffX = floorExpOffX[floor.id] ?? 0;
       const floorOffZ = floorExpOffZ[floor.id] ?? 0;
-      const isActive = floor.id === activeFloorId;
+      const isActive = !hasActiveFloor || floor.id === activeFloorId;
       const faded = highlightFloor && !isActive;
 
       const floorElements: JSX.Element[] = [];
@@ -896,7 +1009,7 @@ function BuildingScene({
         );
       }
 
-      if (onFloorClick) {
+      if (onFloorClick && !hasActiveFloor) {
         const fw = fpMaxX - fpMinX;
         const fd = maxZ - minZ;
         if (fw > 0.1 && fd > 0.1) {
@@ -914,9 +1027,20 @@ function BuildingScene({
       }
 
       const flLayers = { ...DEFAULT_LAYERS, ...(floor.layers ?? {}) };
+      const layerEnabled = (layer: VisibleLayer) =>
+        !visibleLayers || visibleLayers.includes(layer);
 
       for (const room of floor.rooms) {
-        if (!flLayers.rooms) break;
+        if (!flLayers.rooms || !layerEnabled('rooms')) break;
+        const roomCX = room.x + offsetX + room.width / 2;
+        const roomCZ = room.y + room.depth / 2;
+        const handleRoomClick = hasActiveFloor && onRoomZoom
+          ? () => {
+              onSelectRoom(room.id);
+              onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
+            }
+          : () => { onSelectRoom(room.id); onSelectWall(null); };
+
         if (room.points && room.points.length > 2) {
           floorElements.push(
             <PolygonRoomMesh
@@ -928,7 +1052,7 @@ function BuildingScene({
               color={room.color}
               selected={room.id === selectedRoomId}
               faded={faded}
-              onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
+              onSelect={handleRoomClick}
             />
           );
         } else {
@@ -944,7 +1068,7 @@ function BuildingScene({
               color={room.color}
               selected={room.id === selectedRoomId}
               faded={faded}
-              onSelect={() => { onSelectRoom(room.id); onSelectWall(null); }}
+              onSelect={handleRoomClick}
               castShadow={lighting.shadowEnabled}
             />
           );
@@ -952,7 +1076,7 @@ function BuildingScene({
       }
 
       for (const wall of floor.walls) {
-        if (!flLayers.walls) break;
+        if (!flLayers.walls || !layerEnabled('walls')) break;
         const wallH = wall.height > 0 ? wall.height : floor.height;
         const adjX1 = wall.x1 + offsetX;
         const adjX2 = wall.x2 + offsetX;
@@ -1016,7 +1140,7 @@ function BuildingScene({
       }
 
       for (const duct of (floor.ducts ?? [])) {
-        if (!flLayers.ducts) break;
+        if (!flLayers.ducts || !layerEnabled('ducts')) break;
         if (duct.isVertical) {
           if (!flLayers.verticalDucts) continue;
           if (explode && duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
@@ -1069,7 +1193,7 @@ function BuildingScene({
       }
 
       for (const pipe of (floor.pipes ?? [])) {
-        if (!flLayers.pipes) break;
+        if (!flLayers.pipes || !layerEnabled('pipes')) break;
         floorElements.push(
           <PipeMesh
             key={`pipe-${pipe.id}`}
@@ -1084,7 +1208,7 @@ function BuildingScene({
       }
 
       for (const slab of (floor.slabs ?? [])) {
-        if (!flLayers.slabs) break;
+        if (!flLayers.slabs || !layerEnabled('slabs')) break;
         floorElements.push(
           <SlabMesh
             key={`slab-${slab.id}`}
@@ -1095,7 +1219,7 @@ function BuildingScene({
         );
       }
 
-      if (flLayers.furniture !== false) {
+      if (flLayers.furniture !== false && layerEnabled('furniture')) {
         for (const fi of (floor.furniture ?? [])) {
           floorElements.push(
             <FurnitureMesh
@@ -1230,7 +1354,9 @@ export function BuildingCanvas3D({
   explosion = DEFAULT_EXPLOSION,
   wallsTransparent = false,
   xrayOpacity = 0.2,
+  visibleLayers,
   onFloorClick,
+  onRoomZoom,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
   return (
@@ -1278,14 +1404,18 @@ export function BuildingCanvas3D({
             showGrid={showGrid}
             wallsTransparent={wallsTransparent}
             xrayOpacity={xrayOpacity}
+            visibleLayers={visibleLayers}
             explosion={explosion}
             onFloorClick={onFloorClick}
+            onRoomZoom={onRoomZoom}
           />
           <Environment preset="city" />
         </Suspense>
 
         <CameraAutoFit buildings={buildings} />
         <CameraFocusFloor />
+        <CameraFocusRoom />
+        <CameraSetPos buildings={buildings} />
         <DynamicOrbitTarget />
 
         <OrbitControls
@@ -1318,28 +1448,21 @@ export function BuildingCanvas3D({
 }
 
 function ViewButtons() {
-  const presets = [
-    { label: 'Vorne', pos: [0, 8, 30] as [number, number, number] },
-    { label: 'Seite', pos: [30, 8, 0] as [number, number, number] },
-    { label: 'Oben', pos: [0, 40, 0.1] as [number, number, number] },
-    { label: '3D', pos: [14, 18, 20] as [number, number, number] },
-  ];
-
+  const labels = ['Vorne', 'Seite', 'Oben', '3D'];
   return (
     <div className="absolute top-2 right-2 flex gap-1.5 z-10">
-      {presets.map(v => (
-        <ViewButton key={v.label} label={v.label} targetPos={v.pos} />
+      {labels.map(label => (
+        <ViewButton key={label} label={label} />
       ))}
     </div>
   );
 }
 
-function ViewButton({ label, targetPos }: { label: string; targetPos: [number, number, number] }) {
+function ViewButton({ label }: { label: string }) {
   return (
     <button
       onClick={() => {
-        const event = new CustomEvent('set-camera-pos', { detail: targetPos });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label } }));
       }}
       className="px-2 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded text-[10px] font-medium transition-colors"
     >

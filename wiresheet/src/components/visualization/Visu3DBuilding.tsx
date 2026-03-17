@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Building3DWidgetConfig } from '../../types/visualization';
 import { Building } from '../../types/building';
-import { BuildingCanvas3D, DEFAULT_LIGHTING, DEFAULT_EXPLOSION, LightingSettings, ExplosionSettings } from '../building/BuildingCanvas3D';
-import { Maximize2, ChevronDown } from 'lucide-react';
+import { BuildingCanvas3D, DEFAULT_LIGHTING, DEFAULT_EXPLOSION, LightingSettings, ExplosionSettings, VisibleLayer } from '../building/BuildingCanvas3D';
+import { Maximize2, ChevronDown, RotateCcw } from 'lucide-react';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -136,6 +136,8 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const bgTransparent = config.transparentBackground ?? false;
   const bgColor = config.backgroundColor || '#0a1020';
 
+  const [floorIsolated, setFloorIsolated] = useState(false);
+
   const handleFloorClick = useCallback((
     floorId: string,
     cx: number,
@@ -148,10 +150,25 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     maxZ: number
   ) => {
     setActiveFloorId(floorId);
+    setFloorIsolated(true);
+    const duration = (config.floorZoomDuration ?? 700);
     window.dispatchEvent(new CustomEvent('focus-floor', {
-      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ }
+      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration }
+    }));
+  }, [config.floorZoomDuration]);
+
+  const handleRoomZoom = useCallback((cx: number, baseY: number, cz: number, w: number, d: number, h: number) => {
+    window.dispatchEvent(new CustomEvent('focus-room', {
+      detail: { cx, baseY, cz, w, d, h }
     }));
   }, []);
+
+  const handleResetView = useCallback(() => {
+    setFloorIsolated(false);
+    window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D' } }));
+  }, []);
+
+  const visibleLayers = config.visibleLayers as VisibleLayer[] | undefined;
 
   const activeBuilding = config.buildingId
     ? (buildings.find(b => b.id === config.buildingId) || buildings[0])
@@ -201,20 +218,33 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={buildings}
-        activeFloorId={config.showAllFloors ? null : activeFloorId}
+        activeFloorId={config.showAllFloors ? null : (floorIsolated ? activeFloorId : null)}
         selectedRoomId={null}
         selectedWallId={null}
         onSelectRoom={() => {}}
         onSelectWall={() => {}}
         liveValues={liveValues}
-        highlightFloor={config.highlightFloor ?? true}
+        highlightFloor={!floorIsolated && (config.highlightFloor ?? true)}
         bgColor={bgColor}
         bgTransparent={bgTransparent}
         showGrid={config.showGrid ?? false}
         lighting={lighting}
         explosion={explosion}
-        onFloorClick={config.showAllFloors ? undefined : handleFloorClick}
+        visibleLayers={visibleLayers}
+        onFloorClick={config.showAllFloors ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
+        onRoomZoom={floorIsolated ? handleRoomZoom : undefined}
       />
+      {floorIsolated && (
+        <button
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); handleResetView(); }}
+          className="absolute top-10 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-700 rounded text-xs text-slate-300 transition-colors backdrop-blur-sm"
+          title="Zurück zur Gesamtansicht"
+        >
+          <RotateCcw className="w-3 h-3" />
+          Alle Etagen
+        </button>
+      )}
 
       {floors.length > 1 && !config.showAllFloors && (
         <div className="absolute bottom-8 left-2 z-10">

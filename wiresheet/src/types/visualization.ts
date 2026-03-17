@@ -776,6 +776,8 @@ export interface Building3DWidgetDatapointOverride {
   unit?: string;
 }
 
+export type VisuLayerKey = 'rooms' | 'walls' | 'ducts' | 'pipes' | 'slabs' | 'furniture' | 'widgets';
+
 export interface Building3DWidgetConfig {
   buildingId?: string;
   floorId?: string;
@@ -798,6 +800,8 @@ export interface Building3DWidgetConfig {
   explosionOffset?: number;
   showExplosion?: boolean;
   controlsEnabled?: boolean;
+  floorZoomDuration?: number;
+  visibleLayers?: VisuLayerKey[];
 }
 
 export interface WidgetTemplate {

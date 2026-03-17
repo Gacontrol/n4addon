@@ -2816,6 +2816,53 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             </div>
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Etagenklick - Zoom-Dauer</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={200} max={2000} step={100}
+                  value={b3dCfg.floorZoomDuration ?? 700}
+                  onChange={(e) => onUpdate({ config: { ...b3dCfg, floorZoomDuration: Number(e.target.value) } })}
+                  className="flex-1"
+                />
+                <span className="text-[10px] text-slate-500 w-12 text-right">{b3dCfg.floorZoomDuration ?? 700}ms</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="text-xs font-medium text-slate-400">Sichtbare Layer</label>
+              <p className="text-[10px] text-slate-600">Alle deaktivieren = alle sichtbar</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['rooms', 'walls', 'ducts', 'pipes', 'slabs', 'furniture'] as const).map((layer) => {
+                  const labels: Record<string, string> = { rooms: 'Räume', walls: 'Wände', ducts: 'Lüftung', pipes: 'Rohre', slabs: 'Decken', furniture: 'Möbel' };
+                  const currentLayers = b3dCfg.visibleLayers;
+                  const allVisible = !currentLayers;
+                  const isChecked = allVisible || currentLayers.includes(layer);
+                  return (
+                    <label key={layer} className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const base: typeof layer[] = allVisible
+                            ? ['rooms', 'walls', 'ducts', 'pipes', 'slabs', 'furniture']
+                            : [...(currentLayers ?? [])] as typeof layer[];
+                          const next = e.target.checked
+                            ? [...new Set([...base, layer])]
+                            : base.filter(l => l !== layer);
+                          const useAll = next.length >= 6;
+                          onUpdate({ config: { ...b3dCfg, visibleLayers: useAll ? undefined : next } });
+                        }}
+                        className="rounded w-3 h-3"
+                      />
+                      {labels[layer]}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
               <label className="text-xs font-medium text-slate-400">Explosionsansicht</label>
               <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
                 <input
