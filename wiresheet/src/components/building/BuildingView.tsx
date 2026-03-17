@@ -109,6 +109,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     selectedRoomId,
     selectedWallId,
     tool,
+    isLoaded,
     setActiveBuildingId,
     setActiveFloorId,
     setSelectedRoomId,
@@ -510,6 +511,17 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     if (selectedRoom) return 'Raum';
     return 'Eigenschaften';
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-full items-center justify-center bg-slate-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-slate-600 border-t-teal-400 rounded-full animate-spin" />
+          <span className="text-xs text-slate-500">Gebäude wird geladen...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full overflow-hidden bg-slate-900 text-slate-100">
