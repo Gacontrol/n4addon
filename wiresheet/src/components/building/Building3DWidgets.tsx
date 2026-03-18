@@ -580,7 +580,7 @@ function profileFrame(tangent: THREE.Vector3): { right: THREE.Vector3; up: THREE
   const worldUp = new THREE.Vector3(0, 1, 0);
   if (Math.abs(tangent.dot(worldUp)) > 0.999) {
     const right = new THREE.Vector3(1, 0, 0);
-    const up = new THREE.Vector3().crossVectors(right, tangent).normalize();
+    const up = new THREE.Vector3(0, 0, 1);
     return { right, up };
   }
   const right = new THREE.Vector3().crossVectors(worldUp, tangent).normalize();
