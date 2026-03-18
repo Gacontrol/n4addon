@@ -3025,6 +3025,9 @@ function broadcastSSE(event, data) {
 
 function getLiveSnapshot() {
   const merged = {};
+  for (const [key, val] of persistentDpValues) {
+    merged[key] = val;
+  }
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }

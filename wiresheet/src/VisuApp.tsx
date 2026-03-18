@@ -271,6 +271,9 @@ export function VisuApp() {
           }
         };
       }));
+      setLiveValues(prev => ({ ...prev, [dpKey]: value }));
+    } else {
+      setLiveValues(prev => ({ ...prev, [dpKey]: value }));
     }
 
     try {
