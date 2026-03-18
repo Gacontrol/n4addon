@@ -782,6 +782,8 @@ export interface Building3DWidgetConfig {
   buildingId?: string;
   floorId?: string;
   showAllFloors?: boolean;
+  visibleFloorIds?: string[];
+  floorsClickable?: boolean;
   cameraAngle?: 'isometric' | 'top' | 'front' | 'perspective';
   showWidgets?: boolean;
   showDucts?: boolean;

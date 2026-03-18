@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Building3DWidgetConfig } from '../../types/visualization';
 import { Building } from '../../types/building';
 import { BuildingCanvas3D, DEFAULT_LIGHTING, DEFAULT_EXPLOSION, LightingSettings, ExplosionSettings, VisibleLayer } from '../building/BuildingCanvas3D';
@@ -16,11 +16,13 @@ interface Visu3DBuildingProps {
   width?: number;
   height?: number;
   isEditMode: boolean;
+  instanceId?: string;
 }
 
 export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   config,
-  isEditMode
+  isEditMode,
+  instanceId,
 }) => {
   const [liveValues] = useState<Record<string, string | number>>({});
   const [buildings, setBuildings] = useState<Building[]>([]);
@@ -31,6 +33,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const [floorIsolated, setFloorIsolated] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializedRef = useRef(false);
+  const myId = useRef(instanceId || `visu3d-${Math.random().toString(36).slice(2)}`);
 
   const applyBuildingList = useCallback((buildingList: Building[]) => {
     setBuildings(buildingList);
@@ -124,6 +127,33 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     };
   }, [loadBuildings]);
 
+  useEffect(() => {
+    const id = myId.current;
+
+    const onFocusFloor = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.targetId && detail.targetId !== id) return;
+    };
+    const onFocusRoom = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.targetId && detail.targetId !== id) return;
+    };
+    const onSetCameraPos = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.targetId && detail.targetId !== id) return;
+    };
+
+    window.addEventListener('focus-floor', onFocusFloor);
+    window.addEventListener('focus-room', onFocusRoom);
+    window.addEventListener('set-camera-pos', onSetCameraPos);
+
+    return () => {
+      window.removeEventListener('focus-floor', onFocusFloor);
+      window.removeEventListener('focus-room', onFocusRoom);
+      window.removeEventListener('set-camera-pos', onSetCameraPos);
+    };
+  }, []);
+
   const lighting: LightingSettings = {
     ...DEFAULT_LIGHTING,
     ambientIntensity: config.ambientIntensity ?? DEFAULT_LIGHTING.ambientIntensity,
@@ -138,6 +168,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
 
   const bgTransparent = config.transparentBackground ?? false;
   const bgColor = config.backgroundColor || '#0a1020';
+  const floorsClickable = config.floorsClickable ?? true;
 
   const handleFloorClick = useCallback((
     floorId: string,
@@ -154,19 +185,19 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     setFloorIsolated(true);
     const duration = (config.floorZoomDuration ?? 700);
     window.dispatchEvent(new CustomEvent('focus-floor', {
-      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration }
+      detail: { cx, baseY, cz, floorHeight, minX, maxX, minZ, maxZ, duration, targetId: myId.current }
     }));
   }, [config.floorZoomDuration]);
 
   const handleRoomZoom = useCallback((cx: number, baseY: number, cz: number, w: number, d: number, h: number) => {
     window.dispatchEvent(new CustomEvent('focus-room', {
-      detail: { cx, baseY, cz, w, d, h }
+      detail: { cx, baseY, cz, w, d, h, targetId: myId.current }
     }));
   }, []);
 
   const handleResetView = useCallback(() => {
     setFloorIsolated(false);
-    window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D' } }));
+    window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D', targetId: myId.current } }));
   }, []);
 
   const visibleLayers = config.visibleLayers as VisibleLayer[] | undefined;
@@ -174,7 +205,24 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const activeBuilding = config.buildingId
     ? (buildings.find(b => b.id === config.buildingId) || buildings[0])
     : buildings[0];
-  const floors = activeBuilding?.floors || [];
+  const floors = useMemo(() => activeBuilding?.floors || [], [activeBuilding]);
+
+  const visibleFloors = useMemo(() => {
+    if (!config.visibleFloorIds || config.visibleFloorIds.length === 0) return floors;
+    return floors.filter(f => config.visibleFloorIds!.includes(f.id));
+  }, [floors, config.visibleFloorIds]);
+
+  const filteredBuildings = useMemo(() => {
+    if (!config.visibleFloorIds || config.visibleFloorIds.length === 0) return buildings;
+    return buildings.map(b => {
+      if (config.buildingId && b.id !== config.buildingId) return b;
+      return {
+        ...b,
+        floors: b.floors.filter(f => config.visibleFloorIds!.includes(f.id)),
+      };
+    });
+  }, [buildings, config.buildingId, config.visibleFloorIds]);
+
   const activeFloor = floors.find(f => f.id === activeFloorId);
 
   if (loading) {
@@ -215,11 +263,14 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     );
   }
 
+  const displayedFloorId = config.showAllFloors ? null : activeFloorId;
+  const canClickFloors = floorsClickable && !config.showAllFloors;
+
   return (
     <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
-        buildings={buildings}
-        activeFloorId={config.showAllFloors ? null : activeFloorId}
+        buildings={filteredBuildings}
+        activeFloorId={displayedFloorId}
         selectedRoomId={null}
         selectedWallId={null}
         onSelectRoom={() => {}}
@@ -237,7 +288,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
         wallsTransparent={config.wallsTransparent ?? false}
         xrayOpacity={config.xrayOpacity ?? 0.2}
-        onFloorClick={config.showAllFloors || activeFloorId === null ? undefined : (!floorIsolated ? handleFloorClick : undefined)}
+        onFloorClick={canClickFloors && activeFloorId !== null && !floorIsolated ? handleFloorClick : undefined}
         onRoomZoom={floorIsolated && activeFloorId !== null ? handleRoomZoom : undefined}
       />
       {floorIsolated && (
@@ -252,7 +303,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         </button>
       )}
 
-      {floors.length > 0 && !config.showAllFloors && (
+      {visibleFloors.length > 0 && !config.showAllFloors && (
         <div className="absolute bottom-8 left-2 z-10">
           <div className="relative">
             <button
@@ -269,12 +320,12 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <button
-                  onClick={() => { setActiveFloorId(null); setFloorIsolated(false); setShowFloorSelector(false); window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D' } })); }}
+                  onClick={() => { setActiveFloorId(null); setFloorIsolated(false); setShowFloorSelector(false); window.dispatchEvent(new CustomEvent('set-camera-pos', { detail: { label: '3D', targetId: myId.current } })); }}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${activeFloorId === null ? 'text-blue-400 bg-blue-900/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
                 >
                   Ganzes Gebäude
                 </button>
-                {[...floors].reverse().map(floor => (
+                {[...visibleFloors].reverse().map(floor => (
                   <button
                     key={floor.id}
                     onClick={() => { setActiveFloorId(floor.id); setFloorIsolated(false); setShowFloorSelector(false); }}

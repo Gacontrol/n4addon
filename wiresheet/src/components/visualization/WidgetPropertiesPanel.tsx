@@ -248,7 +248,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [availableBuildings, setAvailableBuildings] = useState<{ id: string; name: string }[]>([]);
+  const [availableBuildings, setAvailableBuildings] = useState<{ id: string; name: string; floors: { id: string; name: string }[] }[]>([]);
 
   const refreshBuildings = useCallback(() => {
     const p = window.location.pathname;
@@ -258,7 +258,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return;
-        let list: { id: string; name: string }[] = (data.buildings || (data.id ? [data] : []));
+        let list: { id: string; name: string; floors?: { id: string; name: string }[] }[] = (data.buildings || (data.id ? [data] : []));
         if (list.length === 0) {
           try {
             const ls = localStorage.getItem('wiresheet_building_config');
@@ -268,7 +268,11 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             }
           } catch { }
         }
-        setAvailableBuildings(list.map((b: { id: string; name: string }) => ({ id: b.id, name: b.name })));
+        setAvailableBuildings(list.map((b: { id: string; name: string; floors?: { id: string; name: string }[] }) => ({
+          id: b.id,
+          name: b.name,
+          floors: (b.floors || []).map((f: { id: string; name: string }) => ({ id: f.id, name: f.name })),
+        })));
       })
       .catch(() => {});
   }, []);
@@ -2758,7 +2762,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               </div>
               <select
                 value={b3dCfg.buildingId || ''}
-                onChange={(e) => onUpdate({ config: { ...b3dCfg, buildingId: e.target.value || undefined } })}
+                onChange={(e) => onUpdate({ config: { ...b3dCfg, buildingId: e.target.value || undefined, visibleFloorIds: undefined } })}
                 className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500"
               >
                 <option value="">
@@ -2769,6 +2773,43 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 ))}
               </select>
             </div>
+
+            {(() => {
+              const selBuilding = availableBuildings.find(b => b.id === b3dCfg.buildingId) || availableBuildings[0];
+              const bFloors = selBuilding?.floors || [];
+              if (bFloors.length === 0) return null;
+              const visIds = b3dCfg.visibleFloorIds;
+              const allVisible = !visIds || visIds.length === 0;
+              return (
+                <div className="space-y-1.5 border-t border-slate-700 pt-2">
+                  <label className="text-xs font-medium text-slate-400">Sichtbare Etagen</label>
+                  <p className="text-[10px] text-slate-600">Alle deaktivieren = alle sichtbar</p>
+                  <div className="space-y-1">
+                    {[...bFloors].reverse().map(floor => {
+                      const isChecked = allVisible || visIds!.includes(floor.id);
+                      return (
+                        <label key={floor.id} className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const base = allVisible ? bFloors.map(f => f.id) : [...(visIds ?? [])];
+                              const next = e.target.checked
+                                ? [...new Set([...base, floor.id])]
+                                : base.filter(id => id !== floor.id);
+                              const useAll = next.length >= bFloors.length;
+                              onUpdate({ config: { ...b3dCfg, visibleFloorIds: useAll ? undefined : next } });
+                            }}
+                            className="rounded w-3 h-3"
+                          />
+                          {floor.name}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-1.5 border-t border-slate-700 pt-2">
               <label className="text-xs font-medium text-slate-400">Hintergrund</label>
@@ -2961,6 +3002,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     {label}
                   </label>
                 ))}
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={b3dCfg.floorsClickable ?? true}
+                    onChange={(e) => onUpdate({ config: { ...b3dCfg, floorsClickable: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Etagen klickbar
+                </label>
               </div>
             </div>
           </>
