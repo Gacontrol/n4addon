@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw } from 'lucide-react';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw, Activity } from 'lucide-react';
 
 interface ColorPickerProps {
   value: string | undefined;
@@ -64,6 +64,7 @@ interface WidgetPropertiesPanelProps {
   visuPages?: { id: string; name: string }[];
   alarmConsoles?: AlarmConsole[];
   trackedTrends?: TrackedTrend[];
+  liveValues?: Record<string, unknown>;
   onUpdate: (updates: Partial<VisuWidget>) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -242,6 +243,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   visuPages = [],
   alarmConsoles = [],
   trackedTrends = [],
+  liveValues = {},
   onUpdate,
   onDelete,
   onClose
@@ -340,13 +342,13 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
   const handlePortChange = (portId: string) => {
     if (!widget.binding) return;
-    const nodeId = widget.binding.nodeId || widget.binding.dpKey.split(':')[0];
+    const nodeId = bindingNodeId || '';
     onUpdate({ binding: { ...widget.binding, dpKey: portId ? `${nodeId}:${portId}` : nodeId, portId: portId || undefined, paramKey: undefined } });
   };
 
   const handleParamChange = (paramKey: string) => {
     if (!widget.binding) return;
-    const nodeId = widget.binding.nodeId || widget.binding.dpKey.split(':')[0];
+    const nodeId = bindingNodeId || '';
     const newDpKey = paramKey ? `${nodeId}:cfg:${paramKey}` : nodeId;
     onUpdate({ binding: { ...widget.binding, dpKey: newDpKey, paramKey: paramKey || undefined, portId: undefined } });
   };
@@ -3114,15 +3116,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[`${bindingNodeId}:output-2`] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Laeuft:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{liveValues[`${bindingNodeId}:output-2`] ? 'Ja' : 'Nein'}</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3158,15 +3169,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Ventilstellung:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3202,15 +3222,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Messwert + Alarm)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Messwert + Alarm)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Messwert:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(2).replace(/\.00$/, '')}</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3246,15 +3275,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || pidControlNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Sollwert, Istwert, Stellgroesse)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || pidControlNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Sollwert, Istwert, Stellgroesse)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Stellgroesse:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3290,15 +3328,24 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || heatingCurveNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Eingang, Ausgang, Parameter)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || heatingCurveNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Eingang, Ausgang, Parameter)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Ausgang:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)}</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3345,15 +3392,30 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
-                      <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
+                        <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                    <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {liveValues[widget.binding.dpKey] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">
+                          {typeof liveValues[widget.binding.dpKey] === 'boolean'
+                            ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
+                            : typeof liveValues[widget.binding.dpKey] === 'number'
+                              ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
+                              : String(liveValues[widget.binding.dpKey])}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
@@ -3447,20 +3509,38 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   </div>
                 )}
                 {widget.binding ? (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <Link2 className="w-4 h-4 text-green-500" />
-                    <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
-                      {(widget.binding.portId || widget.binding.paramKey) && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          {widget.binding.paramKey && <Settings className="w-3 h-3 text-amber-400" />}
-                          <p className="text-green-500/70">{currentBindingLabel()}</p>
-                        </div>
-                      )}
-                      <p className="text-green-600/50 mt-0.5">
-                        {isWriteWidget ? (widget.binding.paramKey ? 'Lesen + Schreiben (Parameter)' : 'Nur schreiben (Eingang)') : 'Nur lesen'}
-                      </p>
+                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <div className="text-xs text-green-400 flex-1 min-w-0">
+                        <p className="font-medium truncate">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
+                        {(() => { const p = parseDpKey(widget.binding!.dpKey); return (p.portId || (p.segment === 'cfg' && p.paramKey)); })() && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {parseDpKey(widget.binding.dpKey).segment === 'cfg' && <Settings className="w-3 h-3 text-amber-400" />}
+                            <p className="text-green-500/70">{currentBindingLabel()}</p>
+                          </div>
+                        )}
+                        <p className="text-green-600/50 mt-0.5">
+                          {isWriteWidget ? (parseDpKey(widget.binding.dpKey).segment === 'cfg' ? 'Lesen + Schreiben (Parameter)' : 'Nur schreiben (Eingang)') : 'Nur lesen'}
+                        </p>
+                      </div>
+                      <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
+                    {liveValues[widget.binding.dpKey] !== undefined && (
+                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
+                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                        <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
+                        <span className="text-[10px] font-mono text-sky-300 ml-auto">
+                          {typeof liveValues[widget.binding.dpKey] === 'boolean'
+                            ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
+                            : typeof liveValues[widget.binding.dpKey] === 'number'
+                              ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
+                              : String(liveValues[widget.binding.dpKey])}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">

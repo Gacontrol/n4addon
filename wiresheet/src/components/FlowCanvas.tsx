@@ -223,7 +223,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
     if (!canvasRef.current) return null;
-    const el = canvasRef.current.querySelector(`[data-port-id="${nodeId}-${portId}"]`);
+    const el = canvasRef.current.querySelector(`[data-port-id="${nodeId}|${portId}"]`);
     if (!el) return null;
     const portRect = el.getBoundingClientRect();
     const canvasRect = canvasRef.current.getBoundingClientRect();
@@ -318,9 +318,9 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         if (portEl) {
           const portIdAttr = portEl.getAttribute('data-port-id');
           if (portIdAttr) {
-            const parts = portIdAttr.split('-');
-            const portId = parts.slice(-2).join('-');
-            const nodeId = parts.slice(0, -2).join('-');
+            const sepIdx = portIdAttr.indexOf('|');
+            const nodeId = sepIdx !== -1 ? portIdAttr.slice(0, sepIdx) : '';
+            const portId = sepIdx !== -1 ? portIdAttr.slice(sepIdx + 1) : '';
             if (nodeId !== connectingFromRef.current.nodeId) {
               onConnectionEnd(nodeId, portId, connectingFromRef.current.nodeId, connectingFromRef.current.portId);
               connectionJustEndedRef.current = Date.now();

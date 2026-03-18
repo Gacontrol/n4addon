@@ -687,6 +687,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             visuPages={visuPages.map(p => ({ id: p.id, name: p.name }))}
             alarmConsoles={alarmConsoles}
             trackedTrends={trackedTrends}
+            liveValues={liveValues}
             onUpdate={(updates) => handleUpdateWidget(selectedWidget.id, updates)}
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}

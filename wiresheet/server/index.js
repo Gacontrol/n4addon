@@ -957,6 +957,7 @@ function getDefaultValueForNodeType(nodeType) {
     case 'falling-edge':
     case 'compare':
     case 'switch':
+    case 'light-toggle':
       return false;
     case 'math-add':
     case 'math-sub':
@@ -967,14 +968,14 @@ function getDefaultValueForNodeType(nodeType) {
     case 'math-avg':
     case 'math-abs':
     case 'dp-numeric':
+    case 'dp-enum':
     case 'scaling':
     case 'smoothing':
     case 'pid-controller':
     case 'counter':
     case 'const-value':
     case 'timer':
-      return 0;
-    case 'dp-enum':
+    case 'heating-curve':
       return 0;
     case 'threshold':
       return 'below';
@@ -985,8 +986,14 @@ function getDefaultValueForNodeType(nodeType) {
     case 'python-script':
     case 'ha-input':
     case 'ha-output':
+    case 'aggregate-control':
+    case 'pump-control':
+    case 'valve-control':
+    case 'sensor-control':
     case 'modbus-device-input':
     case 'modbus-device-output':
+    case 'time-trigger':
+    case 'state-trigger':
       return null;
     default:
       return null;
@@ -999,27 +1006,74 @@ function getDefaultOutputsForNodeType(node) {
   const defaults = {};
 
   switch (nodeType) {
-    case 'pid-controller':
-      defaults['output-0'] = 0;
-      break;
-    case 'threshold':
-      defaults['output-0'] = 'below';
-      defaults['output-1'] = null;
-      break;
+    case 'and-gate':
+    case 'or-gate':
+    case 'xor-gate':
+    case 'not-gate':
+    case 'compare':
+    case 'switch':
     case 'timer':
+    case 'rising-edge':
+    case 'falling-edge':
+    case 'light-toggle':
       defaults['output-0'] = false;
-      break;
-    case 'counter':
-      defaults['output-0'] = 0;
       break;
     case 'sr-flipflop':
     case 'rs-flipflop':
       defaults['output-0'] = false;
       defaults['output-1'] = true;
       break;
-    case 'rising-edge':
-    case 'falling-edge':
+    case 'threshold':
+      defaults['output-0'] = 'below';
+      defaults['output-1'] = null;
+      break;
+    case 'math-add':
+    case 'math-sub':
+    case 'math-mul':
+    case 'math-div':
+    case 'math-min':
+    case 'math-max':
+    case 'math-avg':
+    case 'math-abs':
+    case 'const-value':
+    case 'scaling':
+    case 'smoothing':
+    case 'pid-controller':
+    case 'counter':
+    case 'heating-curve':
+      defaults['output-0'] = 0;
+      break;
+    case 'select':
+      defaults['output-0'] = null;
+      break;
+    case 'delay':
+      defaults['output-0'] = null;
+      break;
+    case 'dp-boolean':
       defaults['output-0'] = false;
+      break;
+    case 'dp-numeric':
+    case 'dp-enum':
+      defaults['output-0'] = 0;
+      break;
+    case 'aggregate-control':
+    case 'pump-control':
+      defaults['output-0'] = false;
+      defaults['output-1'] = 0;
+      defaults['output-2'] = false;
+      defaults['output-3'] = false;
+      defaults['output-4'] = true;
+      defaults['output-5'] = false;
+      defaults['output-6'] = 0;
+      defaults['output-7'] = 0;
+      break;
+    case 'valve-control':
+      defaults['output-0'] = 0;
+      defaults['output-1'] = false;
+      break;
+    case 'sensor-control':
+      defaults['output-0'] = 0;
+      defaults['output-1'] = false;
       break;
     case 'python-script': {
       const pythonOutputs = (node.data && node.data.config && node.data.config.pythonOutputs) || [];
@@ -1320,7 +1374,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       if (bindingValues[portKey] !== undefined) {
         return bindingValues[portKey];
       }
-      const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
+      const conn = incomingConns.find(c => c.targetPort === inputPort.id);
       if (conn) {
         dpStore.delete(portKey);
         return getInputValue(conn);

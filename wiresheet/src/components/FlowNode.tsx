@@ -401,7 +401,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
-              data-port-id={`${node.id}-input-0`}
+              data-port-id={`${node.id}|input-0`}
               onClick={e => { console.log('[CASE INPUT PORT] click', node.id); e.stopPropagation(); onPortClick(node.id, 'input-0', false); }}
               onPointerDown={e => { e.stopPropagation(); }}
             >
@@ -990,7 +990,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         justifyContent: 'center',
                         isolation: 'isolate'
                       }}
-                      data-port-id={`${node.id}-${input.id}`}
+                      data-port-id={`${node.id}|${input.id}`}
                       onClick={e => { e.stopPropagation(); onPortClick(node.id, input.id, false); }}
                       onPointerDown={e => { e.stopPropagation(); }}
                     >
@@ -1066,7 +1066,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                         justifyContent: 'center',
                         isolation: 'isolate'
                       }}
-                      data-port-id={`${node.id}-${output.id}`}
+                      data-port-id={`${node.id}|${output.id}`}
                       onClick={e => { e.stopPropagation(); onPortClick(node.id, output.id, true); }}
                       onPointerDown={e => { e.stopPropagation(); }}
                     >
