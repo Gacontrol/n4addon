@@ -1160,7 +1160,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     const ductLen = maxY - minY;
     const vertStart = new THREE.Vector3(0, -ductLen / 2, 0);
     const vertEnd   = new THREE.Vector3(0,  ductLen / 2, 0);
-    const vertGeo   = createStraightDuct(vertStart, vertEnd, h, w, isRound);
+    const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
 
     return (
       <group position={[vx, midY, vz]} rotation={[0, rotY, 0]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -1172,7 +1172,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
           <mesh>
             {isRound
               ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductLen + 0.03, 12]} />
-              : <boxGeometry args={[h + 0.03, ductLen + 0.03, w + 0.03]} />
+              : <boxGeometry args={[w + 0.03, ductLen + 0.03, h + 0.03]} />
             }
             <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
           </mesh>
