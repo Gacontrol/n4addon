@@ -1141,7 +1141,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
   if (duct.isVertical && duct.verticalX != null) {
     const vx = duct.verticalX + offsetX;
     const vz = duct.verticalY ?? 5;
-    const rotY = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
+    const rotY = -((duct.verticalRotation ?? 0) * Math.PI) / 180;
 
     let minY: number;
     let maxY: number;
