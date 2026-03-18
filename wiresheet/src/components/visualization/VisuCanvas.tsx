@@ -191,7 +191,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
-    const dpKey = widget.binding.dpKey;
+    const legacyNodeId = (widget.binding as unknown as { nodeId?: string }).nodeId;
+    const dpKey = widget.binding.dpKey || legacyNodeId || '';
     const { nodeId, segment, paramKey: cfgParamKey } = parseDpKey(dpKey);
 
     if (widget.type === 'visu-pump') {
@@ -274,15 +275,16 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getWidgetStatusValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.statusBinding) return undefined;
-    const dpKey = widget.statusBinding.dpKey;
-    if (dpKey in liveValues) return liveValues[dpKey];
+    const legacyNodeId = (widget.statusBinding as unknown as { nodeId?: string }).nodeId;
+    const dpKey = widget.statusBinding.dpKey || legacyNodeId || '';
+    if (dpKey && dpKey in liveValues) return liveValues[dpKey];
     const { nodeId } = parseDpKey(dpKey);
     return liveValues[nodeId];
   }, [liveValues]);
 
   const getPumpWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-pump' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || (node.type !== 'pump-control' && node.type !== 'aggregate-control')) return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
@@ -304,7 +306,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getValveWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-valve' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || node.type !== 'valve-control') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
@@ -322,7 +324,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getSensorWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-sensor' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || node.type !== 'sensor-control') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
@@ -342,7 +344,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getPIDWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-pid' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || node.type !== 'pid-controller') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
@@ -361,7 +363,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getHeatingCurveWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-heating-curve' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === widget.binding?.nodeId);
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || node.type !== 'heating-curve') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;

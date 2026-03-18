@@ -782,9 +782,9 @@ function App() {
       if (prevPage) {
         for (const widget of updates.widgets) {
           const prev = prevPage.widgets.find(w => w.id === widget.id);
-          const newPortId = widget.binding?.portId;
-          const prevPortId = prev?.binding?.portId;
-          const nodeId = widget.binding?.nodeId;
+          const newPortId = widget.binding?.portId || parseDpKey(widget.binding?.dpKey).portId;
+          const prevPortId = prev?.binding?.portId || parseDpKey(prev?.binding?.dpKey).portId;
+          const nodeId = parseDpKey(widget.binding?.dpKey).nodeId || (widget.binding as unknown as { nodeId?: string })?.nodeId;
           if (newPortId && newPortId !== prevPortId && nodeId) {
             const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
             if (targetNode) {
