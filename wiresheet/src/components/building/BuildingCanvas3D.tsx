@@ -1,6 +1,6 @@
-import { Suspense, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Suspense, useRef, useEffect, useMemo, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { Canvas, useThree, useFrame, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
@@ -79,6 +79,32 @@ interface Props {
   compact?: boolean;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
+}
+
+interface ErrorBoundaryState { hasError: boolean; error?: Error }
+class CanvasErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  componentDidCatch(_err: Error, _info: ErrorInfo) {}
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? (
+        <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm flex-col gap-2">
+          <span>3D-Ansicht konnte nicht geladen werden</span>
+          <button
+            className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+            onClick={() => this.setState({ hasError: false })}
+          >
+            Erneut versuchen
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function hexToThree(hex: string): THREE.Color {
@@ -1502,6 +1528,7 @@ export function BuildingCanvas3D({
   }
 
   return (
+    <CanvasErrorBoundary>
     <div className="relative w-full h-full select-none" style={bgTransparent ? { background: 'transparent' } : undefined}>
       <Canvas
         shadows={lighting.shadowEnabled ? 'soft' : false}
@@ -1552,7 +1579,6 @@ export function BuildingCanvas3D({
             onFloorClick={onFloorClick}
             onRoomZoom={onRoomZoom}
           />
-          <Environment preset="city" />
         </Suspense>
 
         <CameraAutoFit buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
@@ -1593,6 +1619,7 @@ export function BuildingCanvas3D({
         </div>
       )}
     </div>
+    </CanvasErrorBoundary>
   );
 }
 
