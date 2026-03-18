@@ -222,10 +222,12 @@ export function VisuApp() {
     lastWriteRef.current.set(widgetId, { time: now, value });
 
     const pages = visuPagesRef.current;
+    let foundWidget: VisuWidget | undefined;
     let binding: VisuWidget['binding'] | undefined;
     for (const page of pages) {
       const widget = page.widgets.find(w => w.id === widgetId);
       if (widget?.binding) {
+        foundWidget = widget;
         binding = widget.binding;
         break;
       }
@@ -236,19 +238,34 @@ export function VisuApp() {
 
     if (binding.paramKey) {
       setLogicNodes(prev => prev.map(n => {
-        if (n.id !== binding.nodeId) return n;
+        if (n.id !== binding!.nodeId) return n;
         return {
           ...n,
           data: {
             ...n.data,
-            config: { ...(n.data.config || {}), [binding.paramKey!]: value }
+            config: { ...(n.data.config || {}), [binding!.paramKey!]: value }
           }
         };
       }));
     }
 
     try {
-      const payload = { nodeId: binding.nodeId, portId: binding.portId, paramKey: binding.paramKey, value };
+      const isImpulseWidget = foundWidget?.type === 'visu-button' || foundWidget?.type === 'modern-button';
+      const isImpulseMode = isImpulseWidget && ((foundWidget?.config as Record<string, unknown>)?.impulseMode === true);
+
+      const payload: Record<string, unknown> = {
+        nodeId: binding.nodeId,
+        portId: binding.portId,
+        paramKey: binding.paramKey,
+        value
+      };
+
+      if (isImpulseMode && value === true) {
+        const releaseVal = (foundWidget?.config as Record<string, unknown>)?.releaseValue ?? false;
+        payload.impulse = true;
+        payload.releaseValue = releaseVal;
+      }
+
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

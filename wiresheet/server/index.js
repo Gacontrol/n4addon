@@ -2568,12 +2568,15 @@ async function runPageCycle(pageId) {
 
       lastNodeValues.set(pageId, nodeValues);
 
+      const pageNodeIds = new Set(page.nodes.map(n => n.id));
       for (const key of [...lastVisuWrites.keys()]) {
         if (key in nodeValues) {
           lastVisuWrites.delete(key);
         } else {
           const baseNodeId = key.includes(':') ? key.split(':')[0] : null;
           if (baseNodeId && baseNodeId in nodeValues) {
+            lastVisuWrites.delete(key);
+          } else if (baseNodeId && pageNodeIds.has(baseNodeId)) {
             lastVisuWrites.delete(key);
           }
         }
