@@ -1142,6 +1142,7 @@ function App() {
           config: { ...targetNode.data.config, [parsed.paramKey]: value }
         });
       }
+      setLiveValue(dpKey, value);
     }
     if (parsed.segment !== 'cfg') {
       setLiveValue(dpKey, value);

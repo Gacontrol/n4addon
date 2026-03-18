@@ -201,6 +201,12 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
       params.push({ key: 'kd', label: 'Kd (Differential)', type: 'number' });
       params.push({ key: 'outputMin', label: 'Ausgang Min', type: 'number' });
       params.push({ key: 'outputMax', label: 'Ausgang Max', type: 'number' });
+      params.push({ key: 'pidKp', label: 'PID Kp', type: 'number' });
+      params.push({ key: 'pidKi', label: 'PID Ki', type: 'number' });
+      params.push({ key: 'pidKd', label: 'PID Kd', type: 'number' });
+      params.push({ key: 'pidWindupLimit', label: 'Windup-Grenze', type: 'number' });
+      params.push({ key: 'pidMinOutput', label: 'Ausgang Min', type: 'number' });
+      params.push({ key: 'pidMaxOutput', label: 'Ausgang Max', type: 'number' });
       break;
     case 'scaling':
       params.push({ key: 'inputMin', label: 'Eingang Min', type: 'number' });
@@ -221,15 +227,57 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
       params.push({ key: 'timerMs', label: 'Zeitdauer (ms)', type: 'number' });
       break;
     case 'counter':
-      params.push({ key: 'counterMin', label: 'Zähler Min', type: 'number' });
-      params.push({ key: 'counterMax', label: 'Zähler Max', type: 'number' });
+      params.push({ key: 'counterMin', label: 'Zaehler Min', type: 'number' });
+      params.push({ key: 'counterMax', label: 'Zaehler Max', type: 'number' });
       break;
     case 'smoothing':
-      params.push({ key: 'smoothingDuration', label: 'Glaettungsdauer', type: 'number' });
+      params.push({ key: 'smoothingDuration', label: 'Glaettungsdauer (ms)', type: 'number' });
       params.push({ key: 'sampleIntervalMs', label: 'Abtastintervall (ms)', type: 'number' });
       break;
     case 'const-value':
       params.push({ key: 'constValue', label: 'Konstantwert', type: 'number' });
+      break;
+    case 'heating-curve':
+      params.push({ key: 'hcMinInput', label: 'Eingang Min', type: 'number' });
+      params.push({ key: 'hcMaxInput', label: 'Eingang Max', type: 'number' });
+      params.push({ key: 'hcMinOutput', label: 'Ausgang Min', type: 'number' });
+      params.push({ key: 'hcMaxOutput', label: 'Ausgang Max', type: 'number' });
+      break;
+    case 'aggregate-control':
+      params.push({ key: 'aggregateStartDelayMs', label: 'Startverz. (ms)', type: 'number' });
+      params.push({ key: 'aggregateStopDelayMs', label: 'Stoppverz. (ms)', type: 'number' });
+      params.push({ key: 'aggregateFeedbackTimeoutMs', label: 'Rueckmeldung Timeout (ms)', type: 'number' });
+      params.push({ key: 'aggregateSpeedMin', label: 'Drehzahl Min', type: 'number' });
+      params.push({ key: 'aggregateSpeedMax', label: 'Drehzahl Max', type: 'number' });
+      params.push({ key: 'aggregateAntiSeizeIntervalMs', label: 'Blockierschutz Intervall (ms)', type: 'number' });
+      params.push({ key: 'aggregateAntiSeizeRunMs', label: 'Blockierschutz Laufzeit (ms)', type: 'number' });
+      params.push({ key: 'aggregateAntiSeizeSpeed', label: 'Blockierschutz Drehzahl', type: 'number' });
+      break;
+    case 'valve-control':
+      params.push({ key: 'valveMinOutput', label: 'Ausgang Min', type: 'number' });
+      params.push({ key: 'valveMaxOutput', label: 'Ausgang Max', type: 'number' });
+      params.push({ key: 'valveTolerance', label: 'Toleranz', type: 'number' });
+      params.push({ key: 'valveAlarmDelayMs', label: 'Alarm Verz. (ms)', type: 'number' });
+      break;
+    case 'sensor-control':
+      params.push({ key: 'sensorMinLimit', label: 'Grenzwert Min', type: 'number' });
+      params.push({ key: 'sensorMaxLimit', label: 'Grenzwert Max', type: 'number' });
+      params.push({ key: 'sensorAlarmDelayMs', label: 'Alarm Verz. (ms)', type: 'number' });
+      params.push({ key: 'sensorRangeMin', label: 'Bereich Min', type: 'number' });
+      params.push({ key: 'sensorRangeMax', label: 'Bereich Max', type: 'number' });
+      params.push({ key: 'sensorManualValue', label: 'Manuell-Wert', type: 'number' });
+      break;
+    case 'light-toggle':
+      params.push({ key: 'lightTogglePulseMs', label: 'Pulslaenge (ms)', type: 'number' });
+      break;
+    case 'math-add':
+    case 'math-sub':
+    case 'math-mul':
+    case 'math-div':
+    case 'math-min':
+    case 'math-max':
+    case 'math-avg':
+    case 'math-abs':
       break;
     default:
       break;
