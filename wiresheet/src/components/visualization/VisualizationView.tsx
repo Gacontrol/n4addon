@@ -139,9 +139,10 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     if (!templateJson) return;
 
     const template: WidgetTemplate = JSON.parse(templateJson);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - template.defaultSize.width / 2;
-    const y = e.clientY - rect.top - template.defaultSize.height / 2;
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left + el.scrollLeft - template.defaultSize.width / 2;
+    const y = e.clientY - rect.top + el.scrollTop - template.defaultSize.height / 2;
 
     const gridSize = activePage.gridSize || 10;
     const snappedX = activePage.showGrid ? Math.round(x / gridSize) * gridSize : x;

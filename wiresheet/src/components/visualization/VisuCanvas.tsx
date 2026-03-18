@@ -132,11 +132,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getCanvasPos = useCallback((e: React.MouseEvent | MouseEvent | React.PointerEvent | PointerEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
-    const el = canvasRef.current;
-    const rect = el.getBoundingClientRect();
+    const rect = canvasRef.current.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left + el.scrollLeft,
-      y: e.clientY - rect.top + el.scrollTop
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
   }, []);
 
@@ -1044,7 +1043,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   return (
     <div
       ref={canvasRef}
-      className="relative overflow-auto"
+      className="relative"
       style={{
         backgroundColor: page.backgroundColor || '#0f172a',
         cursor: drawingCursor,
