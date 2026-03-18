@@ -290,7 +290,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         onWidgetValueChange(widgetId, widget.binding, { pumpControl: pumpValue });
       } else {
         const isImpulseWidget = widget.type === 'visu-button' || widget.type === 'modern-button';
-        const isImpulseMode = isImpulseWidget && ((widget.config as Record<string, unknown>)?.impulseMode !== false);
+        const isImpulseMode = isImpulseWidget && ((widget.config as Record<string, unknown>)?.impulseMode === true);
         if (isImpulseMode) {
           if (value === true) {
             const releaseVal = (widget.config as Record<string, unknown>)?.releaseValue ?? false;
