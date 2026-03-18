@@ -3085,6 +3085,13 @@ app.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
 
 visuApp.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
 
+visuApp.use('/api', async (req, res, next) => {
+  if (req.path === '/sse' || req.originalUrl.endsWith('/sse')) {
+    return setupSSEClient(req, res);
+  }
+  next();
+});
+
 const net = require('net');
 
 function modbusReadRegister(host, port, unitId, address, registerType, dataType, timeout = 3000) {

@@ -142,10 +142,11 @@ export function VisuApp() {
 
   const loadData = useCallback(async () => {
     try {
-      const [visuRes, pagesRes, alarmRes] = await Promise.all([
+      const [visuRes, pagesRes, alarmRes, pollRes] = await Promise.all([
         fetch(`${apiBase}/visu-pages`),
         fetch(`${apiBase}/pages`),
-        fetch(`${apiBase}/alarm-config`)
+        fetch(`${apiBase}/alarm-config`),
+        fetch(`${apiBase}/visu-poll`)
       ]);
 
       if (visuRes.ok) {
@@ -181,6 +182,11 @@ export function VisuApp() {
         setAlarmClasses(data.alarmClasses || []);
         setAlarmConsoles(data.alarmConsoles || []);
         setActiveAlarms(data.activeAlarms || []);
+      }
+
+      if (pollRes.ok) {
+        const data = await pollRes.json();
+        if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
       }
     } catch (err) {
       console.error('loadData error:', err);
