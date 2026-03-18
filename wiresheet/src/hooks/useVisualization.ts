@@ -40,8 +40,13 @@ export const useVisualization = () => {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setVisuPages(data);
-          setActiveVisuPageId(data[0].id);
+          const pages = data.map((p: VisuPage) => ({
+            ...p,
+            canvasWidth: p.canvasWidth ?? 1900,
+            canvasHeight: p.canvasHeight ?? 900,
+          }));
+          setVisuPages(pages);
+          setActiveVisuPageId(pages[0].id);
         }
       }
     } catch (err) {
