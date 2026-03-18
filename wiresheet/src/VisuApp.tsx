@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
-import { VisuPage, VisuWidget, PageTransitionEffect } from './types/visualization';
+import { VisuPage, VisuWidget, PageTransitionEffect, parseDpKey, migrateBinding } from './types/visualization';
 import { FlowNode } from './types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
 import { Monitor } from 'lucide-react';
@@ -149,7 +149,15 @@ export function VisuApp() {
       ]);
 
       if (visuRes.ok) {
-        const data = await visuRes.json();
+        const raw = await visuRes.json();
+        const data: VisuPage[] = Array.isArray(raw) ? raw.map((page: VisuPage) => ({
+          ...page,
+          widgets: page.widgets.map(w => ({
+            ...w,
+            binding: w.binding && !w.binding.dpKey ? migrateBinding(w.binding as Parameters<typeof migrateBinding>[0]) : w.binding,
+            statusBinding: w.statusBinding && !(w.statusBinding as { dpKey?: string }).dpKey ? migrateBinding(w.statusBinding as Parameters<typeof migrateBinding>[0]) : w.statusBinding
+          }))
+        })) : raw;
         if (Array.isArray(data) && data.length > 0) {
           setVisuPages(data);
           setActivePageId(prev => prev || data[0].id);
@@ -249,14 +257,17 @@ export function VisuApp() {
       return;
     }
 
-    if (binding.paramKey) {
+    const dpKey = binding.dpKey;
+    const parsed = parseDpKey(dpKey);
+
+    if (parsed.segment === 'cfg' && parsed.paramKey) {
       setLogicNodes(prev => prev.map(n => {
-        if (n.id !== binding!.nodeId) return n;
+        if (n.id !== parsed.nodeId) return n;
         return {
           ...n,
           data: {
             ...n.data,
-            config: { ...(n.data.config || {}), [binding!.paramKey!]: value }
+            config: { ...(n.data.config || {}), [parsed.paramKey!]: value }
           }
         };
       }));
@@ -266,17 +277,11 @@ export function VisuApp() {
       const isImpulseWidget = foundWidget?.type === 'visu-button' || foundWidget?.type === 'modern-button';
       const isImpulseMode = isImpulseWidget && ((foundWidget?.config as Record<string, unknown>)?.impulseMode === true);
 
-      const payload: Record<string, unknown> = {
-        nodeId: binding.nodeId,
-        portId: binding.portId,
-        paramKey: binding.paramKey,
-        value
-      };
+      const payload: Record<string, unknown> = { dpKey, value, mode: isImpulseMode ? 'impulse' : 'set' };
 
       if (isImpulseMode) {
         if (value !== true) return;
         const releaseVal = (foundWidget?.config as Record<string, unknown>)?.releaseValue ?? false;
-        payload.impulse = true;
         payload.releaseValue = releaseVal;
       }
 

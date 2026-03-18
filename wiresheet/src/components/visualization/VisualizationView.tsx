@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink } from 'lucide-react';
-import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
+import { VisuPage, VisuWidget, WidgetBinding, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
@@ -35,7 +35,7 @@ interface VisualizationViewProps {
   onUpdateVisuPage: (pageId: string, updates: Partial<VisuPage>) => void;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
-  onWidgetValueChange: (widgetId: string, binding: { nodeId: string; portId?: string }, value: unknown) => void;
+  onWidgetValueChange: (widgetId: string, binding: WidgetBinding & { impulse?: boolean; releaseValue?: unknown }, value: unknown) => void;
   highlightedWidgetId?: string | null;
   alarmClasses?: AlarmClass[];
   alarmConsoles?: AlarmConsole[];

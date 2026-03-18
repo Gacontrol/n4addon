@@ -69,10 +69,55 @@ export type WidgetType =
   | 'visu-3d-building';
 
 export interface WidgetBinding {
-  nodeId: string;
+  dpKey: string;
+  direction: 'read' | 'write' | 'readwrite';
+  nodeId?: string;
   portId?: string;
   paramKey?: string;
-  direction: 'read' | 'write' | 'readwrite';
+}
+
+export interface DpKeyComponents {
+  nodeId: string;
+  segment: 'primary' | 'input' | 'output' | 'cfg' | 'port';
+  portId?: string;
+  paramKey?: string;
+}
+
+export function parseDpKey(dpKey: string): DpKeyComponents {
+  if (!dpKey) return { nodeId: '', segment: 'primary' };
+  const colonIdx = dpKey.indexOf(':');
+  if (colonIdx === -1) return { nodeId: dpKey, segment: 'primary' };
+  const nodeId = dpKey.slice(0, colonIdx);
+  const rest = dpKey.slice(colonIdx + 1);
+  if (rest.startsWith('cfg:')) return { nodeId, segment: 'cfg', paramKey: rest.slice(4) };
+  if (rest.startsWith('output-')) return { nodeId, segment: 'output', portId: rest };
+  if (rest.startsWith('input-')) return { nodeId, segment: 'input', portId: rest };
+  return { nodeId, segment: 'port', portId: rest };
+}
+
+export function buildDpKey(nodeId: string, segment: 'primary' | 'input' | 'output' | 'cfg', indexOrParam?: number | string): string {
+  if (segment === 'primary') return nodeId;
+  if (segment === 'cfg') return `${nodeId}:cfg:${indexOrParam}`;
+  if (segment === 'output') return `${nodeId}:output-${indexOrParam}`;
+  if (segment === 'input') return `${nodeId}:input-${indexOrParam}`;
+  return nodeId;
+}
+
+export function migrateBinding(old: { nodeId: string; portId?: string; paramKey?: string; direction: 'read' | 'write' | 'readwrite' }): WidgetBinding {
+  let dpKey: string;
+  if (old.paramKey) {
+    dpKey = `${old.nodeId}:cfg:${old.paramKey}`;
+  } else if (old.portId) {
+    dpKey = `${old.nodeId}:${old.portId}`;
+  } else {
+    dpKey = old.nodeId;
+  }
+  return { dpKey, direction: old.direction };
+}
+
+export function getBindingNodeId(binding: WidgetBinding): string {
+  if (binding.nodeId) return binding.nodeId;
+  return parseDpKey(binding.dpKey).nodeId;
 }
 
 export type WidgetTheme =

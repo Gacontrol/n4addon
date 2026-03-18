@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { VisuPage, VisuWidget } from '../types/visualization';
+import { VisuPage, VisuWidget, migrateBinding } from '../types/visualization';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -44,6 +44,11 @@ export const useVisualization = () => {
             ...p,
             canvasWidth: p.canvasWidth ?? 1900,
             canvasHeight: p.canvasHeight ?? 900,
+            widgets: p.widgets.map((w: VisuWidget) => ({
+              ...w,
+              binding: w.binding && !w.binding.dpKey ? migrateBinding(w.binding as Parameters<typeof migrateBinding>[0]) : w.binding,
+              statusBinding: w.statusBinding && !(w.statusBinding as { dpKey?: string }).dpKey ? migrateBinding(w.statusBinding as Parameters<typeof migrateBinding>[0]) : w.statusBinding
+            }))
           }));
           setVisuPages(pages);
           setActiveVisuPageId(pages[0].id);

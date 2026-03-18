@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { VisuWidget, VisuPage, PolygonConfig, LineConfig } from '../../types/visualization';
+import { VisuWidget, VisuPage, PolygonConfig, LineConfig, parseDpKey } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuWidgetRenderer } from './VisuWidget';
@@ -191,11 +191,13 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
-    const { nodeId, portId, paramKey } = widget.binding;
+    const dpKey = widget.binding.dpKey;
+    const { nodeId, segment, paramKey: cfgParamKey } = parseDpKey(dpKey);
 
     if (widget.type === 'visu-pump') {
       const node = logicNodes.find(n => n.id === nodeId);
       if (!node || (node.type !== 'pump-control' && node.type !== 'aggregate-control')) return null;
+      const prefix = node.type === 'aggregate-control' ? 'aggregate' : 'pump';
       return {
         pumpCmd: liveValues[`${nodeId}:output-0`] ?? false,
         speedOut: liveValues[`${nodeId}:output-1`] ?? 0,
@@ -205,23 +207,23 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         alarm: liveValues[`${nodeId}:output-5`] ?? false,
         opHours: liveValues[`${nodeId}:output-6`] ?? 0,
         starts: liveValues[`${nodeId}:output-7`] ?? 0,
-        hoaMode: node.data.config?.pumpVisuHOA ?? node.data.config?.aggregateVisuHOA ?? 2,
+        hoaMode: (liveValues[`${nodeId}:cfg:${prefix}VisuHOA`] ?? node.data.config?.[`${prefix}VisuHOA`]) ?? 2,
         revision: liveValues[`${nodeId}:input-3`] ?? false,
-        handStart: node.data.config?.pumpVisuHandStart ?? node.data.config?.aggregateVisuHandStart ?? false
+        handStart: (liveValues[`${nodeId}:cfg:${prefix}VisuHandStart`] ?? node.data.config?.[`${prefix}VisuHandStart`]) ?? false
       };
     }
 
     if (widget.type === 'visu-valve') {
       const node = logicNodes.find(n => n.id === nodeId);
       if (!node || node.type !== 'valve-control') return null;
-      const setpointFromVisu = node.data.config?.valveVisuSetpoint;
+      const setpointFromVisu = liveValues[`${nodeId}:cfg:valveVisuSetpoint`] ?? node.data.config?.valveVisuSetpoint;
       const setpointFromWire = liveValues[`${nodeId}:input-0`] ?? 0;
       return {
         valveOutput: liveValues[`${nodeId}:output-0`] ?? 0,
         setpoint: setpointFromVisu ?? setpointFromWire ?? 0,
         feedback: liveValues[`${nodeId}:input-1`] ?? 0,
         alarm: liveValues[`${nodeId}:output-1`] ?? false,
-        hoaMode: node.data.config?.valveVisuHOA ?? 2
+        hoaMode: (liveValues[`${nodeId}:cfg:valveVisuHOA`] ?? node.data.config?.valveVisuHOA) ?? 2
       };
     }
 
@@ -231,8 +233,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return {
         sensorValue: liveValues[`${nodeId}:output-0`] ?? 0,
         alarm: liveValues[`${nodeId}:output-1`] ?? false,
-        hoaMode: node.data.config?.sensorVisuHOA ?? 'auto',
-        manualValue: node.data.config?.sensorManualValue ?? 0
+        hoaMode: (liveValues[`${nodeId}:cfg:sensorVisuHOA`] ?? node.data.config?.sensorVisuHOA) ?? 'auto',
+        manualValue: (liveValues[`${nodeId}:cfg:sensorManualValue`] ?? node.data.config?.sensorManualValue) ?? 0
       };
     }
 
@@ -244,8 +246,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         setpoint: liveValues[`${nodeId}:input-0`] ?? 0,
         actualValue: liveValues[`${nodeId}:input-1`] ?? 0,
         enable: liveValues[`${nodeId}:input-2`] ?? false,
-        hoaMode: node.data.config?.pidVisuHOA ?? 'auto',
-        manualOutput: node.data.config?.pidManualOutput ?? 0
+        hoaMode: (liveValues[`${nodeId}:cfg:pidVisuHOA`] ?? node.data.config?.pidVisuHOA) ?? 'auto',
+        manualOutput: (liveValues[`${nodeId}:cfg:pidManualOutput`] ?? node.data.config?.pidManualOutput) ?? 0
       };
     }
 
@@ -259,28 +261,22 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
-    if (paramKey) {
+    if (segment === 'cfg' && cfgParamKey) {
+      const cfgLiveVal = liveValues[dpKey];
+      if (cfgLiveVal !== undefined) return cfgLiveVal;
       const node = logicNodes.find(n => n.id === nodeId);
-      if (node?.data.config) {
-        const val = node.data.config[paramKey];
-        if (val !== undefined) return val;
-      }
-      return null;
+      return node?.data.config?.[cfgParamKey] ?? null;
     }
-    if (portId) {
-      const portKey = `${nodeId}:${portId}`;
-      if (portKey in liveValues) return liveValues[portKey];
-    }
+
+    if (dpKey in liveValues) return liveValues[dpKey];
     return liveValues[nodeId] ?? null;
   }, [liveValues, logicNodes]);
 
   const getWidgetStatusValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.statusBinding) return undefined;
-    const { nodeId, portId } = widget.statusBinding;
-    if (portId) {
-      const portKey = `${nodeId}:${portId}`;
-      if (portKey in liveValues) return liveValues[portKey];
-    }
+    const dpKey = widget.statusBinding.dpKey;
+    if (dpKey in liveValues) return liveValues[dpKey];
+    const { nodeId } = parseDpKey(dpKey);
     return liveValues[nodeId];
   }, [liveValues]);
 

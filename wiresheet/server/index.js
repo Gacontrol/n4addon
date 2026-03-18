@@ -38,13 +38,10 @@ let trendFlushTimer = null;
 const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
-const clientVisuOverrides = new Map();
+const dpStore = new Map();
 const persistentDpValues = new Map();
-const visuControlledDps = new Map();
 const persistentNodeOverrides = new Map();
-const impulseResetPending = new Map();
 const impulseQueue = new Map();
-const lastVisuWrites = new Map();
 let dpValuesSaveTimeout = null;
 
 let driverConfig = {
@@ -1105,10 +1102,7 @@ print(json.dumps(_outputs))
   });
 }
 
-async function executePageLogic(nodes, connections, manualOverrides = {}, visuOverrides = {}, pageId = null) {
-  console.log(`[EXEC DEBUG] executePageLogic gestartet fuer pageId=${pageId}`);
-  console.log(`[EXEC DEBUG] visuOverrides empfangen:`, JSON.stringify(visuOverrides));
-  console.log(`[EXEC DEBUG] visuControlledDps aktuell:`, JSON.stringify([...visuControlledDps.entries()]));
+async function executePageLogic(nodes, connections, manualOverrides = {}, pageId = null) {
   const nodeValues = {};
 
   const modbusDevices = driverConfig.modbusDevices || [];
@@ -1326,17 +1320,14 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (bindingValues[portKey] !== undefined) {
         return bindingValues[portKey];
       }
-      if (visuOverrides[portKey] !== undefined) {
-        return visuOverrides[portKey];
-      }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
       if (conn) {
-        visuControlledDps.delete(portKey);
+        dpStore.delete(portKey);
         return getInputValue(conn);
       }
-      const visuControlledPortVal = visuControlledDps.get(portKey);
-      if (visuControlledPortVal !== undefined) {
-        return visuControlledPortVal;
+      const dpVal = dpStore.get(portKey);
+      if (dpVal !== undefined) {
+        return dpVal;
       }
       const portDefaultValues = (node.data.config || {}).portDefaultValues || {};
       const defaultStr = portDefaultValues[inputPort.id];
@@ -1357,17 +1348,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       nodeValues[nodeId] = manualOverrides[nodeId];
     } else if (node.type === 'ha-input') {
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
-      const visuKey = node.data.inputs?.[0]?.id ? `${nodeId}:${node.data.inputs[0].id}` : nodeId;
-      const visuVal = visuOverrides[visuKey] !== undefined ? visuOverrides[visuKey] : visuOverrides[nodeId];
-      const visuControlledVal = visuControlledDps.get(nodeId);
-
-      console.log(`[DP-EVAL DEBUG] Node: ${nodeId} (${node.type})`);
-      console.log(`[DP-EVAL DEBUG]   visuKey=${visuKey}`);
-      console.log(`[DP-EVAL DEBUG]   visuOverrides[visuKey]=${visuOverrides[visuKey]}, visuOverrides[nodeId]=${visuOverrides[nodeId]}`);
-      console.log(`[DP-EVAL DEBUG]   visuVal=${visuVal} (type: ${typeof visuVal})`);
-      console.log(`[DP-EVAL DEBUG]   visuControlledVal=${visuControlledVal} (type: ${typeof visuControlledVal})`);
-      console.log(`[DP-EVAL DEBUG]   inputVals[0]=${inputVals[0]}`);
-      console.log(`[DP-EVAL DEBUG]   visuControlledDps size=${visuControlledDps.size}`);
+      const dpVal = dpStore.get(nodeId);
 
       const convertToDpType = (val) => {
         if (node.type === 'dp-boolean') {
@@ -1379,48 +1360,31 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         return val;
       };
 
-      if (visuVal !== undefined) {
-        console.log(`[DP-EVAL DEBUG]   -> NEUER VISU-WERT: ${visuVal}`);
-        const converted = convertToDpType(visuVal);
-        visuControlledDps.set(nodeId, converted);
+      if (dpVal !== undefined) {
+        const converted = convertToDpType(dpVal);
         nodeValues[nodeId] = converted;
         setPersistentDpValue(nodeId, converted);
-        delete visuOverrides[visuKey];
-        delete visuOverrides[nodeId];
-        for (const key of Object.keys(visuOverrides)) {
-          if (key.startsWith(`${nodeId}:`)) {
-            delete visuOverrides[key];
-          }
-        }
       } else if (inputVals[0] !== undefined) {
-        console.log(`[DP-EVAL DEBUG]   -> INPUT-WERT: ${inputVals[0]}`);
         const converted = convertToDpType(inputVals[0]);
-        visuControlledDps.delete(nodeId);
+        dpStore.delete(nodeId);
         nodeValues[nodeId] = converted;
         setPersistentDpValue(nodeId, converted);
-      } else if (visuControlledVal !== undefined) {
-        console.log(`[DP-EVAL DEBUG]   -> VISU-KONTROLLE AKTIV: ${visuControlledVal}`);
-        nodeValues[nodeId] = convertToDpType(visuControlledVal);
       } else {
         const persistentVal = persistentDpValues.get(nodeId);
         if (persistentVal !== undefined) {
-          console.log(`[DP-EVAL DEBUG]   -> PERSISTENTER WERT: ${persistentVal}`);
           const converted = convertToDpType(persistentVal);
-          visuControlledDps.set(nodeId, converted);
+          dpStore.set(nodeId, converted);
           nodeValues[nodeId] = converted;
         } else {
-          console.log(`[DP-EVAL DEBUG]   -> DEFAULT-WERT`);
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
         }
       }
-      console.log(`[DP-EVAL DEBUG]   ERGEBNIS nodeValues[${nodeId}]=${nodeValues[nodeId]}`);
-    } else if (visuOverrides[nodeId] !== undefined) {
-      const ov = visuOverrides[nodeId];
+    } else if (dpStore.has(nodeId) && !['dp-boolean','dp-numeric','dp-enum'].includes(node.type)) {
+      const ov = dpStore.get(nodeId);
       nodeValues[nodeId] = ov;
       if (inputVals.every(v => v === undefined)) {
         persistentNodeOverrides.set(nodeId, ov);
       }
-      delete visuOverrides[nodeId];
     } else if (persistentNodeOverrides.has(nodeId) && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = persistentNodeOverrides.get(nodeId);
     } else if (node.type === 'and-gate') {
@@ -2513,9 +2477,7 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
 
   const { nodes, connections, manualOverrides = {} } = req.body;
   try {
-    const serverOverrides = { ...(clientVisuOverrides.get('global') || {}) };
-    clientVisuOverrides.set('global', {});
-    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, serverOverrides, pageId);
+    const nodeValues = await executePageLogic(nodes, connections, manualOverrides, pageId);
 
     res.json({ success: true, nodeValues });
   } catch (err) {
@@ -2547,49 +2509,33 @@ async function runPageCycle(pageId) {
         }
       }
 
-      const allOverrides = { ...(clientVisuOverrides.get('global') || {}) };
-      clientVisuOverrides.set('global', {});
-
       const pendingResets = [];
-      const usedTargetNodeIds = new Set();
-      for (const [qNodeId, queue] of [...impulseQueue.entries()]) {
-        if (queue.length === 0) { impulseQueue.delete(qNodeId); continue; }
-        const item = queue[0];
-        if (usedTargetNodeIds.has(item.nodeId)) continue;
-        queue.shift();
-        if (queue.length === 0) impulseQueue.delete(qNodeId);
-        usedTargetNodeIds.add(item.nodeId);
-        allOverrides[item.nodeId] = item.val;
-        allOverrides[item.overrideKey] = item.val;
-        visuControlledDps.set(item.nodeId, item.val);
-        if (item.overrideKey !== item.nodeId) visuControlledDps.set(item.overrideKey, item.val);
-        pendingResets.push(item);
+      for (const [dpKey, queue] of [...impulseQueue.entries()]) {
+        if (queue.length === 0) { impulseQueue.delete(dpKey); continue; }
+        const item = queue.shift();
+        if (queue.length === 0) impulseQueue.delete(dpKey);
+        dpStore.set(dpKey, item.val);
+        pendingResets.push({ dpKey, val: item.val, resetVal: item.resetVal });
       }
 
-      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, allOverrides, pageId);
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
 
       for (const item of pendingResets) {
         if (item.val === item.resetVal) continue;
-        const resetEntry = { val: item.resetVal, resetVal: item.resetVal, nodeId: item.nodeId, overrideKey: item.overrideKey };
-        const q = impulseQueue.get(item.nodeId) || [];
-        q.unshift(resetEntry);
-        impulseQueue.set(item.nodeId, q);
-        lastVisuWrites.set(item.overrideKey, item.resetVal);
+        const q = impulseQueue.get(item.dpKey) || [];
+        q.unshift({ val: item.resetVal, resetVal: item.resetVal });
+        impulseQueue.set(item.dpKey, q);
+        dpStore.set(item.dpKey, item.resetVal);
       }
 
       lastNodeValues.set(pageId, nodeValues);
 
       const pageNodeIds = new Set(page.nodes.map(n => n.id));
-      for (const key of [...lastVisuWrites.keys()]) {
-        if (key in nodeValues) {
-          lastVisuWrites.delete(key);
-        } else {
-          const baseNodeId = key.includes(':') ? key.split(':')[0] : null;
-          if (baseNodeId && baseNodeId in nodeValues) {
-            lastVisuWrites.delete(key);
-          } else if (baseNodeId && pageNodeIds.has(baseNodeId)) {
-            lastVisuWrites.delete(key);
-          }
+      for (const [key] of [...dpStore.entries()]) {
+        if (key.includes(':cfg:')) continue;
+        const baseNodeId = key.includes(':') ? key.split(':')[0] : key;
+        if (pageNodeIds.has(baseNodeId) && key in nodeValues) {
+          dpStore.delete(key);
         }
       }
 
@@ -2778,339 +2724,173 @@ app.post(['/visu-pages', '/api/visu-pages'], async (req, res) => {
   }
 });
 
-app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
-  const { nodeId, portId, paramKey, value, clientId } = req.body;
-  if (!nodeId) {
-    return res.status(400).json({ error: 'nodeId fehlt' });
-  }
+function parseDpKey(dpKey) {
+  if (!dpKey) return { nodeId: dpKey, segment: 'primary' };
+  const colonIdx = dpKey.indexOf(':');
+  if (colonIdx === -1) return { nodeId: dpKey, segment: 'primary' };
+  const nodeId = dpKey.slice(0, colonIdx);
+  const rest = dpKey.slice(colonIdx + 1);
+  if (rest.startsWith('cfg:')) return { nodeId, segment: 'cfg', paramKey: rest.slice(4) };
+  if (rest.startsWith('output-')) return { nodeId, segment: 'output', portId: rest };
+  if (rest.startsWith('input-')) return { nodeId, segment: 'input', portId: rest };
+  return { nodeId, segment: 'port', portId: rest };
+}
 
-  if (value && typeof value === 'object' && (value.pumpControl || value.aggregateControl)) {
-    const aggCtrl = value.pumpControl || value.aggregateControl;
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && (n.type === 'pump-control' || n.type === 'aggregate-control'));
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          const prefix = node.type === 'aggregate-control' ? 'aggregate' : 'pump';
-          if (aggCtrl.hoaMode !== undefined) {
-            node.data.config[`${prefix}VisuHOA`] = aggCtrl.hoaMode;
-          }
-          if (aggCtrl.handStart !== undefined) {
-            node.data.config[`${prefix}VisuHandStart`] = aggCtrl.handStart;
-          }
-          if (aggCtrl.reset !== undefined && aggCtrl.reset === true) {
-            node.data.config[`${prefix}VisuReset`] = true;
-          } else if (aggCtrl.reset === false) {
-            node.data.config[`${prefix}VisuReset`] = false;
-          }
-          for (const key of Object.keys(aggCtrl)) {
-            if (key.startsWith('param_')) {
-              const paramName = key.slice(6);
-              node.data.config[paramName] = aggCtrl[key];
-            }
-          }
-          console.log(`Aggregate Control geschrieben: ${nodeId}`, JSON.stringify(aggCtrl));
-          updated = true;
-          break;
-        }
-      }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Aggregate-Control Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des Aggregate-Control Parameters:', err);
-      res.status(500).json({ error: err.message });
+async function writeCfgParam(nodeId, paramKey, value) {
+  const data = await fs.readFile(pagesFile, 'utf-8');
+  const pages = JSON.parse(data);
+  let updated = false;
+  for (const page of pages) {
+    const node = page.nodes.find(n => n.id === nodeId);
+    if (node) {
+      if (!node.data.config) node.data.config = {};
+      node.data.config[paramKey] = value;
+      updated = true;
+      break;
     }
-    return;
   }
+  if (updated) {
+    await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+  }
+  return updated;
+}
 
-  if (value && typeof value === 'object' && value.valveControl) {
-    const valveCtrl = value.valveControl;
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && n.type === 'valve-control');
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          if (valveCtrl.setpoint !== undefined) {
-            node.data.config.valveVisuSetpoint = valveCtrl.setpoint;
-          }
-          if (valveCtrl.reset !== undefined && valveCtrl.reset === true) {
-            node.data.config.valveVisuReset = true;
-          } else if (valveCtrl.reset === false) {
-            node.data.config.valveVisuReset = false;
-          }
-          if (valveCtrl.hoa !== undefined) {
-            node.data.config.valveVisuHOA = valveCtrl.hoa;
-          }
-          for (const key of Object.keys(valveCtrl)) {
-            if (key.startsWith('param_')) {
-              const paramName = key.slice(6);
-              node.data.config[paramName] = valveCtrl[key];
-            }
-          }
-          console.log(`Valve Control geschrieben: ${nodeId}`, JSON.stringify(valveCtrl));
-          updated = true;
-          break;
-        }
+async function broadcastNodeConfigs() {
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    const nodeConfigs = {};
+    for (const page of pages) {
+      for (const node of (page.nodes || [])) {
+        if (node.data?.config) nodeConfigs[node.id] = node.data.config;
       }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Valve-Control Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des Valve-Control Parameters:', err);
-      res.status(500).json({ error: err.message });
     }
-    return;
-  }
+    broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
+  } catch {}
+}
 
-  if (value && typeof value === 'object' && value.sensorControl) {
-    const sensorCtrl = value.sensorControl;
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && n.type === 'sensor-control');
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          if (sensorCtrl.reset !== undefined && sensorCtrl.reset === true) {
-            node.data.config.sensorVisuReset = true;
-          } else if (sensorCtrl.reset === false) {
-            node.data.config.sensorVisuReset = false;
-          }
-          if (sensorCtrl.hoaMode !== undefined) {
-            node.data.config.sensorVisuHOA = sensorCtrl.hoaMode;
-          }
-          if (sensorCtrl.manualValue !== undefined) {
-            node.data.config.sensorManualValue = sensorCtrl.manualValue;
-          }
-          for (const key of Object.keys(sensorCtrl)) {
-            if (key.startsWith('param_')) {
-              const paramName = key.slice(6);
-              node.data.config[paramName] = sensorCtrl[key];
-            }
-          }
-          console.log(`Sensor Control geschrieben: ${nodeId}`, JSON.stringify(sensorCtrl));
-          updated = true;
-          break;
-        }
-      }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Sensor-Control Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des Sensor-Control Parameters:', err);
-      res.status(500).json({ error: err.message });
-    }
-    return;
-  }
+function normalizeDpWritePayload(body) {
+  if (body.dpKey) return { dpKey: body.dpKey, value: body.value, mode: body.mode || 'set', releaseValue: body.releaseValue };
 
-  if (value && typeof value === 'object' && value.heatingCurveControl) {
-    const hcCtrl = value.heatingCurveControl;
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && n.type === 'heating-curve');
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          for (const key of Object.keys(hcCtrl)) {
-            if (key.startsWith('param_')) {
-              const paramName = key.slice(6);
-              node.data.config[paramName] = hcCtrl[key];
-            }
-          }
-          console.log(`Heating Curve Control geschrieben: ${nodeId}`, JSON.stringify(hcCtrl));
-          updated = true;
-          break;
-        }
-      }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Heating-Curve Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des Heating-Curve Parameters:', err);
-      res.status(500).json({ error: err.message });
-    }
-    return;
-  }
-
-  if (value && typeof value === 'object' && value.pidControl) {
-    const pidCtrl = value.pidControl;
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId && n.type === 'pid-controller');
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          if (pidCtrl.hoaMode !== undefined) {
-            node.data.config.pidVisuHOA = pidCtrl.hoaMode;
-          }
-          if (pidCtrl.manualOutput !== undefined) {
-            node.data.config.pidManualOutput = pidCtrl.manualOutput;
-          }
-          for (const key of Object.keys(pidCtrl)) {
-            if (key.startsWith('param_')) {
-              const paramName = key.slice(6);
-              node.data.config[paramName] = pidCtrl[key];
-            }
-          }
-          console.log(`PID Control geschrieben: ${nodeId}`, JSON.stringify(pidCtrl));
-          updated = true;
-          break;
-        }
-      }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'PID-Controller Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des PID-Controller Parameters:', err);
-      res.status(500).json({ error: err.message });
-    }
-    return;
-  }
-
+  const { nodeId, portId, paramKey, value, impulse, releaseValue } = body;
+  let dpKey;
   if (paramKey) {
-    try {
-      const data = await fs.readFile(pagesFile, 'utf-8');
-      const pages = JSON.parse(data);
-      let updated = false;
-      for (const page of pages) {
-        const node = page.nodes.find(n => n.id === nodeId);
-        if (node) {
-          if (!node.data.config) node.data.config = {};
-          node.data.config[paramKey] = value;
-          console.log(`Visu-Parameter geschrieben: ${nodeId}.${paramKey} = ${value}`);
-          updated = true;
-          break;
-        }
-      }
-      if (updated) {
-        await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
-        const nodeConfigs = {};
-        for (const page of pages) {
-          for (const node of (page.nodes || [])) {
-            if (node.data?.config) nodeConfigs[node.id] = node.data.config;
-          }
-        }
-        broadcastSSE('state', { liveValues: getLiveSnapshot(), nodeConfigs });
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Node nicht gefunden' });
-      }
-    } catch (err) {
-      console.error('Fehler beim Schreiben des Visu-Parameters:', err);
-      res.status(500).json({ error: err.message });
-    }
+    dpKey = `${nodeId}:cfg:${paramKey}`;
+  } else if (portId) {
+    dpKey = `${nodeId}:${portId}`;
   } else {
-    const overrideKey = portId ? `${nodeId}:${portId}` : nodeId;
-    const isImpulse = req.body.impulse === true;
+    dpKey = nodeId;
+  }
+  return { dpKey, value, mode: impulse ? 'impulse' : 'set', releaseValue };
+}
 
-    if (isImpulse) {
-      const capturedResetVal = req.body.releaseValue !== undefined ? req.body.releaseValue : false;
-      const existing = (impulseQueue.get(nodeId) || []).filter(e => e.val !== e.resetVal);
-      existing.push({ val: value, resetVal: capturedResetVal, nodeId, overrideKey });
-      impulseQueue.set(nodeId, existing);
-      lastVisuWrites.set(overrideKey, value);
+function expandCompositeControl(nodeId, ctrl, rawValue) {
+  const writes = [];
+  const aggCtrl = rawValue.pumpControl || rawValue.aggregateControl;
+  if (aggCtrl) {
+    const prefix = rawValue.aggregateControl ? 'aggregate' : 'pump';
+    if (aggCtrl.hoaMode !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuHOA`, value: aggCtrl.hoaMode });
+    if (aggCtrl.handStart !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuHandStart`, value: aggCtrl.handStart });
+    if (aggCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuReset`, value: aggCtrl.reset });
+    for (const key of Object.keys(aggCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: aggCtrl[key] });
+    }
+    return writes;
+  }
+  const valveCtrl = rawValue.valveControl;
+  if (valveCtrl) {
+    if (valveCtrl.setpoint !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuSetpoint`, value: valveCtrl.setpoint });
+    if (valveCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuReset`, value: valveCtrl.reset });
+    if (valveCtrl.hoa !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuHOA`, value: valveCtrl.hoa });
+    for (const key of Object.keys(valveCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: valveCtrl[key] });
+    }
+    return writes;
+  }
+  const sensorCtrl = rawValue.sensorControl;
+  if (sensorCtrl) {
+    if (sensorCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:sensorVisuReset`, value: sensorCtrl.reset });
+    if (sensorCtrl.hoaMode !== undefined) writes.push({ dpKey: `${nodeId}:cfg:sensorVisuHOA`, value: sensorCtrl.hoaMode });
+    if (sensorCtrl.manualValue !== undefined) writes.push({ dpKey: `${nodeId}:cfg:sensorManualValue`, value: sensorCtrl.manualValue });
+    for (const key of Object.keys(sensorCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: sensorCtrl[key] });
+    }
+    return writes;
+  }
+  const hcCtrl = rawValue.heatingCurveControl;
+  if (hcCtrl) {
+    for (const key of Object.keys(hcCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: hcCtrl[key] });
+    }
+    return writes;
+  }
+  const pidCtrl = rawValue.pidControl;
+  if (pidCtrl) {
+    if (pidCtrl.hoaMode !== undefined) writes.push({ dpKey: `${nodeId}:cfg:pidVisuHOA`, value: pidCtrl.hoaMode });
+    if (pidCtrl.manualOutput !== undefined) writes.push({ dpKey: `${nodeId}:cfg:pidManualOutput`, value: pidCtrl.manualOutput });
+    for (const key of Object.keys(pidCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: pidCtrl[key] });
+    }
+    return writes;
+  }
+  return writes;
+}
+
+app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
+  try {
+    const rawValue = req.body.value;
+    const srcNodeId = req.body.nodeId || (req.body.dpKey ? req.body.dpKey.split(':')[0] : null);
+
+    if (!srcNodeId && !req.body.dpKey) {
+      return res.status(400).json({ error: 'nodeId oder dpKey fehlt' });
+    }
+
+    let writes = [];
+    if (rawValue && typeof rawValue === 'object' && (
+      rawValue.pumpControl || rawValue.aggregateControl || rawValue.valveControl ||
+      rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl
+    )) {
+      writes = expandCompositeControl(srcNodeId, null, rawValue);
     } else {
-      if (!clientVisuOverrides.has('global')) {
-        clientVisuOverrides.set('global', {});
-      }
-      const overrides = clientVisuOverrides.get('global');
+      const normalized = normalizeDpWritePayload(req.body);
+      writes = [normalized];
+    }
 
-      if (portId) {
-        delete overrides[overrideKey];
+    let needsConfigBroadcast = false;
+
+    for (const write of writes) {
+      const { dpKey, value, mode = 'set', releaseValue = false } = write;
+      const parsed = parseDpKey(dpKey);
+
+      if (parsed.segment === 'cfg') {
+        const updated = await writeCfgParam(parsed.nodeId, parsed.paramKey, value);
+        if (updated) {
+          dpStore.set(dpKey, value);
+          needsConfigBroadcast = true;
+        }
+      } else if (mode === 'impulse') {
+        const existing = (impulseQueue.get(dpKey) || []).filter(e => e.val !== e.resetVal);
+        existing.push({ val: value, resetVal: releaseValue });
+        impulseQueue.set(dpKey, existing);
+        dpStore.set(dpKey, value);
+        broadcastSSE('state', { liveValues: getLiveSnapshot() });
       } else {
-        for (const key of Object.keys(overrides)) {
-          if (key === nodeId || key.startsWith(`${nodeId}:`)) {
-            delete overrides[key];
-          }
+        dpStore.set(dpKey, value);
+        if (parsed.segment === 'primary') {
+          setPersistentDpValue(parsed.nodeId, value);
         }
-      }
-
-      overrides[overrideKey] = value;
-      if (!portId) {
-        overrides[nodeId] = value;
-      }
-
-      lastVisuWrites.set(overrideKey, value);
-      if (!portId) {
-        lastVisuWrites.set(nodeId, value);
-        visuControlledDps.set(nodeId, value);
-        setPersistentDpValue(nodeId, value);
-        for (const [pid, nodeValues] of lastNodeValues) {
-          const updated = { ...nodeValues, [nodeId]: value };
-          lastNodeValues.set(pid, updated);
-        }
-      } else {
-        for (const [pid, nodeValues] of lastNodeValues) {
-          const updated = { ...nodeValues, [overrideKey]: value };
-          lastNodeValues.set(pid, updated);
-        }
+        broadcastSSE('state', { liveValues: getLiveSnapshot() });
       }
     }
 
-    broadcastSSE('state', { liveValues: getLiveSnapshot() });
+    if (needsConfigBroadcast) {
+      await broadcastNodeConfigs();
+    }
+
     res.json({ success: true });
+  } catch (err) {
+    console.error('Fehler in write-value:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -3152,8 +2932,10 @@ function getLiveSnapshot() {
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
   }
-  for (const [key, val] of lastVisuWrites) {
-    merged[key] = val;
+  for (const [key, val] of dpStore) {
+    if (!key.includes(':cfg:')) {
+      merged[key] = val;
+    }
   }
   return merged;
 }

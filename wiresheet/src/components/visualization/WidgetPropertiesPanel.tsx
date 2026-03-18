@@ -40,7 +40,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, migrateBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
@@ -321,46 +321,31 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     }
     const node = availableNodes.find(n => n.id === nodeId);
     if (isPumpWidget && (node?.type === PUMP_CONTROL_NODE_TYPE || node?.type === AGGREGATE_CONTROL_NODE_TYPE)) {
-      const binding: WidgetBinding = {
-        nodeId,
-        portId: undefined,
-        paramKey: undefined,
-        direction: 'readwrite'
-      };
-      onUpdate({ binding });
+      onUpdate({ binding: migrateBinding({ nodeId, direction: 'readwrite' }) });
       return;
     }
     if (isValveWidget && node?.type === VALVE_CONTROL_NODE_TYPE) {
-      const binding: WidgetBinding = {
-        nodeId,
-        portId: undefined,
-        paramKey: undefined,
-        direction: 'readwrite'
-      };
-      onUpdate({ binding });
+      onUpdate({ binding: migrateBinding({ nodeId, direction: 'readwrite' }) });
       return;
     }
     const ports = node ? getNodePorts(node) : [];
     const defaultPort = isWriteWidget
       ? ports.find(p => !p.isOutput)
       : ports.find(p => p.isOutput);
-    const binding: WidgetBinding = {
-      nodeId,
-      portId: defaultPort?.id,
-      paramKey: undefined,
-      direction: isWriteWidget ? 'readwrite' : 'read'
-    };
-    onUpdate({ binding });
+    onUpdate({ binding: migrateBinding({ nodeId, portId: defaultPort?.id, direction: isWriteWidget ? 'readwrite' : 'read' }) });
   };
 
   const handlePortChange = (portId: string) => {
     if (!widget.binding) return;
-    onUpdate({ binding: { ...widget.binding, portId: portId || undefined, paramKey: undefined } });
+    const nodeId = widget.binding.nodeId || widget.binding.dpKey.split(':')[0];
+    onUpdate({ binding: { ...widget.binding, dpKey: portId ? `${nodeId}:${portId}` : nodeId, portId: portId || undefined, paramKey: undefined } });
   };
 
   const handleParamChange = (paramKey: string) => {
     if (!widget.binding) return;
-    onUpdate({ binding: { ...widget.binding, paramKey: paramKey || undefined, portId: undefined } });
+    const nodeId = widget.binding.nodeId || widget.binding.dpKey.split(':')[0];
+    const newDpKey = paramKey ? `${nodeId}:cfg:${paramKey}` : nodeId;
+    onUpdate({ binding: { ...widget.binding, dpKey: newDpKey, paramKey: paramKey || undefined, portId: undefined } });
   };
 
   const currentBindingLabel = () => {
@@ -3502,7 +3487,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                           const node = availableNodes.find(n => n.id === e.target.value);
                           const ports = node ? getNodePorts(node) : [];
                           const outPort = ports.find(p => p.isOutput) || ports[0];
-                          onUpdate({ statusBinding: { nodeId: e.target.value, portId: outPort?.id, direction: 'read' } });
+                          onUpdate({ statusBinding: migrateBinding({ nodeId: e.target.value, portId: outPort?.id, direction: 'read' }) });
                         }}
                         className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                       >
