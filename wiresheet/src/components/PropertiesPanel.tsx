@@ -77,7 +77,19 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
   useEffect(() => {
     setConfig(node.data.config || {});
-  }, [node.id]);
+  }, [node.id, node.data.config]);
+
+  const isParamBoundByVisu = useCallback((paramKey: string): boolean => {
+    const dpKey = `${node.id}:cfg:${paramKey}`;
+    return visuPages.some(pg =>
+      pg.widgets.some(w => {
+        if (!w.binding?.dpKey) return false;
+        if (w.binding.dpKey !== dpKey) return false;
+        const dir = (w.binding as unknown as { direction?: string }).direction;
+        return dir === 'write' || dir === 'read-write' || w.type === 'visu-input' || w.type === 'visu-incrementer' || w.type === 'visu-slider';
+      })
+    );
+  }, [node.id, visuPages]);
 
   useEffect(() => {
     if (node.type === 'python-script') {
@@ -161,6 +173,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }, [driverBindings, node.id, modbusDevices, modbusDriverEnabled, haDevices, haDriverEnabled]);
 
   const hasBindings = nodeBindings.length > 0;
+
+  const VisuBoundBadge = () => (
+    <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-1.5 py-0.5 ml-1">
+      <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      Visu
+    </span>
+  );
 
   const updateConfig = (key: keyof NodeConfig, value: unknown) => {
     const next = { ...config, [key]: value };
@@ -599,38 +618,42 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {node.type === 'timer' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Einschaltverzögerung
+                {isParamBoundByVisu('timerOnMs') && <VisuBoundBadge />}
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min={0}
                   step={100}
-                  value={config.timerOnMs ?? 1000}
+                  value={isParamBoundByVisu('timerOnMs') ? (liveValues[`${node.id}:cfg:timerOnMs`] ?? config.timerOnMs ?? 1000) : (config.timerOnMs ?? 1000)}
                   onChange={e => updateConfig('timerOnMs', parseInt(e.target.value) || 0)}
-                  className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                  disabled={isParamBoundByVisu('timerOnMs')}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('timerOnMs') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
                 />
                 <span className="text-xs text-slate-400 flex-shrink-0">ms</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">{((config.timerOnMs ?? 1000) / 1000).toFixed(1)} Sek. — 0 = sofort</p>
+              <p className="text-xs text-slate-500 mt-1">{(((isParamBoundByVisu('timerOnMs') ? liveValues[`${node.id}:cfg:timerOnMs`] as number : undefined) ?? config.timerOnMs ?? 1000) / 1000).toFixed(1)} Sek. — 0 = sofort</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Ausschaltverzögerung
+                {isParamBoundByVisu('timerOffMs') && <VisuBoundBadge />}
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min={0}
                   step={100}
-                  value={config.timerOffMs ?? 0}
+                  value={isParamBoundByVisu('timerOffMs') ? (liveValues[`${node.id}:cfg:timerOffMs`] ?? config.timerOffMs ?? 0) : (config.timerOffMs ?? 0)}
                   onChange={e => updateConfig('timerOffMs', parseInt(e.target.value) || 0)}
-                  className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                  disabled={isParamBoundByVisu('timerOffMs')}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('timerOffMs') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
                 />
                 <span className="text-xs text-slate-400 flex-shrink-0">ms</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">{((config.timerOffMs ?? 0) / 1000).toFixed(1)} Sek. — 0 = sofort</p>
+              <p className="text-xs text-slate-500 mt-1">{(((isParamBoundByVisu('timerOffMs') ? liveValues[`${node.id}:cfg:timerOffMs`] as number : undefined) ?? config.timerOffMs ?? 0) / 1000).toFixed(1)} Sek. — 0 = sofort</p>
             </div>
           </div>
         )}
@@ -638,25 +661,29 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {node.type === 'counter' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Zaehler Min
+                {isParamBoundByVisu('counterMin') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
-                value={config.counterMin ?? 0}
+                value={isParamBoundByVisu('counterMin') ? (liveValues[`${node.id}:cfg:counterMin`] ?? config.counterMin ?? 0) : (config.counterMin ?? 0)}
                 onChange={e => updateConfig('counterMin', parseInt(e.target.value) || 0)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                disabled={isParamBoundByVisu('counterMin')}
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('counterMin') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Zaehler Max
+                {isParamBoundByVisu('counterMax') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
-                value={config.counterMax ?? 100}
+                value={isParamBoundByVisu('counterMax') ? (liveValues[`${node.id}:cfg:counterMax`] ?? config.counterMax ?? 100) : (config.counterMax ?? 100)}
                 onChange={e => updateConfig('counterMax', parseInt(e.target.value) || 100)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                disabled={isParamBoundByVisu('counterMax')}
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('counterMax') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
             </div>
           </div>
@@ -664,63 +691,71 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {node.type === 'delay' && (
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
               Verzögerung
+              {isParamBoundByVisu('delayMs') && <VisuBoundBadge />}
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 min={0}
                 step={100}
-                value={config.delayMs ?? 1000}
+                value={isParamBoundByVisu('delayMs') ? (liveValues[`${node.id}:cfg:delayMs`] ?? config.delayMs ?? 1000) : (config.delayMs ?? 1000)}
                 onChange={e => updateConfig('delayMs', parseInt(e.target.value) || 0)}
-                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                disabled={isParamBoundByVisu('delayMs')}
+                className={`flex-1 border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('delayMs') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
               <span className="text-xs text-slate-400 flex-shrink-0">ms</span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">{((config.delayMs ?? 1000) / 1000).toFixed(1)} Sekunden</p>
+            <p className="text-xs text-slate-500 mt-1">{(((isParamBoundByVisu('delayMs') ? (liveValues[`${node.id}:cfg:delayMs`] as number) : undefined) ?? config.delayMs ?? 1000) / 1000).toFixed(1)} Sekunden</p>
           </div>
         )}
 
         {node.type === 'threshold' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Schwellwert
+                {isParamBoundByVisu('thresholdValue') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
                 step="any"
-                value={config.thresholdValue ?? 0}
+                value={isParamBoundByVisu('thresholdValue') ? (liveValues[`${node.id}:cfg:thresholdValue`] ?? config.thresholdValue ?? 0) : (config.thresholdValue ?? 0)}
                 onChange={e => updateConfig('thresholdValue', parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors"
+                disabled={isParamBoundByVisu('thresholdValue')}
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors ${isParamBoundByVisu('thresholdValue') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Hysterese Einschalten (+)
+                {isParamBoundByVisu('hysteresisUpper') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
                 step="any"
-                value={config.hysteresisUpper !== undefined ? String(config.hysteresisUpper) : ''}
+                value={isParamBoundByVisu('hysteresisUpper') ? (liveValues[`${node.id}:cfg:hysteresisUpper`] ?? config.hysteresisUpper ?? '') : (config.hysteresisUpper !== undefined ? String(config.hysteresisUpper) : '')}
                 onChange={e => updateConfig('hysteresisUpper', e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                disabled={isParamBoundByVisu('hysteresisUpper')}
                 placeholder="Leer = keine Hysterese"
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors placeholder-slate-500 ${isParamBoundByVisu('hysteresisUpper') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
               <p className="text-xs text-slate-500 mt-1">EIN wenn Wert &ge; Schwellwert + Hysterese</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Hysterese Ausschalten (-)
+                {isParamBoundByVisu('hysteresisLower') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
                 step="any"
-                value={config.hysteresisLower !== undefined ? String(config.hysteresisLower) : ''}
+                value={isParamBoundByVisu('hysteresisLower') ? (liveValues[`${node.id}:cfg:hysteresisLower`] ?? config.hysteresisLower ?? '') : (config.hysteresisLower !== undefined ? String(config.hysteresisLower) : '')}
                 onChange={e => updateConfig('hysteresisLower', e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                disabled={isParamBoundByVisu('hysteresisLower')}
                 placeholder="Leer = keine Hysterese"
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors placeholder-slate-500 ${isParamBoundByVisu('hysteresisLower') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
               <p className="text-xs text-slate-500 mt-1">AUS wenn Wert &lt; Schwellwert - Hysterese</p>
             </div>
@@ -747,16 +782,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center">
                 Vergleichswert B
+                {isParamBoundByVisu('compareValue') && <VisuBoundBadge />}
               </label>
               <input
                 type="number"
                 step="any"
-                value={config.compareValue !== undefined ? String(config.compareValue) : ''}
+                value={isParamBoundByVisu('compareValue') ? (liveValues[`${node.id}:cfg:compareValue`] ?? config.compareValue ?? '') : (config.compareValue !== undefined ? String(config.compareValue) : '')}
                 onChange={e => updateConfig('compareValue', e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                disabled={isParamBoundByVisu('compareValue')}
                 placeholder="Leer = Port B Eingang verwenden"
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 transition-colors placeholder-slate-500"
+                className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition-colors placeholder-slate-500 ${isParamBoundByVisu('compareValue') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-blue-500'}`}
               />
             </div>
           </div>
@@ -953,46 +990,53 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-2 font-medium">PID Parameter</label>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Kp (P-Anteil)</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Kp {isParamBoundByVisu('pidKp') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={config.pidKp ?? 1.0}
+                    value={isParamBoundByVisu('pidKp') ? (liveValues[`${node.id}:cfg:pidKp`] ?? config.pidKp ?? 1.0) : (config.pidKp ?? 1.0)}
                     onChange={e => updateConfig('pidKp', parseFloat(e.target.value) || 1.0)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                    disabled={isParamBoundByVisu('pidKp')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidKp') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Ki (I-Anteil)</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Ki {isParamBoundByVisu('pidKi') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={config.pidKi ?? 0.1}
+                    value={isParamBoundByVisu('pidKi') ? (liveValues[`${node.id}:cfg:pidKi`] ?? config.pidKi ?? 0.1) : (config.pidKi ?? 0.1)}
                     onChange={e => updateConfig('pidKi', parseFloat(e.target.value) || 0.1)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                    disabled={isParamBoundByVisu('pidKi')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidKi') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Kd (D-Anteil)</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Kd {isParamBoundByVisu('pidKd') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="0.01"
-                    value={config.pidKd ?? 0.0}
+                    value={isParamBoundByVisu('pidKd') ? (liveValues[`${node.id}:cfg:pidKd`] ?? config.pidKd ?? 0.0) : (config.pidKd ?? 0.0)}
                     onChange={e => updateConfig('pidKd', parseFloat(e.target.value) || 0.0)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                    disabled={isParamBoundByVisu('pidKd')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidKd') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
                   />
                 </div>
               </div>
             </div>
 
             <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
-              <label className="block text-xs text-slate-400 mb-2 font-medium">Windup Limit</label>
+              <label className="block text-xs text-slate-400 mb-2 font-medium flex items-center">
+                Windup Limit
+                {isParamBoundByVisu('pidWindupLimit') && <VisuBoundBadge />}
+              </label>
               <input
                 type="number"
                 step="any"
-                value={config.pidWindupLimit ?? 100}
+                value={isParamBoundByVisu('pidWindupLimit') ? (liveValues[`${node.id}:cfg:pidWindupLimit`] ?? config.pidWindupLimit ?? 100) : (config.pidWindupLimit ?? 100)}
                 onChange={e => updateConfig('pidWindupLimit', parseFloat(e.target.value) || 100)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                disabled={isParamBoundByVisu('pidWindupLimit')}
+                className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidWindupLimit') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
               />
               <p className="text-[9px] text-slate-500">Begrenzung des Integrators (Anti-Windup)</p>
             </div>
@@ -1001,23 +1045,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbegrenzung</label>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Min. Ausgang (%)</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Min. Ausgang (%) {isParamBoundByVisu('pidMinOutput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.pidMinOutput ?? 0}
+                    value={isParamBoundByVisu('pidMinOutput') ? (liveValues[`${node.id}:cfg:pidMinOutput`] ?? config.pidMinOutput ?? 0) : (config.pidMinOutput ?? 0)}
                     onChange={e => updateConfig('pidMinOutput', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                    disabled={isParamBoundByVisu('pidMinOutput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidMinOutput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Max. Ausgang (%)</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Max. Ausgang (%) {isParamBoundByVisu('pidMaxOutput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.pidMaxOutput ?? 100}
+                    value={isParamBoundByVisu('pidMaxOutput') ? (liveValues[`${node.id}:cfg:pidMaxOutput`] ?? config.pidMaxOutput ?? 100) : (config.pidMaxOutput ?? 100)}
                     onChange={e => updateConfig('pidMaxOutput', parseFloat(e.target.value) || 100)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-red-500"
+                    disabled={isParamBoundByVisu('pidMaxOutput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('pidMaxOutput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-red-500'}`}
                   />
                 </div>
               </div>
@@ -1064,17 +1110,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <span className="text-xs font-semibold uppercase tracking-wider">Licht Taster</span>
             </div>
             <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
-              <label className="block text-xs text-slate-400 mb-1 font-medium">Impulsdauer</label>
+              <label className="block text-xs text-slate-400 mb-1 font-medium flex items-center">
+                Impulsdauer
+                {isParamBoundByVisu('lightTogglePulseMs') && <VisuBoundBadge />}
+              </label>
               <input
                 type="number"
                 min={50}
                 max={10000}
                 step={50}
-                value={config.lightTogglePulseMs ?? 500}
+                value={isParamBoundByVisu('lightTogglePulseMs') ? (liveValues[`${node.id}:cfg:lightTogglePulseMs`] ?? config.lightTogglePulseMs ?? 500) : (config.lightTogglePulseMs ?? 500)}
                 onChange={e => updateConfig('lightTogglePulseMs', parseInt(e.target.value) || 500)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                disabled={isParamBoundByVisu('lightTogglePulseMs')}
+                className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('lightTogglePulseMs') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-amber-500'}`}
               />
-              <p className="text-xs text-slate-500">{((config.lightTogglePulseMs ?? 500) / 1000).toFixed(2)} Sek.</p>
+              <p className="text-xs text-slate-500">{(((isParamBoundByVisu('lightTogglePulseMs') ? liveValues[`${node.id}:cfg:lightTogglePulseMs`] as number : undefined) ?? config.lightTogglePulseMs ?? 500) / 1000).toFixed(2)} Sek.</p>
             </div>
             <div className="bg-slate-700/30 rounded-lg p-3 text-xs text-slate-400 space-y-1">
               <p className="font-medium text-slate-300">Logik:</p>
@@ -1106,23 +1156,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-2 font-medium">Eingangsbereich</label>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Min. Eingang</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Min. Eingang {isParamBoundByVisu('hcMinInput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.hcMinInput ?? -20}
+                    value={isParamBoundByVisu('hcMinInput') ? (liveValues[`${node.id}:cfg:hcMinInput`] ?? config.hcMinInput ?? -20) : (config.hcMinInput ?? -20)}
                     onChange={e => updateConfig('hcMinInput', parseFloat(e.target.value) || -20)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                    disabled={isParamBoundByVisu('hcMinInput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('hcMinInput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-orange-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Max. Eingang</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Max. Eingang {isParamBoundByVisu('hcMaxInput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.hcMaxInput ?? 20}
+                    value={isParamBoundByVisu('hcMaxInput') ? (liveValues[`${node.id}:cfg:hcMaxInput`] ?? config.hcMaxInput ?? 20) : (config.hcMaxInput ?? 20)}
                     onChange={e => updateConfig('hcMaxInput', parseFloat(e.target.value) || 20)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                    disabled={isParamBoundByVisu('hcMaxInput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('hcMaxInput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-orange-500'}`}
                   />
                 </div>
               </div>
@@ -1132,23 +1184,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbereich</label>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Min. Ausgang</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Min. Ausgang {isParamBoundByVisu('hcMinOutput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.hcMinOutput ?? 20}
+                    value={isParamBoundByVisu('hcMinOutput') ? (liveValues[`${node.id}:cfg:hcMinOutput`] ?? config.hcMinOutput ?? 20) : (config.hcMinOutput ?? 20)}
                     onChange={e => updateConfig('hcMinOutput', parseFloat(e.target.value) || 20)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                    disabled={isParamBoundByVisu('hcMinOutput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('hcMinOutput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-orange-500'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 mb-1">Max. Ausgang</label>
+                  <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Max. Ausgang {isParamBoundByVisu('hcMaxOutput') && <VisuBoundBadge />}</label>
                   <input
                     type="number"
                     step="any"
-                    value={config.hcMaxOutput ?? 80}
+                    value={isParamBoundByVisu('hcMaxOutput') ? (liveValues[`${node.id}:cfg:hcMaxOutput`] ?? config.hcMaxOutput ?? 80) : (config.hcMaxOutput ?? 80)}
                     onChange={e => updateConfig('hcMaxOutput', parseFloat(e.target.value) || 80)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                    disabled={isParamBoundByVisu('hcMaxOutput')}
+                    className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('hcMaxOutput') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-orange-500'}`}
                   />
                 </div>
               </div>
@@ -1196,23 +1250,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <label className="block text-xs text-slate-400 mb-2 font-medium">Eingangsbereich</label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Min X</label>
+                    <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Min X {isParamBoundByVisu('inputMin') && <VisuBoundBadge />}</label>
                     <input
                       type="number"
                       step="any"
-                      value={config.inputMin ?? 0}
+                      value={isParamBoundByVisu('inputMin') ? (liveValues[`${node.id}:cfg:inputMin`] ?? config.inputMin ?? 0) : (config.inputMin ?? 0)}
                       onChange={e => updateConfig('inputMin', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                      disabled={isParamBoundByVisu('inputMin')}
+                      className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('inputMin') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-violet-500'}`}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Max X</label>
+                    <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Max X {isParamBoundByVisu('inputMax') && <VisuBoundBadge />}</label>
                     <input
                       type="number"
                       step="any"
-                      value={config.inputMax ?? 100}
+                      value={isParamBoundByVisu('inputMax') ? (liveValues[`${node.id}:cfg:inputMax`] ?? config.inputMax ?? 100) : (config.inputMax ?? 100)}
                       onChange={e => updateConfig('inputMax', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                      disabled={isParamBoundByVisu('inputMax')}
+                      className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('inputMax') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-violet-500'}`}
                     />
                   </div>
                 </div>
@@ -1222,23 +1278,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <label className="block text-xs text-slate-400 mb-2 font-medium">Ausgangsbereich</label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Min Y</label>
+                    <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Min Y {isParamBoundByVisu('outputMin') && <VisuBoundBadge />}</label>
                     <input
                       type="number"
                       step="any"
-                      value={config.outputMin ?? 0}
+                      value={isParamBoundByVisu('outputMin') ? (liveValues[`${node.id}:cfg:outputMin`] ?? config.outputMin ?? 0) : (config.outputMin ?? 0)}
                       onChange={e => updateConfig('outputMin', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                      disabled={isParamBoundByVisu('outputMin')}
+                      className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('outputMin') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-violet-500'}`}
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-500 mb-1">Max Y</label>
+                    <label className="block text-[10px] text-slate-500 mb-1 flex items-center">Max Y {isParamBoundByVisu('outputMax') && <VisuBoundBadge />}</label>
                     <input
                       type="number"
                       step="any"
-                      value={config.outputMax ?? 100}
+                      value={isParamBoundByVisu('outputMax') ? (liveValues[`${node.id}:cfg:outputMax`] ?? config.outputMax ?? 100) : (config.outputMax ?? 100)}
                       onChange={e => updateConfig('outputMax', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-violet-500"
+                      disabled={isParamBoundByVisu('outputMax')}
+                      className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('outputMax') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-violet-500'}`}
                     />
                   </div>
                 </div>
