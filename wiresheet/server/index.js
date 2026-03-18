@@ -2567,6 +2567,18 @@ async function runPageCycle(pageId) {
       }
 
       lastNodeValues.set(pageId, nodeValues);
+
+      for (const key of [...lastVisuWrites.keys()]) {
+        if (key in nodeValues) {
+          lastVisuWrites.delete(key);
+        } else {
+          const baseNodeId = key.includes(':') ? key.split(':')[0] : null;
+          if (baseNodeId && baseNodeId in nodeValues) {
+            lastVisuWrites.delete(key);
+          }
+        }
+      }
+
       const trendNow = Date.now();
       for (const trackedNode of trendConfig.trackedNodes) {
         if (!trackedNode.enabled) continue;
@@ -3062,21 +3074,19 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
         overrides[nodeId] = value;
       }
 
+      lastVisuWrites.set(overrideKey, value);
       if (!portId) {
+        lastVisuWrites.set(nodeId, value);
         visuControlledDps.set(nodeId, value);
         setPersistentDpValue(nodeId, value);
         for (const [pid, nodeValues] of lastNodeValues) {
-          if (nodeId in nodeValues) {
-            lastNodeValues.set(pid, { ...nodeValues, [nodeId]: value });
-          }
+          const updated = { ...nodeValues, [nodeId]: value };
+          lastNodeValues.set(pid, updated);
         }
       } else {
         for (const [pid, nodeValues] of lastNodeValues) {
-          if (overrideKey in nodeValues || nodeId in nodeValues) {
-            const updated = { ...nodeValues };
-            updated[overrideKey] = value;
-            lastNodeValues.set(pid, updated);
-          }
+          const updated = { ...nodeValues, [overrideKey]: value };
+          lastNodeValues.set(pid, updated);
         }
       }
     }
@@ -3125,9 +3135,7 @@ function getLiveSnapshot() {
     Object.assign(merged, values);
   }
   for (const [key, val] of lastVisuWrites) {
-    if (key.includes(':') && !(key in merged)) {
-      merged[key] = val;
-    }
+    merged[key] = val;
   }
   return merged;
 }
