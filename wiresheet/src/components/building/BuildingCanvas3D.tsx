@@ -74,6 +74,7 @@ interface Props {
   isolateActiveFloor?: boolean;
   autoRotate?: boolean;
   autoRotateSpeed?: number;
+  lockTarget?: boolean;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -740,7 +741,7 @@ function CameraFocusRoom() {
   return null;
 }
 
-function CameraSetPos({ buildings }: { buildings: Building[] }) {
+function CameraSetPos({ buildings, explosionOffset = 0 }: { buildings: Building[]; explosionOffset?: number }) {
   const { camera, controls } = useThree();
 
   const getBuildingCenter = useCallback(() => {
@@ -751,7 +752,8 @@ function CameraSetPos({ buildings }: { buildings: Building[] }) {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<SetCameraPosDetail>).detail;
       const { cx, cz, targetY, totalH, diag } = getBuildingCenter();
-      const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+      const explosionExtra = explosionOffset > 0 ? explosionOffset * 0.6 : 0;
+      const dist = Math.max((diag + explosionExtra) * 1.2, (totalH + explosionExtra) * 1.5, 15);
 
       let endPos: THREE.Vector3;
       const label = (e as CustomEvent<any>).detail?.label as string;
@@ -819,47 +821,48 @@ function computeBuildingBounds(buildings: Building[]) {
   };
 }
 
-function CameraAutoFit({ buildings }: { buildings: Building[] }) {
+function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building[]; explosionOffset?: number }) {
   const { camera, controls } = useThree();
   const fitted = useRef(false);
+  const prevExplosion = useRef(explosionOffset);
 
-  useEffect(() => {
-    if (fitted.current) return;
+  const fitCamera = useCallback(() => {
     const bounds = computeBuildingBounds(buildings);
-    if (!bounds) return;
-
+    if (!bounds) return false;
     const { cx, cz, targetY, totalH, diag } = bounds;
-    const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
+    const explosionExtra = explosionOffset > 0 ? explosionOffset * 0.6 : 0;
+    const dist = Math.max((diag + explosionExtra) * 1.2, (totalH + explosionExtra) * 1.5, 15);
     camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
     camera.lookAt(cx, targetY, cz);
-
     if (controls && (controls as any).target) {
       (controls as any).target.set(cx, targetY, cz);
       (controls as any).update?.();
     }
+    return true;
+  }, [buildings, camera, controls, explosionOffset]);
 
-    fitted.current = true;
-  }, [buildings, camera, controls]);
+  useEffect(() => {
+    if (fitted.current) return;
+    if (fitCamera()) fitted.current = true;
+  }, [buildings, camera, controls, fitCamera]);
+
+  useEffect(() => {
+    if (!fitted.current) return;
+    if (prevExplosion.current !== explosionOffset) {
+      prevExplosion.current = explosionOffset;
+      fitCamera();
+    }
+  }, [explosionOffset, fitCamera]);
 
   useFrame(() => {
     if (fitted.current) return;
-    const bounds = computeBuildingBounds(buildings);
-    if (!bounds) return;
-    if (!controls || !(controls as any).target) return;
-
-    const { cx, cz, targetY, totalH, diag } = bounds;
-    const dist = Math.max(diag * 1.2, totalH * 1.5, 15);
-    camera.position.set(cx + dist * 0.7, totalH + dist * 0.5, cz + dist * 0.7);
-    camera.lookAt(cx, targetY, cz);
-    (controls as any).target.set(cx, targetY, cz);
-    (controls as any).update?.();
-    fitted.current = true;
+    if (fitCamera()) fitted.current = true;
   });
 
   return null;
 }
 
-function DynamicOrbitTarget({ buildings, autoRotate }: { buildings: Building[]; autoRotate?: boolean }) {
+function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
   const { controls } = useThree();
 
   const buildingCenter = useMemo(() => {
@@ -874,10 +877,17 @@ function DynamicOrbitTarget({ buildings, autoRotate }: { buildings: Building[]; 
   }, [buildingCenter, controls]);
 
   useFrame(() => {
-    if (!autoRotate) return;
     if (!buildingCenter || !controls || !(controls as any).target) return;
     const { cx, cz, targetY } = buildingCenter;
     const t = (controls as any).target as THREE.Vector3;
+    if (lockTarget) {
+      if (Math.abs(t.x - cx) > 0.001 || Math.abs(t.y - targetY) > 0.001 || Math.abs(t.z - cz) > 0.001) {
+        t.set(cx, targetY, cz);
+        (controls as any).update?.();
+      }
+      return;
+    }
+    if (!autoRotate) return;
     if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
       t.lerp(new THREE.Vector3(cx, targetY, cz), 0.05);
       (controls as any).update?.();
@@ -1377,6 +1387,7 @@ export function BuildingCanvas3D({
   isolateActiveFloor = false,
   autoRotate = false,
   autoRotateSpeed = 1.0,
+  lockTarget = false,
   onFloorClick,
   onRoomZoom,
 }: Props) {
@@ -1444,11 +1455,11 @@ export function BuildingCanvas3D({
           <Environment preset="city" />
         </Suspense>
 
-        <CameraAutoFit buildings={buildings} />
+        <CameraAutoFit buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
         <CameraFocusFloor />
         <CameraFocusRoom />
-        <CameraSetPos buildings={buildings} />
-        <DynamicOrbitTarget buildings={buildings} autoRotate={autoRotate} />
+        <CameraSetPos buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
+        <DynamicOrbitTarget buildings={buildings} autoRotate={autoRotate} lockTarget={lockTarget} />
 
         <OrbitControls
           makeDefault
@@ -1463,11 +1474,12 @@ export function BuildingCanvas3D({
           zoomSpeed={1.0}
           autoRotate={autoRotate}
           autoRotateSpeed={autoRotateSpeed}
+          enablePan={!lockTarget}
           target={initialBounds ? [initialBounds.cx, initialBounds.targetY, initialBounds.cz] : [0, 0, 0]}
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,
             MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.PAN,
+            RIGHT: lockTarget ? THREE.MOUSE.DOLLY : THREE.MOUSE.PAN,
           }}
         />
       </Canvas>

@@ -3011,6 +3011,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   />
                   Etagen klickbar
                 </label>
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={b3dCfg.lockTarget ?? true}
+                    onChange={(e) => onUpdate({ config: { ...b3dCfg, lockTarget: e.target.checked } })}
+                    className="rounded w-3 h-3"
+                  />
+                  Gebäude immer mittig
+                </label>
               </div>
             </div>
           </>

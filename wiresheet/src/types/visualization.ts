@@ -807,6 +807,7 @@ export interface Building3DWidgetConfig {
   autoRotateSpeed?: number;
   wallsTransparent?: boolean;
   xrayOpacity?: number;
+  lockTarget?: boolean;
 }
 
 export interface WidgetTemplate {

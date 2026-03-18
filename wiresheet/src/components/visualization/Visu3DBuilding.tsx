@@ -169,6 +169,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const bgTransparent = config.transparentBackground ?? false;
   const bgColor = config.backgroundColor || '#0a1020';
   const floorsClickable = config.floorsClickable ?? true;
+  const lockTarget = config.lockTarget ?? true;
 
   const handleFloorClick = useCallback((
     floorId: string,
@@ -288,6 +289,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         autoRotateSpeed={config.autoRotateSpeed ?? 1.0}
         wallsTransparent={config.wallsTransparent ?? false}
         xrayOpacity={config.xrayOpacity ?? 0.2}
+        lockTarget={lockTarget}
         onFloorClick={canClickFloors && activeFloorId !== null && !floorIsolated ? handleFloorClick : undefined}
         onRoomZoom={floorIsolated && activeFloorId !== null ? handleRoomZoom : undefined}
       />
