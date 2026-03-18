@@ -193,6 +193,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showLightingPanel, setShowLightingPanel] = useState(false);
   const [explosion, setExplosion] = useState<ExplosionSettings>(DEFAULT_EXPLOSION);
   const [showExplosionPanel, setShowExplosionPanel] = useState(false);
+  const [autoRotate3D, setAutoRotate3D] = useState(false);
 
   const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
   const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
@@ -895,6 +896,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   </div>
                 )}
                 <button
+                  onClick={() => setAutoRotate3D(v => !v)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${autoRotate3D ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="Auto-Rotation"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+                <button
                   onClick={() => setShowLightingPanel(p => !p)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showLightingPanel ? 'bg-amber-700 text-white border-amber-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
                   title="Beleuchtung"
@@ -1020,6 +1028,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
                   explosion={explosion}
+                  autoRotate={autoRotate3D}
                 />
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">

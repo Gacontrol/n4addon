@@ -865,6 +865,7 @@ function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building
 function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
   const { controls } = useThree();
   const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
+  const targetInitialized = useRef(false);
 
   const buildingCenter = useMemo(() => {
     return computeBuildingBounds(buildings);
@@ -872,6 +873,8 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
 
   useEffect(() => {
     if (!buildingCenter || !controls || !(controls as any).target) return;
+    if (targetInitialized.current) return;
+    targetInitialized.current = true;
     const { cx, cz, targetY } = buildingCenter;
     (controls as any).target.set(cx, targetY, cz);
     (controls as any).update?.();
