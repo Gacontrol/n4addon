@@ -964,7 +964,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
     const scaleX = containerSize.width / canvasW;
     const scaleY = containerSize.height / canvasH;
-    return Math.min(scaleX, scaleY);
+    return Math.min(1, scaleX, scaleY);
   }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight, widgetsBounds]);
 
   const shouldScale = !isEditMode && responsiveScale !== 1;

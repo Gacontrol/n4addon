@@ -108,7 +108,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       for (const widget of page.widgets) {
         if (!widget.binding || widget.binding.nodeId !== nodeId) continue;
         const isWrite = WRITE_TYPES.includes(widget.type) || widget.binding.direction === 'write' || widget.binding.direction === 'readwrite';
-        const bindingValue = liveValues[nodeId];
+        const portKey = widget.binding.portId ? `${nodeId}:${widget.binding.portId}` : null;
+        const bindingValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[nodeId];
         result.push({
           widgetLabel: widget.label || widget.type,
           pageName: page.name,

@@ -43,6 +43,7 @@ const persistentDpValues = new Map();
 const visuControlledDps = new Map();
 const impulseResetPending = new Map();
 const impulseQueue = new Map();
+const lastVisuWrites = new Map();
 let dpValuesSaveTimeout = null;
 
 let driverConfig = {
@@ -2562,6 +2563,7 @@ async function runPageCycle(pageId) {
         const q = impulseQueue.get(item.nodeId) || [];
         q.unshift(resetEntry);
         impulseQueue.set(item.nodeId, q);
+        lastVisuWrites.set(item.overrideKey, item.resetVal);
       }
 
       lastNodeValues.set(pageId, nodeValues);
@@ -3042,6 +3044,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       const existing = (impulseQueue.get(nodeId) || []).filter(e => e.val !== e.resetVal);
       existing.push({ val: value, resetVal: capturedResetVal, nodeId, overrideKey });
       impulseQueue.set(nodeId, existing);
+      lastVisuWrites.set(overrideKey, value);
     } else {
       if (!clientVisuOverrides.has('global')) {
         clientVisuOverrides.set('global', {});
@@ -3120,6 +3123,11 @@ function getLiveSnapshot() {
   const merged = {};
   for (const [, values] of lastNodeValues) {
     Object.assign(merged, values);
+  }
+  for (const [key, val] of lastVisuWrites) {
+    if (key.includes(':') && !(key in merged)) {
+      merged[key] = val;
+    }
   }
   return merged;
 }
