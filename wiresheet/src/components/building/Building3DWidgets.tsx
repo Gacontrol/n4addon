@@ -1157,21 +1157,21 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     }
 
     const midY = (minY + maxY) / 2;
-    const ductLen = maxY - minY;
-    const vertStart = new THREE.Vector3(0, -ductLen / 2, 0);
-    const vertEnd   = new THREE.Vector3(0,  ductLen / 2, 0);
-    const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
+    const ductLen = Math.max(0.01, maxY - minY);
 
     return (
       <group position={[vx, midY, vz]} rotation={[0, rotY, 0]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
         <mesh castShadow>
-          <primitive object={vertGeo} />
+          {isRound
+            ? <cylinderGeometry args={[w / 2, w / 2, ductLen, 16, 1]} />
+            : <boxGeometry args={[w, ductLen, h]} />
+          }
           {mat}
         </mesh>
         {selected && (
           <mesh>
             {isRound
-              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductLen + 0.03, 12]} />
+              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductLen + 0.03, 16]} />
               : <boxGeometry args={[w + 0.03, ductLen + 0.03, h + 0.03]} />
             }
             <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
