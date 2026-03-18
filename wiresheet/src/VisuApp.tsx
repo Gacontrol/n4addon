@@ -125,6 +125,7 @@ export function VisuApp() {
   const pageHistoryRef = useRef<string[]>([]);
   const visuPagesRef = useRef<VisuPage[]>([]);
   const lastWriteRef = useRef<Map<string, { time: number; value: unknown }>>(new Map());
+  const pendingWritesRef = useRef<Map<string, number>>(new Map());
   const logicNodesRef = useRef<FlowNode[]>([]);
   const apiBase = getApiBase();
 
@@ -138,6 +139,20 @@ export function VisuApp() {
       if (!cfg) return n;
       return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
     }));
+  }, []);
+
+  const applyLiveValues = useCallback((incoming: Record<string, unknown>) => {
+    const now = Date.now();
+    const pending = pendingWritesRef.current;
+    const filtered: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(incoming)) {
+      const writeTime = pending.get(key);
+      if (writeTime && now - writeTime < 2000) continue;
+      filtered[key] = val;
+    }
+    if (Object.keys(filtered).length > 0) {
+      setLiveValues(prev => ({ ...prev, ...filtered }));
+    }
   }, []);
 
   const loadData = useCallback(async () => {
@@ -207,10 +222,10 @@ export function VisuApp() {
       const res = await fetch(`${apiBase}/visu-poll`);
       if (!res.ok) return;
       const data = await res.json();
-      if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+      if (data.liveValues) applyLiveValues(data.liveValues);
       if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
     } catch {}
-  }, [apiBase, applyNodeConfigs]);
+  }, [apiBase, applyLiveValues, applyNodeConfigs]);
 
   useEffect(() => {
     let es: EventSource | null = null;
@@ -237,7 +252,7 @@ export function VisuApp() {
       es.addEventListener('state', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+          if (data.liveValues) applyLiveValues(data.liveValues);
           if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
           if (!sseActiveRef.current) {
             sseActiveRef.current = true;
@@ -306,7 +321,9 @@ export function VisuApp() {
 
     const dpKey = binding.dpKey;
 
+    pendingWritesRef.current.set(dpKey, Date.now());
     setLiveValues(prev => ({ ...prev, [dpKey]: value }));
+    setTimeout(() => pendingWritesRef.current.delete(dpKey), 2000);
 
     try {
       const isImpulseWidget = foundWidget.type === 'visu-button' || foundWidget.type === 'modern-button';
