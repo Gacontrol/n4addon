@@ -526,26 +526,55 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         </defs>
 
         <g>
-          {connections.map(conn => {
-            const start = getPortCenter(conn.source, conn.sourcePort);
-            const end = getPortCenter(conn.target, conn.targetPort);
-            if (!start || !end) return null;
-            const portKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
-            const connValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[conn.source];
-            const isSelected = selectedConnection === conn.id;
-            return (
-              <ConnectionLine
-                key={conn.id}
-                x1={start.x} y1={start.y}
-                x2={end.x} y2={end.y}
-                color={isSelected ? '#f59e0b' : '#10b981'}
-                liveValue={connValue}
-                isSelected={isSelected}
-                onClick={(e) => handleConnectionClick(conn.id, e)}
-                onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
-              />
-            );
-          })}
+          {(() => {
+            const allPortValues: Record<string, Record<string, unknown>> = {};
+            for (const node of nodes.filter(n => n.type !== 'case-container')) {
+              const pv: Record<string, unknown> = {};
+              for (const input of node.data.inputs) {
+                const conn = connections.find(c => c.target === node.id && c.targetPort === input.id);
+                if (conn) {
+                  const srcPortKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
+                  const srcVal = (srcPortKey && liveValues[srcPortKey] !== undefined) ? liveValues[srcPortKey] : liveValues[conn.source];
+                  if (srcVal !== undefined && srcVal !== null) pv[input.id] = srcVal;
+                }
+                const binding = driverBindings.find(b => b.nodeId === node.id && b.portId === input.id && b.direction === 'input');
+                if (binding) {
+                  const driverKey = binding.driverType === 'homeassistant' ? binding.haEntityId : `${binding.deviceId}:${binding.datapointId}`;
+                  const liveStore = (driverLiveValues as { modbus?: Record<string, unknown>; ha?: Record<string, unknown> });
+                  const storeKey = binding.driverType === 'homeassistant' ? 'ha' : 'modbus';
+                  if (driverKey && liveStore[storeKey]?.[driverKey] !== undefined) pv[input.id] = liveStore[storeKey]?.[driverKey];
+                }
+                const visuPortKey = `${node.id}:${input.id}`;
+                const visuPortVal = liveValues[visuPortKey];
+                if (visuPortVal !== undefined && visuPortVal !== null) pv[input.id] = visuPortVal;
+              }
+              allPortValues[node.id] = pv;
+            }
+            return connections.map(conn => {
+              const start = getPortCenter(conn.source, conn.sourcePort);
+              const end = getPortCenter(conn.target, conn.targetPort);
+              if (!start || !end) return null;
+              const targetNode = nodes.find(n => n.id === conn.target);
+              const targetPortId = conn.targetPort;
+              const targetPortVal = targetPortId && allPortValues[conn.target]?.[targetPortId];
+              const srcPortKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
+              const srcVal = (srcPortKey && liveValues[srcPortKey] !== undefined) ? liveValues[srcPortKey] : liveValues[conn.source];
+              const connValue = targetPortVal !== undefined && targetPortVal !== null ? targetPortVal : srcVal;
+              const isSelected = selectedConnection === conn.id;
+              return (
+                <ConnectionLine
+                  key={conn.id}
+                  x1={start.x} y1={start.y}
+                  x2={end.x} y2={end.y}
+                  color={isSelected ? '#f59e0b' : '#10b981'}
+                  liveValue={connValue}
+                  isSelected={isSelected}
+                  onClick={(e) => handleConnectionClick(conn.id, e)}
+                  onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
+                />
+              );
+            });
+          })()}
         </g>
 
         {connectingFrom && connectingFromPos && (
