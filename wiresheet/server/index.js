@@ -2551,10 +2551,14 @@ async function runPageCycle(pageId) {
       clientVisuOverrides.set('global', {});
 
       const pendingResets = [];
+      const usedTargetNodeIds = new Set();
       for (const [qNodeId, queue] of [...impulseQueue.entries()]) {
         if (queue.length === 0) { impulseQueue.delete(qNodeId); continue; }
-        const item = queue.shift();
+        const item = queue[0];
+        if (usedTargetNodeIds.has(item.nodeId)) continue;
+        queue.shift();
         if (queue.length === 0) impulseQueue.delete(qNodeId);
+        usedTargetNodeIds.add(item.nodeId);
         allOverrides[item.nodeId] = item.val;
         allOverrides[item.overrideKey] = item.val;
         visuControlledDps.set(item.nodeId, item.val);
@@ -3073,9 +3077,13 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
       const overrides = clientVisuOverrides.get('global');
 
-      for (const key of Object.keys(overrides)) {
-        if (key === nodeId || key.startsWith(`${nodeId}:`)) {
-          delete overrides[key];
+      if (portId) {
+        delete overrides[overrideKey];
+      } else {
+        for (const key of Object.keys(overrides)) {
+          if (key === nodeId || key.startsWith(`${nodeId}:`)) {
+            delete overrides[key];
+          }
         }
       }
 
