@@ -136,6 +136,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     deleteWallOpening,
     updateFloorLayers,
     addDuct,
+    addVerticalDuctFromFloorPlan,
+    updateVerticalDuctSectionPoints,
     updateDuct,
     moveDuctPoint,
     insertDuctPoint,
@@ -740,6 +742,16 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   <Wind className="w-3.5 h-3.5" />
                   Kanal
                 </button>
+                {viewMode === 'floor' && (
+                  <button
+                    onClick={() => setTool('vertical-duct')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'vertical-duct' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    title="Vertikalen Kanal platzieren (Schacht)"
+                  >
+                    <ChevronsUpDown className="w-3.5 h-3.5" />
+                    V-Kanal
+                  </button>
+                )}
                 <button
                   onClick={() => setTool('pipe')}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'pipe' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:text-white'}`}
@@ -812,6 +824,32 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     onChange={e => setDuctHeight(parseFloat(e.target.value) || 0.2)}
                     className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
                     title="Höhe (m)" placeholder="H" />
+                )}
+              </div>
+            )}
+
+            {viewMode === 'floor' && tool === 'vertical-duct' && (
+              <div className="flex items-center gap-1.5">
+                <select value={ductType} onChange={e => setDuctType(e.target.value as DuctType)}
+                  className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
+                  {(Object.keys(DUCT_TYPE_LABELS) as DuctType[]).map(t => (
+                    <option key={t} value={t}>{DUCT_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+                <select value={ductShape} onChange={e => setDuctShape(e.target.value as DuctShape)}
+                  className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none">
+                  <option value="rectangular">Eckig</option>
+                  <option value="round">Rund</option>
+                </select>
+                <input type="number" min="0.1" max="2" step="0.1" value={ductWidth}
+                  onChange={e => setDuctWidth(parseFloat(e.target.value) || 0.3)}
+                  className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
+                  title="Breite (m)" placeholder="B" />
+                {ductShape === 'rectangular' && (
+                  <input type="number" min="0.1" max="2" step="0.05" value={ductHeight}
+                    onChange={e => setDuctHeight(parseFloat(e.target.value) || 0.2)}
+                    className="w-14 bg-slate-700 border border-slate-600 text-slate-200 text-xs px-1.5 py-1 rounded outline-none"
+                    title="Tiefe (m)" placeholder="T" />
                 )}
               </div>
             )}
@@ -1316,6 +1354,10 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       if (!activeBuilding) return;
                       updateDuct(activeBuilding.id, floorId, ductId, changes);
                     }}
+                    onUpdateVerticalDuctSectionPoints={(ductId, floorId, newPoints) => {
+                      if (!activeBuilding) return;
+                      updateVerticalDuctSectionPoints(activeBuilding.id, floorId, ductId, newPoints);
+                    }}
                     onMergeDucts={(ductIds, floorId) => {
                       if (!activeBuilding) return null;
                       return mergeDucts(activeBuilding.id, floorId, ductIds);
@@ -1350,6 +1392,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onDeleteRoom={handleDeleteRoom}
                 onSetBackground={handleSetBackground}
                 onAddDuct={handleAddDuct}
+                onAddVerticalDuctFromFloorPlan={duct => {
+                  if (!activeBuilding || !activeFloor) return;
+                  const newId = addVerticalDuctFromFloorPlan(activeBuilding.id, activeFloor.id, duct);
+                  setSelectedDuctId(newId);
+                  setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null);
+                  setShowRoomPanel(true);
+                }}
                 onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); setShowRoomPanel(true); }}
                 onDeleteDuct={id => { if (activeBuilding && activeFloor) deleteDuct(activeBuilding.id, activeFloor.id, id); setSelectedDuctId(null); }}
                 onMoveDuctPoint={(ductId, ptIdx, x, y) => { if (activeBuilding && activeFloor) moveDuctPoint(activeBuilding.id, activeFloor.id, ductId, ptIdx, x, y); }}
@@ -1928,13 +1977,24 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { height: parseFloat(e.target.value) || 0.2 })} />
                       </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einbauhöhe (m)</label>
-                      <input type="number" step="0.1" min="0"
-                        className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
-                        value={selectedDuct.elevation}
-                        onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { elevation: parseFloat(e.target.value) || 2.4 })} />
-                    </div>
+                    {!selectedDuct.isVertical && (
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Einbauhöhe (m)</label>
+                        <input type="number" step="0.1" min="0"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedDuct.elevation}
+                          onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { elevation: parseFloat(e.target.value) || 2.4 })} />
+                      </div>
+                    )}
+                    {selectedDuct.isVertical && (
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Rotation (°)</label>
+                        <input type="number" step="5" min="0" max="360"
+                          className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          value={selectedDuct.verticalRotation ?? 0}
+                          onChange={e => activeBuilding && activeFloor && updateDuct(activeBuilding.id, activeFloor.id, selectedDuct.id, { verticalRotation: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Bezeichnung</label>
                       <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"

@@ -144,6 +144,7 @@ export interface Duct {
   isVertical?: boolean;
   verticalX?: number;
   verticalY?: number;
+  verticalRotation?: number;
   verticalSectionPoints?: DuctPoint[];
 }
 
@@ -307,7 +308,7 @@ export interface FurnitureItem {
   category: FurnitureCategory;
 }
 
-export type BuildingTool = 'select' | 'room' | 'polygon-room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'pipe' | 'slab' | 'furniture';
+export type BuildingTool = 'select' | 'room' | 'polygon-room' | 'wall' | 'door' | 'window' | 'delete' | 'measure' | 'duct' | 'vertical-duct' | 'pipe' | 'slab' | 'furniture';
 
 export interface BuildingViewState {
   selectedBuildingId: string | null;

@@ -34,6 +34,7 @@ interface Props {
   onDeleteRoom: (roomId: string) => void;
   onSetBackground: (bg: BackgroundImage | null) => void;
   onAddDuct?: (duct: Omit<Duct, 'id'>) => void;
+  onAddVerticalDuctFromFloorPlan?: (duct: Omit<Duct, 'id'>) => void;
   onSelectDuct?: (id: string | null) => void;
   onDeleteDuct?: (id: string) => void;
   onMoveDuctPoint?: (ductId: string, pointIndex: number, x: number, y: number) => void;
@@ -246,7 +247,7 @@ export function FloorPlanEditor({
   onAddWall, onSelectWall, onMoveWallPoint, onMoveWall,
   onAddRoom, onSelectRoom, onMoveRoom,
   onDeleteWall, onDeleteRoom, onSetBackground,
-  onAddDuct, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onConnectDuctEndpoints, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
+  onAddDuct, onAddVerticalDuctFromFloorPlan, onSelectDuct, onDeleteDuct, onMoveDuctPoint, onMoveDuct, onMergeDucts, onConnectDuctEndpoints, onSplitDuct, onInsertDuctPoint, onRemoveDuctPoint,
   onAddPipe, onSelectPipe, onDeletePipe, onMovePipePoint, onMovePipe,
   onAddSlab, onDeleteSlab, onAddPolygonRoom,
   dropOpeningType, onAddWallOpening, onUpdateWallOpening,
@@ -1040,11 +1041,17 @@ export function FloorPlanEditor({
         ctx.strokeStyle = isSelected ? '#fff' : color;
         ctx.lineWidth = isSelected ? 2 : 1.5;
         const a = r * 0.55;
-        ctx.beginPath(); ctx.moveTo(sp.x - a, sp.y); ctx.lineTo(sp.x + a, sp.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x, sp.y + a); ctx.stroke();
+        const rot = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const rx = (dx: number, dy: number) => ({ x: sp.x + dx * cos - dy * sin, y: sp.y + dx * sin + dy * cos });
+        const p1 = rx(-a, 0), p2 = rx(a, 0), p3 = rx(0, -a), p4 = rx(0, a);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
         const ar = a * 0.4;
-        ctx.beginPath(); ctx.moveTo(sp.x + a, sp.y); ctx.lineTo(sp.x + a - ar, sp.y - ar); ctx.moveTo(sp.x + a, sp.y); ctx.lineTo(sp.x + a - ar, sp.y + ar); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x - ar, sp.y - a + ar); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x + ar, sp.y - a + ar); ctx.stroke();
+        const pa1 = rx(a - ar, -ar), pa2 = rx(a - ar, ar);
+        ctx.beginPath(); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa1.x, pa1.y); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa2.x, pa2.y); ctx.stroke();
+        const pa3 = rx(-ar, -a + ar), pa4 = rx(ar, -a + ar);
+        ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa3.x, pa3.y); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa4.x, pa4.y); ctx.stroke();
         if (zoom > 0.5) {
           ctx.fillStyle = color;
           ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
@@ -1423,6 +1430,29 @@ export function FloorPlanEditor({
       ctx.restore();
     }
 
+    if (tool === 'vertical-duct' && mouseWorld) {
+      const color = DUCT_TYPE_COLORS[ductType] || '#60a5fa';
+      const sp = toScreen(mouseWorld.x, mouseWorld.y);
+      const r = Math.max(ductWidth * cellPx * 0.6, 10);
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color + '33';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const a = r * 0.55;
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = color;
+      ctx.beginPath(); ctx.moveTo(sp.x - a, sp.y); ctx.lineTo(sp.x + a, sp.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sp.x, sp.y - a); ctx.lineTo(sp.x, sp.y + a); ctx.stroke();
+      ctx.restore();
+    }
+
     if (lassoRect) {
       const s1 = toScreen(Math.min(lassoRect.x1, lassoRect.x2), Math.min(lassoRect.y1, lassoRect.y2));
       const s2 = toScreen(Math.max(lassoRect.x1, lassoRect.x2), Math.max(lassoRect.y1, lassoRect.y2));
@@ -1435,7 +1465,7 @@ export function FloorPlanEditor({
       ctx.setLineDash([]);
     }
 
-    if (snapPoint && (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe' || tool === 'slab')) {
+    if (snapPoint && (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'vertical-duct' || tool === 'pipe' || tool === 'slab')) {
       const sp = toScreen(snapPoint.x, snapPoint.y);
       ctx.beginPath();
       ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
@@ -1711,6 +1741,24 @@ export function FloorPlanEditor({
 
     if (tool === 'duct' || tool === 'pipe') {
       setDrawingPolyline(prev => [...prev, { x: snapped.x, y: snapped.y }]);
+      return;
+    }
+
+    if (tool === 'vertical-duct') {
+      onAddVerticalDuctFromFloorPlan?.({
+        points: [{ x: snapped.x, y: snapped.y }, { x: snapped.x, y: snapped.y + 0.001 }],
+        shape: ductShape,
+        type: ductType,
+        width: ductWidth,
+        height: ductHeight,
+        elevation: 0,
+        insulated: false,
+        isVertical: true,
+        verticalX: snapped.x,
+        verticalY: snapped.y,
+        verticalRotation: 0,
+        verticalSectionPoints: [{ x: snapped.x, y: 0 }, { x: snapped.x, y: 0.5 }],
+      });
       return;
     }
 
@@ -2238,6 +2286,7 @@ export function FloorPlanEditor({
   const getCursor = () => {
     if (tool === 'wall' || tool === 'room' || tool === 'polygon-room' || tool === 'duct' || tool === 'pipe' || tool === 'slab') return 'crosshair';
     if (tool === 'delete') return 'not-allowed';
+    if (tool === 'vertical-duct') return 'crosshair';
     if (dragState.current?.type === 'lasso') return 'crosshair';
     return 'default';
   };

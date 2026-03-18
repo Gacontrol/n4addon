@@ -19,6 +19,7 @@ interface Props {
   onAddVerticalDuct: (duct: Omit<Duct, 'id'>, fromFloorId: string) => void;
   onAddVerticalPipe: (pipe: Omit<Pipe, 'id'>, fromFloorId: string, toFloorId: string) => void;
   onUpdateVerticalDuct?: (ductId: string, floorId: string, changes: Partial<Duct>) => void;
+  onUpdateVerticalDuctSectionPoints?: (ductId: string, floorId: string, newPoints: { x: number; y: number }[]) => void;
   onMergeDucts?: (ductIds: string[], floorId: string) => string | null;
   gridSize: number;
   label?: string;
@@ -77,6 +78,7 @@ export function SectionView({
   onAddVerticalDuct,
   onAddVerticalPipe,
   onUpdateVerticalDuct,
+  onUpdateVerticalDuctSectionPoints,
   onMergeDucts,
   gridSize,
   label,
@@ -631,16 +633,20 @@ export function SectionView({
           const newPts = entry.duct.verticalSectionPoints!.map((p, i) =>
             i === dragState.pointIndex ? { x: finalX, y: finalY } : p
           );
-          const buildingCoords = sectionXToBuildingCoords(finalX);
-          const changes: Partial<Duct> = { verticalSectionPoints: newPts };
-          if (buildingCoords.bx !== undefined) changes.verticalX = buildingCoords.bx;
-          if (buildingCoords.by !== undefined) changes.verticalY = buildingCoords.by;
-          onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, changes);
+          if (onUpdateVerticalDuctSectionPoints) {
+            onUpdateVerticalDuctSectionPoints(dragState.ductId, dragState.floorId, newPts);
+          } else {
+            const buildingCoords = sectionXToBuildingCoords(finalX);
+            const changes: Partial<Duct> = { verticalSectionPoints: newPts };
+            if (buildingCoords.bx !== undefined) changes.verticalX = buildingCoords.bx;
+            if (buildingCoords.by !== undefined) changes.verticalY = buildingCoords.by;
+            onUpdateVerticalDuct?.(dragState.ductId, dragState.floorId, changes);
+          }
         }
       }
       setDragState(null);
     }
-  }, [dragState, tool, toWorld, snapTo, getAllSectionDucts, onUpdateVerticalDuct, sectionXToBuildingCoords, sortedFloors, getH]);
+  }, [dragState, tool, toWorld, snapTo, getAllSectionDucts, onUpdateVerticalDuct, onUpdateVerticalDuctSectionPoints, sectionXToBuildingCoords, sortedFloors, getH]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     if (polyline.length < 2) { setPolyline([]); return; }

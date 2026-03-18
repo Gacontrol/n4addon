@@ -1013,6 +1013,109 @@ export function useBuildingEditor() {
     return [firstHalf.id, secondHalf.id];
   }, [buildings, updateBuildings]);
 
+  const addVerticalDuctFromFloorPlan = useCallback((buildingId: string, floorId: string, duct: Omit<Duct, 'id'>): string => {
+    const building = buildings.find(b => b.id === buildingId);
+    if (!building) return '';
+    const sortedFloors = [...building.floors].sort((a, b) => a.level - b.level);
+    const floorIdx = sortedFloors.findIndex(f => f.id === floorId);
+    const floorHeight = sortedFloors[floorIdx]?.height ?? 3;
+    let baseY = 0;
+    for (let i = 0; i < floorIdx; i++) baseY += sortedFloors[i].height;
+    const newDuct: Duct = {
+      ...duct,
+      id: `duct-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      verticalSectionPoints: [{ x: duct.verticalX ?? 0, y: baseY + 0.1 }, { x: duct.verticalX ?? 0, y: baseY + floorHeight - 0.1 }],
+    };
+    const updated = buildings.map(b =>
+      b.id === buildingId
+        ? { ...b, floors: b.floors.map(f => f.id === floorId ? { ...f, ducts: [...(f.ducts ?? []), newDuct] } : f), updatedAt: Date.now() }
+        : b
+    );
+    updateBuildings(updated);
+    return newDuct.id;
+  }, [buildings, updateBuildings]);
+
+  const updateVerticalDuctSectionPoints = useCallback((buildingId: string, fromFloorId: string, ductId: string, newPoints: { x: number; y: number }[]) => {
+    const building = buildings.find(b => b.id === buildingId);
+    if (!building || newPoints.length < 2) return;
+
+    const sortedFloors = [...building.floors].sort((a, b) => a.level - b.level);
+    const floorBounds: { floor: typeof sortedFloors[0]; baseY: number; topY: number }[] = [];
+    let accY = 0;
+    for (const f of sortedFloors) {
+      floorBounds.push({ floor: f, baseY: accY, topY: accY + f.height });
+      accY += f.height;
+    }
+
+    const minY = Math.min(...newPoints.map(p => p.y));
+    const maxY = Math.max(...newPoints.map(p => p.y));
+
+    const spannedFloors = floorBounds.filter(fb => fb.topY > minY && fb.baseY < maxY);
+
+    if (spannedFloors.length <= 1) {
+      const updated = buildings.map(b =>
+        b.id === buildingId
+          ? {
+              ...b,
+              floors: b.floors.map(f =>
+                f.id === fromFloorId
+                  ? { ...f, ducts: (f.ducts ?? []).map(d => d.id === ductId ? { ...d, verticalSectionPoints: newPoints } : d) }
+                  : f
+              ),
+              updatedAt: Date.now(),
+            }
+          : b
+      );
+      updateBuildings(updated);
+      return;
+    }
+
+    const fromFloor = building.floors.find(f => f.id === fromFloorId);
+    const baseDuct = (fromFloor?.ducts ?? []).find(d => d.id === ductId);
+    if (!baseDuct) return;
+
+    const newDucts: { floorId: string; duct: Duct }[] = [];
+
+    for (const fb of spannedFloors) {
+      const segStart = Math.max(minY, fb.baseY);
+      const segEnd = Math.min(maxY, fb.topY);
+      if (segEnd <= segStart) continue;
+      const vx = baseDuct.verticalX ?? newPoints[0].x;
+      const segPoints = [{ x: vx, y: segStart }, { x: vx, y: segEnd }];
+      const isOriginal = fb.floor.id === fromFloorId;
+      newDucts.push({
+        floorId: fb.floor.id,
+        duct: {
+          ...baseDuct,
+          id: isOriginal ? ductId : `duct-${Date.now()}-v-${Math.random().toString(36).substr(2, 6)}`,
+          verticalSectionPoints: segPoints,
+        },
+      });
+    }
+
+    const updated = buildings.map(b => {
+      if (b.id !== buildingId) return b;
+      const floors = b.floors.map(f => {
+        const match = newDucts.find(nd => nd.floorId === f.id);
+        const isOrigFloor = f.id === fromFloorId;
+        if (isOrigFloor && match) {
+          return { ...f, ducts: [...(f.ducts ?? []).filter(d => d.id !== ductId), match.duct] };
+        } else if (isOrigFloor) {
+          return { ...f, ducts: (f.ducts ?? []).filter(d => d.id !== ductId) };
+        } else if (match) {
+          const existing = (f.ducts ?? []).find(d => d.id === match.duct.id);
+          if (existing) {
+            return { ...f, ducts: (f.ducts ?? []).map(d => d.id === match.duct.id ? match.duct : d) };
+          }
+          return { ...f, ducts: [...(f.ducts ?? []), match.duct] };
+        }
+        return f;
+      });
+      return { ...b, floors, updatedAt: Date.now() };
+    });
+    updateBuildings(updated);
+  }, [buildings, updateBuildings]);
+
   // ---- Pipe Actions ----
 
   const addPipe = useCallback((buildingId: string, floorId: string, pipe: Omit<Pipe, 'id'>) => {
@@ -1447,6 +1550,8 @@ export function useBuildingEditor() {
     deleteWallOpening,
     updateFloorLayers,
     addDuct,
+    addVerticalDuctFromFloorPlan,
+    updateVerticalDuctSectionPoints,
     updateDuct,
     moveDuctPoint,
     insertDuctPoint,
