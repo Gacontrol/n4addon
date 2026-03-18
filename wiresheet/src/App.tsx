@@ -1129,7 +1129,7 @@ function App() {
   }, [liveValuesJson, allLogicNodes, alarmClasses, nodeToPageMap]);
 
   const handleVisuWidgetValueChange = useCallback(async (
-    _widgetId: string,
+    widgetId: string,
     binding: WidgetBinding & { impulse?: boolean; releaseValue?: unknown },
     value: unknown
   ) => {
@@ -1145,6 +1145,10 @@ function App() {
     }
     if (parsed.segment !== 'cfg') {
       setLiveValue(dpKey, value);
+      const widget = visuPages.flatMap(p => p.widgets).find(w => w.id === widgetId);
+      if (widget?.statusBinding?.dpKey) {
+        setLiveValue(widget.statusBinding.dpKey, value);
+      }
     }
     try {
       const apiBase = (() => {
@@ -1168,7 +1172,7 @@ function App() {
     } catch (err) {
       console.error('Failed to write visu value:', err);
     }
-  }, [pages, updateNodeData]);
+  }, [pages, visuPages, updateNodeData, setLiveValue]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">

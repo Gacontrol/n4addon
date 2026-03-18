@@ -306,7 +306,13 @@ export function VisuApp() {
 
     const dpKey = binding.dpKey;
 
-    setLiveValues(prev => ({ ...prev, [dpKey]: value }));
+    setLiveValues(prev => {
+      const next = { ...prev, [dpKey]: value };
+      if (foundWidget?.statusBinding?.dpKey) {
+        next[foundWidget.statusBinding.dpKey] = value;
+      }
+      return next;
+    });
 
     try {
       const isImpulseWidget = foundWidget.type === 'visu-button' || foundWidget.type === 'modern-button';
