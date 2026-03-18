@@ -114,12 +114,12 @@ function getSnapshot() {
 function setFromLogicOutput(nodeValues) {
   const changed = [];
   for (const [dpKey, value] of Object.entries(nodeValues)) {
-    if (!dpKey.includes(':cfg:')) {
-      const prev = _store.get(dpKey);
-      if (prev !== value) {
-        _store.set(dpKey, value);
-        changed.push(dpKey);
-      }
+    if (dpKey.includes(':cfg:')) continue;
+    if (dpKey.includes(':input-')) continue;
+    const prev = _store.get(dpKey);
+    if (prev !== value) {
+      _store.set(dpKey, value);
+      changed.push(dpKey);
     }
   }
   if (changed.length > 0) {
