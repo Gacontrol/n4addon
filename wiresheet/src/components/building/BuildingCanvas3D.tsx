@@ -75,6 +75,8 @@ interface Props {
   autoRotate?: boolean;
   autoRotateSpeed?: number;
   lockTarget?: boolean;
+  focusDuctId?: string | null;
+  compact?: boolean;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -690,6 +692,62 @@ function animateCamera(
     if (t < 1) requestAnimationFrame(animate);
   };
   requestAnimationFrame(animate);
+}
+
+function CameraFocusDuct({ buildings, focusDuctId }: { buildings: Building[]; focusDuctId?: string | null }) {
+  const { camera, controls } = useThree();
+  const prevId = useRef<string | null | undefined>(null);
+
+  useEffect(() => {
+    if (!focusDuctId || focusDuctId === prevId.current) return;
+    prevId.current = focusDuctId;
+
+    for (const building of buildings) {
+      for (const floor of building.floors) {
+        const duct = (floor.ducts ?? []).find(d => d.id === focusDuctId);
+        if (!duct) continue;
+
+        let cx = 0, cy = 0, cz = 0, dist = 8;
+
+        if (duct.isVertical && duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
+          const pts = duct.verticalSectionPoints;
+          const minY = Math.min(...pts.map(p => p.y));
+          const maxY = Math.max(...pts.map(p => p.y));
+          cx = (duct.verticalX ?? 0) + (building.offsetX ?? 0);
+          cy = (minY + maxY) / 2;
+          cz = duct.verticalY ?? 0;
+          dist = Math.max(maxY - minY, duct.width || 0.3, 3) * 2.5;
+        } else if (duct.points && duct.points.length >= 2) {
+          const xs = duct.points.map(p => p.x);
+          const zs = duct.points.map(p => p.y);
+          cx = (Math.min(...xs) + Math.max(...xs)) / 2 + (building.offsetX ?? 0);
+          cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+          let baseY = 0;
+          const sorted = [...building.floors].sort((a, b) => a.level - b.level);
+          for (const f of sorted) {
+            if (f.id === floor.id) break;
+            baseY += f.height;
+          }
+          cy = baseY + (duct.elevation ?? 2.4);
+          const span = Math.max(
+            Math.max(...xs) - Math.min(...xs),
+            Math.max(...zs) - Math.min(...zs),
+            2
+          );
+          dist = Math.max(span * 1.5, 4);
+        }
+
+        const startPos = camera.position.clone();
+        const endPos = new THREE.Vector3(cx + dist * 0.6, cy + dist * 0.7, cz + dist * 0.6);
+        const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, cy, cz);
+        const endTarget = new THREE.Vector3(cx, cy, cz);
+        animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600);
+        return;
+      }
+    }
+  }, [focusDuctId, buildings, camera, controls]);
+
+  return null;
 }
 
 function CameraFocusFloor() {
@@ -1428,6 +1486,8 @@ export function BuildingCanvas3D({
   autoRotate = false,
   autoRotateSpeed = 1.0,
   lockTarget = false,
+  focusDuctId,
+  compact = false,
   onFloorClick,
   onRoomZoom,
 }: Props) {
@@ -1496,6 +1556,7 @@ export function BuildingCanvas3D({
         </Suspense>
 
         <CameraAutoFit buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
+        <CameraFocusDuct buildings={buildings} focusDuctId={focusDuctId} />
         <CameraFocusFloor />
         <CameraFocusRoom />
         <CameraSetPos buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
@@ -1524,11 +1585,13 @@ export function BuildingCanvas3D({
         />
       </Canvas>
 
-      <ViewButtons />
+      {!compact && <ViewButtons />}
 
-      <div className="absolute bottom-3 left-3 text-slate-600 text-[10px] bg-slate-900/60 px-2 py-1 rounded">
-        {lockTarget ? 'Ziehen: Drehen · Scroll: Zoom' : 'Ziehen: Drehen · Rechtsklick: Verschieben · Scroll: Zoom'}
-      </div>
+      {!compact && (
+        <div className="absolute bottom-3 left-3 text-slate-600 text-[10px] bg-slate-900/60 px-2 py-1 rounded">
+          {lockTarget ? 'Ziehen: Drehen · Scroll: Zoom' : 'Ziehen: Drehen · Rechtsklick: Verschieben · Scroll: Zoom'}
+        </div>
+      )}
     </div>
   );
 }

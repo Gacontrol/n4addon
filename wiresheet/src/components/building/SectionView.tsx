@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { Trash2, X, Wind } from 'lucide-react';
 import { Building, Floor, Duct, Pipe, DuctType, DuctShape, PipeType } from '../../types/building';
+import { BuildingCanvas3D, DEFAULT_LIGHTING, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
 
 interface Props {
   building: Building;
@@ -341,25 +342,57 @@ export function SectionView({
       const sectX = getDuctSectionX(duct);
       const color = duct.color || DUCT_COLORS[duct.type];
       const isSelected = selectedDuctIds.includes(duct.id);
+      const dw = duct.width || 0.3;
+      const dh = duct.shape === 'round' ? dw : (duct.height || 0.2);
+      const halfW = dw / 2;
       ctx.save();
-      ctx.strokeStyle = isSelected ? '#ffffff' : color;
-      ctx.lineWidth = duct.width * cellPx;
-      ctx.lineCap = 'square';
-      ctx.lineJoin = 'miter';
-      ctx.globalAlpha = isSelected ? 0.9 : 0.75;
-      ctx.beginPath();
-      for (let pi = 0; pi < pts.length; pi++) {
-        const isDraggingPt = dragState?.ductId === duct.id && dragState?.pointIndex === pi && dragPos;
-        const ptY = isDraggingPt ? dragPos!.y : pts[pi].y;
-        const sp = toScreen(sectX, ptY);
-        if (pi === 0) ctx.moveTo(sp.x, sp.y);
-        else ctx.lineTo(sp.x, sp.y);
-      }
-      ctx.stroke();
-      if (isSelected) {
-        ctx.lineWidth = duct.width * cellPx + 4;
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.3;
+
+      if (pts.length >= 2) {
+        const minY = Math.min(...pts.map(p => p.y));
+        const maxY = Math.max(...pts.map(p => p.y));
+        const topScreen = toScreen(sectX - halfW, maxY);
+        const botScreen = toScreen(sectX + halfW, minY);
+        const rectX = topScreen.x;
+        const rectY = topScreen.y;
+        const rectW = botScreen.x - topScreen.x;
+        const rectH = botScreen.y - topScreen.y;
+
+        ctx.globalAlpha = isSelected ? 0.9 : 0.75;
+        ctx.fillStyle = color + Math.round(0.35 * 255).toString(16).padStart(2, '0');
+        ctx.fillRect(rectX, rectY, rectW, rectH);
+
+        if (isSelected) {
+          ctx.globalAlpha = 0.35;
+          ctx.fillStyle = color + '60';
+          ctx.fillRect(rectX - 3, rectY - 3, rectW + 6, rectH + 6);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(rectX, rectY, rectW, rectH);
+        } else {
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(rectX, rectY, rectW, rectH);
+        }
+
+        if (duct.shape !== 'round') {
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = isSelected ? '#ffffff' : color;
+          ctx.lineWidth = 0.5;
+          ctx.setLineDash([2, 3]);
+          ctx.strokeRect(rectX, rectY, rectW, rectH);
+          ctx.setLineDash([]);
+        }
+
+        ctx.globalAlpha = 1;
+        void dh;
+      } else {
+        ctx.strokeStyle = isSelected ? '#ffffff' : color;
+        ctx.lineWidth = dw * cellPx;
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
+        ctx.globalAlpha = isSelected ? 0.9 : 0.75;
         ctx.beginPath();
         for (let pi = 0; pi < pts.length; pi++) {
           const isDraggingPt = dragState?.ductId === duct.id && dragState?.pointIndex === pi && dragPos;
@@ -369,8 +402,8 @@ export function SectionView({
           else ctx.lineTo(sp.x, sp.y);
         }
         ctx.stroke();
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
       for (let pi = 0; pi < pts.length; pi++) {
         const isDraggingPt = dragState?.ductId === duct.id && dragState?.pointIndex === pi;
         const ptY = (isDraggingPt && dragPos) ? dragPos.y : pts[pi].y;
@@ -879,7 +912,31 @@ export function SectionView({
 
             <div className="pt-1 border-t border-slate-700">
               <div className="text-[10px] text-slate-500 mb-1.5">3D Vorschau</div>
-              <DuctMiniPreview duct={activeSingleDuct} floors={sortedFloors} />
+              <div className="w-full rounded overflow-hidden border border-slate-700" style={{ height: 160 }}>
+                <BuildingCanvas3D
+                  buildings={[building]}
+                  activeFloorId={null}
+                  selectedRoomId={null}
+                  selectedWallId={null}
+                  selectedDuctId={activeSingleDuct.id}
+                  focusDuctId={activeSingleDuct.id}
+                  onSelectRoom={() => {}}
+                  onSelectWall={() => {}}
+                  onSelectDuct={() => {}}
+                  highlightFloor={false}
+                  bgColor="#0f172a"
+                  showGrid={true}
+                  lighting={DEFAULT_LIGHTING}
+                  explosion={DEFAULT_EXPLOSION}
+                  wallsTransparent={true}
+                  xrayOpacity={0.18}
+                  visibleLayers={['walls', 'ducts']}
+                  isolateActiveFloor={false}
+                  autoRotate={false}
+                  lockTarget={false}
+                  compact={true}
+                />
+              </div>
             </div>
 
             <button
@@ -903,203 +960,3 @@ export function SectionView({
   );
 }
 
-const DUCT_3D_COLORS: Record<DuctType, string> = {
-  supply: '#3b82f6',
-  return: '#10b981',
-  exhaust: '#ef4444',
-  fresh: '#06b6d4',
-};
-
-function DuctMiniPreview({ duct, floors }: { duct: Duct; floors: { height: number; name: string }[] }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const W = canvas.width;
-    const H = canvas.height;
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, W, H);
-
-    const color = duct.color || DUCT_3D_COLORS[duct.type];
-    const dw = duct.width;
-    const dh = duct.shape === 'round' ? duct.width : duct.height;
-    const px3 = 0.35;
-    const py3 = 0.25;
-
-    const isVertical = !!(duct.isVertical && duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2);
-    const isHorizontal = !isVertical && duct.points.length >= 2;
-
-    if (!isVertical && !isHorizontal) {
-      ctx.fillStyle = '#475569';
-      ctx.font = '10px Inter,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Keine Punkte', W / 2, H / 2);
-      return;
-    }
-
-    if (isVertical) {
-      const pts = duct.verticalSectionPoints!;
-      const minY = Math.min(...pts.map(p => p.y));
-      const maxY = Math.max(...pts.map(p => p.y));
-      const ductH = maxY - minY;
-      const padY = Math.max(0.5, ductH * 0.2);
-
-      const sceneW = dw * 2 + px3 * dw;
-      const sceneH = ductH + padY * 2;
-      const scaleX = (W * 0.7) / sceneW;
-      const scaleY = (H * 0.82) / sceneH;
-      const scale = Math.min(scaleX, scaleY);
-      const ox = W * 0.25;
-      const oy = H * 0.88;
-
-      const toSX = (wx: number) => ox + wx * scale;
-      const toSY = (wy: number) => oy - (wy - minY + padY) * scale;
-      const proj = (wx: number, wy: number, wz: number) => ({
-        x: toSX(wx + wz * px3),
-        y: toSY(wy + wz * py3),
-      });
-
-      ctx.strokeStyle = 'rgba(148,163,184,0.15)';
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i <= floors.length; i++) {
-        let flY = 0;
-        for (let j = 0; j < i; j++) flY += floors[j].height;
-        if (flY < minY - padY || flY > maxY + padY) continue;
-        const sy = toSY(flY);
-        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-      }
-
-      const hx = dw / 2;
-      const hz = dh / 2;
-      const faces = [
-        { verts: [[-hx,0,-hz],[-hx,ductH,-hz],[hx,ductH,-hz],[hx,0,-hz]], alpha: 0.55 },
-        { verts: [[hx,0,-hz],[hx,ductH,-hz],[hx,ductH,hz],[hx,0,hz]], alpha: 0.7 },
-        { verts: [[-hx,ductH,-hz],[-hx,ductH,hz],[hx,ductH,hz],[hx,ductH,-hz]], alpha: 0.85 },
-      ] as { verts: [number,number,number][]; alpha: number }[];
-
-      for (const face of faces) {
-        const points = face.verts.map(([wx, wy, wz]) => proj(wx, wy + minY, wz));
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-        ctx.closePath();
-        ctx.fillStyle = color + Math.round(face.alpha * 255).toString(16).padStart(2,'0');
-        ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      let fy = 0;
-      for (let i = 0; i < floors.length; i++) {
-        const fTopY = fy + floors[i].height;
-        if (fTopY > minY - 0.1 && fy < maxY + 0.1) {
-          const labelY = toSY(fy + floors[i].height / 2);
-          ctx.fillStyle = 'rgba(148,163,184,0.6)';
-          ctx.font = '8px Inter,sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(floors[i].name, W * 0.72, labelY + 3);
-        }
-        fy = fTopY;
-      }
-    } else {
-      const elev = duct.elevation ?? 0;
-      let floorBaseY = 0;
-      let floorIdx = 0;
-      let cumH = 0;
-      for (let i = 0; i < floors.length; i++) {
-        if (elev >= cumH && elev < cumH + floors[i].height) {
-          floorBaseY = cumH;
-          floorIdx = i;
-          break;
-        }
-        cumH += floors[i].height;
-      }
-      const floorH = floors[floorIdx]?.height ?? 3;
-      const padY = Math.max(0.3, floorH * 0.15);
-
-      const pts = duct.points;
-      let totalLen = 0;
-      for (let i = 1; i < pts.length; i++) {
-        totalLen += Math.sqrt((pts[i].x - pts[i-1].x) ** 2 + (pts[i].y - pts[i-1].y) ** 2);
-      }
-      const displayLen = Math.min(totalLen, floorH * 2);
-
-      const sceneW = displayLen + px3 * dh + dw * 0.5;
-      const sceneH = floorH + padY * 2;
-      const scaleX = (W * 0.82) / sceneW;
-      const scaleY = (H * 0.82) / sceneH;
-      const scale = Math.min(scaleX, scaleY);
-
-      const minSceneY = floorBaseY;
-      const ox = W * 0.08;
-      const oy = H * 0.88;
-
-      const toSX = (wx: number) => ox + wx * scale;
-      const toSY = (wy: number) => oy - (wy - minSceneY + padY) * scale;
-      const proj = (wx: number, wy: number, wz: number) => ({
-        x: toSX(wx + wz * px3),
-        y: toSY(wy + wz * py3),
-      });
-
-      ctx.strokeStyle = 'rgba(148,163,184,0.15)';
-      ctx.lineWidth = 0.5;
-      for (let i = 0; i <= floors.length; i++) {
-        let flY = 0;
-        for (let j = 0; j < i; j++) flY += floors[j].height;
-        if (flY < minSceneY - padY || flY > minSceneY + floorH + padY) continue;
-        const sy = toSY(flY);
-        ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke();
-      }
-
-      const hy = dh / 2;
-      const hz = dw / 2;
-      const ductY = elev;
-
-      const faces = [
-        { verts: [[0, ductY - hy, -hz],[0, ductY - hy, hz],[displayLen, ductY - hy, hz],[displayLen, ductY - hy, -hz]], alpha: 0.5 },
-        { verts: [[0, ductY - hy, hz],[0, ductY + hy, hz],[displayLen, ductY + hy, hz],[displayLen, ductY - hy, hz]], alpha: 0.7 },
-        { verts: [[0, ductY + hy, -hz],[displayLen, ductY + hy, -hz],[displayLen, ductY + hy, hz],[0, ductY + hy, hz]], alpha: 0.85 },
-      ] as { verts: [number,number,number][]; alpha: number }[];
-
-      for (const face of faces) {
-        const points = face.verts.map(([wx, wy, wz]) => proj(wx, wy, wz));
-        ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-        ctx.closePath();
-        ctx.fillStyle = color + Math.round(face.alpha * 255).toString(16).padStart(2,'0');
-        ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      let fy = 0;
-      for (let i = 0; i < floors.length; i++) {
-        const fTopY = fy + floors[i].height;
-        if (fTopY > minSceneY - 0.1 && fy < minSceneY + floorH + 0.1) {
-          const labelY = toSY(fy + floors[i].height / 2);
-          ctx.fillStyle = 'rgba(148,163,184,0.6)';
-          ctx.font = '8px Inter,sans-serif';
-          ctx.textAlign = 'left';
-          ctx.fillText(floors[i].name, W * 0.72, labelY + 3);
-        }
-        fy = fTopY;
-      }
-    }
-
-    if (duct.label) {
-      ctx.fillStyle = color;
-      ctx.font = 'bold 9px Inter,sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(duct.label, W / 2, 12);
-    }
-  }, [duct, floors]);
-
-  return <canvas ref={canvasRef} width={160} height={110} className="w-full rounded border border-slate-700" />;
-}
