@@ -41,6 +41,7 @@ const lastNodeValues = new Map();
 const clientVisuOverrides = new Map();
 const persistentDpValues = new Map();
 const visuControlledDps = new Map();
+const persistentNodeOverrides = new Map();
 const impulseResetPending = new Map();
 const impulseQueue = new Map();
 const lastVisuWrites = new Map();
@@ -1413,9 +1414,15 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
         }
       }
       console.log(`[DP-EVAL DEBUG]   ERGEBNIS nodeValues[${nodeId}]=${nodeValues[nodeId]}`);
-    } else if (visuOverrides[nodeId] !== undefined && inputVals.every(v => v === undefined)) {
-      nodeValues[nodeId] = visuOverrides[nodeId];
+    } else if (visuOverrides[nodeId] !== undefined) {
+      const ov = visuOverrides[nodeId];
+      nodeValues[nodeId] = ov;
+      if (inputVals.every(v => v === undefined)) {
+        persistentNodeOverrides.set(nodeId, ov);
+      }
       delete visuOverrides[nodeId];
+    } else if (persistentNodeOverrides.has(nodeId) && inputVals.every(v => v === undefined)) {
+      nodeValues[nodeId] = persistentNodeOverrides.get(nodeId);
     } else if (node.type === 'and-gate') {
       if (inputVals.length === 0) {
         nodeValues[nodeId] = false;

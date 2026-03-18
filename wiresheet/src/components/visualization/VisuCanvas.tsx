@@ -267,19 +267,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       }
       return null;
     }
-    const isWrite = WRITE_WIDGET_TYPES.has(widget.type);
-    if (isWrite) {
-      if (widget.statusBinding) return null;
-      if (portId) {
-        const portKey = `${nodeId}:${portId}`;
-        if (portKey in liveValues) return liveValues[portKey];
-      }
-      return liveValues[nodeId] ?? null;
-    }
     if (portId) {
-      return liveValues[`${nodeId}:${portId}`] ?? liveValues[nodeId];
+      const portKey = `${nodeId}:${portId}`;
+      if (portKey in liveValues) return liveValues[portKey];
     }
-    return liveValues[nodeId];
+    return liveValues[nodeId] ?? null;
   }, [liveValues, logicNodes]);
 
   const getWidgetStatusValue = useCallback((widget: VisuWidget): unknown => {
