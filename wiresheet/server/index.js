@@ -1450,18 +1450,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
     } else if (persistentNodeOverrides.has(nodeId) && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = persistentNodeOverrides.get(nodeId);
     } else if (node.type === 'and-gate') {
-      const definedAndVals = inputVals.filter(v => v !== undefined && v !== null);
-      if (definedAndVals.length === 0) {
-        nodeValues[nodeId] = false;
-      } else {
-        nodeValues[nodeId] = definedAndVals.every(v => toBool(v));
-      }
+      nodeValues[nodeId] = inputVals.length === 0 ? false : inputVals.every(v => toBool(v));
     } else if (node.type === 'or-gate') {
-      const definedOrVals = inputVals.filter(v => v !== undefined && v !== null);
-      nodeValues[nodeId] = definedOrVals.length === 0 ? false : definedOrVals.some(v => toBool(v));
+      nodeValues[nodeId] = inputVals.length === 0 ? false : inputVals.some(v => toBool(v));
     } else if (node.type === 'xor-gate') {
-      const definedXorVals = inputVals.filter(v => v !== undefined && v !== null);
-      const trueCount = definedXorVals.filter(v => toBool(v)).length;
+      const trueCount = inputVals.filter(v => toBool(v)).length;
       nodeValues[nodeId] = trueCount % 2 === 1;
     } else if (node.type === 'not-gate') {
       nodeValues[nodeId] = !toBool(inputVals[0]);
@@ -1493,8 +1486,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
     } else if (node.type === 'math-max') {
       nodeValues[nodeId] = Math.max(toNumber(inputVals[0]), toNumber(inputVals[1]));
     } else if (node.type === 'math-avg') {
-      const validVals = inputVals.filter(v => v !== null && v !== undefined).map(v => toNumber(v));
-      nodeValues[nodeId] = validVals.length > 0 ? validVals.reduce((a, b) => a + b, 0) / validVals.length : 0;
+      const avgVals = inputVals.map(v => toNumber(v));
+      nodeValues[nodeId] = avgVals.length > 0 ? avgVals.reduce((a, b) => a + b, 0) / avgVals.length : 0;
     } else if (node.type === 'math-abs') {
       nodeValues[nodeId] = Math.abs(toNumber(inputVals[0]));
     } else if (node.type === 'const-value') {
