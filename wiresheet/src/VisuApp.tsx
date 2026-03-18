@@ -273,7 +273,8 @@ export function VisuApp() {
         value
       };
 
-      if (isImpulseMode && value === true) {
+      if (isImpulseMode) {
+        if (value !== true) return;
         const releaseVal = (foundWidget?.config as Record<string, unknown>)?.releaseValue ?? false;
         payload.impulse = true;
         payload.releaseValue = releaseVal;
