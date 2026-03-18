@@ -1377,8 +1377,6 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       nodeValues[nodeId] = manualOverrides[nodeId];
     } else if (node.type === 'ha-input') {
     } else if (node.type === 'dp-boolean' || node.type === 'dp-numeric' || node.type === 'dp-enum') {
-      const dpVal = dpStore.get(nodeId);
-
       const convertToDpType = (val) => {
         if (node.type === 'dp-boolean') {
           if (typeof val === 'boolean') return val;
@@ -1389,11 +1387,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         return val;
       };
 
-      if (dpVal !== undefined) {
-        const converted = convertToDpType(dpVal);
-        nodeValues[nodeId] = converted;
-        setPersistentDpValue(nodeId, converted);
-      } else if (inputVals[0] !== undefined) {
+      if (inputVals[0] !== undefined) {
         const converted = convertToDpType(inputVals[0]);
         nodeValues[nodeId] = converted;
         setPersistentDpValue(nodeId, converted);
