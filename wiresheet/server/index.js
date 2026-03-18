@@ -1389,14 +1389,15 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
             delete visuOverrides[key];
           }
         }
-      } else if (visuControlledVal !== undefined) {
-        console.log(`[DP-EVAL DEBUG]   -> VISU-KONTROLLE AKTIV: ${visuControlledVal}`);
-        nodeValues[nodeId] = convertToDpType(visuControlledVal);
       } else if (inputVals[0] !== undefined) {
         console.log(`[DP-EVAL DEBUG]   -> INPUT-WERT: ${inputVals[0]}`);
         const converted = convertToDpType(inputVals[0]);
+        visuControlledDps.delete(nodeId);
         nodeValues[nodeId] = converted;
         setPersistentDpValue(nodeId, converted);
+      } else if (visuControlledVal !== undefined) {
+        console.log(`[DP-EVAL DEBUG]   -> VISU-KONTROLLE AKTIV: ${visuControlledVal}`);
+        nodeValues[nodeId] = convertToDpType(visuControlledVal);
       } else {
         const persistentVal = persistentDpValues.get(nodeId);
         if (persistentVal !== undefined) {
