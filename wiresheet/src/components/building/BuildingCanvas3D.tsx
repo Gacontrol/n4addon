@@ -1226,8 +1226,20 @@ function BuildingScene({
                 </group>
               );
             }
-            continue;
+          } else {
+            elements.push(
+              <DuctMesh
+                key={`vduct-${duct.id}`}
+                duct={duct}
+                offsetX={offsetX}
+                baseY={baseY}
+                selected={duct.id === selectedDuctId}
+                faded={faded}
+                onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+              />
+            );
           }
+          continue;
         } else {
           if (!flLayers.ducts || !layerEnabled('ducts')) continue;
         }
