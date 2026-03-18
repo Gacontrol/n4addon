@@ -208,6 +208,30 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
     : buildings[0];
   const floors = useMemo(() => activeBuilding?.floors || [], [activeBuilding]);
 
+  const focusFloor = useCallback((floorId: string) => {
+    if (!activeBuilding) return;
+    const sortedFloors = [...activeBuilding.floors].sort((a, b) => a.level - b.level);
+    let baseY = 0;
+    for (const f of sortedFloors) {
+      if (f.id === floorId) {
+        const xs: number[] = [], zs: number[] = [];
+        for (const w of f.walls) { xs.push(w.x1, w.x2); zs.push(w.y1, w.y2); }
+        for (const r of f.rooms) { xs.push(r.x, r.x + r.width); zs.push(r.y, r.y + r.depth); }
+        if (xs.length < 2) {
+          xs.push(0, 10); zs.push(0, 10);
+        }
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minZ = Math.min(...zs), maxZ = Math.max(...zs);
+        const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+        window.dispatchEvent(new CustomEvent('focus-floor', {
+          detail: { cx, baseY, cz, floorHeight: f.height, minX, maxX, minZ, maxZ, duration: config.floorZoomDuration ?? 700, targetId: myId.current }
+        }));
+        return;
+      }
+      baseY += f.height;
+    }
+  }, [activeBuilding, config.floorZoomDuration]);
+
   const visibleFloors = useMemo(() => {
     if (!config.visibleFloorIds || config.visibleFloorIds.length === 0) return floors;
     return floors.filter(f => config.visibleFloorIds!.includes(f.id));
@@ -330,7 +354,12 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
                 {[...visibleFloors].reverse().map(floor => (
                   <button
                     key={floor.id}
-                    onClick={() => { setActiveFloorId(floor.id); setFloorIsolated(false); setShowFloorSelector(false); }}
+                    onClick={() => {
+                      setActiveFloorId(floor.id);
+                      setFloorIsolated(false);
+                      setShowFloorSelector(false);
+                      focusFloor(floor.id);
+                    }}
                     className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${activeFloorId === floor.id ? 'text-blue-400 bg-blue-900/30' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
                   >
                     {floor.name}

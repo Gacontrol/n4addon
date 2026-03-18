@@ -900,9 +900,12 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
     const t = (controls as any).target as THREE.Vector3;
 
     if (lockTarget) {
-      const target = floorTargetOverride.current ?? new THREE.Vector3(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
-      if (Math.abs(t.x - target.x) > 0.001 || Math.abs(t.y - target.y) > 0.001 || Math.abs(t.z - target.z) > 0.001) {
-        t.set(target.x, target.y, target.z);
+      const desired = floorTargetOverride.current ?? new THREE.Vector3(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
+      const dx = desired.x - t.x, dy = desired.y - t.y, dz = desired.z - t.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > 0.001) {
+        const alpha = Math.min(dist > 0.5 ? 0.12 : 0.18, 1);
+        t.lerp(desired, alpha);
         (controls as any).update?.();
       }
       return;
@@ -1509,7 +1512,7 @@ export function BuildingCanvas3D({
       <ViewButtons />
 
       <div className="absolute bottom-3 left-3 text-slate-600 text-[10px] bg-slate-900/60 px-2 py-1 rounded">
-        Ziehen: Drehen · Rechtsklick: Verschieben · Scroll: Zoom
+        {lockTarget ? 'Ziehen: Drehen · Scroll: Zoom' : 'Ziehen: Drehen · Rechtsklick: Verschieben · Scroll: Zoom'}
       </div>
     </div>
   );
