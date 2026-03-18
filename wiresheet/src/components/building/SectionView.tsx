@@ -12,6 +12,7 @@ interface Props {
   pipeDiameter: number;
   tool: 'select' | 'duct' | 'pipe';
   axis?: 'xz' | 'yz';
+  sliceDepth?: number;
   selectedDuctId?: string | null;
   onSelectDuct?: (id: string | null) => void;
   onDeleteDuct?: (ductId: string, floorId: string) => void;
@@ -71,6 +72,7 @@ export function SectionView({
   pipeDiameter,
   tool,
   axis = 'xz',
+  sliceDepth,
   selectedDuctId: externalSelectedDuctId,
   onSelectDuct,
   onDeleteDuct,
@@ -107,9 +109,9 @@ export function SectionView({
   }, [axis]);
 
   const sectionXToBuildingCoords = useCallback((sectionX: number): { bx?: number; by?: number } => {
-    if (axis === 'xz') return { bx: sectionX };
-    return { by: sectionX };
-  }, [axis]);
+    if (axis === 'xz') return { bx: sectionX, by: sliceDepth };
+    return { by: sectionX, bx: sliceDepth };
+  }, [axis, sliceDepth]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 100, y: 100 });
   const [zoom, setZoom] = useState(1.0);

@@ -1345,6 +1345,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis={sectionAxis}
+                    sliceDepth={(() => {
+                      if (!activeBuilding) return 5;
+                      let maxH = 10;
+                      for (const floor of activeBuilding.floors) {
+                        if (sectionAxis === 'xz') {
+                          for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
+                          for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
+                        } else {
+                          for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
+                          for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
+                        }
+                      }
+                      return maxH / 2;
+                    })()}
                     label={sectionAxis === 'xz' ? 'Vorderansicht (X-Achse)' : 'Seitenansicht (Y-Achse)'}
                     selectedDuctId={selectedDuctId}
                     onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
