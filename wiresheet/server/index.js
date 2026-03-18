@@ -1327,13 +1327,14 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, visuOv
       if (visuOverrides[portKey] !== undefined) {
         return visuOverrides[portKey];
       }
+      const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
+      if (conn) {
+        visuControlledDps.delete(portKey);
+        return getInputValue(conn);
+      }
       const visuControlledPortVal = visuControlledDps.get(portKey);
       if (visuControlledPortVal !== undefined) {
         return visuControlledPortVal;
-      }
-      const conn = incomingConns.find(c => c.targetPort === inputPort.id || c.targetPort === `input-${idx}`);
-      if (conn) {
-        return getInputValue(conn);
       }
       const portDefaultValues = (node.data.config || {}).portDefaultValues || {};
       const defaultStr = portDefaultValues[inputPort.id];

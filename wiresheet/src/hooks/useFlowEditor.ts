@@ -31,15 +31,10 @@ export const useFlowEditor = () => {
 
   const addConnection = useCallback((connection: Connection) => {
     setConnections(prev => {
-      const exists = prev.some(
-        conn =>
-          conn.source === connection.source &&
-          conn.sourcePort === connection.sourcePort &&
-          conn.target === connection.target &&
-          conn.targetPort === connection.targetPort
+      const withoutExisting = prev.filter(
+        conn => !(conn.target === connection.target && conn.targetPort === connection.targetPort)
       );
-      if (exists) return prev;
-      return [...prev, connection];
+      return [...withoutExisting, connection];
     });
   }, []);
 
