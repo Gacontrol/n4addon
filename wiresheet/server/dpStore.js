@@ -116,6 +116,7 @@ function setFromLogicOutput(nodeValues) {
   for (const [dpKey, value] of Object.entries(nodeValues)) {
     if (dpKey.includes(':cfg:')) continue;
     if (dpKey.includes(':input-')) continue;
+    if (!dpKey.includes(':')) continue;
     const prev = _store.get(dpKey);
     if (prev !== value) {
       _store.set(dpKey, value);
