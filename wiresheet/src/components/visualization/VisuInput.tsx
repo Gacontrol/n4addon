@@ -38,6 +38,10 @@ export const VisuInput: React.FC<VisuInputProps> = ({
     }
   }, [value, hasChanges, effectiveDefault]);
 
+  const handleFocus = useCallback(() => {
+    setHasChanges(true);
+  }, []);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);
     setHasChanges(true);
@@ -85,6 +89,7 @@ export const VisuInput: React.FC<VisuInputProps> = ({
             type={config.inputType}
             value={localValue}
             onChange={handleChange}
+            onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             onBlur={handleSubmit}
             disabled={disabled}

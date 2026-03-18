@@ -299,13 +299,6 @@ export function VisuApp() {
   }, [apiBase, applyNodeConfigs, fetchPoll]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
-    const now = Date.now();
-    const last = lastWriteRef.current.get(widgetId);
-    if (last && now - last.time < 50 && last.value === value) {
-      return;
-    }
-    lastWriteRef.current.set(widgetId, { time: now, value });
-
     const pages = visuPagesRef.current;
     let foundWidget: VisuWidget | undefined;
     let binding: VisuWidget['binding'] | undefined;
@@ -318,6 +311,13 @@ export function VisuApp() {
       }
     }
     if (!binding || !foundWidget) return;
+
+    const now = Date.now();
+    const last = lastWriteRef.current.get(widgetId);
+    if (last && now - last.time < 50 && last.value === value) {
+      return;
+    }
+    lastWriteRef.current.set(widgetId, { time: now, value });
 
     const dpKey = binding.dpKey;
 
