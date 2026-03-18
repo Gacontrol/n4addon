@@ -3055,20 +3055,25 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       }
 
       overrides[overrideKey] = value;
-      overrides[nodeId] = value;
-
-      visuControlledDps.set(nodeId, value);
-      if (overrideKey !== nodeId) {
-        visuControlledDps.set(overrideKey, value);
+      if (!portId) {
+        overrides[nodeId] = value;
       }
 
-      setPersistentDpValue(nodeId, value);
-
-      for (const [pid, nodeValues] of lastNodeValues) {
-        if (nodeId in nodeValues) {
-          const updated = { ...nodeValues, [nodeId]: value };
-          if (overrideKey !== nodeId) updated[overrideKey] = value;
-          lastNodeValues.set(pid, updated);
+      if (!portId) {
+        visuControlledDps.set(nodeId, value);
+        setPersistentDpValue(nodeId, value);
+        for (const [pid, nodeValues] of lastNodeValues) {
+          if (nodeId in nodeValues) {
+            lastNodeValues.set(pid, { ...nodeValues, [nodeId]: value });
+          }
+        }
+      } else {
+        for (const [pid, nodeValues] of lastNodeValues) {
+          if (overrideKey in nodeValues || nodeId in nodeValues) {
+            const updated = { ...nodeValues };
+            updated[overrideKey] = value;
+            lastNodeValues.set(pid, updated);
+          }
         }
       }
     }

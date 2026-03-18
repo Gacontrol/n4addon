@@ -216,6 +216,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showOpeningPanel, setShowOpeningPanel] = useState(false);
   const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
   const [sectionAxis, setSectionAxis] = useState<'xz' | 'yz'>('xz');
+  const [sectionSliceDepth, setSectionSliceDepth] = useState<number>(5);
   const [showAnsichtPanel, setShowAnsichtPanel] = useState(false);
   const [newWidgetType, setNewWidgetType] = useState<Widget3DType>('temperature');
   const [newWidgetDatapoint, setNewWidgetDatapoint] = useState('');
@@ -1319,20 +1320,50 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
             ) : viewMode === 'section' && activeBuilding ? (
               <div className="flex flex-col w-full h-full">
-                <div className="flex items-center gap-1 px-3 py-1.5 border-b border-slate-700 bg-slate-800/80 flex-shrink-0">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Achse:</span>
-                  <button
-                    onClick={() => setSectionAxis('xz')}
-                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'xz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                  >
-                    Vorderansicht (X)
-                  </button>
-                  <button
-                    onClick={() => setSectionAxis('yz')}
-                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'yz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
-                  >
-                    Seitenansicht (Y)
-                  </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700 bg-slate-800/80 flex-shrink-0 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider">Achse:</span>
+                    <button
+                      onClick={() => setSectionAxis('xz')}
+                      className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'xz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                    >
+                      Vorderansicht (X)
+                    </button>
+                    <button
+                      onClick={() => setSectionAxis('yz')}
+                      className={`px-2 py-0.5 rounded text-xs border transition-colors ${sectionAxis === 'yz' ? 'bg-blue-700 text-white border-blue-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                    >
+                      Seitenansicht (Y)
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      {sectionAxis === 'xz' ? 'Tiefe (Y):' : 'Position (X):'}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={(() => {
+                        let maxH = 20;
+                        if (!activeBuilding) return maxH;
+                        for (const floor of activeBuilding.floors) {
+                          if (sectionAxis === 'xz') {
+                            for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
+                            for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
+                          } else {
+                            for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
+                            for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
+                          }
+                        }
+                        return Math.ceil(maxH);
+                      })()}
+                      step={0.1}
+                      value={sectionSliceDepth}
+                      onChange={e => setSectionSliceDepth(parseFloat(e.target.value))}
+                      className="w-24 accent-blue-500"
+                    />
+                    <span className="text-xs text-slate-300 w-10">{sectionSliceDepth.toFixed(1)} m</span>
+                  </div>
                 </div>
                 <div className="flex-1 min-w-0 min-h-0">
                   <SectionView
@@ -1345,20 +1376,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     pipeDiameter={pipeDiameter}
                     tool={tool === 'duct' ? 'duct' : tool === 'pipe' ? 'pipe' : 'select'}
                     axis={sectionAxis}
-                    sliceDepth={(() => {
-                      if (!activeBuilding) return 5;
-                      let maxH = 10;
-                      for (const floor of activeBuilding.floors) {
-                        if (sectionAxis === 'xz') {
-                          for (const wall of floor.walls) maxH = Math.max(maxH, wall.y1, wall.y2);
-                          for (const room of floor.rooms) maxH = Math.max(maxH, room.y + room.depth);
-                        } else {
-                          for (const wall of floor.walls) maxH = Math.max(maxH, wall.x1, wall.x2);
-                          for (const room of floor.rooms) maxH = Math.max(maxH, room.x + room.width);
-                        }
-                      }
-                      return maxH / 2;
-                    })()}
+                    sliceDepth={sectionSliceDepth}
                     label={sectionAxis === 'xz' ? 'Vorderansicht (X-Achse)' : 'Seitenansicht (Y-Achse)'}
                     selectedDuctId={selectedDuctId}
                     onSelectDuct={id => { setSelectedDuctId(id); setSelectedWallId(null); setSelectedRoomId(null); setSelectedPipeId(null); setSelectedWidget3DId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(false); }}
