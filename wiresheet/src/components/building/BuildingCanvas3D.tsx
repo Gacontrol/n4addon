@@ -1209,8 +1209,8 @@ function BuildingScene({
               const segDuct = {
                 ...duct,
                 verticalSectionPoints: [
-                  { x: 0, y: segStartY - segBaseY },
-                  { x: 0, y: segEndY - segBaseY }
+                  { x: 0, y: segStartY },
+                  { x: 0, y: segEndY }
                 ]
               };
               elements.push(

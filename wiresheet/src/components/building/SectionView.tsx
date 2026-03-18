@@ -623,27 +623,8 @@ export function SectionView({
         const snappedX = snapTo(world.x);
         const snappedY = snapTo(world.y);
 
-        const SNAP_RADIUS = 0.4;
-        let finalX = snappedX;
-        let finalY = snappedY;
-        let floorBaseY = 0;
-        for (const floor of sortedFloors) {
-          for (const d of (floor.ducts ?? [])) {
-            if (d.isVertical) continue;
-            for (const pi of [0, d.points.length - 1]) {
-              const p = d.points[pi];
-              const elev = d.elevation ?? 0;
-              const sx = getH(p);
-              const sy = floorBaseY + elev;
-              const dist = Math.sqrt((world.x - sx) ** 2 + (world.y - sy) ** 2);
-              if (dist < SNAP_RADIUS) {
-                finalX = sx;
-                finalY = sy;
-              }
-            }
-          }
-          floorBaseY += floor.height;
-        }
+        const finalX = snappedX;
+        const finalY = snappedY;
 
         const entries = getAllSectionDucts();
         const entry = entries.find(({ duct }) => duct.id === dragState.ductId);
