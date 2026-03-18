@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { FlowNode, VisuBindingInfo } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection, DatapointOverride, DriverBinding, BindingStatus } from '../types/flow';
-import { VisuPage } from '../types/visualization';
+import { VisuPage, getBindingNodeId, parseDpKey } from '../types/visualization';
 import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ContextMenuState {
@@ -106,17 +106,22 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const WRITE_TYPES = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'];
     for (const page of visuPages) {
       for (const widget of page.widgets) {
-        if (!widget.binding || widget.binding.nodeId !== nodeId) continue;
+        if (!widget.binding) continue;
+        const bindingNodeId = getBindingNodeId(widget.binding);
+        if (bindingNodeId !== nodeId) continue;
         const isWrite = WRITE_TYPES.includes(widget.type) || widget.binding.direction === 'write' || widget.binding.direction === 'readwrite';
-        const portKey = widget.binding.portId ? `${nodeId}:${widget.binding.portId}` : null;
+        const parsed = parseDpKey(widget.binding.dpKey);
+        const portId = widget.binding.portId ?? parsed.portId;
+        const paramKey = widget.binding.paramKey ?? (parsed.segment === 'cfg' ? parsed.paramKey : undefined);
+        const portKey = portId ? `${nodeId}:${portId}` : null;
         const bindingValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[nodeId];
         result.push({
           widgetLabel: widget.label || widget.type,
           pageName: page.name,
           pageId: page.id,
           widgetId: widget.id,
-          portId: widget.binding.portId,
-          paramKey: widget.binding.paramKey,
+          portId,
+          paramKey,
           isWrite,
           value: bindingValue
         });
