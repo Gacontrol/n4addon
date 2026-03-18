@@ -1146,10 +1146,6 @@ function App() {
     }
     if (parsed.segment !== 'cfg') {
       setLiveValue(dpKey, value);
-      const widget = visuPages.flatMap(p => p.widgets).find(w => w.id === widgetId);
-      if (widget?.statusBinding?.dpKey) {
-        setLiveValue(widget.statusBinding.dpKey, value);
-      }
     }
     try {
       const apiBase = (() => {
