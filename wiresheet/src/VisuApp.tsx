@@ -205,7 +205,7 @@ export function VisuApp() {
       es.addEventListener('state', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data.liveValues) setLiveValues(data.liveValues);
+          if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
           if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
         } catch {}
       });
