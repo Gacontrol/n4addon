@@ -40,7 +40,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, migrateBinding, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
@@ -304,7 +304,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     return acc;
   }, {});
 
-  const selectedNode = widget.binding ? availableNodes.find(n => n.id === widget.binding?.nodeId) : null;
+  const bindingNodeId = widget.binding
+    ? (parseDpKey(widget.binding.dpKey).nodeId || (widget.binding as unknown as { nodeId?: string }).nodeId || '')
+    : undefined;
+  const selectedNode = bindingNodeId ? availableNodes.find(n => n.id === bindingNodeId) : null;
   const selectedNodePorts = selectedNode ? getNodePorts(selectedNode) : [];
   const selectedNodeConfigParams = selectedNode ? getNodeConfigParams(selectedNode) : [];
 
@@ -350,12 +353,13 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
   const currentBindingLabel = () => {
     if (!widget.binding) return null;
-    if (widget.binding.paramKey) {
-      const param = selectedNodeConfigParams.find(p => p.key === widget.binding?.paramKey);
-      return param?.label || widget.binding.paramKey;
+    const parsed = parseDpKey(widget.binding.dpKey);
+    if (parsed.segment === 'cfg' && parsed.paramKey) {
+      const param = selectedNodeConfigParams.find(p => p.key === parsed.paramKey);
+      return param?.label || parsed.paramKey;
     }
-    if (widget.binding.portId) {
-      return selectedNodePorts.find(p => p.id === widget.binding?.portId)?.label || widget.binding.portId;
+    if (parsed.portId && parsed.segment !== 'primary') {
+      return selectedNodePorts.find(p => p.id === parsed.portId)?.label || parsed.portId;
     }
     return 'Hauptwert';
   };
@@ -3091,7 +3095,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Pumpenbaustein</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3113,7 +3117,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3135,7 +3139,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Ventilbaustein</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3157,7 +3161,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3179,7 +3183,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Sensorbaustein</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3201,7 +3205,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Messwert + Alarm)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3223,7 +3227,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">PID-Regler</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3245,7 +3249,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || pidControlNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || pidControlNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Sollwert, Istwert, Stellgroesse)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3267,7 +3271,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Heizkurven-Baustein</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3289,7 +3293,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || heatingCurveNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || heatingCurveNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Eingang, Ausgang, Parameter)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3311,7 +3315,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt (Farbsteuerung)</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3344,7 +3348,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
                       <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
                     </div>
                     <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400">
@@ -3363,7 +3367,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt</label>
                   <select
-                    value={widget.binding?.nodeId || ''}
+                    value={bindingNodeId || ''}
                     onChange={(e) => handleNodeChange(e.target.value)}
                     className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                   >
@@ -3385,7 +3389,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       {isWriteWidget ? 'Eingang (schreiben)' : 'Port / Parameter'}
                     </label>
                     <select
-                      value={widget.binding.paramKey ? `param:${widget.binding.paramKey}` : (widget.binding.portId || '')}
+                      value={(() => { const p = parseDpKey(widget.binding.dpKey); return p.segment === 'cfg' && p.paramKey ? `param:${p.paramKey}` : (p.portId || ''); })()}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val.startsWith('param:')) {
@@ -3446,7 +3450,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-700 rounded">
                     <Link2 className="w-4 h-4 text-green-500" />
                     <div className="text-xs text-green-400">
-                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === widget.binding?.nodeId))}</p>
+                      <p className="font-medium">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
                       {(widget.binding.portId || widget.binding.paramKey) && (
                         <div className="flex items-center gap-1 mt-0.5">
                           {widget.binding.paramKey && <Settings className="w-3 h-3 text-amber-400" />}
@@ -3478,7 +3482,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Baustein</label>
                       <select
-                        value={widget.statusBinding?.nodeId || ''}
+                        value={widget.statusBinding ? parseDpKey(widget.statusBinding.dpKey).nodeId : ''}
                         onChange={(e) => {
                           if (!e.target.value) {
                             onUpdate({ statusBinding: undefined });
@@ -3502,14 +3506,18 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       </select>
                     </div>
                     {widget.statusBinding && (() => {
-                      const statusNode = availableNodes.find(n => n.id === widget.statusBinding?.nodeId);
+                      const statusNodeId = parseDpKey(widget.statusBinding.dpKey).nodeId;
+                      const statusNode = availableNodes.find(n => n.id === statusNodeId);
                       const statusPorts = statusNode ? getNodePorts(statusNode) : [];
                       return statusPorts.length > 0 ? (
                         <div>
                           <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Port</label>
                           <select
-                            value={widget.statusBinding.portId || ''}
-                            onChange={(e) => onUpdate({ statusBinding: { ...widget.statusBinding!, portId: e.target.value || undefined } })}
+                            value={parseDpKey(widget.statusBinding.dpKey).portId || ''}
+                            onChange={(e) => {
+                              const newPortId = e.target.value || undefined;
+                              onUpdate({ statusBinding: { ...widget.statusBinding!, dpKey: newPortId ? `${statusNodeId}:${newPortId}` : statusNodeId, portId: newPortId } });
+                            }}
                             className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
                           >
                             <option value="">-- Hauptwert --</option>
@@ -3536,7 +3544,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                         <Monitor className="w-4 h-4 text-sky-400" />
                         <div className="text-xs text-sky-400">
                           <p className="font-medium">Rueckmeldung verknuepft</p>
-                          <p className="text-sky-500/70">{getNodeLabel(availableNodes.find(n => n.id === widget.statusBinding?.nodeId))}</p>
+                          <p className="text-sky-500/70">{getNodeLabel(availableNodes.find(n => n.id === (widget.statusBinding ? parseDpKey(widget.statusBinding.dpKey).nodeId : '')))}</p>
                         </div>
                         <button
                           onClick={() => onUpdate({ statusBinding: undefined })}

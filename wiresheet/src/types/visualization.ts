@@ -83,7 +83,7 @@ export interface DpKeyComponents {
   paramKey?: string;
 }
 
-export function parseDpKey(dpKey: string): DpKeyComponents {
+export function parseDpKey(dpKey: string | undefined | null): DpKeyComponents {
   if (!dpKey) return { nodeId: '', segment: 'primary' };
   const colonIdx = dpKey.indexOf(':');
   if (colonIdx === -1) return { nodeId: dpKey, segment: 'primary' };
