@@ -965,35 +965,56 @@ export function FloorPlanEditor({
         ctx.globalAlpha = opacity;
         for (const duct of (oFloor.ducts ?? [])) {
           if (!oLayers.ducts) break;
+          const baseColor = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+          const color = '#94a3b8';
           if (duct.isVertical && duct.verticalX != null) {
             const vx = duct.verticalX;
             const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
-            const r = Math.max(duct.width * cellPx * 0.6, 10);
             const sp = toScreen(vx, vy);
-            const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+            const rot = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
+            const cos = Math.cos(rot), sin = Math.sin(rot);
+            const rxFn = (dx: number, dy: number) => ({ x: sp.x + dx * cos - dy * sin, y: sp.y + dx * sin + dy * cos });
             ctx.strokeStyle = color;
             ctx.fillStyle = color + '33';
             ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
+            if (duct.shape === 'rectangular') {
+              const hw = (duct.width * cellPx) / 2;
+              const hd = (duct.height * cellPx) / 2;
+              const c0 = rxFn(-hw, -hd), c1 = rxFn(hw, -hd), c2 = rxFn(hw, hd), c3 = rxFn(-hw, hd);
+              ctx.beginPath();
+              ctx.moveTo(c0.x, c0.y); ctx.lineTo(c1.x, c1.y); ctx.lineTo(c2.x, c2.y); ctx.lineTo(c3.x, c3.y);
+              ctx.closePath(); ctx.fill(); ctx.stroke();
+            } else {
+              const r = Math.max(duct.width * cellPx * 0.6, 10);
+              ctx.beginPath();
+              ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+              ctx.fill(); ctx.stroke();
+            }
+            void baseColor;
             continue;
           }
           if (duct.points.length < 2) continue;
-          const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
-          ctx.strokeStyle = color;
-          ctx.lineWidth = Math.max(duct.width * cellPx, 2);
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.beginPath();
-          for (let pi = 0; pi < duct.points.length; pi++) {
-            const p = duct.points[pi];
-            const sp = toScreen(p.x, p.y);
-            if (pi === 0) ctx.moveTo(sp.x, sp.y);
-            else ctx.lineTo(sp.x, sp.y);
+          void baseColor;
+          if (duct.shape === 'rectangular') {
+            const halfW = duct.width / 2;
+            ctx.restore();
+            ctx.save();
+            ctx.globalAlpha = opacity * 0.75;
+            drawDuctWithMiters(ctx, duct.points, halfW, color, 1, false, toScreen);
+          } else {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(duct.width * cellPx, 2);
+            ctx.lineCap = 'square';
+            ctx.lineJoin = 'miter';
+            ctx.beginPath();
+            for (let pi = 0; pi < duct.points.length; pi++) {
+              const p = duct.points[pi];
+              const sp = toScreen(p.x, p.y);
+              if (pi === 0) ctx.moveTo(sp.x, sp.y);
+              else ctx.lineTo(sp.x, sp.y);
+            }
+            ctx.stroke();
           }
-          ctx.stroke();
         }
         for (const pipe of (oFloor.pipes ?? [])) {
           if (!oLayers.pipes) break;
@@ -1028,35 +1049,60 @@ export function FloorPlanEditor({
         const vx = duct.verticalX;
         const vy = duct.verticalY ?? pts[0].y;
         const sp = toScreen(vx, vy);
-        const r = Math.max(duct.width * cellPx * 0.6, 10);
+        const rot = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
+        const cos = Math.cos(rot), sin = Math.sin(rot);
+        const rxFn = (dx: number, dy: number) => ({ x: sp.x + dx * cos - dy * sin, y: sp.y + dx * sin + dy * cos });
         ctx.save();
         ctx.globalAlpha = isSelected ? 1 : 0.8;
         ctx.strokeStyle = isSelected ? '#fff' : color;
         ctx.fillStyle = color + '33';
         ctx.lineWidth = isSelected ? 2.5 : 1.5;
-        ctx.beginPath();
-        ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.strokeStyle = isSelected ? '#fff' : color;
-        ctx.lineWidth = isSelected ? 2 : 1.5;
-        const a = r * 0.55;
-        const rot = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
-        const cos = Math.cos(rot), sin = Math.sin(rot);
-        const rx = (dx: number, dy: number) => ({ x: sp.x + dx * cos - dy * sin, y: sp.y + dx * sin + dy * cos });
-        const p1 = rx(-a, 0), p2 = rx(a, 0), p3 = rx(0, -a), p4 = rx(0, a);
-        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
-        const ar = a * 0.4;
-        const pa1 = rx(a - ar, -ar), pa2 = rx(a - ar, ar);
-        ctx.beginPath(); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa1.x, pa1.y); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa2.x, pa2.y); ctx.stroke();
-        const pa3 = rx(-ar, -a + ar), pa4 = rx(ar, -a + ar);
-        ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa3.x, pa3.y); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa4.x, pa4.y); ctx.stroke();
-        if (zoom > 0.5) {
-          ctx.fillStyle = color;
-          ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+
+        if (duct.shape === 'rectangular') {
+          const hw = (duct.width * cellPx) / 2;
+          const hd = (duct.height * cellPx) / 2;
+          const c0 = rxFn(-hw, -hd), c1 = rxFn(hw, -hd), c2 = rxFn(hw, hd), c3 = rxFn(-hw, hd);
+          ctx.beginPath();
+          ctx.moveTo(c0.x, c0.y);
+          ctx.lineTo(c1.x, c1.y);
+          ctx.lineTo(c2.x, c2.y);
+          ctx.lineTo(c3.x, c3.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          const a = Math.min(hw, hd) * 0.5;
+          ctx.lineWidth = isSelected ? 1.5 : 1;
+          const p1 = rxFn(-a, 0), p2 = rxFn(a, 0), p3 = rxFn(0, -a), p4 = rxFn(0, a);
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
+          if (zoom > 0.5) {
+            ctx.fillStyle = color;
+            ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + hd + 9);
+          }
+        } else {
+          const r = Math.max(duct.width * cellPx * 0.6, 10);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.lineWidth = isSelected ? 2 : 1.5;
+          const a = r * 0.55;
+          const p1 = rxFn(-a, 0), p2 = rxFn(a, 0), p3 = rxFn(0, -a), p4 = rxFn(0, a);
+          ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke();
+          const ar = a * 0.4;
+          const pa1 = rxFn(a - ar, -ar), pa2 = rxFn(a - ar, ar);
+          ctx.beginPath(); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa1.x, pa1.y); ctx.moveTo(p2.x, p2.y); ctx.lineTo(pa2.x, pa2.y); ctx.stroke();
+          const pa3 = rxFn(-ar, -a + ar), pa4 = rxFn(ar, -a + ar);
+          ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa3.x, pa3.y); ctx.moveTo(p3.x, p3.y); ctx.lineTo(pa4.x, pa4.y); ctx.stroke();
+          if (zoom > 0.5) {
+            ctx.fillStyle = color;
+            ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+          }
         }
         ctx.restore();
         continue;
@@ -1156,24 +1202,43 @@ export function FloorPlanEditor({
           const vx = duct.verticalX;
           const vy = duct.verticalY ?? duct.points[0]?.y ?? 0;
           const sp = toScreen(vx, vy);
-          const r = Math.max(duct.width * cellPx * 0.6, 10);
-          const color = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
+          const color = '#94a3b8';
+          const rot = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
+          const cos = Math.cos(rot), sin = Math.sin(rot);
+          const rxFn = (dx: number, dy: number) => ({ x: sp.x + dx * cos - dy * sin, y: sp.y + dx * sin + dy * cos });
           ctx.save();
           ctx.globalAlpha = 0.5;
           ctx.strokeStyle = color;
           ctx.fillStyle = color + '22';
           ctx.lineWidth = 1.5;
           ctx.setLineDash([4, 3]);
-          ctx.beginPath();
-          ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.setLineDash([]);
-          if (zoom > 0.5) {
-            ctx.fillStyle = color;
-            ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+          if (duct.shape === 'rectangular') {
+            const hw = (duct.width * cellPx) / 2;
+            const hd = (duct.height * cellPx) / 2;
+            const c0 = rxFn(-hw, -hd), c1 = rxFn(hw, -hd), c2 = rxFn(hw, hd), c3 = rxFn(-hw, hd);
+            ctx.beginPath();
+            ctx.moveTo(c0.x, c0.y); ctx.lineTo(c1.x, c1.y); ctx.lineTo(c2.x, c2.y); ctx.lineTo(c3.x, c3.y);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.setLineDash([]);
+            if (zoom > 0.5) {
+              ctx.fillStyle = color;
+              ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + hd + 9);
+            }
+          } else {
+            const r = Math.max(duct.width * cellPx * 0.6, 10);
+            ctx.beginPath();
+            ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.setLineDash([]);
+            if (zoom > 0.5) {
+              ctx.fillStyle = color;
+              ctx.font = `${Math.max(7, 7 * zoom)}px Inter, sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.fillText(`${duct.width * 100 | 0}×${duct.height * 100 | 0}`, sp.x, sp.y + r + 9);
+            }
           }
           ctx.restore();
         }

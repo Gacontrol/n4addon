@@ -278,8 +278,8 @@ export function SectionView({
         const isSelected = selectedDuctIds.includes(duct.id);
         ctx.strokeStyle = isSelected ? '#fff' : color;
         ctx.lineWidth = duct.width * cellPx;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
         ctx.globalAlpha = 0.7;
         ctx.beginPath();
         for (let pi = 0; pi < duct.points.length; pi++) {
