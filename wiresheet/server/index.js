@@ -2773,6 +2773,25 @@ function parseDpKey(dpKey) {
   return { nodeId, segment: 'port', portId: rest };
 }
 
+async function resolvePrimaryDpKey(dpKey) {
+  const parsed = parseDpKey(dpKey);
+  if (parsed.segment !== 'primary') return dpKey;
+  try {
+    const data = await fs.readFile(pagesFile, 'utf-8');
+    const pages = JSON.parse(data);
+    for (const page of pages) {
+      const node = page.nodes.find(n => n.id === parsed.nodeId);
+      if (node) {
+        const inputs = node.data?.inputs || [];
+        if (inputs.length === 1) return `${parsed.nodeId}:${inputs[0].id}`;
+        if (inputs.length > 1) return dpKey;
+        return dpKey;
+      }
+    }
+  } catch {}
+  return dpKey;
+}
+
 async function writeCfgParam(nodeId, paramKey, value) {
   const data = await fs.readFile(pagesFile, 'utf-8');
   const pages = JSON.parse(data);
@@ -2897,7 +2916,8 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     const affectedNodeIds = new Set();
 
     for (const write of writes) {
-      const { dpKey, value, mode = 'set', releaseValue = false } = write;
+      let { dpKey, value, mode = 'set', releaseValue = false } = write;
+      dpKey = await resolvePrimaryDpKey(dpKey);
       const parsed = parseDpKey(dpKey);
 
       if (parsed.segment === 'cfg') {
