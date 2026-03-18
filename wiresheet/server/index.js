@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { spawn } = require('child_process');
+const dpStore = require('./dpStore');
 
 const app = express();
 const visuApp = express();
@@ -38,11 +39,7 @@ let trendFlushTimer = null;
 const runningPages = new Map();
 const pageNodeStates = new Map();
 const lastNodeValues = new Map();
-const dpStore = new Map();
-const persistentDpValues = new Map();
-const persistentNodeOverrides = new Map();
 const impulseQueue = new Map();
-let dpValuesSaveTimeout = null;
 
 let driverConfig = {
   modbusDevices: [],
@@ -175,40 +172,11 @@ function stopDriverPolling() {
 }
 
 async function loadPersistentDpValues() {
-  try {
-    const data = await fs.readFile(dpValuesFile, 'utf-8');
-    const obj = JSON.parse(data);
-    persistentDpValues.clear();
-    for (const [key, value] of Object.entries(obj)) {
-      persistentDpValues.set(key, value);
-    }
-    console.log(`Persistente DP-Werte geladen: ${persistentDpValues.size} Eintraege`);
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      console.error('Fehler beim Laden der DP-Werte:', err.message);
-    }
-  }
-}
-
-function savePersistentDpValues() {
-  if (dpValuesSaveTimeout) {
-    clearTimeout(dpValuesSaveTimeout);
-  }
-  dpValuesSaveTimeout = setTimeout(async () => {
-    try {
-      const obj = Object.fromEntries(persistentDpValues);
-      await fs.writeFile(dpValuesFile, JSON.stringify(obj, null, 2));
-      console.log(`Persistente DP-Werte gespeichert: ${persistentDpValues.size} Eintraege`);
-    } catch (err) {
-      console.error('Fehler beim Speichern der DP-Werte:', err.message);
-    }
-    dpValuesSaveTimeout = null;
-  }, 500);
+  await dpStore.load(dpValuesFile, fs);
 }
 
 function setPersistentDpValue(nodeId, value) {
-  persistentDpValues.set(nodeId, value);
-  savePersistentDpValues();
+  dpStore.set(nodeId, value, { persist: true });
 }
 
 async function loadDriverConfig() {
@@ -1377,7 +1345,6 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id);
       if (conn) {
-        dpStore.delete(portKey);
         const connVal = getInputValue(conn);
         nodeValues[portKey] = connVal;
         return connVal;
@@ -1428,27 +1395,20 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         setPersistentDpValue(nodeId, converted);
       } else if (inputVals[0] !== undefined) {
         const converted = convertToDpType(inputVals[0]);
-        dpStore.delete(nodeId);
         nodeValues[nodeId] = converted;
         setPersistentDpValue(nodeId, converted);
       } else {
-        const persistentVal = persistentDpValues.get(nodeId);
+        const persistentVal = dpStore.get(nodeId);
         if (persistentVal !== undefined) {
           const converted = convertToDpType(persistentVal);
-          dpStore.set(nodeId, converted);
           nodeValues[nodeId] = converted;
         } else {
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
         }
       }
-    } else if (dpStore.has(nodeId) && !['dp-boolean','dp-numeric','dp-enum'].includes(node.type)) {
+    } else if (dpStore.get(nodeId) !== undefined && !['dp-boolean','dp-numeric','dp-enum'].includes(node.type)) {
       const ov = dpStore.get(nodeId);
       nodeValues[nodeId] = ov;
-      if (inputVals.every(v => v === undefined)) {
-        persistentNodeOverrides.set(nodeId, ov);
-      }
-    } else if (persistentNodeOverrides.has(nodeId) && inputVals.every(v => v === undefined)) {
-      nodeValues[nodeId] = persistentNodeOverrides.get(nodeId);
     } else if (node.type === 'and-gate') {
       nodeValues[nodeId] = inputVals.length === 0 ? false : inputVals.every(v => toBool(v));
     } else if (node.type === 'or-gate') {
@@ -2563,7 +2523,7 @@ async function triggerImmediateExecution(affectedNodeId) {
       }
       const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
       lastNodeValues.set(pageId, nodeValues);
-      broadcastSSE('state', { liveValues: getLiveSnapshot() });
+      dpStore.setFromLogicOutput(nodeValues);
       if (pageInfo.running) {
         pageInfo.timeout = setTimeout(() => runPageCycle(pageId), pageInfo.cycleMs);
       }
@@ -2601,7 +2561,7 @@ async function runPageCycle(pageId) {
         if (queue.length === 0) { impulseQueue.delete(dpKey); continue; }
         const item = queue.shift();
         if (queue.length === 0) impulseQueue.delete(dpKey);
-        dpStore.set(dpKey, item.val);
+        dpStore.set(dpKey, item.val, { silent: true });
         pendingResets.push({ dpKey, val: item.val, resetVal: item.resetVal });
       }
 
@@ -2612,19 +2572,11 @@ async function runPageCycle(pageId) {
         const q = impulseQueue.get(item.dpKey) || [];
         q.unshift({ val: item.resetVal, resetVal: item.resetVal });
         impulseQueue.set(item.dpKey, q);
-        dpStore.set(item.dpKey, item.resetVal);
+        dpStore.set(item.dpKey, item.resetVal, { silent: true });
       }
 
       lastNodeValues.set(pageId, nodeValues);
-
-      const pageNodeIds = new Set(page.nodes.map(n => n.id));
-      for (const [key] of [...dpStore.entries()]) {
-        if (key.includes(':cfg:')) continue;
-        const baseNodeId = key.includes(':') ? key.split(':')[0] : key;
-        if (pageNodeIds.has(baseNodeId) && key in nodeValues) {
-          dpStore.delete(key);
-        }
-      }
+      dpStore.setFromLogicOutput(nodeValues);
 
       const trendNow = Date.now();
       for (const trackedNode of trendConfig.trackedNodes) {
@@ -2634,7 +2586,6 @@ async function runPageCycle(pageId) {
           recordTrendValue(trackedNode.nodeId, val, trendNow);
         }
       }
-      broadcastSSE('state', { liveValues: getLiveSnapshot() });
     }
 
     pageInfo.lastRun = Date.now();
@@ -2953,20 +2904,18 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       if (parsed.segment === 'cfg') {
         const updated = await writeCfgParam(parsed.nodeId, parsed.paramKey, value);
         if (updated) {
-          dpStore.set(dpKey, value);
+          dpStore.set(dpKey, value, { silent: true });
           needsConfigBroadcast = true;
         }
       } else if (mode === 'impulse') {
         const existing = (impulseQueue.get(dpKey) || []).filter(e => e.val !== e.resetVal);
         existing.push({ val: value, resetVal: releaseValue });
         impulseQueue.set(dpKey, existing);
-        dpStore.set(dpKey, value);
+        dpStore.set(dpKey, value, { silent: true });
         affectedNodeIds.add(parsed.nodeId);
       } else {
-        dpStore.set(dpKey, value);
-        if (parsed.segment === 'primary') {
-          setPersistentDpValue(parsed.nodeId, value);
-        }
+        const persist = parsed.segment === 'primary';
+        dpStore.set(dpKey, value, { persist, silent: true });
         affectedNodeIds.add(parsed.nodeId);
       }
     }
@@ -3024,20 +2973,12 @@ function broadcastSSE(event, data) {
 }
 
 function getLiveSnapshot() {
-  const merged = {};
-  for (const [key, val] of persistentDpValues) {
-    merged[key] = val;
-  }
-  for (const [, values] of lastNodeValues) {
-    Object.assign(merged, values);
-  }
-  for (const [key, val] of dpStore) {
-    if (!key.includes(':cfg:')) {
-      merged[key] = val;
-    }
-  }
-  return merged;
+  return dpStore.getSnapshot();
 }
+
+dpStore.onBatch(() => {
+  broadcastSSE('state', { liveValues: getLiveSnapshot() });
+});
 
 async function getNodeConfigSnapshot() {
   try {
@@ -3084,13 +3025,6 @@ function setupSSEClient(req, res) {
 app.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
 
 visuApp.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
-
-visuApp.use('/api', async (req, res, next) => {
-  if (req.path === '/sse' || req.originalUrl.endsWith('/sse')) {
-    return setupSSEClient(req, res);
-  }
-  next();
-});
 
 const net = require('net');
 
@@ -3787,6 +3721,9 @@ visuApp.use(express.json({ limit: '10mb' }));
 const distDir = path.join(__dirname, '../dist');
 
 async function proxyToApi(req, res, apiPath) {
+  if (apiPath === '/sse' || apiPath.endsWith('/sse')) {
+    return setupSSEClient(req, res);
+  }
   try {
     const apiUrl = `http://localhost:${PORT}${apiPath}`;
     const response = await axios({
@@ -3828,6 +3765,10 @@ visuApp.use((req, res, next) => {
 });
 
 visuApp.use('/api', async (req, res) => {
+  const apiPath = req.path;
+  if (apiPath === '/sse' || apiPath.endsWith('/sse')) {
+    return setupSSEClient(req, res);
+  }
   await proxyToApi(req, res, req.originalUrl);
 });
 

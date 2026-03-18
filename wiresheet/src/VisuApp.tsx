@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { VisuCanvas } from './components/visualization/VisuCanvas';
-import { VisuPage, VisuWidget, PageTransitionEffect, parseDpKey, migrateBinding } from './types/visualization';
+import { VisuPage, VisuWidget, PageTransitionEffect, migrateBinding } from './types/visualization';
 import { FlowNode } from './types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
 import { Monitor } from 'lucide-react';
@@ -302,39 +302,22 @@ export function VisuApp() {
         break;
       }
     }
-    if (!binding) {
-      return;
-    }
+    if (!binding || !foundWidget) return;
 
     const dpKey = binding.dpKey;
-    const parsed = parseDpKey(dpKey);
 
-    if (parsed.segment === 'cfg' && parsed.paramKey) {
-      setLogicNodes(prev => prev.map(n => {
-        if (n.id !== parsed.nodeId) return n;
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            config: { ...(n.data.config || {}), [parsed.paramKey!]: value }
-          }
-        };
-      }));
-      setLiveValues(prev => ({ ...prev, [dpKey]: value }));
-    } else {
-      setLiveValues(prev => ({ ...prev, [dpKey]: value }));
-    }
+    setLiveValues(prev => ({ ...prev, [dpKey]: value }));
 
     try {
-      const isImpulseWidget = foundWidget?.type === 'visu-button' || foundWidget?.type === 'modern-button';
-      const isImpulseMode = isImpulseWidget && ((foundWidget?.config as Record<string, unknown>)?.impulseMode === true);
+      const isImpulseWidget = foundWidget.type === 'visu-button' || foundWidget.type === 'modern-button';
+      const isImpulseMode = isImpulseWidget && ((foundWidget.config as Record<string, unknown>)?.impulseMode === true);
 
-      const payload: Record<string, unknown> = { dpKey, value, mode: isImpulseMode ? 'impulse' : 'set' };
+      const payload: Record<string, unknown> = { dpKey, value };
 
       if (isImpulseMode) {
         if (value !== true) return;
-        const releaseVal = (foundWidget?.config as Record<string, unknown>)?.releaseValue ?? false;
-        payload.releaseValue = releaseVal;
+        payload.mode = 'impulse';
+        payload.releaseValue = (foundWidget.config as Record<string, unknown>)?.releaseValue ?? false;
       }
 
       await fetch(`${apiBase}/visu/write-value`, {
