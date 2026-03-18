@@ -5,6 +5,7 @@
  *   - holds all live values keyed by dpKey
  *   - supports get / set / subscribe
  *   - triggers subscribers on every set
+ *   - emits 'change:batch' with array of changed keys after every mutation
  *
  * dpKey format: "<nodeId>"  |  "<nodeId>:<portId>"  |  "<nodeId>:cfg:<paramKey>"
  */
@@ -63,15 +64,20 @@ function get(dpKey) {
 
 function set(dpKey, value, options = {}) {
   const { persist = false, silent = false } = options;
+  const prev = _store.get(dpKey);
+  if (prev === value && !persist) return;
+
   _store.set(dpKey, value);
+
   if (persist) {
     const nodeId = dpKey.includes(':') ? dpKey.split(':')[0] : dpKey;
     _persistent.set(nodeId, value);
     _scheduleSave();
   }
+
   if (!silent) {
-    _emitter.emit('change', dpKey, value);
     _emitter.emit(`change:${dpKey}`, value);
+    _emitter.emit('change:batch', [dpKey]);
   }
 }
 
@@ -111,6 +117,14 @@ function getSnapshot() {
   return Object.fromEntries(_store);
 }
 
+function getDiff(changedKeys) {
+  const diff = {};
+  for (const k of changedKeys) {
+    diff[k] = _store.get(k);
+  }
+  return diff;
+}
+
 function setFromLogicOutput(nodeValues) {
   const changed = [];
   for (const [dpKey, value] of Object.entries(nodeValues)) {
@@ -124,6 +138,9 @@ function setFromLogicOutput(nodeValues) {
     }
   }
   if (changed.length > 0) {
+    for (const dpKey of changed) {
+      _emitter.emit(`change:${dpKey}`, _store.get(dpKey));
+    }
     _emitter.emit('change:batch', changed);
   }
 }
@@ -133,4 +150,4 @@ function updatePaths(dpValuesFilePath, fsPromises) {
   _fsSave = fsPromises;
 }
 
-module.exports = { load, get, set, setMany, setFromLogicOutput, subscribe, onBatch, onChange, getSnapshot, updatePaths, configure };
+module.exports = { load, get, set, setMany, setFromLogicOutput, subscribe, onBatch, onChange, getSnapshot, getDiff, updatePaths, configure };

@@ -2898,18 +2898,18 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       if (parsed.segment === 'cfg') {
         const updated = await writeCfgParam(parsed.nodeId, parsed.paramKey, value);
         if (updated) {
-          dpStore.set(dpKey, value, { silent: true });
+          dpStore.set(dpKey, value);
           needsConfigBroadcast = true;
         }
       } else if (mode === 'impulse') {
         const existing = (impulseQueue.get(dpKey) || []).filter(e => e.val !== e.resetVal);
         existing.push({ val: value, resetVal: releaseValue });
         impulseQueue.set(dpKey, existing);
-        dpStore.set(dpKey, value, { silent: true });
+        dpStore.set(dpKey, value);
         affectedNodeIds.add(parsed.nodeId);
       } else {
         const persist = parsed.segment === 'primary';
-        dpStore.set(dpKey, value, { persist, silent: true });
+        dpStore.set(dpKey, value, { persist });
         affectedNodeIds.add(parsed.nodeId);
       }
     }
@@ -2918,12 +2918,8 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       await broadcastNodeConfigs();
     }
 
-    if (affectedNodeIds.size > 0) {
-      for (const nodeId of affectedNodeIds) {
-        triggerImmediateExecution(nodeId).catch(() => {});
-      }
-    } else {
-      broadcastSSE('state', { liveValues: getLiveSnapshot() });
+    for (const nodeId of affectedNodeIds) {
+      triggerImmediateExecution(nodeId).catch(() => {});
     }
 
     res.json({ success: true });
@@ -2970,8 +2966,8 @@ function getLiveSnapshot() {
   return dpStore.getSnapshot();
 }
 
-dpStore.onBatch(() => {
-  broadcastSSE('state', { liveValues: getLiveSnapshot() });
+dpStore.onBatch((changedKeys) => {
+  broadcastSSE('state', { liveValues: dpStore.getDiff(changedKeys) });
 });
 
 async function getNodeConfigSnapshot() {
