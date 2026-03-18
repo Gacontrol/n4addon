@@ -959,10 +959,78 @@ export function FloorPlanEditor({
     }
 
     if (overlayFloors) {
-      for (const { floor: oFloor, opacity = 0.25 } of overlayFloors) {
+      for (let oi = 0; oi < overlayFloors.length; oi++) {
+      const { floor: oFloor, opacity = 0.25 } = overlayFloors[oi];
         const oLayers: FloorLayers = { ...DEFAULT_LAYERS, ...(oFloor.layers ?? {}) };
         ctx.save();
         ctx.globalAlpha = opacity;
+
+        if (oLayers.rooms) {
+          for (const room of oFloor.rooms) {
+            if (room.points && room.points.length >= 3) {
+              const pts = room.points;
+              const sp0 = toScreen(pts[0].x, pts[0].y);
+              ctx.beginPath();
+              ctx.moveTo(sp0.x, sp0.y);
+              for (let i = 1; i < pts.length; i++) {
+                const spi = toScreen(pts[i].x, pts[i].y);
+                ctx.lineTo(spi.x, spi.y);
+              }
+              ctx.closePath();
+              ctx.fillStyle = 'rgba(251,146,60,0.18)';
+              ctx.fill();
+              ctx.strokeStyle = 'rgba(251,146,60,0.7)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([4, 3]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            } else {
+              const s = toScreen(room.x, room.y);
+              const rw = room.width * cellPx;
+              const rd = room.depth * cellPx;
+              ctx.fillStyle = 'rgba(251,146,60,0.15)';
+              ctx.fillRect(s.x, s.y, rw, rd);
+              ctx.strokeStyle = 'rgba(251,146,60,0.65)';
+              ctx.lineWidth = 1;
+              ctx.setLineDash([4, 3]);
+              ctx.strokeRect(s.x, s.y, rw, rd);
+              ctx.setLineDash([]);
+            }
+          }
+        }
+
+        if (oLayers.walls) {
+          for (const wall of oFloor.walls) {
+            const s1 = toScreen(wall.x1, wall.y1);
+            const s2 = toScreen(wall.x2, wall.y2);
+            const thickness = wall.thickness * cellPx;
+            const dx = s2.x - s1.x;
+            const dy = s2.y - s1.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 0.5) continue;
+            const nx = (-dy / len) * thickness / 2;
+            const ny = (dx / len) * thickness / 2;
+            ctx.beginPath();
+            ctx.moveTo(s1.x + nx, s1.y + ny);
+            ctx.lineTo(s2.x + nx, s2.y + ny);
+            ctx.lineTo(s2.x - nx, s2.y - ny);
+            ctx.lineTo(s1.x - nx, s1.y - ny);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(251,146,60,0.35)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(251,146,60,0.8)';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+
+        ctx.globalAlpha = Math.min(1, opacity * 2.5);
+        ctx.fillStyle = 'rgba(251,146,60,0.9)';
+        ctx.font = `bold 10px Inter, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`▸ ${oFloor.name}`, 8, 16 + oi * 14);
+        ctx.textAlign = 'left';
+
         for (const duct of (oFloor.ducts ?? [])) {
           if (!oLayers.ducts) break;
           const baseColor = duct.color || DUCT_TYPE_COLORS[duct.type] || '#60a5fa';
