@@ -703,9 +703,9 @@ function CameraFocusFloor() {
       const spanZ = maxZ - minZ;
       const span = Math.max(spanX, spanZ, 4);
 
-      const camHeight = baseY + floorHeight + span * 1.2;
+      const dist = span * 1.4;
       const startPos = camera.position.clone();
-      const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
+      const endPos = new THREE.Vector3(cx + dist * 0.7, floorCenterY + dist * 0.8, cz + dist * 0.7);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
       const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
@@ -864,6 +864,7 @@ function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building
 
 function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
   const { controls } = useThree();
+  const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
 
   const buildingCenter = useMemo(() => {
     return computeBuildingBounds(buildings);
@@ -876,18 +877,39 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
     (controls as any).update?.();
   }, [buildingCenter, controls]);
 
+  useEffect(() => {
+    const onFloorFocus = (e: Event) => {
+      const { cx, baseY, cz, floorHeight } = (e as CustomEvent<FocusFloorDetail>).detail;
+      floorTargetOverride.current = new THREE.Vector3(cx, baseY + floorHeight / 2, cz);
+    };
+    const onReset = () => {
+      floorTargetOverride.current = null;
+    };
+    window.addEventListener('focus-floor', onFloorFocus);
+    window.addEventListener('set-camera-pos', onReset);
+    window.addEventListener('focus-room', onReset);
+    return () => {
+      window.removeEventListener('focus-floor', onFloorFocus);
+      window.removeEventListener('set-camera-pos', onReset);
+      window.removeEventListener('focus-room', onReset);
+    };
+  }, []);
+
   useFrame(() => {
     if (!buildingCenter || !controls || !(controls as any).target) return;
-    const { cx, cz, targetY } = buildingCenter;
     const t = (controls as any).target as THREE.Vector3;
+
     if (lockTarget) {
-      if (Math.abs(t.x - cx) > 0.001 || Math.abs(t.y - targetY) > 0.001 || Math.abs(t.z - cz) > 0.001) {
-        t.set(cx, targetY, cz);
+      const target = floorTargetOverride.current ?? new THREE.Vector3(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
+      if (Math.abs(t.x - target.x) > 0.001 || Math.abs(t.y - target.y) > 0.001 || Math.abs(t.z - target.z) > 0.001) {
+        t.set(target.x, target.y, target.z);
         (controls as any).update?.();
       }
       return;
     }
+
     if (!autoRotate) return;
+    const { cx, cz, targetY } = buildingCenter;
     if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
       t.lerp(new THREE.Vector3(cx, targetY, cz), 0.05);
       (controls as any).update?.();
