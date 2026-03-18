@@ -70,8 +70,7 @@ function set(dpKey, value, options = {}) {
   _store.set(dpKey, value);
 
   if (persist) {
-    const nodeId = dpKey.includes(':') ? dpKey.split(':')[0] : dpKey;
-    _persistent.set(nodeId, value);
+    _persistent.set(dpKey, value);
     _scheduleSave();
   }
 

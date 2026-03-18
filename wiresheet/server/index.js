@@ -1354,6 +1354,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         nodeValues[portKey] = dpVal;
         return dpVal;
       }
+      const primaryVal = dpStore.get(nodeId);
+      if (primaryVal !== undefined && nodeInputs.length === 1) {
+        nodeValues[portKey] = primaryVal;
+        return primaryVal;
+      }
       const portDefaultValues = (node.data.config || {}).portDefaultValues || {};
       const defaultStr = portDefaultValues[inputPort.id];
       if (defaultStr !== undefined && defaultStr !== '') {
