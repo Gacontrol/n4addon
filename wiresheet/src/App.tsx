@@ -1143,6 +1143,9 @@ function App() {
         });
       }
     }
+    if (parsed.segment !== 'cfg') {
+      setLiveValue(dpKey, value);
+    }
     try {
       const apiBase = (() => {
         const path = window.location.pathname;

@@ -2540,6 +2540,35 @@ app.post(['/pages/:pageId/execute', '/api/pages/:pageId/execute'], async (req, r
   }
 });
 
+async function triggerImmediateExecution(affectedNodeId) {
+  for (const [pageId, pageInfo] of runningPages.entries()) {
+    if (!pageInfo.running) continue;
+    try {
+      const data = await fs.readFile(pagesFile, 'utf-8');
+      const pages = JSON.parse(data);
+      const page = pages.find(p => p.id === pageId);
+      if (!page) continue;
+      if (affectedNodeId && !page.nodes.some(n => n.id === affectedNodeId)) continue;
+      if (pageInfo.timeout) {
+        clearTimeout(pageInfo.timeout);
+        pageInfo.timeout = null;
+      }
+      const manualOverrides = {};
+      for (const node of page.nodes) {
+        if (node.data.override?.manual) manualOverrides[node.id] = node.data.override.value;
+      }
+      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
+      lastNodeValues.set(pageId, nodeValues);
+      broadcastSSE('state', { liveValues: getLiveSnapshot() });
+      if (pageInfo.running) {
+        pageInfo.timeout = setTimeout(() => runPageCycle(pageId), pageInfo.cycleMs);
+      }
+    } catch (err) {
+      console.error(`Sofort-Ausfuehrung Fehler fuer ${pageId}:`, err.message);
+    }
+  }
+}
+
 async function runPageCycle(pageId) {
   const pageInfo = runningPages.get(pageId);
   if (!pageInfo || !pageInfo.running) return;
@@ -2911,6 +2940,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     }
 
     let needsConfigBroadcast = false;
+    const affectedNodeIds = new Set();
 
     for (const write of writes) {
       const { dpKey, value, mode = 'set', releaseValue = false } = write;
@@ -2927,18 +2957,26 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
         existing.push({ val: value, resetVal: releaseValue });
         impulseQueue.set(dpKey, existing);
         dpStore.set(dpKey, value);
-        broadcastSSE('state', { liveValues: getLiveSnapshot() });
+        affectedNodeIds.add(parsed.nodeId);
       } else {
         dpStore.set(dpKey, value);
         if (parsed.segment === 'primary') {
           setPersistentDpValue(parsed.nodeId, value);
         }
-        broadcastSSE('state', { liveValues: getLiveSnapshot() });
+        affectedNodeIds.add(parsed.nodeId);
       }
     }
 
     if (needsConfigBroadcast) {
       await broadcastNodeConfigs();
+    }
+
+    if (affectedNodeIds.size > 0) {
+      for (const nodeId of affectedNodeIds) {
+        triggerImmediateExecution(nodeId).catch(() => {});
+      }
+    } else {
+      broadcastSSE('state', { liveValues: getLiveSnapshot() });
     }
 
     res.json({ success: true });
