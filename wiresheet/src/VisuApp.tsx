@@ -199,10 +199,36 @@ export function VisuApp() {
     loadData();
   }, [loadData]);
 
+  const sseActiveRef = useRef(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchPoll = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase}/visu-poll`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+      if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
+    } catch {}
+  }, [apiBase, applyNodeConfigs]);
+
   useEffect(() => {
     let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
+    sseActiveRef.current = false;
+
+    function startFallbackPoll() {
+      if (pollIntervalRef.current) return;
+      pollIntervalRef.current = setInterval(fetchPoll, 1000);
+    }
+
+    function stopFallbackPoll() {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
 
     function connect() {
       if (!active) return;
@@ -213,6 +239,10 @@ export function VisuApp() {
           const data = JSON.parse(e.data);
           if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
           if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
+          if (!sseActiveRef.current) {
+            sseActiveRef.current = true;
+            stopFallbackPoll();
+          }
         } catch {}
       });
 
@@ -226,19 +256,32 @@ export function VisuApp() {
       });
 
       es.onerror = () => {
+        sseActiveRef.current = false;
         es?.close();
+        startFallbackPoll();
         if (active) reconnectTimer = setTimeout(connect, 2000);
       };
+
+      setTimeout(() => {
+        if (active && !sseActiveRef.current) {
+          startFallbackPoll();
+        }
+      }, 3000);
     }
 
     connect();
 
     return () => {
       active = false;
+      sseActiveRef.current = false;
       es?.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
     };
-  }, [apiBase, applyNodeConfigs]);
+  }, [apiBase, applyNodeConfigs, fetchPoll]);
 
   const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
     const now = Date.now();
