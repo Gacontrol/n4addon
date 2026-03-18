@@ -1372,26 +1372,34 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
     const inputVals = nodeInputs.map((inputPort, idx) => {
       const portKey = `${nodeId}:${inputPort.id}`;
       if (bindingValues[portKey] !== undefined) {
+        nodeValues[portKey] = bindingValues[portKey];
         return bindingValues[portKey];
       }
       const conn = incomingConns.find(c => c.targetPort === inputPort.id);
       if (conn) {
         dpStore.delete(portKey);
-        return getInputValue(conn);
+        const connVal = getInputValue(conn);
+        nodeValues[portKey] = connVal;
+        return connVal;
       }
       const dpVal = dpStore.get(portKey);
       if (dpVal !== undefined) {
+        nodeValues[portKey] = dpVal;
         return dpVal;
       }
       const portDefaultValues = (node.data.config || {}).portDefaultValues || {};
       const defaultStr = portDefaultValues[inputPort.id];
       if (defaultStr !== undefined && defaultStr !== '') {
-        if (defaultStr === 'true') return true;
-        if (defaultStr === 'false') return false;
-        if (defaultStr === 'null') return null;
-        const num = Number(defaultStr);
-        if (!isNaN(num) && defaultStr.trim() !== '') return num;
-        return defaultStr;
+        let defaultVal;
+        if (defaultStr === 'true') defaultVal = true;
+        else if (defaultStr === 'false') defaultVal = false;
+        else if (defaultStr === 'null') defaultVal = null;
+        else {
+          const num = Number(defaultStr);
+          defaultVal = (!isNaN(num) && defaultStr.trim() !== '') ? num : defaultStr;
+        }
+        nodeValues[portKey] = defaultVal;
+        return defaultVal;
       }
       return undefined;
     });
@@ -1442,15 +1450,18 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
     } else if (persistentNodeOverrides.has(nodeId) && inputVals.every(v => v === undefined)) {
       nodeValues[nodeId] = persistentNodeOverrides.get(nodeId);
     } else if (node.type === 'and-gate') {
-      if (inputVals.length === 0) {
+      const definedAndVals = inputVals.filter(v => v !== undefined && v !== null);
+      if (definedAndVals.length === 0) {
         nodeValues[nodeId] = false;
       } else {
-        nodeValues[nodeId] = inputVals.every(v => toBool(v));
+        nodeValues[nodeId] = definedAndVals.every(v => toBool(v));
       }
     } else if (node.type === 'or-gate') {
-      nodeValues[nodeId] = inputVals.some(v => toBool(v));
+      const definedOrVals = inputVals.filter(v => v !== undefined && v !== null);
+      nodeValues[nodeId] = definedOrVals.length === 0 ? false : definedOrVals.some(v => toBool(v));
     } else if (node.type === 'xor-gate') {
-      const trueCount = inputVals.filter(v => toBool(v)).length;
+      const definedXorVals = inputVals.filter(v => v !== undefined && v !== null);
+      const trueCount = definedXorVals.filter(v => toBool(v)).length;
       nodeValues[nodeId] = trueCount % 2 === 1;
     } else if (node.type === 'not-gate') {
       nodeValues[nodeId] = !toBool(inputVals[0]);

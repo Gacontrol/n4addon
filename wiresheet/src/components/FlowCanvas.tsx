@@ -114,7 +114,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         const portId = widget.binding.portId ?? parsed.portId;
         const paramKey = widget.binding.paramKey ?? (parsed.segment === 'cfg' ? parsed.paramKey : undefined);
         const portKey = portId ? `${nodeId}:${portId}` : null;
-        const bindingValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[nodeId];
+        const dpKey = widget.binding.dpKey || '';
+        const bindingValue = dpKey in liveValues
+          ? liveValues[dpKey]
+          : portKey && portKey in liveValues
+            ? liveValues[portKey]
+            : !portKey
+              ? liveValues[nodeId]
+              : undefined;
         result.push({
           widgetLabel: widget.label || widget.type,
           pageName: page.name,
