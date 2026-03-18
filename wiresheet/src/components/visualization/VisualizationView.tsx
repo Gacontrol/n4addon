@@ -671,11 +671,41 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             </div>
           </>
         ) : (
-          <div className="flex-1 relative">
-            <iframe
-              src={getVisuUrl()}
-              className="w-full h-full border-0"
-              title="Visualisierung"
+          <div className="flex-1 relative overflow-hidden">
+            <VisuCanvas
+              page={activePage}
+              liveValues={liveValues}
+              logicNodes={logicNodes}
+              isEditMode={false}
+              selectedWidgetId={null}
+              selectedWidgetIds={[]}
+              clipboard={null}
+              onSelectWidget={() => {}}
+              onSelectWidgets={() => {}}
+              onUpdateWidget={() => {}}
+              onUpdateWidgets={() => {}}
+              onDeleteWidget={() => {}}
+              onDeleteWidgets={() => {}}
+              onDuplicateWidget={() => {}}
+              onCopyWidget={() => {}}
+              onCopyWidgets={() => {}}
+              onPasteWidget={() => {}}
+              onWidgetValueChange={handleWidgetValueChange}
+              onEditWidgetProperties={() => {}}
+              onNavigateToPage={handleNavigateToPage}
+              onNavigateBack={handleNavigateBack}
+              onNavigateHome={handleNavigateHome}
+              onBringToFront={() => {}}
+              onSendToBack={() => {}}
+              onBringForward={() => {}}
+              onSendBackward={() => {}}
+              alarmClasses={alarmClasses}
+              alarmConsoles={alarmConsoles}
+              activeAlarms={activeAlarms}
+              onAcknowledgeAlarm={onAcknowledgeAlarm}
+              onAcknowledgeAll={onAcknowledgeAll}
+              onClearAlarm={onClearAlarm}
+              onShelveAlarm={onShelveAlarm}
             />
           </div>
         )}

@@ -16,12 +16,12 @@ export interface LightingSettings {
 }
 
 export const DEFAULT_LIGHTING: LightingSettings = {
-  ambientIntensity: 0.4,
-  sunIntensity: 1.6,
+  ambientIntensity: 0.55,
+  sunIntensity: 2.2,
   sunAngle: 45,
   shadowEnabled: true,
-  shadowSoftness: 2,
-  fillIntensity: 0.35,
+  shadowSoftness: 1,
+  fillIntensity: 0.5,
 };
 
 export interface ExplosionSettings {
@@ -1454,31 +1454,38 @@ function BuildingScene({
     <>
       <GroundGrid size={allSize} transparent={floorTransparent} showGrid={showGrid} />
 
-      <ambientLight intensity={lighting.ambientIntensity} color="#c8d8f0" />
+      <ambientLight intensity={lighting.ambientIntensity} color="#dce8ff" />
 
       <directionalLight
         position={[sunX, 28, sunZ]}
         intensity={lighting.sunIntensity}
-        color="#fff5e0"
+        color="#fff8ee"
         castShadow={lighting.shadowEnabled}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[4096, 4096]}
         shadow-camera-near={0.5}
-        shadow-camera-far={200}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-bias={-0.0005}
+        shadow-camera-far={250}
+        shadow-camera-left={-80}
+        shadow-camera-right={80}
+        shadow-camera-top={80}
+        shadow-camera-bottom={-80}
+        shadow-bias={-0.001}
+        shadow-normalBias={0.02}
         shadow-radius={lighting.shadowSoftness}
       />
 
       <directionalLight
-        position={[-12, 10, -8]}
+        position={[-15, 12, -10]}
         intensity={lighting.fillIntensity}
-        color="#a0c4ff"
+        color="#b8d4ff"
       />
 
-      <hemisphereLight args={['#b0d0ff', '#1a2a40', 0.5]} />
+      <directionalLight
+        position={[8, 6, 15]}
+        intensity={lighting.fillIntensity * 0.4}
+        color="#ffe8cc"
+      />
+
+      <hemisphereLight args={['#c8deff', '#2a3a50', 0.6]} />
 
       {elements}
 
@@ -1536,9 +1543,10 @@ export function BuildingCanvas3D({
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.1,
+          toneMappingExposure: 0.95,
           outputColorSpace: THREE.SRGBColorSpace,
           alpha: bgTransparent,
+          powerPreference: 'high-performance',
         }}
         onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); onSelectFurniture?.(null); }}
         style={{ background: bgTransparent ? 'transparent' : bgColor }}
