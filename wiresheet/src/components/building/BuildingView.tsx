@@ -1660,15 +1660,60 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           .sort((a, b) => b.level - a.level)
                           .map(f => {
                             const visible = !!floorOverlays[f.id];
+                            const isExpanded = !!expanded3DFloors[f.id];
+                            const flLayers = { ...DEFAULT_LAYERS, ...(f.layers ?? {}) };
                             return (
-                              <button
-                                key={f.id}
-                                onClick={() => setFloorOverlays(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
-                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${visible ? 'text-slate-200 bg-slate-700/50 hover:bg-slate-700' : 'text-slate-500 bg-slate-800 hover:bg-slate-700/30'}`}
-                              >
-                                {visible ? <Eye className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" /> : <EyeOff className="w-3.5 h-3.5 flex-shrink-0" />}
-                                {f.name}
-                              </button>
+                              <div key={f.id} className="rounded border border-slate-700/50 overflow-hidden">
+                                <div className="flex items-center gap-1 px-2 py-1.5 bg-slate-750 hover:bg-slate-700/40 transition-colors">
+                                  <button
+                                    onClick={() => setFloorOverlays(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                                    className={`flex-shrink-0 transition-colors ${visible ? 'text-teal-400 hover:text-teal-300' : 'text-slate-600 hover:text-slate-400'}`}
+                                    title={visible ? 'Etage ausblenden' : 'Etage einblenden'}
+                                  >
+                                    {visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                  </button>
+                                  <button
+                                    className="flex-1 text-left text-xs text-slate-300 font-medium truncate"
+                                    onClick={() => setExpanded3DFloors(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                                  >
+                                    {f.name}
+                                  </button>
+                                  <button
+                                    onClick={() => setExpanded3DFloors(prev => ({ ...prev, [f.id]: !prev[f.id] }))}
+                                    className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
+                                  >
+                                    <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                                  </button>
+                                </div>
+                                {isExpanded && (
+                                  <div className="px-2 pb-1.5 pt-1 space-y-0.5 bg-slate-800/60">
+                                    {([
+                                      { key: 'walls', label: 'Wände' },
+                                      { key: 'rooms', label: 'Räume' },
+                                      { key: 'floorPlane', label: 'Boden' },
+                                      { key: 'ducts', label: 'Kanäle' },
+                                      { key: 'verticalDucts', label: 'Vert. Kanäle' },
+                                      { key: 'pipes', label: 'Rohre' },
+                                      { key: 'slabs', label: 'Decken' },
+                                      { key: 'furniture', label: 'Mobiliar' },
+                                      { key: 'widgets3d', label: '3D Widgets' },
+                                      { key: 'background', label: 'Hintergrundbild' },
+                                    ] as { key: keyof FloorLayers; label: string }[]).map(({ key, label }) => {
+                                      const layerVisible = flLayers[key as keyof typeof flLayers];
+                                      return (
+                                        <button
+                                          key={key}
+                                          onClick={() => updateFloorLayers(activeBuilding.id, f.id, { [key]: !layerVisible })}
+                                          className={`w-full flex items-center gap-2 px-2 py-1 rounded text-[11px] transition-colors ${layerVisible ? 'text-slate-300 hover:bg-slate-700/50' : 'text-slate-600 hover:bg-slate-700/30'}`}
+                                        >
+                                          {layerVisible ? <Eye className="w-3 h-3 text-blue-400 flex-shrink-0" /> : <EyeOff className="w-3 h-3 flex-shrink-0" />}
+                                          {label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             );
                           })}
                       </>
