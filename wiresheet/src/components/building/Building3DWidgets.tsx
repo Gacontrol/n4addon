@@ -678,7 +678,7 @@ function buildSweptTube(
   for (let p = 0; p < pCount; p++) indices.push(ci0, (p + 1) % pCount, p);
   for (let p = 0; p < pCount; p++) {
     const base = (sCount - 1) * pCount;
-    indices.push(ci1, base + p, base + (p + 1) % pCount);
+    indices.push(ci1, base + (p + 1) % pCount, base + p);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -853,7 +853,7 @@ function createReducer(
   for (let p = 0; p < pCount; p++) indices.push(ci0, (p + 1) % pCount, p);
   for (let p = 0; p < pCount; p++) {
     const base = steps * pCount;
-    indices.push(ci1, base + p, base + (p + 1) % pCount);
+    indices.push(ci1, base + (p + 1) % pCount, base + p);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -1141,14 +1141,15 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
   if (duct.isVertical && duct.verticalX != null) {
     const vx = duct.verticalX + offsetX;
     const vz = duct.verticalY ?? 5;
+    const rotY = ((duct.verticalRotation ?? 0) * Math.PI) / 180;
 
     let minY: number;
     let maxY: number;
 
     if (duct.verticalSectionPoints && duct.verticalSectionPoints.length >= 2) {
       const ys = duct.verticalSectionPoints.map(p => p.y);
-      minY = Math.min(...ys) - h / 2;
-      maxY = Math.max(...ys) + h / 2;
+      minY = Math.min(...ys);
+      maxY = Math.max(...ys);
     } else {
       const ductH = Math.max(0.1, (duct.elevation ?? 2.4) * 0.5);
       maxY = baseY + (duct.elevation ?? 2.4);
@@ -1158,18 +1159,20 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
     const vertStart = new THREE.Vector3(vx, minY, vz);
     const vertEnd   = new THREE.Vector3(vx, maxY, vz);
     const vertGeo   = createStraightDuct(vertStart, vertEnd, w, h, isRound);
+    const midY = (minY + maxY) / 2;
+    const ductLen = maxY - minY;
 
     return (
-      <group onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+      <group rotation={[0, rotY, 0]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
         <mesh castShadow>
           <primitive object={vertGeo} />
           {mat}
         </mesh>
         {selected && (
-          <mesh position={[(minY + maxY) / 2 === 0 ? vx : vx, (minY + maxY) / 2, vz]}>
+          <mesh position={[vx, midY, vz]}>
             {isRound
-              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, maxY - minY + 0.03, 12]} />
-              : <boxGeometry args={[w + 0.03, maxY - minY + 0.03, h + 0.03]} />
+              ? <cylinderGeometry args={[w / 2 + 0.03, w / 2 + 0.03, ductLen + 0.03, 12]} />
+              : <boxGeometry args={[w + 0.03, ductLen + 0.03, h + 0.03]} />
             }
             <meshBasicMaterial color="#60a5fa" wireframe opacity={0.5} transparent />
           </mesh>
