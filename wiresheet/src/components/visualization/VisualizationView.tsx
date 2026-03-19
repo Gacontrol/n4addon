@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink } from 'lucide-react';
-import { VisuPage, VisuWidget, WidgetBinding, WidgetTemplate, PolylineConfig } from '../../types/visualization';
+import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
@@ -35,7 +35,7 @@ interface VisualizationViewProps {
   onUpdateVisuPage: (pageId: string, updates: Partial<VisuPage>) => void;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
-  onWidgetValueChange: (widgetId: string, binding: WidgetBinding & { impulse?: boolean; releaseValue?: unknown }, value: unknown) => void;
+  onWidgetValueChange: (dpKey: string, value: unknown) => void;
   highlightedWidgetId?: string | null;
   alarmClasses?: AlarmClass[];
   alarmConsoles?: AlarmConsole[];
@@ -283,26 +283,9 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     onUpdateVisuPage(activePage.id, { widgets: updatedWidgets });
   }, [activePage, onUpdateVisuPage]);
 
-  const handleWidgetValueChange = useCallback((widgetId: string, value: unknown) => {
-    const widget = activePage.widgets.find(w => w.id === widgetId);
-    if (widget?.binding) {
-      if (widget.type === 'visu-pump') {
-        const pumpValue = value as Record<string, unknown>;
-        onWidgetValueChange(widgetId, widget.binding, { pumpControl: pumpValue });
-      } else {
-        const isImpulseWidget = widget.type === 'visu-button' || widget.type === 'modern-button';
-        const isImpulseMode = isImpulseWidget && ((widget.config as Record<string, unknown>)?.impulseMode === true);
-        if (isImpulseMode) {
-          if (value === true) {
-            const releaseVal = (widget.config as Record<string, unknown>)?.releaseValue ?? false;
-            onWidgetValueChange(widgetId, { ...widget.binding, impulse: true, releaseValue: releaseVal } as typeof widget.binding & { impulse?: boolean; releaseValue?: unknown }, value);
-          }
-        } else {
-          onWidgetValueChange(widgetId, widget.binding, value);
-        }
-      }
-    }
-  }, [activePage.widgets, onWidgetValueChange]);
+  const handleWidgetValueChange = useCallback((dpKey: string, value: unknown) => {
+    onWidgetValueChange(dpKey, value);
+  }, [onWidgetValueChange]);
 
   const reindexZOrder = (widgets: VisuWidget[]) =>
     widgets.map((w, i) => ({ ...w, zIndex: i + 1 }));

@@ -298,49 +298,25 @@ export function VisuApp() {
     };
   }, [apiBase, applyNodeConfigs, fetchPoll]);
 
-  const handleWidgetValueChange = useCallback(async (widgetId: string, value: unknown) => {
-    const pages = visuPagesRef.current;
-    let foundWidget: VisuWidget | undefined;
-    let binding: VisuWidget['binding'] | undefined;
-    for (const page of pages) {
-      const widget = page.widgets.find(w => w.id === widgetId);
-      if (widget?.binding) {
-        foundWidget = widget;
-        binding = widget.binding;
-        break;
-      }
-    }
-    if (!binding || !foundWidget) return;
+  const handleWidgetValueChange = useCallback(async (dpKey: string, value: unknown) => {
+    if (!dpKey) return;
 
     const now = Date.now();
-    const last = lastWriteRef.current.get(widgetId);
+    const last = lastWriteRef.current.get(dpKey);
     if (last && now - last.time < 50 && last.value === value) {
       return;
     }
-    lastWriteRef.current.set(widgetId, { time: now, value });
-
-    const dpKey = binding.dpKey;
+    lastWriteRef.current.set(dpKey, { time: now, value });
 
     pendingWritesRef.current.set(dpKey, Date.now());
     setLiveValues(prev => ({ ...prev, [dpKey]: value }));
     setTimeout(() => pendingWritesRef.current.delete(dpKey), 2000);
 
     try {
-      const isImpulseWidget = foundWidget.type === 'visu-button' || foundWidget.type === 'modern-button';
-      const isImpulseMode = isImpulseWidget && ((foundWidget.config as Record<string, unknown>)?.impulseMode === true);
-
-      const payload: Record<string, unknown> = { dpKey, value };
-
-      if (isImpulseMode) {
-        if (value !== true) return;
-        payload.mode = 'impulse';
-        payload.releaseValue = (foundWidget.config as Record<string, unknown>)?.releaseValue ?? false;
-      }
-
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ dpKey, value })
       });
     } catch (err) {
       console.error('write value error:', err);

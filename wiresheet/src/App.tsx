@@ -17,7 +17,7 @@ import { useVisualization } from './hooks/useVisualization';
 import { useAlarmManagement } from './hooks/useAlarmManagement';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
-import { VisuPage, WidgetBinding, parseDpKey } from './types/visualization';
+import { VisuPage, parseDpKey } from './types/visualization';
 import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from './types/alarm';
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
@@ -1128,12 +1128,8 @@ function App() {
     });
   }, [liveValuesJson, allLogicNodes, alarmClasses, nodeToPageMap]);
 
-  const handleVisuWidgetValueChange = useCallback(async (
-    widgetId: string,
-    binding: WidgetBinding & { impulse?: boolean; releaseValue?: unknown },
-    value: unknown
-  ) => {
-    const dpKey = binding.dpKey;
+  const handleVisuWidgetValueChange = useCallback(async (dpKey: string, value: unknown) => {
+    if (!dpKey) return;
     const parsed = parseDpKey(dpKey);
     if (parsed.segment === 'cfg' && parsed.paramKey) {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === parsed.nodeId);
@@ -1153,23 +1149,15 @@ function App() {
         const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
         return m ? `${m[1]}/api` : '/api';
       })();
-      const payload: Record<string, unknown> = {
-        dpKey,
-        value,
-        mode: binding.impulse ? 'impulse' : 'set'
-      };
-      if (binding.impulse) {
-        payload.releaseValue = binding.releaseValue ?? false;
-      }
       await fetch(`${apiBase}/visu/write-value`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ dpKey, value })
       });
     } catch (err) {
       console.error('Failed to write visu value:', err);
     }
-  }, [pages, visuPages, updateNodeData, setLiveValue]);
+  }, [pages, updateNodeData, setLiveValue]);
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">

@@ -36,7 +36,7 @@ interface VisuCanvasProps {
   onCopyWidget: (widgetId: string) => void;
   onCopyWidgets?: (widgetIds: string[]) => void;
   onPasteWidget: () => void;
-  onWidgetValueChange: (widgetId: string, value: unknown) => void;
+  onWidgetValueChange: (dpKey: string, value: unknown) => void;
   onEditWidgetProperties: (widgetId: string) => void;
   onNavigateToPage?: (pageId: string) => void;
   onNavigateBack?: () => void;
@@ -997,7 +997,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               widget={widget}
               value={getWidgetValue(widget)}
               statusValue={getWidgetStatusValue(widget)}
-              onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+              onValueChange={(value) => widget.binding && onWidgetValueChange(widget.binding.dpKey, value)}
               onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
               isEditMode={false}
               isSelected={false}
@@ -1068,7 +1068,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           widget={widget}
           value={getWidgetValue(widget)}
           statusValue={getWidgetStatusValue(widget)}
-          onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+          onValueChange={(value) => widget.binding && onWidgetValueChange(widget.binding.dpKey, value)}
           onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
           isEditMode={isEditMode}
           isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
