@@ -147,7 +147,11 @@ export function VisuApp() {
     const pending = pendingWritesRef.current;
     const filtered: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(incoming)) {
-      if (key.includes(':cfg:')) { filtered[key] = val; continue; }
+      if (key.includes(':cfg:')) {
+        filtered[key] = val;
+        console.log(`[DEBUG 8098] applyLiveValues cfg key=${key} val=${JSON.stringify(val)}`);
+        continue;
+      }
       const writeTime = pending.get(key);
       if (writeTime && now - writeTime < 2000) continue;
       filtered[key] = val;
@@ -226,11 +230,17 @@ export function VisuApp() {
   const sseActiveRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchPoll = useCallback(async () => {
+  const fetchPoll = useCallback(async (debugTag?: string) => {
     try {
       const res = await fetch(`${apiBase}/visu-poll`);
       if (!res.ok) return;
       const data = await res.json();
+      if (debugTag) {
+        const cfgKeys = Object.keys(data.liveValues || {}).filter((k: string) => k.includes(':cfg:'));
+        const cfgSummary = cfgKeys.map((k: string) => k + '=' + JSON.stringify((data.liveValues as Record<string, unknown>)[k])).join(', ');
+        console.log(`[DEBUG 8098] fetchPoll[${debugTag}] cfgKeys=[${cfgSummary}]`);
+        console.log(`[DEBUG 8098] fetchPoll[${debugTag}] nodeConfigsNodeIds=${JSON.stringify(Object.keys(data.nodeConfigs || {}))}`);
+      }
       if (data.liveValues) applyLiveValues(data.liveValues);
       if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
     } catch {}
@@ -334,7 +344,7 @@ export function VisuApp() {
       const json = await res.json().catch(() => null);
       console.log(`[DEBUG 8098] fetch response status=${res.status} ok=${res.ok} body=${JSON.stringify(json)}`);
       if (res.ok && dpKey.includes(':cfg:')) {
-        setTimeout(() => fetchPoll(), 300);
+        setTimeout(() => fetchPoll('afterCfgWrite'), 300);
       }
     } catch (err) {
       console.error('[DEBUG 8098] fetch FEHLER:', err);
