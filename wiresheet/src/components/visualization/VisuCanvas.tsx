@@ -1069,7 +1069,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           widget={widget}
           value={getWidgetValue(widget)}
           statusValue={getWidgetStatusValue(widget)}
-          onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+          onValueChange={(value) => { const dpKey = getWidgetDpKey(widget); if (dpKey) onWidgetValueChange(dpKey, value); }}
           onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
           isEditMode={isEditMode}
           isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
