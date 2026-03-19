@@ -36,7 +36,7 @@ interface VisuCanvasProps {
   onCopyWidget: (widgetId: string) => void;
   onCopyWidgets?: (widgetIds: string[]) => void;
   onPasteWidget: () => void;
-  onWidgetValueChange: (widgetId: string, value: unknown) => void;
+  onWidgetValueChange: (dpKey: string, value: unknown) => void;
   onEditWidgetProperties: (widgetId: string) => void;
   onNavigateToPage?: (pageId: string) => void;
   onNavigateBack?: () => void;
@@ -184,11 +184,6 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   }, [selectedWidgetId, page.widgets, isEditMode, isInDrawingMode]);
 
 
-  const WRITE_WIDGET_TYPES = new Set([
-    'visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button', 'visu-multistate',
-    'modern-switch', 'modern-button', 'modern-incrementer', 'dash-toggle'
-  ]);
-
   const getWidgetValue = useCallback((widget: VisuWidget): unknown => {
     if (!widget.binding) return null;
     const legacyNodeId = (widget.binding as unknown as { nodeId?: string }).nodeId;
@@ -281,6 +276,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const { nodeId } = parseDpKey(dpKey);
     return liveValues[nodeId];
   }, [liveValues]);
+
+  const getWidgetDpKey = useCallback((widget: VisuWidget): string => {
+    if (!widget.binding) return '';
+    const legacyNodeId = (widget.binding as unknown as { nodeId?: string }).nodeId;
+    return widget.binding.dpKey || legacyNodeId || '';
+  }, []);
 
   const getPumpWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-pump' || !widget.binding) return undefined;
@@ -997,7 +998,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               widget={widget}
               value={getWidgetValue(widget)}
               statusValue={getWidgetStatusValue(widget)}
-              onValueChange={(value) => onWidgetValueChange(widget.id, value)}
+              onValueChange={(value) => { const dpKey = getWidgetDpKey(widget); if (dpKey) onWidgetValueChange(dpKey, value); }}
               onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
               isEditMode={false}
               isSelected={false}
