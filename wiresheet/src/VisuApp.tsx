@@ -102,8 +102,9 @@ function getLayerStyle(
 function getApiBase(): string {
   const p = window.location.pathname;
   const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
-  if (m) return `${m[1]}/api`;
-  return '/api';
+  const base = m ? `${m[1]}/api` : '/api';
+  console.log(`[DEBUG 8098] getApiBase: pathname='${p}' -> apiBase='${base}'`);
+  return base;
 }
 
 export function VisuApp() {
@@ -303,7 +304,9 @@ export function VisuApp() {
 
     const now = Date.now();
     const last = lastWriteRef.current.get(dpKey);
+    console.log(`[DEBUG 8098] handleWidgetValueChange dpKey='${dpKey}' value=${JSON.stringify(value)} | dt=${last ? now - last.time : 'n/a'}ms | lastVal=${JSON.stringify(last?.value)}`);
     if (last && now - last.time < 50 && last.value === value) {
+      console.warn(`[DEBUG 8098] THROTTLE BLOCK dpKey='${dpKey}'`);
       return;
     }
     lastWriteRef.current.set(dpKey, { time: now, value });
@@ -312,14 +315,18 @@ export function VisuApp() {
     setLiveValues(prev => ({ ...prev, [dpKey]: value }));
     setTimeout(() => pendingWritesRef.current.delete(dpKey), 2000);
 
+    const url = `${apiBase}/visu/write-value`;
+    console.log(`[DEBUG 8098] fetch -> POST ${url}`);
     try {
-      await fetch(`${apiBase}/visu/write-value`, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dpKey, value })
       });
+      const json = await res.json().catch(() => null);
+      console.log(`[DEBUG 8098] fetch response status=${res.status} ok=${res.ok} body=${JSON.stringify(json)}`);
     } catch (err) {
-      console.error('write value error:', err);
+      console.error('[DEBUG 8098] fetch FEHLER:', err);
     }
   }, [apiBase]);
 

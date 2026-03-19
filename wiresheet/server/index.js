@@ -2897,7 +2897,10 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     const rawValue = req.body.value;
     const srcNodeId = req.body.nodeId || (req.body.dpKey ? req.body.dpKey.split(':')[0] : null);
 
+    console.log(`[DEBUG write-value] >>>EINGANG<<< body=${JSON.stringify(req.body)} | ip=${req.ip} | url=${req.originalUrl}`);
+
     if (!srcNodeId && !req.body.dpKey) {
+      console.warn(`[DEBUG write-value] 400 - keine nodeId/dpKey`);
       return res.status(400).json({ error: 'nodeId oder dpKey fehlt' });
     }
 
@@ -2907,9 +2910,11 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl
     )) {
       writes = expandCompositeControl(srcNodeId, null, rawValue);
+      console.log(`[DEBUG write-value] composite expand -> ${JSON.stringify(writes)}`);
     } else {
       const normalized = normalizeDpWritePayload(req.body);
       writes = [normalized];
+      console.log(`[DEBUG write-value] normalized -> ${JSON.stringify(normalized)}`);
     }
 
     let needsConfigBroadcast = false;
@@ -2917,16 +2922,22 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
     for (const write of writes) {
       let { dpKey, value, mode = 'set', releaseValue = false } = write;
+      const dpKeyBefore = dpKey;
       dpKey = await resolvePrimaryDpKey(dpKey);
+      if (dpKey !== dpKeyBefore) console.log(`[DEBUG write-value] resolvePrimary: '${dpKeyBefore}' -> '${dpKey}'`);
       const parsed = parseDpKey(dpKey);
+
+      console.log(`[DEBUG write-value] segment='${parsed.segment}' nodeId='${parsed.nodeId}' paramKey='${parsed.paramKey}' portId='${parsed.portId}' value=${JSON.stringify(value)}`);
 
       if (parsed.segment === 'cfg') {
         const updated = await writeCfgParam(parsed.nodeId, parsed.paramKey, value);
         dpStore.set(dpKey, value);
         needsConfigBroadcast = true;
         affectedNodeIds.add(parsed.nodeId);
-        if (!updated) {
-          console.warn(`[write-value] writeCfgParam: Node '${parsed.nodeId}' nicht gefunden, dpStore trotzdem gesetzt`);
+        if (updated) {
+          console.log(`[DEBUG write-value] cfg OK: dpKey='${dpKey}' value=${JSON.stringify(value)}`);
+        } else {
+          console.warn(`[DEBUG write-value] cfg WARNUNG: Node '${parsed.nodeId}' nicht in pages.json gefunden - dpStore trotzdem gesetzt`);
         }
       } else if (mode === 'impulse') {
         const existing = (impulseQueue.get(dpKey) || []).filter(e => e.val !== e.resetVal);
