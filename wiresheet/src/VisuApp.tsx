@@ -107,6 +107,14 @@ function getApiBase(): string {
   return base;
 }
 
+function getWsBase(): string {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? `${proto}//${host}${m[1]}/ws` : `${proto}//${host}/ws`;
+}
+
 export function VisuApp() {
   const [visuPages, setVisuPages] = useState<VisuPage[]>([]);
   const [activePageId, setActivePageId] = useState<string>('');
@@ -247,10 +255,11 @@ export function VisuApp() {
   }, [apiBase, applyLiveValues, applyNodeConfigs]);
 
   useEffect(() => {
-    let es: EventSource | null = null;
+    let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
     sseActiveRef.current = false;
+    const wsBase = getWsBase();
 
     function startFallbackPoll() {
       if (pollIntervalRef.current) return;
@@ -266,49 +275,56 @@ export function VisuApp() {
 
     function connect() {
       if (!active) return;
-      es = new EventSource(`${apiBase}/sse`);
+      ws = new WebSocket(wsBase);
 
-      es.addEventListener('state', (e: MessageEvent) => {
+      ws.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data);
-          if (data.liveValues) applyLiveValues(data.liveValues);
-          if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
-          if (!sseActiveRef.current) {
-            sseActiveRef.current = true;
-            stopFallbackPoll();
+          const msg = JSON.parse(e.data);
+          const { event, data } = msg;
+          if (event === 'state') {
+            if (data.liveValues) applyLiveValues(data.liveValues);
+            if (data.nodeConfigs) applyNodeConfigs(data.nodeConfigs);
+            if (!sseActiveRef.current) {
+              sseActiveRef.current = true;
+              stopFallbackPoll();
+            }
+          } else if (event === 'alarms') {
+            if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
+            if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
+            if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
           }
         } catch {}
-      });
+      };
 
-      es.addEventListener('alarms', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
-          if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
-          if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
-        } catch {}
-      });
-
-      es.onerror = () => {
+      ws.onerror = () => {
         sseActiveRef.current = false;
-        es?.close();
+        startFallbackPoll();
+      };
+
+      ws.onclose = () => {
+        sseActiveRef.current = false;
         startFallbackPoll();
         if (active) reconnectTimer = setTimeout(connect, 2000);
       };
 
-      setTimeout(() => {
-        if (active && !sseActiveRef.current) {
-          startFallbackPoll();
-        }
-      }, 3000);
+      ws.onopen = () => {
+        sseActiveRef.current = true;
+        stopFallbackPoll();
+      };
     }
 
     connect();
 
+    setTimeout(() => {
+      if (active && !sseActiveRef.current) {
+        startFallbackPoll();
+      }
+    }, 3000);
+
     return () => {
       active = false;
       sseActiveRef.current = false;
-      es?.close();
+      ws?.close();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);

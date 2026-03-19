@@ -14,7 +14,23 @@ function getApiBase(): string {
   return '/api';
 }
 
+function getWsBase(): string {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  const path = window.location.pathname;
+  const match = path.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+  if (match) {
+    return `${proto}//${host}${match[1]}/ws`;
+  }
+  const appMatch = path.match(/^(\/app\/[^/]+)/);
+  if (appMatch) {
+    return `${proto}//${host}${appMatch[1]}/ws`;
+  }
+  return `${proto}//${host}/ws`;
+}
+
 const API_BASE = getApiBase();
+const WS_BASE = getWsBase();
 
 const defaultPage = (): WiresheetPage => ({
   id: `page-${Date.now()}`,
@@ -173,49 +189,43 @@ export const useWiresheetPages = () => {
   }, [loadPages, loadHaEntities]);
 
   useEffect(() => {
-    let es: EventSource | null = null;
+    let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let active = true;
 
     function connect() {
       if (!active) return;
-      es = new EventSource(`${API_BASE}/sse`);
+      ws = new WebSocket(WS_BASE);
 
-      es.addEventListener('state', (e: MessageEvent) => {
+      ws.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data);
-          if (data.liveValues) {
-            setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+          const msg = JSON.parse(e.data);
+          const { event, data } = msg;
+          if (event === 'state') {
+            if (data.liveValues) {
+              setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+            }
+            if (data.nodeConfigs) {
+              setPages(prev => prev.map(page => ({
+                ...page,
+                nodes: page.nodes.map(n => {
+                  const cfg = data.nodeConfigs[n.id];
+                  if (!cfg) return n;
+                  return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
+                })
+              })));
+            }
+          } else if (event === 'driver-values') {
+            setDriverLiveValues(data);
+          } else if (event === 'modbus-device-status') {
+            setModbusDeviceStatusSSE(data);
           }
-          if (data.nodeConfigs) {
-            setPages(prev => prev.map(page => ({
-              ...page,
-              nodes: page.nodes.map(n => {
-                const cfg = data.nodeConfigs[n.id];
-                if (!cfg) return n;
-                return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
-              })
-            })));
-          }
         } catch {}
-      });
+      };
 
-      es.addEventListener('driver-values', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          setDriverLiveValues(data);
-        } catch {}
-      });
+      ws.onerror = () => {};
 
-      es.addEventListener('modbus-device-status', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          setModbusDeviceStatusSSE(data);
-        } catch {}
-      });
-
-      es.onerror = () => {
-        es?.close();
+      ws.onclose = () => {
         if (active) reconnectTimer = setTimeout(connect, 2000);
       };
     }
@@ -225,7 +235,7 @@ export const useWiresheetPages = () => {
     return () => {
       active = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      es?.close();
+      ws?.close();
     };
   }, []);
 

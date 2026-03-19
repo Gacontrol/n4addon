@@ -3004,12 +3004,17 @@ app.get(['/visu-poll', '/api/visu-poll'], async (req, res) => {
   }
 });
 
-const sseClients = new Set();
+const http = require('http');
+const { WebSocketServer } = require('ws');
+
+const wsClients = new Set();
 
 function broadcastSSE(event, data) {
-  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
-    try { client.write(msg); } catch {}
+  const msg = JSON.stringify({ event, data });
+  for (const ws of wsClients) {
+    try {
+      if (ws.readyState === 1) ws.send(msg);
+    } catch {}
   }
 }
 
@@ -3035,37 +3040,56 @@ async function getNodeConfigSnapshot() {
   } catch { return {}; }
 }
 
-function setupSSEClient(req, res) {
+function setupWSServer(httpServer) {
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  wss.on('connection', (ws) => {
+    wsClients.add(ws);
+    (async () => {
+      try {
+        const liveValues = getLiveSnapshot();
+        const nodeConfigs = await getNodeConfigSnapshot();
+        if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'state', data: { liveValues, nodeConfigs } }));
+        if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'driver-values', data: { modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) } }));
+        if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'modbus-device-status', data: Object.fromEntries(modbusDeviceOnlineStatus) }));
+      } catch {}
+    })();
+    const heartbeat = setInterval(() => {
+      try {
+        if (ws.readyState === 1) ws.ping();
+        else { clearInterval(heartbeat); wsClients.delete(ws); }
+      } catch { clearInterval(heartbeat); wsClients.delete(ws); }
+    }, 15000);
+    ws.on('close', () => {
+      clearInterval(heartbeat);
+      wsClients.delete(ws);
+    });
+    ws.on('error', () => {
+      clearInterval(heartbeat);
+      wsClients.delete(ws);
+    });
+  });
+  return wss;
+}
+
+app.get(['/sse', '/api/sse'], (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  res.write(': ok\n\n');
+  res.end();
+});
 
-  sseClients.add(res);
-  res.write(':ok\n\n');
-
-  (async () => {
-    const liveValues = getLiveSnapshot();
-    const nodeConfigs = await getNodeConfigSnapshot();
-    res.write(`event: state\ndata: ${JSON.stringify({ liveValues, nodeConfigs })}\n\n`);
-    res.write(`event: driver-values\ndata: ${JSON.stringify({ modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) })}\n\n`);
-    res.write(`event: modbus-device-status\ndata: ${JSON.stringify(Object.fromEntries(modbusDeviceOnlineStatus))}\n\n`);
-  })();
-
-  const heartbeat = setInterval(() => {
-    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); }
-  }, 15000);
-
-  req.on('close', () => {
-    clearInterval(heartbeat);
-    sseClients.delete(res);
-  });
-}
-
-app.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
-
-visuApp.get(['/sse', '/api/sse'], (req, res) => setupSSEClient(req, res));
+visuApp.get(['/sse', '/api/sse'], (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  res.write(': ok\n\n');
+  res.end();
+});
 
 const net = require('net');
 
@@ -3886,12 +3910,16 @@ async function start() {
       console.log(`Stelle sicher dass config.json "homeassistant_api": true hat`);
     }
 
-    app.listen(PORT, async () => {
+    const httpServer = http.createServer(app);
+    setupWSServer(httpServer);
+    httpServer.listen(PORT, async () => {
       console.log(`=== Wiresheet API Server laeuft auf Port ${PORT} ===`);
       await restoreRunningPages();
     });
 
-    visuApp.listen(VISU_PORT, () => {
+    const visuHttpServer = http.createServer(visuApp);
+    setupWSServer(visuHttpServer);
+    visuHttpServer.listen(VISU_PORT, () => {
       console.log(`=== Wiresheet Visu Server laeuft auf Port ${VISU_PORT} ===`);
     });
   } catch (err) {
