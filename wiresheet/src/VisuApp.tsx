@@ -147,6 +147,7 @@ export function VisuApp() {
     const pending = pendingWritesRef.current;
     const filtered: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(incoming)) {
+      if (key.includes(':cfg:')) { filtered[key] = val; continue; }
       const writeTime = pending.get(key);
       if (writeTime && now - writeTime < 2000) continue;
       filtered[key] = val;
@@ -332,10 +333,13 @@ export function VisuApp() {
       });
       const json = await res.json().catch(() => null);
       console.log(`[DEBUG 8098] fetch response status=${res.status} ok=${res.ok} body=${JSON.stringify(json)}`);
+      if (res.ok && dpKey.includes(':cfg:')) {
+        setTimeout(() => fetchPoll(), 300);
+      }
     } catch (err) {
       console.error('[DEBUG 8098] fetch FEHLER:', err);
     }
-  }, [apiBase]);
+  }, [apiBase, fetchPoll]);
 
   const navigateWithTransition = useCallback((pageId: string) => {
     const pages = visuPagesRef.current;
