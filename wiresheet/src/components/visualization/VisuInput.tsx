@@ -38,10 +38,6 @@ export const VisuInput: React.FC<VisuInputProps> = ({
     }
   }, [value, hasChanges, effectiveDefault]);
 
-  const handleFocus = useCallback(() => {
-    setHasChanges(true);
-  }, []);
-
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);
     setHasChanges(true);
@@ -67,6 +63,12 @@ export const VisuInput: React.FC<VisuInputProps> = ({
     setHasChanges(false);
   }, [localValue, config.inputType, config.min, config.max, onChange]);
 
+  const handleBlur = useCallback(() => {
+    if (hasChanges) {
+      handleSubmit();
+    }
+  }, [hasChanges, handleSubmit]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSubmit();
@@ -89,9 +91,8 @@ export const VisuInput: React.FC<VisuInputProps> = ({
             type={config.inputType}
             value={localValue}
             onChange={handleChange}
-            onFocus={handleFocus}
             onKeyDown={handleKeyDown}
-            onBlur={handleSubmit}
+            onBlur={handleBlur}
             disabled={disabled}
             placeholder={config.placeholder}
             min={config.min}
