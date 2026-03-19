@@ -2922,10 +2922,11 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
 
       if (parsed.segment === 'cfg') {
         const updated = await writeCfgParam(parsed.nodeId, parsed.paramKey, value);
-        if (updated) {
-          dpStore.set(dpKey, value);
-          needsConfigBroadcast = true;
-          affectedNodeIds.add(parsed.nodeId);
+        dpStore.set(dpKey, value);
+        needsConfigBroadcast = true;
+        affectedNodeIds.add(parsed.nodeId);
+        if (!updated) {
+          console.warn(`[write-value] writeCfgParam: Node '${parsed.nodeId}' nicht gefunden, dpStore trotzdem gesetzt`);
         }
       } else if (mode === 'impulse') {
         const existing = (impulseQueue.get(dpKey) || []).filter(e => e.val !== e.resetVal);
