@@ -203,6 +203,13 @@ export function VisuApp() {
       if (pollRes.ok) {
         const data = await pollRes.json();
         if (data.liveValues) setLiveValues(prev => ({ ...prev, ...data.liveValues }));
+        if (data.nodeConfigs) {
+          setLogicNodes(prev => prev.map(n => {
+            const cfg = data.nodeConfigs[n.id];
+            if (!cfg) return n;
+            return { ...n, data: { ...n.data, config: { ...(n.data.config || {}), ...cfg } } };
+          }));
+        }
       }
     } catch (err) {
       console.error('loadData error:', err);

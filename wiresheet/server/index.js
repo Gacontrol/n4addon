@@ -228,6 +228,19 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
+app.use((req, res, next) => {
+  const ingressMatch = req.path.match(/^\/api\/hassio_ingress\/[^/]+(\/api\/.*)$/);
+  if (ingressMatch) {
+    req.url = ingressMatch[1];
+    return next();
+  }
+  const appMatch = req.path.match(/^\/app\/[^/]+(\/api\/.*)$/);
+  if (appMatch) {
+    req.url = appMatch[1];
+    return next();
+  }
+  next();
+});
 
 async function findWritableDataDir() {
   for (const dir of DATA_PATHS) {
