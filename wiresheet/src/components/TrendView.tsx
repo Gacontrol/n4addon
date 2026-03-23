@@ -1465,7 +1465,12 @@ const RETENTION_OPTIONS = [
   { label: '30 Tage', days: 30 },
   { label: '60 Tage', days: 60 },
   { label: '90 Tage', days: 90 },
+  { label: '6 Monate', days: 180 },
   { label: '1 Jahr', days: 365 },
+  { label: '2 Jahre', days: 730 },
+  { label: '3 Jahre', days: 1095 },
+  { label: '5 Jahre', days: 1825 },
+  { label: '10 Jahre', days: 3650 },
 ];
 
 function formatBytes(b: number): string {
@@ -1559,8 +1564,8 @@ function ConfigView({
                 {trackedNodes.map(tn => {
                   const isExpanded = expandedNodes.has(tn.nodeId);
                   const usage = diskUsage[tn.nodeId];
-                  const intervalMs = tn.sampleIntervalMs || 1000;
-                  const retention = tn.retentionDays || 30;
+                  const intervalMs = tn.sampleIntervalMs || 60000;
+                  const retention = tn.retentionDays || 730;
                   const dailyEst = estimateDailyBytes(intervalMs);
                   const totalEst = dailyEst * retention;
                   return (

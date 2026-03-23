@@ -671,7 +671,7 @@ function recordTrendValue(nodeId, value, timestamp) {
   if (!tracked || !tracked.enabled) return;
 
   const now = timestamp || Date.now();
-  const intervalMs = tracked.sampleIntervalMs || 1000;
+  const intervalMs = tracked.sampleIntervalMs || 60000;
   const lastTs = trendLastRecorded.get(nodeId) || 0;
   if (now - lastTs < intervalMs) return;
   trendLastRecorded.set(nodeId, now);
@@ -737,7 +737,7 @@ async function runTrendRetention() {
         const safe = n.nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
         return safe === safePrefix;
       });
-      const retentionDays = (tracked && tracked.retentionDays) ? tracked.retentionDays : 30;
+      const retentionDays = (tracked && tracked.retentionDays) ? tracked.retentionDays : 730;
       const ageMs = now - fileDate;
       if (ageMs > retentionDays * 86400000) {
         try {
