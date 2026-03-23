@@ -582,7 +582,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'aggregate-control',
     label: 'Aggregatebaustein',
     icon: 'Fan',
-    category: 'special',
+    category: 'complex',
     color: '#0891b2',
     inputs: [
       { label: 'StartCmd', type: 'input' },
@@ -623,7 +623,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'valve-control',
     label: 'Ventilbaustein',
     icon: 'Pipette',
-    category: 'special',
+    category: 'complex',
     color: '#7c3aed',
     inputs: [
       { label: 'Setpoint', type: 'input' },
@@ -648,7 +648,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'sensor-control',
     label: 'Sensorbaustein',
     icon: 'Thermometer',
-    category: 'special',
+    category: 'complex',
     color: '#0891b2',
     inputs: [
       { label: 'SensorIn', type: 'input' },
@@ -674,7 +674,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'pid-controller',
     label: 'PID Regler',
     icon: 'Activity',
-    category: 'special',
+    category: 'complex',
     color: '#dc2626',
     inputs: [
       { label: 'Setpoint', type: 'input' },
@@ -700,7 +700,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'light-toggle',
     label: 'Licht Taster',
     icon: 'Lightbulb',
-    category: 'special',
+    category: 'complex',
     color: '#f59e0b',
     inputs: [
       { label: 'Taster', type: 'input' },
@@ -718,7 +718,7 @@ export const nodeTemplates: NodeTemplate[] = [
     type: 'heating-curve',
     label: 'Heizkurve',
     icon: 'TrendingUp',
-    category: 'special',
+    category: 'complex',
     color: '#ea580c',
     inputs: [
       { label: 'InputValue', type: 'input' },

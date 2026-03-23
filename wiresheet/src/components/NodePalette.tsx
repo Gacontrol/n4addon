@@ -2,132 +2,164 @@ import React, { useState } from 'react';
 import { NodeTemplate } from '../types/flow';
 import { nodeTemplates } from '../data/nodeTemplates';
 import * as Icons from 'lucide-react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface NodePaletteProps {
   onNodePointerDown: (template: NodeTemplate, clientX: number, clientY: number) => void;
 }
 
-interface CategoryConfig {
+interface GroupConfig {
+  key: string;
   label: string;
-  color: string;
-  icon: keyof typeof Icons;
+  categories: string[];
+  dot: string;
+  bg: string;
 }
 
+const groups: GroupConfig[] = [
+  {
+    key: 'io',
+    label: 'Home Assistant',
+    categories: ['input', 'output'],
+    dot: '#3b82f6',
+    bg: 'rgba(59,130,246,0.06)'
+  },
+  {
+    key: 'datapoint',
+    label: 'Datenpunkte',
+    categories: ['datapoint'],
+    dot: '#8b5cf6',
+    bg: 'rgba(139,92,246,0.06)'
+  },
+  {
+    key: 'logic',
+    label: 'Logik',
+    categories: ['logic'],
+    dot: '#10b981',
+    bg: 'rgba(16,185,129,0.06)'
+  },
+  {
+    key: 'math',
+    label: 'Mathematik',
+    categories: ['math'],
+    dot: '#f59e0b',
+    bg: 'rgba(245,158,11,0.06)'
+  },
+  {
+    key: 'trigger',
+    label: 'Trigger',
+    categories: ['trigger'],
+    dot: '#0ea5e9',
+    bg: 'rgba(14,165,233,0.06)'
+  },
+  {
+    key: 'special',
+    label: 'Spezial',
+    categories: ['special'],
+    dot: '#64748b',
+    bg: 'rgba(100,116,139,0.06)'
+  },
+  {
+    key: 'complex',
+    label: 'Komplexe Bausteine',
+    categories: ['complex'],
+    dot: '#ef4444',
+    bg: 'rgba(239,68,68,0.06)'
+  },
+  {
+    key: 'driver',
+    label: 'Treiber',
+    categories: ['driver'],
+    dot: '#059669',
+    bg: 'rgba(5,150,105,0.06)'
+  }
+];
+
 export const NodePalette: React.FC<NodePaletteProps> = ({ onNodePointerDown }) => {
-  const categories: Record<string, CategoryConfig> = {
-    input: { label: 'HA Eingaenge', color: '#3b82f6', icon: 'ArrowRightToLine' },
-    output: { label: 'HA Ausgaenge', color: '#f59e0b', icon: 'ArrowRightFromLine' },
-    driver: { label: 'Treiber', color: '#059669', icon: 'Network' },
-    datapoint: { label: 'Datenpunkte', color: '#8b5cf6', icon: 'Database' },
-    logic: { label: 'Logik', color: '#10b981', icon: 'GitMerge' },
-    math: { label: 'Mathematik', color: '#f59e0b', icon: 'Calculator' },
-    trigger: { label: 'Trigger', color: '#0ea5e9', icon: 'Zap' },
-    special: { label: 'Spezial', color: '#64748b', icon: 'Sparkles' }
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
+    datapoint: true,
+    math: true,
+    trigger: true,
+    special: true,
+    driver: true
+  });
+
+  const toggleGroup = (key: string) => {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
   };
-
-  const categoryOrder = ['input', 'output', 'driver', 'datapoint', 'logic', 'math', 'trigger', 'special'];
-
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(['input', 'output', 'logic'])
-  );
-
-  const toggleCategory = (cat: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(cat)) {
-        next.delete(cat);
-      } else {
-        next.add(cat);
-      }
-      return next;
-    });
-  };
-
-  const groupedTemplates = nodeTemplates.reduce((acc, template) => {
-    if (!acc[template.category]) acc[template.category] = [];
-    acc[template.category].push(template);
-    return acc;
-  }, {} as Record<string, NodeTemplate[]>);
 
   return (
-    <div className="h-full bg-slate-800 overflow-y-auto">
-      <div className="p-3 border-b border-slate-700 bg-slate-800/80 backdrop-blur sticky top-0 z-10">
-        <p className="text-xs text-slate-400">Bausteine auf Canvas ziehen</p>
+    <div className="h-full bg-slate-900 overflow-y-auto flex flex-col">
+      <div className="px-3 py-2.5 border-b border-slate-800 sticky top-0 z-10 bg-slate-900">
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Bausteine</h2>
+        <p className="text-[10px] text-slate-600 mt-0.5">Auf Canvas ziehen</p>
       </div>
 
-      <div className="p-2 space-y-1">
-        {categoryOrder.map(key => {
-          const cat = categories[key];
-          if (!cat) return null;
-          const templates = groupedTemplates[key] || [];
-          if (templates.length === 0) return null;
-          const isExpanded = expandedCategories.has(key);
-          const CatIcon = Icons[cat.icon] as React.FC<{ className?: string }>;
+      {groups.map(group => {
+        const items = nodeTemplates.filter(t => group.categories.includes(t.category));
+        if (items.length === 0) return null;
+        const isOpen = !collapsed[group.key];
 
-          return (
-            <div key={key} className="rounded-lg overflow-hidden">
-              <button
-                onClick={() => toggleCategory(key)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-700/50 transition-colors"
-                style={{ borderLeft: `3px solid ${cat.color}` }}
+        return (
+          <div key={group.key} className="border-b border-slate-800/60">
+            <button
+              onClick={() => toggleGroup(group.key)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-800/50 transition-colors text-left"
+            >
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: group.dot }}
+              />
+              <span className="text-xs font-semibold text-slate-200 flex-1">{group.label}</span>
+              <span className="text-[10px] text-slate-500 tabular-nums">{items.length}</span>
+              <svg
+                className="w-3 h-3 text-slate-500 transition-transform duration-200 flex-shrink-0"
+                style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
               >
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                )}
-                {CatIcon && <CatIcon className="w-4 h-4 flex-shrink-0" style={{ color: cat.color }} />}
-                <span className="text-sm font-medium text-slate-200 flex-1">{cat.label}</span>
-                <span className="text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
-                  {templates.length}
-                </span>
-              </button>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-              {isExpanded && (
-                <div className="py-1 px-1 space-y-1 bg-slate-900/30">
-                  {templates.map(template => {
-                    const IconComponent = Icons[template.icon as keyof typeof Icons] as React.FC<{ className?: string }>;
-
-                    return (
+            {isOpen && (
+              <div className="pb-1.5 px-2" style={{ backgroundColor: group.bg }}>
+                {items.map(template => {
+                  const IconComponent = Icons[template.icon as keyof typeof Icons] as React.FC<{ className?: string }>;
+                  return (
+                    <div
+                      key={template.type}
+                      onPointerDown={e => {
+                        e.preventDefault();
+                        onNodePointerDown(template, e.clientX, e.clientY);
+                      }}
+                      className="flex items-center gap-2.5 px-2 py-2 rounded-md cursor-grab active:cursor-grabbing transition-colors hover:bg-white/5 select-none group"
+                    >
                       <div
-                        key={template.type}
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          onNodePointerDown(template, e.clientX, e.clientY);
-                        }}
-                        className="bg-slate-700/60 hover:bg-slate-600/80 px-3 py-2 rounded cursor-grab active:cursor-grabbing transition-all border border-transparent hover:border-slate-500/50 select-none group"
+                        className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${template.color}22` }}
                       >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${template.color}20` }}
-                          >
-                            {IconComponent && (
-                              <IconComponent
-                                className="w-3.5 h-3.5"
-                                style={{ color: template.color }}
-                              />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="text-sm font-medium text-white block truncate">
-                              {template.label}
-                            </span>
-                            <span className="text-[10px] text-slate-500 block truncate">
-                              {template.description}
-                            </span>
-                          </div>
+                        {IconComponent && (
+                          <IconComponent
+                            className="w-3.5 h-3.5 flex-shrink-0"
+                            style={{ color: template.color }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-slate-200 truncate leading-tight font-medium">
+                          {template.label}
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
+                          {template.description}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
