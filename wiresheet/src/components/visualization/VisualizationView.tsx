@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink } from 'lucide-react';
+import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
@@ -79,6 +79,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   }
 
   const [isEditMode, setIsEditMode] = useState(true);
+  const [editZoom, setEditZoom] = useState(1);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
   const [selectedWidgetIds, setSelectedWidgetIds] = useState<string[]>([]);
   const [showProperties, setShowProperties] = useState(false);
@@ -338,6 +339,84 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const sortedWidgets = [...activePage.widgets].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
 
+  const handleAlignWidgets = useCallback((alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
+    if (selectedWidgetIds.length < 2) return;
+    const widgets = selectedWidgetIds.map(id => activePage.widgets.find(w => w.id === id)).filter(Boolean) as VisuWidget[];
+    let updates: { widgetId: string; updates: Partial<VisuWidget> }[] = [];
+    if (alignment === 'left') {
+      const minX = Math.min(...widgets.map(w => w.position.x));
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: minX, y: w.position.y } } }));
+    } else if (alignment === 'right') {
+      const maxX = Math.max(...widgets.map(w => w.position.x + w.size.width));
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: maxX - w.size.width, y: w.position.y } } }));
+    } else if (alignment === 'center-h') {
+      const minX = Math.min(...widgets.map(w => w.position.x));
+      const maxX = Math.max(...widgets.map(w => w.position.x + w.size.width));
+      const centerX = (minX + maxX) / 2;
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: centerX - w.size.width / 2, y: w.position.y } } }));
+    } else if (alignment === 'top') {
+      const minY = Math.min(...widgets.map(w => w.position.y));
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: minY } } }));
+    } else if (alignment === 'bottom') {
+      const maxY = Math.max(...widgets.map(w => w.position.y + w.size.height));
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: maxY - w.size.height } } }));
+    } else if (alignment === 'center-v') {
+      const minY = Math.min(...widgets.map(w => w.position.y));
+      const maxY = Math.max(...widgets.map(w => w.position.y + w.size.height));
+      const centerY = (minY + maxY) / 2;
+      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: centerY - w.size.height / 2 } } }));
+    }
+    handleUpdateWidgets(updates);
+  }, [selectedWidgetIds, activePage.widgets, handleUpdateWidgets]);
+
+  const handleDistributeWidgets = useCallback((axis: 'h' | 'v') => {
+    if (selectedWidgetIds.length < 3) return;
+    const widgets = selectedWidgetIds.map(id => activePage.widgets.find(w => w.id === id)).filter(Boolean) as VisuWidget[];
+    if (axis === 'h') {
+      const sorted = [...widgets].sort((a, b) => a.position.x - b.position.x);
+      const minX = sorted[0].position.x;
+      const maxX = sorted[sorted.length - 1].position.x + sorted[sorted.length - 1].size.width;
+      const totalWidth = sorted.reduce((s, w) => s + w.size.width, 0);
+      const gap = (maxX - minX - totalWidth) / (sorted.length - 1);
+      let curX = minX;
+      const updates = sorted.map(w => {
+        const upd = { widgetId: w.id, updates: { position: { x: Math.round(curX), y: w.position.y } } };
+        curX += w.size.width + gap;
+        return upd;
+      });
+      handleUpdateWidgets(updates);
+    } else {
+      const sorted = [...widgets].sort((a, b) => a.position.y - b.position.y);
+      const minY = sorted[0].position.y;
+      const maxY = sorted[sorted.length - 1].position.y + sorted[sorted.length - 1].size.height;
+      const totalHeight = sorted.reduce((s, w) => s + w.size.height, 0);
+      const gap = (maxY - minY - totalHeight) / (sorted.length - 1);
+      let curY = minY;
+      const updates = sorted.map(w => {
+        const upd = { widgetId: w.id, updates: { position: { x: w.position.x, y: Math.round(curY) } } };
+        curY += w.size.height + gap;
+        return upd;
+      });
+      handleUpdateWidgets(updates);
+    }
+  }, [selectedWidgetIds, activePage.widgets, handleUpdateWidgets]);
+
+  const handleSameSizeWidgets = useCallback((dimension: 'width' | 'height' | 'both') => {
+    if (selectedWidgetIds.length < 2) return;
+    const widgets = selectedWidgetIds.map(id => activePage.widgets.find(w => w.id === id)).filter(Boolean) as VisuWidget[];
+    const ref = widgets[0];
+    const updates = widgets.slice(1).map(w => ({
+      widgetId: w.id,
+      updates: {
+        size: {
+          width: dimension !== 'height' ? ref.size.width : w.size.width,
+          height: dimension !== 'width' ? ref.size.height : w.size.height,
+        }
+      }
+    }));
+    handleUpdateWidgets(updates);
+  }, [selectedWidgetIds, activePage.widgets, handleUpdateWidgets]);
+
   const selectedWidget = selectedWidgetId
     ? activePage.widgets.find(w => w.id === selectedWidgetId)
     : null;
@@ -454,6 +533,15 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 Ansicht
               </button>
             </div>
+            {isEditMode && (
+              <button
+                onClick={() => setEditZoom(1)}
+                className="px-2 py-1 text-xs rounded bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors min-w-12 text-center"
+                title="Zoom zuruecksetzen (Strg+Mausrad zum Zoomen)"
+              >
+                {Math.round(editZoom * 100)}%
+              </button>
+            )}
             {!isEditMode && (
               <button
                 onClick={() => window.open(getVisuUrl(), '_blank')}
@@ -588,6 +676,34 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         </div>
       )}
 
+      {isEditMode && selectedWidgetIds.length >= 2 && (
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-slate-700 bg-slate-800/50">
+          <span className="text-xs text-slate-500 mr-1">{selectedWidgetIds.length} Widgets:</span>
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => handleAlignWidgets('left')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Links ausrichten"><AlignLeft className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('center-h')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Horizontal zentrieren"><AlignCenter className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('right')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Rechts ausrichten"><AlignRight className="w-3.5 h-3.5" /></button>
+          </div>
+          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => handleAlignWidgets('top')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Oben ausrichten"><AlignStartVertical className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('center-v')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Vertikal zentrieren"><AlignCenterVertical className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('bottom')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Unten ausrichten"><AlignEndVertical className="w-3.5 h-3.5" /></button>
+          </div>
+          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => handleDistributeWidgets('h')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Horizontal verteilen"><AlignHorizontalDistributeCenter className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleDistributeWidgets('v')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Vertikal verteilen"><AlignVerticalDistributeCenter className="w-3.5 h-3.5" /></button>
+          </div>
+          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => handleSameSizeWidgets('width')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Breite">W</button>
+            <button onClick={() => handleSameSizeWidgets('height')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Hoehe">H</button>
+            <button onClick={() => handleSameSizeWidgets('both')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Groesse">W+H</button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         {isEditMode ? (
           <>
@@ -596,7 +712,13 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
               className="flex-1 relative overflow-auto"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
+              onWheel={(e) => {
+                if (!e.ctrlKey) return;
+                e.preventDefault();
+                setEditZoom(z => Math.min(3, Math.max(0.2, z - e.deltaY * 0.001)));
+              }}
             >
+              <div style={{ transform: `scale(${editZoom})`, transformOrigin: 'top left', display: 'inline-block' }}>
               <VisuCanvas
                 page={activePage}
                 liveValues={liveValues}
@@ -653,6 +775,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 onClearAlarm={onClearAlarm}
                 onShelveAlarm={onShelveAlarm}
               />
+              </div>
             </div>
           </>
         ) : (

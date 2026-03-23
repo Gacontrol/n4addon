@@ -586,6 +586,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (multiDragState) {
       const rawDeltaX = e.clientX - multiDragState.startX;
       const rawDeltaY = e.clientY - multiDragState.startY;
+      if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
       const gridSize = page.gridSize || 10;
       let dx = rawDeltaX;
       let dy = rawDeltaY;
@@ -623,6 +624,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (dragState) {
       const rawDeltaX = e.clientX - dragState.startX;
       const rawDeltaY = e.clientY - dragState.startY;
+      if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
       const gridSize = page.gridSize || 10;
 
       if (dragState.isVertex && dragState.initialConfig) {
@@ -1053,6 +1055,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       onClick={handleCanvasClick}
       onMouseMove={handleCanvasMouseMove}
       onMouseDown={handleCanvasMouseDown}
+      onMouseUp={handleMouseUp}
       onContextMenu={(e) => {
         if (e.target === canvasRef.current) {
           handleCanvasContextMenu(e);

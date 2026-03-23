@@ -44,6 +44,7 @@ import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, Sli
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
+import { NodeBrowser } from './NodeBrowser';
 
 function getApiBase(): string {
   const p = window.location.pathname;
@@ -3432,193 +3433,63 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe diese Form mit einem Datenpunkt um Farbe oder Sichtbarkeit zu steuern. Aktiv/Inaktiv-Farben werden im Allgemein-Tab eingestellt.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt (Farbsteuerung)</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {Object.entries(nodesByCategory).map(([cat, nodes]) => (
-                      <optgroup key={cat} label={cat}>
-                        {nodes.map((node) => (
-                          <option key={node.id} value={node.id}>{getNodeLabel(node)}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                {widget.binding && selectedNodePorts.length > 0 && (
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Port</label>
-                    <select
-                      value={widget.binding.portId || ''}
-                      onChange={(e) => handlePortChange(e.target.value)}
-                      className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                    >
-                      <option value="">-- Hauptwert --</option>
-                      {selectedNodePorts.filter(p => p.isOutput).map(p => (
-                        <option key={p.id} value={p.id}>{p.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Lesen (Farb-/Sichtbarkeitssteuerung)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[widget.binding.dpKey] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">
-                          {typeof liveValues[widget.binding.dpKey] === 'boolean'
-                            ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
-                            : typeof liveValues[widget.binding.dpKey] === 'number'
-                              ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
-                              : String(liveValues[widget.binding.dpKey])}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt (Farbsteuerung)</label>
+                <NodeBrowser
+                  nodes={bindableNodes}
+                  logicSheets={logicSheets}
+                  selectedNodeId={bindingNodeId}
+                  selectedPortId={widget.binding ? (parseDpKey(widget.binding.dpKey).portId || '') : undefined}
+                  getNodeLabel={getNodeLabel}
+                  getNodePorts={getNodePorts}
+                  getNodeConfigParams={getNodeConfigParams}
+                  isWriteWidget={false}
+                  onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                  onSelectPort={(portId) => handlePortChange(portId)}
+                  onClear={() => onUpdate({ binding: undefined })}
+                />
+                {widget.binding && liveValues[widget.binding.dpKey] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">
+                      {typeof liveValues[widget.binding.dpKey] === 'boolean'
+                        ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
+                        : typeof liveValues[widget.binding.dpKey] === 'number'
+                          ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
+                          : String(liveValues[widget.binding.dpKey])}
+                    </span>
                   </div>
                 )}
               </>
             ) : (
               <>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {Object.entries(nodesByCategory).map(([cat, nodes]) => (
-                      <optgroup key={cat} label={cat}>
-                        {nodes.map((node) => (
-                          <option key={node.id} value={node.id}>
-                            {getNodeLabel(node)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                {widget.binding && (selectedNodePorts.length > 0 || selectedNodeConfigParams.length > 0) && (
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">
-                      {isWriteWidget ? 'Eingang (schreiben)' : 'Port / Parameter'}
-                    </label>
-                    <select
-                      value={(() => { const p = parseDpKey(widget.binding.dpKey); return p.segment === 'cfg' && p.paramKey ? `param:${p.paramKey}` : (p.portId || ''); })()}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.startsWith('param:')) {
-                          handleParamChange(val.slice(6));
-                        } else {
-                          handlePortChange(val);
-                        }
-                      }}
-                      className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                    >
-                      <option value="">-- Hauptwert --</option>
-                      {isWriteWidget ? (
-                        <>
-                          {selectedNodePorts.filter(p => !p.isOutput).length > 0 && (
-                            <optgroup label="Eingaenge (schreiben)">
-                              {selectedNodePorts.filter(p => !p.isOutput).map(p => (
-                                <option key={p.id} value={p.id}>{p.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {selectedNodeConfigParams.length > 0 && (
-                            <optgroup label="Parameter (lesen/schreiben)">
-                              {selectedNodeConfigParams.map(p => (
-                                <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {selectedNodePorts.filter(p => p.isOutput).length > 0 && (
-                            <optgroup label="Ausgaenge (lesen)">
-                              {selectedNodePorts.filter(p => p.isOutput).map(p => (
-                                <option key={p.id} value={p.id}>{p.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {selectedNodePorts.filter(p => !p.isOutput).length > 0 && (
-                            <optgroup label="Eingaenge (lesen)">
-                              {selectedNodePorts.filter(p => !p.isOutput).map(p => (
-                                <option key={p.id} value={p.id}>{p.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {selectedNodeConfigParams.length > 0 && (
-                            <optgroup label="Parameter">
-                              {selectedNodeConfigParams.map(p => (
-                                <option key={p.key} value={`param:${p.key}`}>{p.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </>
-                      )}
-                    </select>
-                  </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || bindableNodes.find(n => n.id === bindingNodeId))}</p>
-                        {(() => { const p = parseDpKey(widget.binding!.dpKey); return (p.portId || (p.segment === 'cfg' && p.paramKey)); })() && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {parseDpKey(widget.binding.dpKey).segment === 'cfg' && <Settings className="w-3 h-3 text-amber-400" />}
-                            <p className="text-green-500/70">{currentBindingLabel()}</p>
-                          </div>
-                        )}
-                        <p className="text-green-600/50 mt-0.5">
-                          {isWriteWidget ? (parseDpKey(widget.binding.dpKey).segment === 'cfg' ? 'Lesen + Schreiben (Parameter)' : 'Nur schreiben (Eingang)') : 'Nur lesen'}
-                        </p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="ml-auto text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[widget.binding.dpKey] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">
-                          {typeof liveValues[widget.binding.dpKey] === 'boolean'
-                            ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
-                            : typeof liveValues[widget.binding.dpKey] === 'number'
-                              ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
-                              : String(liveValues[widget.binding.dpKey])}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                <label className="block text-xs text-slate-400 mb-1">Baustein / Datenpunkt</label>
+                <NodeBrowser
+                  nodes={bindableNodes}
+                  logicSheets={logicSheets}
+                  selectedNodeId={bindingNodeId}
+                  selectedPortId={widget.binding ? (parseDpKey(widget.binding.dpKey).portId || '') : undefined}
+                  selectedParamKey={widget.binding ? (parseDpKey(widget.binding.dpKey).segment === 'cfg' ? (parseDpKey(widget.binding.dpKey).paramKey || '') : '') : undefined}
+                  getNodeLabel={getNodeLabel}
+                  getNodePorts={getNodePorts}
+                  getNodeConfigParams={getNodeConfigParams}
+                  isWriteWidget={isWriteWidget}
+                  onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                  onSelectPort={(portId) => handlePortChange(portId)}
+                  onSelectParam={(paramKey) => handleParamChange(paramKey)}
+                  onClear={() => onUpdate({ binding: undefined })}
+                />
+                {widget.binding && liveValues[widget.binding.dpKey] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Aktueller Wert:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">
+                      {typeof liveValues[widget.binding.dpKey] === 'boolean'
+                        ? (liveValues[widget.binding.dpKey] ? 'Ein' : 'Aus')
+                        : typeof liveValues[widget.binding.dpKey] === 'number'
+                          ? Number(liveValues[widget.binding.dpKey]).toFixed(2).replace(/\.00$/, '')
+                          : String(liveValues[widget.binding.dpKey])}
+                    </span>
                   </div>
                 )}
 
@@ -3629,84 +3500,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                       <Monitor className="w-3.5 h-3.5 text-sky-400" />
                       <label className="text-xs text-sky-400 font-medium">Rueckmeldung / Anzeige (optional)</label>
                     </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed -mt-1">
-                      Verknuepfe einen Ausgang oder Eingang als Anzeigewert. Separate Rueckmeldung z.B. vom Datenpunkt-Ausgang.
-                    </p>
-                    <div>
-                      <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Baustein</label>
-                      <select
-                        value={widget.statusBinding ? parseDpKey(widget.statusBinding.dpKey).nodeId : ''}
-                        onChange={(e) => {
-                          if (!e.target.value) {
-                            onUpdate({ statusBinding: undefined });
-                            return;
-                          }
-                          const node = availableNodes.find(n => n.id === e.target.value);
-                          const ports = node ? getNodePorts(node) : [];
-                          const outPort = ports.find(p => p.isOutput) || ports[0];
-                          onUpdate({ statusBinding: migrateBinding({ nodeId: e.target.value, portId: outPort?.id, direction: 'read' }) });
-                        }}
-                        className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                      >
-                        <option value="">-- Keine Rueckmeldung --</option>
-                        {Object.entries(nodesByCategory).map(([cat, nodes]) => (
-                          <optgroup key={cat} label={cat}>
-                            {nodes.map((node) => (
-                              <option key={node.id} value={node.id}>{getNodeLabel(node)}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </div>
-                    {widget.statusBinding && (() => {
-                      const statusNodeId = parseDpKey(widget.statusBinding.dpKey).nodeId;
-                      const statusNode = availableNodes.find(n => n.id === statusNodeId);
-                      const statusPorts = statusNode ? getNodePorts(statusNode) : [];
-                      return statusPorts.length > 0 ? (
-                        <div>
-                          <label className="block text-xs text-slate-400 mb-1">Rueckmeldungs-Port</label>
-                          <select
-                            value={parseDpKey(widget.statusBinding.dpKey).portId || ''}
-                            onChange={(e) => {
-                              const newPortId = e.target.value || undefined;
-                              onUpdate({ statusBinding: { ...widget.statusBinding!, dpKey: newPortId ? `${statusNodeId}:${newPortId}` : statusNodeId, portId: newPortId } });
-                            }}
-                            className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                          >
-                            <option value="">-- Hauptwert --</option>
-                            {statusPorts.filter(p => p.isOutput).length > 0 && (
-                              <optgroup label="Ausgaenge">
-                                {statusPorts.filter(p => p.isOutput).map(p => (
-                                  <option key={p.id} value={p.id}>{p.label}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                            {statusPorts.filter(p => !p.isOutput).length > 0 && (
-                              <optgroup label="Eingaenge">
-                                {statusPorts.filter(p => !p.isOutput).map(p => (
-                                  <option key={p.id} value={p.id}>{p.label}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </select>
-                        </div>
-                      ) : null;
-                    })()}
-                    {widget.statusBinding && (
-                      <div className="flex items-center gap-2 p-2 bg-sky-900/20 border border-sky-700 rounded">
-                        <Monitor className="w-4 h-4 text-sky-400" />
-                        <div className="text-xs text-sky-400">
-                          <p className="font-medium">Rueckmeldung verknuepft</p>
-                          <p className="text-sky-500/70">{getNodeLabel(availableNodes.find(n => n.id === (widget.statusBinding ? parseDpKey(widget.statusBinding.dpKey).nodeId : '')))}</p>
-                        </div>
-                        <button
-                          onClick={() => onUpdate({ statusBinding: undefined })}
-                          className="ml-auto text-slate-400 hover:text-red-400"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    <NodeBrowser
+                      nodes={bindableNodes}
+                      logicSheets={logicSheets}
+                      selectedNodeId={widget.statusBinding ? parseDpKey(widget.statusBinding.dpKey).nodeId : undefined}
+                      selectedPortId={widget.statusBinding ? (parseDpKey(widget.statusBinding.dpKey).portId || '') : undefined}
+                      getNodeLabel={getNodeLabel}
+                      getNodePorts={getNodePorts}
+                      getNodeConfigParams={getNodeConfigParams}
+                      isWriteWidget={false}
+                      onSelectNode={(nodeId) => {
+                        const node = availableNodes.find(n => n.id === nodeId);
+                        const ports = node ? getNodePorts(node) : [];
+                        const outPort = ports.find(p => p.isOutput) || ports[0];
+                        onUpdate({ statusBinding: migrateBinding({ nodeId, portId: outPort?.id, direction: 'read' }) });
+                      }}
+                      onSelectPort={(portId) => {
+                        if (!widget.statusBinding) return;
+                        const statusNodeId = parseDpKey(widget.statusBinding.dpKey).nodeId;
+                        onUpdate({ statusBinding: { ...widget.statusBinding, dpKey: portId ? `${statusNodeId}:${portId}` : statusNodeId, portId: portId || undefined } });
+                      }}
+                      onClear={() => onUpdate({ statusBinding: undefined })}
+                    />
                   </>
                 )}
               </>
