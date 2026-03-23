@@ -259,7 +259,11 @@ function MiniTile({
     if (!canvas || s.data.length === 0) return;
     const rMs = s.data.length > 1 ? s.data[s.data.length - 1].ts - s.data[0].ts || 3600000 : 3600000;
     const fTs = s.data[0]?.ts ?? Date.now() - rMs;
-    drawTileChart(canvas, s, rMs, fTs, chartH);
+    const redraw = () => drawTileChart(canvas, s, rMs, fTs, chartH);
+    redraw();
+    const obs = new ResizeObserver(redraw);
+    obs.observe(canvas);
+    return () => obs.disconnect();
   }, [s, chartH]);
 
   const displayVal = live !== undefined ? formatValue(live as number) : (s.last !== undefined ? formatValue(s.last as number) : '-');

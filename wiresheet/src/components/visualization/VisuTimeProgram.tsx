@@ -316,6 +316,16 @@ const ExceptionList: React.FC<{
   };
 
   const [showHolidayPicker, setShowHolidayPicker] = useState(false);
+  const holidayBtnRef = useRef<HTMLButtonElement>(null);
+  const [pickerPos, setPickerPos] = useState<{ top: number; right: number } | null>(null);
+
+  const openPicker = () => {
+    if (holidayBtnRef.current) {
+      const rect = holidayBtnRef.current.getBoundingClientRect();
+      setPickerPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setShowHolidayPicker(v => !v);
+  };
 
   return (
     <div className="space-y-3">
@@ -454,28 +464,35 @@ const ExceptionList: React.FC<{
           <Plus className="w-3.5 h-3.5" />
           Ausnahmetag hinzufuegen
         </button>
-        <div className="relative">
+        <div>
           <button
-            onClick={() => setShowHolidayPicker(v => !v)}
+            ref={holidayBtnRef}
+            onClick={openPicker}
             className="py-2 px-3 border border-dashed border-amber-700/60 text-amber-500 hover:text-amber-300 hover:border-amber-500 text-xs rounded-lg transition-colors flex items-center gap-1.5"
           >
             <Calendar className="w-3.5 h-3.5" />
             CH-Feiertage
           </button>
-          {showHolidayPicker && (
-            <div className="absolute bottom-full mb-1 right-0 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 w-60 max-h-64 overflow-y-auto">
-              {SWISS_HOLIDAYS.map(h => (
-                <button
-                  key={h.key}
-                  onClick={() => { addSwissHoliday(h); setShowHolidayPicker(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
-                >
-                  <span className="font-medium">{h.label}</span>
-                  {h.date && <span className="text-slate-500 ml-2">{h.date}</span>}
-                  {!h.date && <span className="text-slate-500 ml-2 italic">beweglich</span>}
-                </button>
-              ))}
-            </div>
+          {showHolidayPicker && pickerPos && createPortal(
+            <>
+              <div className="fixed inset-0 z-[99998]" onClick={() => setShowHolidayPicker(false)} />
+              <div
+                className="fixed bg-slate-800 border border-slate-600 rounded-lg shadow-2xl z-[99999] w-64 overflow-y-auto"
+                style={{ top: pickerPos.top, right: pickerPos.right, maxHeight: 320 }}
+              >
+                {SWISS_HOLIDAYS.map(h => (
+                  <button
+                    key={h.key}
+                    onClick={() => { addSwissHoliday(h); setShowHolidayPicker(false); }}
+                    className="w-full text-left px-3 py-2.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                  >
+                    <span className="font-medium">{h.label}</span>
+                    {h.date ? <span className="text-slate-500 ml-2">{h.date}</span> : <span className="text-slate-500 ml-2 italic">beweglich</span>}
+                  </button>
+                ))}
+              </div>
+            </>,
+            document.body
           )}
         </div>
       </div>
@@ -553,7 +570,6 @@ export const VisuTimeProgram: React.FC<VisuTimeProgramProps> = ({
       }
     });
     setDirty(false);
-    setShowPopup(false);
   }, [onValueChange, localEntries, localExceptions, localOutputType, localDefaultValue, localName]);
 
   const markDirty = useCallback(() => setDirty(true), []);
