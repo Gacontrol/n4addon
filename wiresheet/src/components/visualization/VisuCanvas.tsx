@@ -22,7 +22,9 @@ interface VisuCanvasProps {
   page: VisuPage;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
+  logicSheets?: { id: string; name: string; nodeIds: string[] }[];
   isEditMode: boolean;
+  zoom?: number;
   selectedWidgetId: string | null;
   selectedWidgetIds?: string[];
   clipboard: VisuWidget | null;
@@ -59,7 +61,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   page,
   liveValues,
   logicNodes,
+  logicSheets = [],
   isEditMode,
+  zoom = 1,
   selectedWidgetId,
   selectedWidgetIds = [],
   clipboard,
@@ -92,6 +96,24 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onShelveAlarm
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const nodeIdToSheetId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const sheet of logicSheets) {
+      for (const nodeId of sheet.nodeIds) {
+        map.set(nodeId, sheet.id);
+      }
+    }
+    return map;
+  }, [logicSheets]);
+
+  const isCrossPageBinding = useCallback((widget: VisuWidget): boolean => {
+    if (logicSheets.length <= 1) return false;
+    const dpKey = widget.binding?.dpKey;
+    if (!dpKey) return false;
+    const nodeId = parseDpKey(dpKey).nodeId;
+    return nodeIdToSheetId.has(nodeId);
+  }, [logicSheets.length, nodeIdToSheetId]);
 
   const [dragState, setDragState] = useState<{
     widgetId: string;
@@ -134,10 +156,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: (e.clientX - rect.left) / zoom,
+      y: (e.clientY - rect.top) / zoom
     };
-  }, []);
+  }, [zoom]);
 
   const snapPos = useCallback((pos: { x: number; y: number }) => {
     if (!page.showGrid) return pos;
@@ -1127,6 +1149,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           heatingCurveParams={getHeatingCurveWidgetParams(widget)}
           timeProgramParams={getTimeProgramWidgetParams(widget)}
           isHighlighted={highlightedWidgetId === widget.id}
+          isCrossPageBinding={isCrossPageBinding(widget)}
           alarmClasses={alarmClasses}
           alarmConsoles={alarmConsoles}
           activeAlarms={activeAlarms}

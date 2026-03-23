@@ -4,7 +4,7 @@ import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../type
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
-import { WidgetPalette } from './WidgetPalette';
+import { WidgetPalette, CustomBlockEntry } from './WidgetPalette';
 import { WidgetPropertiesPanel, TrackedTrend } from './WidgetPropertiesPanel';
 import { FileManager } from './FileManager';
 import { getWidgetTemplate } from '../../data/widgetTemplates';
@@ -36,6 +36,7 @@ interface VisualizationViewProps {
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
   logicSheets?: { id: string; name: string; nodeIds: string[] }[];
+  customBlocks?: CustomBlockEntry[];
   onWidgetValueChange: (dpKey: string, value: unknown) => void;
   highlightedWidgetId?: string | null;
   alarmClasses?: AlarmClass[];
@@ -58,6 +59,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   liveValues,
   logicNodes,
   logicSheets,
+  customBlocks = [],
   onWidgetValueChange,
   highlightedWidgetId,
   alarmClasses = [],
@@ -80,6 +82,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const [isEditMode, setIsEditMode] = useState(true);
   const [editZoom, setEditZoom] = useState(1);
+  const editScrollRef = useRef<HTMLDivElement>(null);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
   const [selectedWidgetIds, setSelectedWidgetIds] = useState<string[]>([]);
   const [showProperties, setShowProperties] = useState(false);
@@ -113,6 +116,18 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
+  useEffect(() => {
+    const el = editScrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setEditZoom(z => Math.min(3, Math.max(0.2, z - e.deltaY * 0.001)));
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [isEditMode]);
+
   const handleNavigateToPage = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
     onSetActiveVisuPage(pageId);
@@ -138,18 +153,43 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+
+    const customBlockJson = e.dataTransfer.getData('custom-block-entry');
+    if (customBlockJson) {
+      const block: CustomBlockEntry = JSON.parse(customBlockJson);
+      const rawX = (e.clientX - rect.left + el.scrollLeft) / editZoom;
+      const rawY = (e.clientY - rect.top + el.scrollTop) / editZoom;
+      const gridSize = activePage.gridSize || 10;
+      const snappedX = activePage.showGrid ? Math.round(rawX / gridSize) * gridSize : rawX;
+      const snappedY = activePage.showGrid ? Math.round(rawY / gridSize) * gridSize : rawY;
+      const newWidget: VisuWidget = {
+        id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'visu-label',
+        position: { x: Math.max(0, snappedX - 60), y: Math.max(0, snappedY - 20) },
+        size: { width: 120, height: 40 },
+        label: block.name,
+        config: { text: block.name, fontSize: 14, color: block.color || '#e879f9', fontWeight: 'bold' },
+        style: { showLabel: false, labelPosition: 'top' },
+        zIndex: activePage.widgets.length + 1
+      };
+      onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
+      setSelectedWidgetId(newWidget.id);
+      setShowProperties(true);
+      return;
+    }
+
     const templateJson = e.dataTransfer.getData('widget-template');
     if (!templateJson) return;
 
     const template: WidgetTemplate = JSON.parse(templateJson);
-    const el = e.currentTarget as HTMLElement;
-    const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left + el.scrollLeft - template.defaultSize.width / 2;
-    const y = e.clientY - rect.top + el.scrollTop - template.defaultSize.height / 2;
+    const rawX = (e.clientX - rect.left + el.scrollLeft) / editZoom - template.defaultSize.width / 2;
+    const rawY = (e.clientY - rect.top + el.scrollTop) / editZoom - template.defaultSize.height / 2;
 
     const gridSize = activePage.gridSize || 10;
-    const snappedX = activePage.showGrid ? Math.round(x / gridSize) * gridSize : x;
-    const snappedY = activePage.showGrid ? Math.round(y / gridSize) * gridSize : y;
+    const snappedX = activePage.showGrid ? Math.round(rawX / gridSize) * gridSize : rawX;
+    const snappedY = activePage.showGrid ? Math.round(rawY / gridSize) * gridSize : rawY;
 
     const newWidget: VisuWidget = {
       id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -168,7 +208,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
     setSelectedWidgetId(newWidget.id);
     setShowProperties(true);
-  }, [activePage, onUpdateVisuPage]);
+  }, [activePage, onUpdateVisuPage, editZoom]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -707,16 +747,12 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
       <div className="flex-1 flex overflow-hidden">
         {isEditMode ? (
           <>
-            <WidgetPalette onDragStart={() => {}} />
+            <WidgetPalette onDragStart={() => {}} customBlocks={customBlocks} />
             <div
+              ref={editScrollRef}
               className="flex-1 relative overflow-auto"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              onWheel={(e) => {
-                if (!e.ctrlKey) return;
-                e.preventDefault();
-                setEditZoom(z => Math.min(3, Math.max(0.2, z - e.deltaY * 0.001)));
-              }}
             >
               <div style={{ transform: `scale(${editZoom})`, transformOrigin: 'top left', display: 'inline-block' }}>
               <VisuCanvas
@@ -724,6 +760,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 liveValues={liveValues}
                 logicNodes={logicNodes}
                 isEditMode={isEditMode}
+                zoom={editZoom}
                 selectedWidgetId={selectedWidgetId}
                 selectedWidgetIds={selectedWidgetIds}
                 clipboard={multiClipboard ? multiClipboard[0] : clipboard}
@@ -774,6 +811,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
                 onAcknowledgeAll={onAcknowledgeAll}
                 onClearAlarm={onClearAlarm}
                 onShelveAlarm={onShelveAlarm}
+                logicSheets={logicSheets}
               />
               </div>
             </div>

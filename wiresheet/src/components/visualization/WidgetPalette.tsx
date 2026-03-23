@@ -6,13 +6,24 @@ import {
   Navigation, Home, ChevronLeft, Hexagon, Star, Diamond, Plus,
   Spline, List, PanelLeft, Image as ImageIcon,
   TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
-  AlignLeft, LayoutGrid
+  AlignLeft, LayoutGrid, Blocks, Package
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
 
+export interface CustomBlockEntry {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  hasVisuPage: boolean;
+}
+
 interface WidgetPaletteProps {
   onDragStart: (template: WidgetTemplate) => void;
+  customBlocks?: CustomBlockEntry[];
+  onCustomBlockDragStart?: (block: CustomBlockEntry) => void;
 }
 
 const iconMap: Record<string, React.FC<{ className?: string }>> = {
@@ -71,7 +82,7 @@ const groups: { key: string; label: string; categories: string[]; color: string;
   }
 ];
 
-export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart }) => {
+export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart, customBlocks = [], onCustomBlockDragStart }) => {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const handleDragStart = (e: React.DragEvent, template: WidgetTemplate) => {
@@ -80,9 +91,17 @@ export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart }) => 
     onDragStart(template);
   };
 
+  const handleCustomBlockDragStart = (e: React.DragEvent, block: CustomBlockEntry) => {
+    e.dataTransfer.setData('custom-block-entry', JSON.stringify(block));
+    e.dataTransfer.effectAllowed = 'copy';
+    onCustomBlockDragStart?.(block);
+  };
+
   const toggleGroup = (key: string) => {
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const customBlocksOpen = !collapsed['custom-blocks'];
 
   return (
     <div className="w-60 bg-slate-900 border-r border-slate-800 overflow-y-auto flex flex-col pb-8">
@@ -136,6 +155,48 @@ export const WidgetPalette: React.FC<WidgetPaletteProps> = ({ onDragStart }) => 
           </div>
         );
       })}
+
+      {customBlocks.length > 0 && (
+        <div className="border-b border-slate-800/60">
+          <button
+            onClick={() => toggleGroup('custom-blocks')}
+            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-800/40 transition-colors text-left"
+          >
+            <Blocks className="w-2 h-2 flex-shrink-0 text-[#e879f9]" style={{ width: 8, height: 8 }} />
+            <span className="text-xs font-semibold text-slate-300 flex-1">Komplexe Bausteine</span>
+            <span className="text-[10px] text-slate-600 tabular-nums">{customBlocks.length}</span>
+            <svg
+              className="w-3 h-3 text-slate-600 transition-transform duration-200 flex-shrink-0"
+              style={{ transform: customBlocksOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {customBlocksOpen && (
+            <div className="pb-1.5 px-2" style={{ backgroundColor: 'rgba(232,121,249,0.06)' }}>
+              {customBlocks.map((block) => (
+                <div
+                  key={block.id}
+                  draggable
+                  onDragStart={(e) => handleCustomBlockDragStart(e, block)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-grab active:cursor-grabbing transition-colors hover:bg-white/5 select-none"
+                  title={block.description || block.name}
+                >
+                  <Package className="w-3.5 h-3.5 flex-shrink-0" style={{ color: block.color || '#e879f9' }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-slate-300 truncate leading-tight">{block.name}</div>
+                    {block.hasVisuPage && (
+                      <div className="text-[9px] text-slate-500 truncate">mit Visu-Seite</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

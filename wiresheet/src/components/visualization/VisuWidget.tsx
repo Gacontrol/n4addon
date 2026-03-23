@@ -238,6 +238,7 @@ interface VisuWidgetProps {
   heatingCurveParams?: HeatingCurveParams;
   timeProgramParams?: TimeProgramParams;
   isHighlighted?: boolean;
+  isCrossPageBinding?: boolean;
   alarmClasses?: AlarmClass[];
   alarmConsoles?: AlarmConsole[];
   activeAlarms?: ActiveAlarm[];
@@ -318,6 +319,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   heatingCurveParams,
   timeProgramParams,
   isHighlighted = false,
+  isCrossPageBinding = false,
   alarmClasses = [],
   alarmConsoles = [],
   activeAlarms = [],
@@ -1543,6 +1545,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           style={{ zIndex: 10, cursor: 'move' }}
           onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(); }}
         />
+      )}
+      {isEditMode && isCrossPageBinding && (
+        <div
+          className="absolute top-0 right-0 flex items-center gap-0.5 px-1 py-0.5 bg-sky-600/80 rounded-bl text-white pointer-events-none"
+          style={{ zIndex: 12, fontSize: 8, lineHeight: 1 }}
+          title="Seitenübergreifende Verknüpfung"
+        >
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
       )}
       {showResizeHandles && (
         <>

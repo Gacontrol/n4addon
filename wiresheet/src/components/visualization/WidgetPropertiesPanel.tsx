@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw, Activity } from 'lucide-react';
+import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw, Activity, Layers } from 'lucide-react';
 
 interface ColorPickerProps {
   value: string | undefined;
@@ -3127,15 +3127,21 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
       </div>
 
       <div className="flex border-b border-slate-700">
-        {(['general', 'binding', 'style'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${activeTab === tab ? 'bg-slate-800 text-slate-200 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
-          >
-            {tab === 'general' ? 'Allgemein' : tab === 'binding' ? 'Verknuepfung' : 'Stil'}
-          </button>
-        ))}
+        {(['general', 'binding', 'style'] as const).map((tab) => {
+          const hasCrossPageBinding = tab === 'binding' && !!bindingNodeId && !!logicSheets && logicSheets.length > 1 && logicSheets.some(s => s.nodeIds.includes(bindingNodeId));
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 px-3 py-2 text-xs font-medium transition-colors relative ${activeTab === tab ? 'bg-slate-800 text-slate-200 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}
+            >
+              {tab === 'general' ? 'Allgemein' : tab === 'binding' ? 'Verknuepfung' : 'Stil'}
+              {hasCrossPageBinding && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-sky-400" title="Seitenübergreifende Verknüpfung" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -3179,6 +3185,20 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
         {activeTab === 'binding' && (
           <>
+            {(() => {
+              if (!bindingNodeId || !logicSheets || logicSheets.length <= 1) return null;
+              const sheet = logicSheets.find(s => s.nodeIds.includes(bindingNodeId));
+              if (!sheet) return null;
+              return (
+                <div className="flex items-center gap-2 px-2.5 py-1.5 bg-sky-900/20 border border-sky-700/50 rounded-md">
+                  <Layers className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] text-sky-400/70">Seitenübergreifende Verknüpfung</span>
+                    <p className="text-xs text-sky-300 font-medium truncate">{sheet.name}</p>
+                  </div>
+                </div>
+              );
+            })()}
             {isDecorationWidget ? (
               <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
                 <Unlink className="w-4 h-4 text-slate-500" />

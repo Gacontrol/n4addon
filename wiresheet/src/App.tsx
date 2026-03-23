@@ -1979,6 +1979,7 @@ function App() {
           liveValues={liveValues}
           logicNodes={allLogicNodes}
           logicSheets={pages.map(p => ({ id: p.id, name: p.name, nodeIds: p.nodes.map(n => n.id) }))}
+          customBlocks={customBlocks.map(b => ({ id: b.id, name: b.name, description: b.description, color: b.color, icon: b.icon, hasVisuPage: !!b.visuPageData }))}
           onWidgetValueChange={handleVisuWidgetValueChange}
           highlightedWidgetId={highlightedWidgetId}
           alarmClasses={alarmClasses}
