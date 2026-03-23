@@ -36,6 +36,8 @@ interface HeatingCurveParams {
   hcMaxOutput?: number;
   hcReverseDirection?: boolean;
   hcName?: string;
+  hcNightSetback?: number;
+  nightReductionActive?: boolean;
 }
 
 interface VisuHeatingCurveProps {
@@ -165,6 +167,8 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   const minOutput = isFinite(Number(params?.hcMinOutput)) ? Number(params?.hcMinOutput) : 20;
   const maxOutput = isFinite(Number(params?.hcMaxOutput)) ? Number(params?.hcMaxOutput) : 80;
   const reverseDirection = params?.hcReverseDirection !== false;
+  const nightReductionActive = params?.nightReductionActive ?? false;
+  const nightSetback = isFinite(Number(params?.hcNightSetback)) ? Number(params?.hcNightSetback) : 5;
 
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -222,6 +226,11 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
             AUS
           </div>
         )}
+        {nightReductionActive && (
+          <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10 bg-blue-700 text-blue-200">
+            -{nightSetback}K
+          </div>
+        )}
         <div
           className="relative flex items-center justify-center"
           style={{
@@ -277,9 +286,12 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-white">{hcName}</h2>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
                     <span className="text-slate-300">Ausgang: {outputValue.toFixed(1)}</span>
                     {!enable && <span className="text-slate-500">| Deaktiviert</span>}
+                    {nightReductionActive && (
+                      <span className="text-blue-300 text-xs px-1.5 py-0.5 bg-blue-900/40 rounded">Nachtabsenkung -{nightSetback}K</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -396,7 +408,24 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Nachtabsenkung (K)</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={localRaw.hcNightSetback ?? String(localParams.hcNightSetback ?? nightSetback)}
+                        onChange={(e) => handleParamChange('hcNightSetback', e.target.value, 5)}
+                        onBlur={(e) => handleParamCommit('hcNightSetback', e.target.value, 5)}
+                        className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
+                      />
+                    </div>
                   </div>
+                  {nightReductionActive && (
+                    <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded text-xs text-blue-300">
+                      <span className="font-semibold">Nachtabsenkung aktiv</span>
+                      <span>– Ausgang um {nightSetback}K reduziert</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

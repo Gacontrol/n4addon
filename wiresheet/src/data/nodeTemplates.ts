@@ -722,18 +722,20 @@ export const nodeTemplates: NodeTemplate[] = [
     color: '#ea580c',
     inputs: [
       { label: 'InputValue', type: 'input' },
-      { label: 'Enable', type: 'input' }
+      { label: 'Enable', type: 'input' },
+      { label: 'Nachtabsenkung', type: 'input' }
     ],
     outputs: [
       { label: 'OutputValue', type: 'output' }
     ],
-    description: 'Heizkurvenbaustein mit linearer Kennlinie',
+    description: 'Heizkurvenbaustein mit linearer Kennlinie und Nachtabsenkung',
     defaultConfig: {
       hcMinInput: -20,
       hcMaxInput: 20,
       hcMinOutput: 20,
       hcMaxOutput: 80,
       hcReverseDirection: true,
+      hcNightSetback: 5,
       hcName: ''
     }
   },

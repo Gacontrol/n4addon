@@ -374,21 +374,25 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
   const getHeatingCurveWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-heating-curve' || !widget.binding) return undefined;
-    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
+    const nodeId = parseDpKey(widget.binding?.dpKey).nodeId;
+    const node = logicNodes.find(n => n.id === nodeId);
     if (!node || node.type !== 'heating-curve') return undefined;
     const cfg = node.data.config || {};
     const customLabel = cfg.customLabel as string | undefined;
     const configName = cfg.hcName as string | undefined;
     const nodeName = configName || customLabel || node.data.label || 'Heizkurve';
+    const nightReductionActive = Boolean(liveValues[`${nodeId}:input-2`]);
     return {
       hcName: nodeName,
       hcMinInput: cfg.hcMinInput,
       hcMaxInput: cfg.hcMaxInput,
       hcMinOutput: cfg.hcMinOutput,
       hcMaxOutput: cfg.hcMaxOutput,
-      hcReverseDirection: cfg.hcReverseDirection
+      hcReverseDirection: cfg.hcReverseDirection,
+      hcNightSetback: cfg.hcNightSetback,
+      nightReductionActive
     };
-  }, [logicNodes]);
+  }, [logicNodes, liveValues]);
 
   const getTimeProgramWidgetParams = useCallback((widget: VisuWidget) => {
     if (widget.type !== 'visu-time-program' || !widget.binding) return undefined;

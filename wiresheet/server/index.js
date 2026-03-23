@@ -2114,12 +2114,14 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       const inputValue = toNumber(inputVals[0]);
       const enableRaw = inputVals[1];
       const enable = enableRaw === null || enableRaw === undefined ? true : toBool(enableRaw);
+      const nightReductionActive = inputVals[2] !== null && inputVals[2] !== undefined ? toBool(inputVals[2]) : false;
 
       const minInput = cfg.hcMinInput ?? -20;
       const maxInput = cfg.hcMaxInput ?? 20;
       const minOutput = cfg.hcMinOutput ?? 20;
       const maxOutput = cfg.hcMaxOutput ?? 80;
       const reverseDirection = cfg.hcReverseDirection !== false;
+      const nightSetback = toNumber(cfg.hcNightSetback) ?? 5;
 
       let outputValue = 0;
 
@@ -2136,12 +2138,17 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         } else {
           outputValue = minOutput;
         }
+
+        if (nightReductionActive) {
+          outputValue = Math.max(minOutput, outputValue - nightSetback);
+        }
       }
 
       nodeValues[nodeId] = outputValue;
       nodeValues[`${nodeId}:output-0`] = outputValue;
       nodeValues[`${nodeId}:input-0`] = inputValue;
       nodeValues[`${nodeId}:input-1`] = enable;
+      nodeValues[`${nodeId}:input-2`] = nightReductionActive;
     } else if (node.type === 'light-toggle') {
       const taster = toBool(inputVals[0]);
       const rueckmeldung = toBool(inputVals[1]);

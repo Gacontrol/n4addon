@@ -1222,11 +1222,30 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </label>
             </div>
 
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-2">
+              <label className="block text-xs text-slate-400 font-medium">Nachtabsenkung</label>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1 flex items-center gap-1">
+                  Absenkung (K) {isParamBoundByVisu('hcNightSetback') && <VisuBoundBadge />}
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={isParamBoundByVisu('hcNightSetback') ? (liveValues[`${node.id}:cfg:hcNightSetback`] ?? config.hcNightSetback ?? 5) : (config.hcNightSetback ?? 5)}
+                  onChange={e => updateConfig('hcNightSetback', parseFloat(e.target.value) || 0)}
+                  disabled={isParamBoundByVisu('hcNightSetback')}
+                  className={`w-full border rounded px-2 py-1.5 text-xs outline-none transition-colors ${isParamBoundByVisu('hcNightSetback') ? 'bg-slate-800 border-amber-400/30 text-amber-300 cursor-not-allowed opacity-75' : 'bg-slate-700 border-slate-600 text-white focus:border-orange-500'}`}
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Wenn Eingang 'Nachtabsenkung' aktiv, wird der Ausgang um diesen Wert (K) verringert.</p>
+              </div>
+            </div>
+
             <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
               <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
               <div className="grid grid-cols-2 gap-1 text-[10px]">
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-slate-300">InputValue (z.B. AT)</span></div>
                 <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-slate-300">Enable</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-cyan-400" /><span className="text-slate-300">Nachtabsenkung</span></div>
               </div>
               <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
               <div className="grid grid-cols-2 gap-1 text-[10px]">
