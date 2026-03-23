@@ -367,42 +367,74 @@ async function loadRegistries() {
 
 app.get('/api/admin-check', async (req, res) => {
   const supervisorToken = getToken();
-  console.log('Admin-Check: alle Headers =', JSON.stringify(req.headers));
   if (!supervisorToken) {
     return res.status(200).json({ isAdmin: true, reason: 'no-supervisor-token' });
   }
-  const hassioUser = req.headers['x-hassio-user'] || req.headers['x-ingress-user'] || req.headers['x-remote-user-id'] || req.headers['x-ha-user'];
-  if (!hassioUser) {
-    console.log('Admin-Check: kein User-Header gefunden -> isAdmin: false');
-    return res.status(403).json({ isAdmin: false, reason: 'no-hassio-header-deny' });
+  const remoteUserId = req.headers['x-remote-user-id'];
+  const remoteUserName = req.headers['x-remote-user-name'];
+  if (!remoteUserId && !remoteUserName) {
+    return res.status(403).json({ isAdmin: false, reason: 'no-user-header-deny' });
   }
   try {
-    const usersRes = await axios.get('http://supervisor/auth/users', {
-      headers: { Authorization: `Bearer ${supervisorToken}` },
-      timeout: 5000
+    const wsUrl = 'ws://supervisor/core/websocket';
+    const WebSocket = (await import('ws')).default;
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(wsUrl, { headers: { Authorization: `Bearer ${supervisorToken}` } });
+      let msgId = 1;
+      let authed = false;
+      const timeout = setTimeout(() => { ws.close(); reject(new Error('WS timeout')); }, 6000);
+      ws.on('message', (data) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'auth_required') {
+          ws.send(JSON.stringify({ type: 'auth', access_token: supervisorToken }));
+        } else if (msg.type === 'auth_ok' && !authed) {
+          authed = true;
+          ws.send(JSON.stringify({ id: msgId++, type: 'config/auth/list' }));
+        } else if (msg.type === 'result' && msg.success) {
+          const users = msg.result || [];
+          const user = users.find(u => u.id === remoteUserId || u.username === remoteUserName || u.name === remoteUserName);
+          clearTimeout(timeout);
+          ws.close();
+          if (!user) {
+            console.log('Admin-Check WS: User nicht gefunden. remoteUserName:', remoteUserName, 'remoteUserId:', remoteUserId);
+            resolve({ isAdmin: false, reason: 'user-not-found' });
+          } else {
+            const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
+            console.log('Admin-Check WS: user gefunden, isAdmin:', isAdmin, 'name:', user.name, 'username:', user.username);
+            resolve({ isAdmin, reason: 'ws-check' });
+          }
+        } else if (msg.type === 'result' && !msg.success) {
+          clearTimeout(timeout);
+          ws.close();
+          reject(new Error('WS result error: ' + JSON.stringify(msg.error)));
+        }
+      });
+      ws.on('error', (err) => { clearTimeout(timeout); reject(err); });
+    }).then(result => {
+      if (result.isAdmin) {
+        return res.status(200).json({ isAdmin: true });
+      } else {
+        return res.status(403).json({ isAdmin: false });
+      }
     });
-    const users = usersRes.data?.data?.users || usersRes.data?.users || [];
-    console.log('Admin-Check: hassioUser header =', hassioUser, '| users in list:', JSON.stringify(users.map(u => ({ id: u.id, username: u.username, name: u.name, is_admin: u.is_admin, is_owner: u.is_owner, group: u.group }))));
-    const user = users.find(u =>
-      u.username === hassioUser ||
-      u.id === hassioUser ||
-      u.name === hassioUser ||
-      u.local_only === false && u.username?.toLowerCase() === hassioUser?.toLowerCase()
-    );
-    if (!user) {
-      console.log('Admin-Check: user not found in list -> denying access. hassioUser:', hassioUser);
-      return res.status(403).json({ isAdmin: false, reason: 'user-not-found-deny' });
-    }
-    const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
-    console.log('Admin-Check: user found, isAdmin:', isAdmin, 'user:', JSON.stringify(user));
-    if (isAdmin) {
-      return res.status(200).json({ isAdmin: true });
-    } else {
-      return res.status(403).json({ isAdmin: false });
-    }
   } catch (err) {
-    console.log('Admin-Check Fehler:', err.message);
-    return res.status(200).json({ isAdmin: true, reason: 'check-failed-allow' });
+    console.log('Admin-Check WS Fehler:', err.message, '-> Fallback auf remoteUserName-Check');
+    try {
+      const statesRes = await axios.get('http://supervisor/core/api/states', {
+        headers: { Authorization: `Bearer ${supervisorToken}` },
+        timeout: 5000
+      });
+      const personStates = (statesRes.data || []).filter(s => s.entity_id.startsWith('person.'));
+      const matchedPerson = personStates.find(p =>
+        p.attributes?.user_id === remoteUserId ||
+        p.attributes?.friendly_name?.toLowerCase() === remoteUserName?.toLowerCase()
+      );
+      console.log('Admin-Check states Fallback: matchedPerson:', matchedPerson?.entity_id, 'user_id:', matchedPerson?.attributes?.user_id);
+      return res.status(403).json({ isAdmin: false, reason: 'states-fallback-deny' });
+    } catch (err2) {
+      console.log('Admin-Check states Fallback fehlgeschlagen:', err2.message, '-> isAdmin: false');
+      return res.status(403).json({ isAdmin: false, reason: 'all-failed-deny' });
+    }
   }
 });
 
