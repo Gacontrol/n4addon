@@ -642,6 +642,7 @@ async function loadTrendConfig() {
     const data = await fs.readFile(trendConfigFile, 'utf8');
     const cfg = JSON.parse(data);
     trendConfig.trackedNodes = cfg.trackedNodes || [];
+    if (cfg.chartGroups) trendConfig.chartGroups = cfg.chartGroups;
     console.log(`Trend-Konfiguration geladen: ${trendConfig.trackedNodes.length} getrackte Knoten`);
   } catch (err) {
     if (err.code !== 'ENOENT') {
