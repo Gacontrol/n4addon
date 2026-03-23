@@ -139,7 +139,7 @@ function App() {
   }, [unshelveExpiredAlarms]);
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building'>('logic');
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | null>(null);
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -193,15 +193,16 @@ function App() {
         const resp = await fetch(`${apiBase}/admin-check`);
         if (resp.ok) {
           const data = await resp.json();
-          setIsAdmin(data.isAdmin === true);
-          if (data.isAdmin === false) {
-            setMainView('visu');
-          }
+          const admin = data.isAdmin === true;
+          setIsAdmin(admin);
+          setMainView(admin ? 'logic' : 'visu');
         } else {
           setIsAdmin(true);
+          setMainView('logic');
         }
       } catch {
         setIsAdmin(true);
+        setMainView('logic');
       }
     };
     checkAdmin();
@@ -1337,6 +1338,23 @@ function App() {
       console.error('Failed to write visu value:', err);
     }
   }, [pages, updateNodeData, setLiveValue]);
+
+  if (mainView === null) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="bg-blue-600 p-3 rounded-xl">
+            <Workflow className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
