@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Wrench, Power, RotateCcw, X, Settings, Play, Pause, ChevronRight } from 'lucide-react';
 import { PumpWidgetConfig, AggregateSymbolType, WidgetSizePreset } from '../../types/visualization';
@@ -148,11 +148,14 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   const speedMax = params?.pumpSpeedMax ?? 100;
   const showSpeedOnCanvas = (speedMin > 0 || speedMax > 0) && speedMax > speedMin;
 
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   useEffect(() => {
-    if (params) {
-      setLocalParams(params);
+    if (showPopup && paramsRef.current) {
+      setLocalParams(paramsRef.current);
     }
-  }, [params]);
+  }, [showPopup]);
 
   const getStatusColor = useCallback(() => {
     if (fault || alarm) return config.faultColor || '#ef4444';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, RotateCcw, X, Settings } from 'lucide-react';
 
@@ -141,11 +141,14 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
   const isHandMode = hoaMode === 'hand';
   const [localManualValue, setLocalManualValue] = useState(manualValue);
 
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   useEffect(() => {
-    if (params) {
-      setLocalParams(params);
+    if (showPopup && paramsRef.current) {
+      setLocalParams(paramsRef.current);
     }
-  }, [params]);
+  }, [showPopup]);
 
   useEffect(() => {
     setLocalManualValue(manualValue);

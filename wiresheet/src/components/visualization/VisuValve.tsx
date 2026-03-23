@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, RotateCcw, X, Settings, Sliders } from 'lucide-react';
 import { ValveWidgetConfig, ValveSymbolType, WidgetSizePreset } from '../../types/visualization';
@@ -147,11 +147,14 @@ export const VisuValve: React.FC<VisuValveProps> = ({
   const minOutput = params?.valveMinOutput ?? 0;
   const maxOutput = params?.valveMaxOutput ?? 100;
 
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   useEffect(() => {
-    if (params) {
-      setLocalParams(params);
+    if (showPopup && paramsRef.current) {
+      setLocalParams(paramsRef.current);
     }
-  }, [params]);
+  }, [showPopup]);
 
   useEffect(() => {
     setLocalSetpoint(setpoint);

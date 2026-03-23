@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Settings } from 'lucide-react';
 
@@ -165,11 +165,14 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   const maxOutput = params?.hcMaxOutput ?? 80;
   const reverseDirection = params?.hcReverseDirection !== false;
 
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
   useEffect(() => {
-    if (params) {
-      setLocalParams(params);
+    if (showPopup && paramsRef.current) {
+      setLocalParams(paramsRef.current);
     }
-  }, [params]);
+  }, [showPopup]);
 
   const getStatusColor = useCallback(() => {
     if (enable) return config.activeColor || '#f97316';
