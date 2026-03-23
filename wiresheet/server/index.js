@@ -1138,7 +1138,8 @@ print(json.dumps(_outputs))
 }
 
 async function executePageLogic(nodes, connections, manualOverrides = {}, pageId = null) {
-  const nodeValues = {};
+  const prevValues = pageId ? (lastNodeValues.get(pageId) || {}) : {};
+  const nodeValues = Object.assign({}, prevValues);
 
   const modbusDevices = driverConfig.modbusDevices || [];
   const modbusDeviceMap = new Map();

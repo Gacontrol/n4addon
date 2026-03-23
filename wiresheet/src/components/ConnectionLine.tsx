@@ -13,11 +13,69 @@ interface ConnectionLineProps {
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
+const R = 6;
+
+function buildOrthogonalPath(x1: number, y1: number, x2: number, y2: number): { path: string; labelX: number; labelY: number } {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const isSelfLoop = Math.abs(dx) < 30 && Math.abs(dy) < 80;
+
+  if (isSelfLoop) {
+    const loopOut = 44;
+    const mx = x1 + loopOut;
+    const my = (y1 + y2) / 2;
+    const r = Math.min(R, Math.abs(dy) / 4);
+    const signY1 = dy >= 0 ? -1 : 1;
+    const signY2 = dy >= 0 ? 1 : -1;
+    const path = [
+      `M ${x1} ${y1}`,
+      `H ${mx - r}`,
+      `Q ${mx} ${y1} ${mx} ${y1 + r * signY1 * -1}`,
+      `V ${y2 + r * signY2 * -1}`,
+      `Q ${mx} ${y2} ${mx - r} ${y2}`,
+      `H ${x2}`
+    ].join(' ');
+    return { path, labelX: mx + 8, labelY: my };
+  }
+
+  const midX = x1 + dx / 2;
+
+  if (Math.abs(dy) < 2) {
+    return {
+      path: `M ${x1} ${y1} H ${x2}`,
+      labelX: midX,
+      labelY: y1 - 10
+    };
+  }
+
+  if (dx > R * 2) {
+    const signY = dy > 0 ? 1 : -1;
+    const path = [
+      `M ${x1} ${y1}`,
+      `H ${midX - R}`,
+      `Q ${midX} ${y1} ${midX} ${y1 + R * signY}`,
+      `V ${y2 - R * signY}`,
+      `Q ${midX} ${y2} ${midX + R} ${y2}`,
+      `H ${x2}`
+    ].join(' ');
+    return { path, labelX: midX, labelY: (y1 + y2) / 2 };
+  }
+
+  const backX = x1 + 24;
+  const signY = dy > 0 ? 1 : -1;
+  const path = [
+    `M ${x1} ${y1}`,
+    `H ${backX - R}`,
+    `Q ${backX} ${y1} ${backX} ${y1 + R * signY}`,
+    `V ${y2 - R * signY}`,
+    `Q ${backX} ${y2} ${backX - R} ${y2}`,
+    `H ${x2}`
+  ].join(' ');
+  return { path, labelX: backX + 8, labelY: (y1 + y2) / 2 };
+}
+
 export const ConnectionLine: React.FC<ConnectionLineProps> = ({
-  x1,
-  y1,
-  x2,
-  y2,
+  x1, y1, x2, y2,
   color = '#10b981',
   isActive = false,
   isSelected = false,
@@ -25,28 +83,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
   onClick,
   onContextMenu
 }) => {
-  const dx = Math.abs(x2 - x1);
-  const dy = Math.abs(y2 - y1);
-  const isSelfLoop = dx < 30 && dy < 80;
-
-  let path: string;
-  let midX: number;
-  let midY: number;
-
-  if (isSelfLoop) {
-    const loopR = 40;
-    const cx1 = x1 + loopR;
-    const cy1 = y1 - loopR;
-    const cx2 = x2 + loopR;
-    const cy2 = y2 + loopR;
-    midX = x1 + loopR * 1.4;
-    midY = (y1 + y2) / 2;
-    path = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
-  } else {
-    midX = (x1 + x2) / 2;
-    midY = (y1 + y2) / 2;
-    path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-  }
+  const { path, labelX, labelY } = buildOrthogonalPath(x1, y1, x2, y2);
 
   const hasValue = liveValue !== undefined && liveValue !== null;
   const displayVal = hasValue ? String(liveValue) : null;
@@ -63,31 +100,33 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
         onContextMenu={onContextMenu}
         style={{ pointerEvents: isActive ? 'none' : 'stroke' }}
       />
-      <path
-        d={path}
-        stroke={color}
-        strokeWidth={isActive || isSelected ? 3 : 2}
-        fill="none"
-        strokeLinecap="round"
-        className={isActive || isSelected ? 'opacity-100' : 'opacity-60 hover:opacity-100'}
-        style={{ transition: 'opacity 0.2s', pointerEvents: 'none' }}
-      />
       {isSelected && (
         <path
           d={path}
           stroke={color}
           strokeWidth={6}
           fill="none"
+          strokeLinejoin="round"
           strokeLinecap="round"
-          opacity={0.3}
+          opacity={0.25}
           style={{ pointerEvents: 'none' }}
         />
       )}
+      <path
+        d={path}
+        stroke={color}
+        strokeWidth={isActive || isSelected ? 2.5 : 1.5}
+        fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        className={isActive || isSelected ? 'opacity-100' : 'opacity-60 hover:opacity-100'}
+        style={{ transition: 'opacity 0.2s', pointerEvents: 'none' }}
+      />
       {hasValue && truncated && !isActive && (
         <>
           <rect
-            x={midX - (truncated.length * 3.2)}
-            y={midY - 8}
+            x={labelX - (truncated.length * 3.2)}
+            y={labelY - 8}
             width={truncated.length * 6.4 + 4}
             height={16}
             rx={4}
@@ -98,8 +137,8 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             style={{ pointerEvents: 'none' }}
           />
           <text
-            x={midX}
-            y={midY + 4}
+            x={labelX}
+            y={labelY + 4}
             textAnchor="middle"
             fill={color}
             fontSize="9"
