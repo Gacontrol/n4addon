@@ -144,6 +144,7 @@ function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
+  const [pendingVisuInsert, setPendingVisuInsert] = useState<{ block: CustomBlockDefinition; idMap: Map<string, string> } | null>(null);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [modbusDeviceStatusManual, setModbusDeviceStatus] = useState<Record<string, { online: boolean; lastSeen?: number; pinging?: boolean }>>({});
@@ -575,7 +576,46 @@ function App() {
       newConns.forEach(c => addConnection(c));
       selectNodes(newNodes.map(n => n.id));
     }, 50);
+
+    if (block.visuPageData) {
+      setPendingVisuInsert({ block, idMap });
+    }
   }, [addNode, addConnection, selectNodes]);
+
+  const handleConfirmVisuInsert = useCallback(() => {
+    if (!pendingVisuInsert) return;
+    const { block, idMap } = pendingVisuInsert;
+    const templatePage = block.visuPageData!;
+    const now = Date.now();
+    const newPageId = `visu-page-${now}`;
+
+    const remapDpKey = (dpKey: string | undefined): string | undefined => {
+      if (!dpKey) return dpKey;
+      const colonIdx = dpKey.indexOf(':');
+      const oldNodeId = colonIdx === -1 ? dpKey : dpKey.slice(0, colonIdx);
+      const newNodeId = idMap.get(oldNodeId);
+      if (!newNodeId) return dpKey;
+      return colonIdx === -1 ? newNodeId : newNodeId + dpKey.slice(colonIdx);
+    };
+
+    const remappedWidgets = templatePage.widgets.map(widget => ({
+      ...widget,
+      id: `widget-${now}-${Math.random().toString(36).substr(2, 9)}`,
+      binding: widget.binding ? { ...widget.binding, dpKey: remapDpKey(widget.binding.dpKey) || widget.binding.dpKey } : undefined,
+      statusBinding: widget.statusBinding ? { ...widget.statusBinding, dpKey: remapDpKey(widget.statusBinding.dpKey) || widget.statusBinding.dpKey } : undefined
+    }));
+
+    const newPage: VisuPage = {
+      ...templatePage,
+      id: newPageId,
+      name: block.name,
+      widgets: remappedWidgets
+    };
+
+    setAllVisuPages([...visuPages, newPage]);
+    setActiveVisuPageId(newPageId);
+    setPendingVisuInsert(null);
+  }, [pendingVisuInsert, visuPages, setAllVisuPages, setActiveVisuPageId]);
 
   const selectedNodesList = nodes.filter(n => selectedNodes.has(n.id));
   const selectedConnectionsList = connections.filter(c =>
@@ -1731,9 +1771,55 @@ function App() {
               selectedConnections={selectedConnectionsList}
               allNodes={nodes}
               allConnections={connections}
+              visuPages={visuPages}
               onSave={handleSaveBlock}
               onCancel={() => { setShowBlockEditor(false); setEditingBlock(null); }}
             />
+          )}
+
+          {pendingVisuInsert && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+              <div className="bg-slate-800 border border-slate-600 rounded-xl w-[440px] shadow-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-cyan-900/40">
+                    <Monitor className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Visualisierung einfuegen?</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Baustein &quot;{pendingVisuInsert.block.name}&quot; hat eine verknuepfte Visu-Seite
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-sm text-slate-300 mb-3">
+                    Moechtest du die Visu-Seite <span className="text-cyan-300 font-medium">&quot;{pendingVisuInsert.block.visuPageData?.name}&quot;</span> ebenfalls einfuegen?
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Die Widget-Verbindungen werden automatisch auf die neuen Bausteine umgemappt.
+                  </p>
+                  <div className="flex items-center gap-2 mt-3 p-2.5 bg-slate-900 rounded-lg border border-slate-700">
+                    <LayoutGrid className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="text-xs text-slate-300">{pendingVisuInsert.block.visuPageData?.widgets.length ?? 0} Widgets auf der Visu-Seite</span>
+                  </div>
+                </div>
+                <div className="px-5 py-4 border-t border-slate-700 flex gap-3">
+                  <button
+                    onClick={() => setPendingVisuInsert(null)}
+                    className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+                  >
+                    Nein, danke
+                  </button>
+                  <button
+                    onClick={handleConfirmVisuInsert}
+                    className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Monitor className="w-4 h-4" />
+                    Ja, einfuegen
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       ) : mainView === 'drivers' ? (

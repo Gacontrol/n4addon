@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { CustomBlockDefinition } from '../types/flow';
 import * as Icons from 'lucide-react';
+import { VisuWidget } from '../types/visualization';
 
 interface CustomBlockLibraryProps {
   blocks: CustomBlockDefinition[];
@@ -14,6 +15,76 @@ interface CustomBlockLibraryProps {
   onAddBlockToCanvas: (block: CustomBlockDefinition) => void;
   canCreateFromSelection: boolean;
 }
+
+const VisuPagePreview: React.FC<{ block: CustomBlockDefinition; onClose: () => void }> = ({ block, onClose }) => {
+  const page = block.visuPageData;
+  if (!page) return null;
+
+  const canvasW = page.canvasWidth || 1280;
+  const canvasH = page.canvasHeight || 800;
+  const previewW = 560;
+  const previewH = Math.round(previewW * (canvasH / canvasW));
+  const scale = previewW / canvasW;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75" onClick={onClose}>
+      <div
+        className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <Icons.Monitor className="w-4 h-4 text-cyan-400" />
+            <span className="text-sm font-medium text-white">{block.name} – Visu-Vorschau</span>
+            <span className="text-xs text-slate-400">{page.name}</span>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
+            <Icons.X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-auto p-3">
+          <div
+            style={{
+              width: previewW,
+              height: previewH,
+              backgroundColor: page.backgroundColor || '#1e293b',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: canvasW, height: canvasH, position: 'absolute' }}>
+              {page.widgets.map((widget: VisuWidget) => (
+                <div
+                  key={widget.id}
+                  style={{
+                    position: 'absolute',
+                    left: widget.position.x,
+                    top: widget.position.y,
+                    width: widget.size.width,
+                    height: widget.size.height,
+                    background: 'rgba(100,116,139,0.3)',
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    color: '#94a3b8',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <span className="truncate px-1">{widget.label || widget.type.replace('visu-', '').replace('modern-', '').replace('dash-', '')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-500 mt-2 text-center">{page.widgets.length} Widgets auf dieser Seite</p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
   blocks,
@@ -30,6 +101,7 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; block: CustomBlockDefinition } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [previewBlock, setPreviewBlock] = useState<CustomBlockDefinition | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredBlocks = blocks.filter(block =>
@@ -204,14 +276,31 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
                             <Icons.Layers className="w-3 h-3" />
                             {block.nodes.length}
                           </span>
+                          {block.visuPageData && (
+                            <span className="text-[9px] text-cyan-500 flex items-center gap-1">
+                              <Icons.Monitor className="w-3 h-3" />
+                              Visu
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleContextMenu(e, block); }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-all"
-                      >
-                        <Icons.MoreVertical className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-0.5">
+                        {block.visuPageData && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setPreviewBlock(block); }}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-cyan-400 transition-all"
+                            title="Visu-Vorschau"
+                          >
+                            <Icons.Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={e => { e.stopPropagation(); handleContextMenu(e, block); }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-all"
+                        >
+                          <Icons.MoreVertical className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -246,6 +335,15 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
               <Icons.Plus className="w-3.5 h-3.5" />
               Zum Canvas hinzufuegen
             </button>
+            {contextMenu.block.visuPageData && (
+              <button
+                onClick={() => { setPreviewBlock(contextMenu.block); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-cyan-400 hover:bg-cyan-900/30 transition-colors"
+              >
+                <Icons.Eye className="w-3.5 h-3.5" />
+                Visu-Vorschau
+              </button>
+            )}
             <button
               onClick={() => { onEditBlock(contextMenu.block); setContextMenu(null); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-slate-700 transition-colors"
@@ -312,6 +410,10 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {previewBlock && (
+        <VisuPagePreview block={previewBlock} onClose={() => setPreviewBlock(null)} />
       )}
     </div>
   );

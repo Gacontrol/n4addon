@@ -183,6 +183,7 @@ export interface CustomBlockDefinition {
   connections: Connection[];
   createdAt: number;
   updatedAt: number;
+  visuPageData?: import('./visualization').VisuPage;
 }
 
 export interface CustomBlockInstance extends FlowNode {

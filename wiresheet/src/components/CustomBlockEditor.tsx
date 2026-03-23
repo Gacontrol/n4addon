@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CustomBlockDefinition, CustomBlockPort, FlowNode, Connection } from '../types/flow';
+import { VisuPage } from '../types/visualization';
 import * as Icons from 'lucide-react';
 
 const ICON_OPTIONS = [
@@ -29,6 +30,7 @@ interface CustomBlockEditorProps {
   selectedConnections: Connection[];
   allNodes: FlowNode[];
   allConnections: Connection[];
+  visuPages: VisuPage[];
   onSave: (block: CustomBlockDefinition) => void;
   onCancel: () => void;
 }
@@ -39,6 +41,7 @@ export const CustomBlockEditor: React.FC<CustomBlockEditorProps> = ({
   selectedConnections,
   allNodes,
   allConnections,
+  visuPages,
   onSave,
   onCancel
 }) => {
@@ -50,6 +53,7 @@ export const CustomBlockEditor: React.FC<CustomBlockEditorProps> = ({
   const [color, setColor] = useState(block?.color || '#06b6d4');
   const [category, setCategory] = useState(block?.category || 'Allgemein');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [selectedVisuPageId, setSelectedVisuPageId] = useState<string>(block?.visuPageData?.id || '');
 
   const nodesToUse = isEditing ? (block?.nodes || []) : selectedNodes;
   const connectionsToUse = isEditing
@@ -182,6 +186,8 @@ export const CustomBlockEditor: React.FC<CustomBlockEditorProps> = ({
       };
     });
 
+    const selectedVisuPage = visuPages.find(p => p.id === selectedVisuPageId);
+
     const newBlock: CustomBlockDefinition = {
       id: block?.id || `custom-block-${now}`,
       name: name.trim(),
@@ -194,7 +200,8 @@ export const CustomBlockEditor: React.FC<CustomBlockEditorProps> = ({
       nodes: normalizedNodes,
       connections: connectionsToUse,
       createdAt: block?.createdAt || now,
-      updatedAt: now
+      updatedAt: now,
+      visuPageData: selectedVisuPage
     };
 
     onSave(newBlock);
@@ -414,6 +421,34 @@ export const CustomBlockEditor: React.FC<CustomBlockEditorProps> = ({
                 </span>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-1.5">
+              <Icons.Monitor className="w-3.5 h-3.5" />
+              Visualisierungsseite (optional)
+            </label>
+            <p className="text-[10px] text-slate-500 mb-2">
+              Wird beim Einfuegen des Bausteins automatisch als Visu-Seite angeboten. Verbindungen werden automatisch erstellt.
+            </p>
+            <select
+              value={selectedVisuPageId}
+              onChange={e => setSelectedVisuPageId(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+            >
+              <option value="">-- Keine Visu-Seite verknuepfen --</option>
+              {visuPages.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {selectedVisuPageId && (
+              <div className="mt-2 flex items-center gap-2 px-2.5 py-1.5 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
+                <Icons.CheckCircle className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="text-xs text-cyan-300">
+                  Seite &quot;{visuPages.find(p => p.id === selectedVisuPageId)?.name}&quot; wird mit dem Baustein gespeichert
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
