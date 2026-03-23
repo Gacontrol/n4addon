@@ -367,12 +367,14 @@ async function loadRegistries() {
 
 app.get('/api/admin-check', async (req, res) => {
   const supervisorToken = getToken();
+  console.log('Admin-Check: alle Headers =', JSON.stringify(req.headers));
   if (!supervisorToken) {
     return res.status(200).json({ isAdmin: true, reason: 'no-supervisor-token' });
   }
-  const hassioUser = req.headers['x-hassio-user'];
+  const hassioUser = req.headers['x-hassio-user'] || req.headers['x-ingress-user'] || req.headers['x-remote-user-id'] || req.headers['x-ha-user'];
   if (!hassioUser) {
-    return res.status(200).json({ isAdmin: true, reason: 'no-hassio-header-allow' });
+    console.log('Admin-Check: kein User-Header gefunden -> isAdmin: false');
+    return res.status(403).json({ isAdmin: false, reason: 'no-hassio-header-deny' });
   }
   try {
     const usersRes = await axios.get('http://supervisor/auth/users', {
