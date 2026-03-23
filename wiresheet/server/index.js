@@ -372,7 +372,22 @@ app.get('/api/admin-check', async (req, res) => {
   }
   const remoteUserId = req.headers['x-remote-user-id'];
   const remoteUserName = req.headers['x-remote-user-name'];
+  const ingressPath = req.headers['x-ingress-path'] || '';
+  const originalUri = req.headers['x-original-uri'] || '';
+
+  function buildVisuRedirect() {
+    if (ingressPath) {
+      return `${ingressPath}/visu`;
+    }
+    const ingressMatch = originalUri.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+    if (ingressMatch) {
+      return `${ingressMatch[1]}/visu`;
+    }
+    return '/visu';
+  }
+
   if (!remoteUserId && !remoteUserName) {
+    res.setHeader('X-Redirect-To', buildVisuRedirect());
     return res.status(403).json({ isAdmin: false, reason: 'no-user-header-deny' });
   }
   try {
@@ -414,6 +429,7 @@ app.get('/api/admin-check', async (req, res) => {
       if (result.isAdmin) {
         return res.status(200).json({ isAdmin: true });
       } else {
+        res.setHeader('X-Redirect-To', buildVisuRedirect());
         return res.status(403).json({ isAdmin: false });
       }
     });
@@ -430,9 +446,11 @@ app.get('/api/admin-check', async (req, res) => {
         p.attributes?.friendly_name?.toLowerCase() === remoteUserName?.toLowerCase()
       );
       console.log('Admin-Check states Fallback: matchedPerson:', matchedPerson?.entity_id, 'user_id:', matchedPerson?.attributes?.user_id);
+      res.setHeader('X-Redirect-To', buildVisuRedirect());
       return res.status(403).json({ isAdmin: false, reason: 'states-fallback-deny' });
     } catch (err2) {
       console.log('Admin-Check states Fallback fehlgeschlagen:', err2.message, '-> isAdmin: false');
+      res.setHeader('X-Redirect-To', buildVisuRedirect());
       return res.status(403).json({ isAdmin: false, reason: 'all-failed-deny' });
     }
   }
