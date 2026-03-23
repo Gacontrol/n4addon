@@ -365,6 +365,36 @@ async function loadRegistries() {
   return { devices: cachedDeviceRegistry, entities: cachedEntityRegistry, configEntries: cachedConfigEntries };
 }
 
+app.get('/api/admin-check', async (req, res) => {
+  const token = getToken();
+  if (!token) {
+    return res.status(200).json({ isAdmin: true, reason: 'no-supervisor-token' });
+  }
+  const haToken = req.headers['x-hassio-user'] || req.headers['authorization'];
+  if (!haToken) {
+    return res.status(403).json({ isAdmin: false, reason: 'no-user-token' });
+  }
+  try {
+    const userToken = haToken.replace(/^Bearer\s+/i, '');
+    const authRes = await axios.post('http://supervisor/auth', { token: userToken }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000
+    });
+    const isAdmin = authRes.data?.is_owner === true || authRes.data?.is_admin === true;
+    if (isAdmin) {
+      return res.status(200).json({ isAdmin: true });
+    } else {
+      return res.status(403).json({ isAdmin: false });
+    }
+  } catch (err) {
+    console.log('Admin-Check Fehler:', err.message);
+    return res.status(200).json({ isAdmin: true, reason: 'check-failed-allow' });
+  }
+});
+
 app.get('/api/status', (req, res) => {
   const envKeys = Object.keys(process.env).filter(k =>
     k.includes('SUPER') || k.includes('HASSIO') || k.includes('HA_') || k.includes('HOME')
