@@ -3286,7 +3286,10 @@ function broadcastSSE(event, data) {
   }
   const sseMsg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
-    try { res.write(sseMsg); } catch { sseClients.delete(res); }
+    try {
+      res.write(sseMsg);
+      res.flush && res.flush();
+    } catch { sseClients.delete(res); }
   }
 }
 
@@ -3348,14 +3351,19 @@ app.get(['/sse', '/api/sse'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Transfer-Encoding', 'chunked');
   res.flushHeaders();
   res.write(': ok\n\n');
+  res.flush && res.flush();
 
   sseClients.add(res);
 
   const heartbeat = setInterval(() => {
-    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
-  }, 25000);
+    try {
+      res.write(': heartbeat\n\n');
+      res.flush && res.flush();
+    } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 1000);
 
   req.on('close', () => {
     clearInterval(heartbeat);
@@ -3368,14 +3376,19 @@ visuApp.get(['/sse', '/api/sse'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Transfer-Encoding', 'chunked');
   res.flushHeaders();
   res.write(': ok\n\n');
+  res.flush && res.flush();
 
   sseClients.add(res);
 
   const heartbeat = setInterval(() => {
-    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
-  }, 25000);
+    try {
+      res.write(': heartbeat\n\n');
+      res.flush && res.flush();
+    } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 1000);
 
   req.on('close', () => {
     clearInterval(heartbeat);
