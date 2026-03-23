@@ -185,7 +185,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
-    onValueChange?.({ [`param_${key}`]: val });
+    onValueChange?.({ pumpControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
   const statusColor = getStatusColor();
