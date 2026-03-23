@@ -57,6 +57,7 @@ function App() {
     connectingFromRef,
     clipboard,
     addNode,
+    addNodesToPage,
     updateNodePosition,
     updateMultipleNodePositions,
     updateNodeData,
@@ -556,7 +557,7 @@ function App() {
     if (!block) return;
     setPendingBlockInsert(null);
 
-    const doInsert = () => {
+    const buildNodesAndConns = () => {
       const now = Date.now();
       const idMap = new Map<string, string>();
       const baseX = 200;
@@ -582,24 +583,29 @@ function App() {
         target: idMap.get(conn.target)!
       }));
 
+      return { newNodes, newConns, idMap };
+    };
+
+    if (targetNewPage) {
+      const newPageId = addPage();
+      const { newNodes, newConns, idMap } = buildNodesAndConns();
+      addNodesToPage(newPageId, newNodes, newConns);
+      setTimeout(() => selectNodes(newNodes.map(n => n.id)), 50);
+      if (block.visuPageData) {
+        setPendingVisuInsert({ block, idMap });
+      }
+    } else {
+      const { newNodes, newConns, idMap } = buildNodesAndConns();
       newNodes.forEach(n => addNode(n));
       setTimeout(() => {
         newConns.forEach(c => addConnection(c));
         selectNodes(newNodes.map(n => n.id));
       }, 50);
-
       if (block.visuPageData) {
         setPendingVisuInsert({ block, idMap });
       }
-    };
-
-    if (targetNewPage) {
-      addPage();
-      setTimeout(doInsert, 50);
-    } else {
-      doInsert();
     }
-  }, [pendingBlockInsert, addNode, addConnection, selectNodes, addPage]);
+  }, [pendingBlockInsert, addNode, addNodesToPage, addConnection, selectNodes, addPage]);
 
   const handleConfirmVisuInsert = useCallback(() => {
     if (!pendingVisuInsert) return;

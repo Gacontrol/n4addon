@@ -59,94 +59,116 @@ const VisuPagePreview: React.FC<{ block: CustomBlockDefinition; onClose: () => v
 
   const canvasW = page.canvasWidth || 1280;
   const canvasH = page.canvasHeight || 800;
-  const maxPreviewW = Math.min(window.innerWidth * 0.85, 800);
-  const maxPreviewH = window.innerHeight * 0.75;
+  const maxPreviewW = Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.88 : 800, 900);
+  const maxPreviewH = typeof window !== 'undefined' ? window.innerHeight * 0.78 : 600;
   const scaleByW = maxPreviewW / canvasW;
   const scaleByH = maxPreviewH / canvasH;
-  const scale = Math.min(scaleByW, scaleByH);
+  const scale = Math.min(scaleByW, scaleByH, 2);
   const previewW = Math.round(canvasW * scale);
   const previewH = Math.round(canvasH * scale);
+
+  const isShape = (type: string) => ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(type);
+  const isLabel = (type: string) => type === 'visu-label';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75" onClick={onClose}>
       <div
         className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ maxWidth: '92vw', maxHeight: '92vh' }}
+        style={{ maxWidth: '94vw', maxHeight: '94vh' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Icons.Monitor className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-medium text-white">{block.name} – Visu-Vorschau</span>
             <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">{page.name}</span>
             <span className="text-xs text-slate-500">{canvasW} × {canvasH}</span>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors ml-4">
             <Icons.X className="w-4 h-4" />
           </button>
         </div>
-        <div className="overflow-auto p-3">
-          <div
-            style={{
-              width: previewW,
-              height: previewH,
-              backgroundColor: page.backgroundColor || '#1e293b',
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 6,
-              flexShrink: 0
-            }}
-          >
-            <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: canvasW, height: canvasH, position: 'absolute' }}>
-              {page.widgets.map((widget: VisuWidget) => {
-                const style = getWidgetStyle(widget.type);
-                const IconComp = Icons[style.icon as keyof typeof Icons] as React.FC<{ style?: React.CSSProperties }> | undefined;
-                const isShape = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
-                return (
-                  <div
-                    key={widget.id}
-                    style={{
-                      position: 'absolute',
-                      left: widget.position.x,
-                      top: widget.position.y,
-                      width: widget.size.width,
-                      height: widget.size.height,
-                      background: isShape ? 'rgba(100,116,139,0.15)' : style.bg,
-                      border: `1.5px solid ${style.border}`,
-                      borderRadius: widget.type === 'visu-circle' ? '50%' : 6,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 3,
-                      overflow: 'hidden',
-                      opacity: 0.9
-                    }}
-                  >
-                    {IconComp && widget.size.height > 28 && (
-                      <IconComp style={{ width: Math.min(16, widget.size.width * 0.3), height: Math.min(16, widget.size.height * 0.3), color: style.color, flexShrink: 0 }} />
-                    )}
-                    {widget.size.height > 18 && (
-                      <span style={{
-                        fontSize: Math.max(9, Math.min(13, widget.size.height * 0.18)),
-                        color: style.color,
-                        textAlign: 'center',
-                        padding: '0 4px',
+        <div className="overflow-auto p-4 flex-1 flex items-start justify-center">
+          <div>
+            <div
+              style={{
+                width: previewW,
+                height: previewH,
+                backgroundColor: page.backgroundColor || '#1e293b',
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 8,
+                flexShrink: 0,
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.06)'
+              }}
+            >
+              <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: canvasW, height: canvasH, position: 'absolute' }}>
+                {[...(page.widgets as VisuWidget[])].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map((widget) => {
+                  const typeStyle = getWidgetStyle(widget.type);
+                  const wStyle = widget.style || {};
+                  const bg = isShape(widget.type)
+                    ? 'rgba(100,116,139,0.15)'
+                    : isLabel(widget.type)
+                      ? (wStyle.backgroundColor && wStyle.backgroundColor !== 'transparent' ? wStyle.backgroundColor : 'transparent')
+                      : (wStyle.backgroundColor || typeStyle.bg);
+                  const border = isLabel(widget.type)
+                    ? (wStyle.borderColor && wStyle.borderColor !== 'transparent' ? `1px solid ${wStyle.borderColor}` : 'none')
+                    : `1.5px solid ${wStyle.borderColor || typeStyle.border}`;
+                  const radius = widget.type === 'visu-circle' ? '50%' : (wStyle.borderRadius !== undefined ? wStyle.borderRadius : 6);
+                  const textColor = wStyle.textColor || typeStyle.color;
+                  const IconComp = Icons[typeStyle.icon as keyof typeof Icons] as React.FC<{ style?: React.CSSProperties }> | undefined;
+                  const labelText = (widget.config as Record<string, unknown>)?.text as string || widget.label || widget.type.replace('visu-', '').replace('modern-', '').replace('dash-', '');
+                  const customFontSize = wStyle.fontSize;
+                  const displayText = isLabel(widget.type) ? labelText : widget.label;
+
+                  return (
+                    <div
+                      key={widget.id}
+                      style={{
+                        position: 'absolute',
+                        left: widget.position.x,
+                        top: widget.position.y,
+                        width: widget.size.width,
+                        height: widget.size.height,
+                        background: bg,
+                        border,
+                        borderRadius: radius,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isLabel(widget.type) ? 'flex-start' : 'center',
+                        justifyContent: 'center',
+                        gap: 3,
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '100%',
-                        lineHeight: 1.2
-                      }}>
-                        {widget.label || widget.type.replace('visu-', '').replace('modern-', '').replace('dash-', '')}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+                        padding: isLabel(widget.type) ? '2px 6px' : 0,
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {!isLabel(widget.type) && !isShape(widget.type) && IconComp && widget.size.height > 28 && (
+                        <IconComp style={{ width: Math.min(18, widget.size.width * 0.35), height: Math.min(18, widget.size.height * 0.35), color: typeStyle.color, flexShrink: 0 }} />
+                      )}
+                      {widget.size.height > 10 && displayText && (
+                        <span style={{
+                          fontSize: customFontSize ? Math.min(customFontSize, 22) : Math.max(9, Math.min(13, widget.size.height * 0.22)),
+                          color: textColor,
+                          textAlign: isLabel(widget.type) ? 'left' : 'center',
+                          padding: isLabel(widget.type) ? 0 : '0 4px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: '100%',
+                          lineHeight: 1.3,
+                          fontWeight: isLabel(widget.type) && customFontSize && customFontSize >= 16 ? 600 : 400
+                        }}>
+                          {displayText}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+            <p className="text-[10px] text-slate-500 mt-2 text-center">{page.widgets.length} Widgets · {canvasW}×{canvasH}px</p>
           </div>
-          <p className="text-[10px] text-slate-500 mt-2 text-center">{page.widgets.length} Widgets · {canvasW}×{canvasH}px</p>
         </div>
       </div>
     </div>

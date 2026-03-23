@@ -281,7 +281,15 @@ export const useWiresheetPages = () => {
     newPage.name = `Seite ${pages.length + 1}`;
     updatePages(prev => [...prev, newPage]);
     setActivePageId(newPage.id);
+    return newPage.id;
   }, [pages.length, updatePages]);
+
+  const addNodesToPage = useCallback((pageId: string, newNodes: FlowNode[], newConns: Connection[]) => {
+    updatePages(prev => prev.map(p => {
+      if (p.id !== pageId) return p;
+      return { ...p, nodes: [...p.nodes, ...newNodes], connections: [...p.connections, ...newConns] };
+    }));
+  }, [updatePages]);
 
   const deletePage = useCallback((pageId: string) => {
     if (pages.length <= 1) return;
@@ -915,6 +923,7 @@ export const useWiresheetPages = () => {
     clipboard,
     addNode,
     addNodes,
+    addNodesToPage,
     updateNodePosition,
     updateMultipleNodePositions,
     updateNodeData,
