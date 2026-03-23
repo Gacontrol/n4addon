@@ -2853,16 +2853,21 @@ function normalizeDpWritePayload(body) {
   return { dpKey, value, mode: impulse ? 'impulse' : 'set', releaseValue };
 }
 
-function expandCompositeControl(nodeId, ctrl, rawValue) {
+function expandCompositeControl(nodeId, ctrl, rawValue, resolvedNodeType) {
   const writes = [];
   const aggCtrl = rawValue.pumpControl || rawValue.aggregateControl;
   if (aggCtrl) {
-    const prefix = rawValue.aggregateControl ? 'aggregate' : 'pump';
+    const isAggregate = resolvedNodeType === 'aggregate-control' || !!rawValue.aggregateControl;
+    const prefix = isAggregate ? 'aggregate' : 'pump';
     if (aggCtrl.hoaMode !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuHOA`, value: aggCtrl.hoaMode });
     if (aggCtrl.handStart !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuHandStart`, value: aggCtrl.handStart });
     if (aggCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:${prefix}VisuReset`, value: aggCtrl.reset });
     for (const key of Object.keys(aggCtrl)) {
-      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: aggCtrl[key] });
+      if (key.startsWith('param_')) {
+        const rawParamKey = key.slice(6);
+        const paramKey = isAggregate ? rawParamKey.replace(/^pump/, 'aggregate') : rawParamKey;
+        writes.push({ dpKey: `${nodeId}:cfg:${paramKey}`, value: aggCtrl[key] });
+      }
     }
     return writes;
   }
@@ -2922,8 +2927,18 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       rawValue.pumpControl || rawValue.aggregateControl || rawValue.valveControl ||
       rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl
     )) {
-      writes = expandCompositeControl(srcNodeId, null, rawValue);
-      console.log(`[DEBUG write-value] composite expand -> ${JSON.stringify(writes)}`);
+      let resolvedNodeType = null;
+      if (srcNodeId && (rawValue.pumpControl || rawValue.aggregateControl)) {
+        try {
+          const pagesData = JSON.parse(await fs.readFile(pagesFile, 'utf-8'));
+          for (const page of pagesData) {
+            const found = (page.nodes || []).find(n => n.id === srcNodeId);
+            if (found) { resolvedNodeType = found.type; break; }
+          }
+        } catch {}
+      }
+      writes = expandCompositeControl(srcNodeId, null, rawValue, resolvedNodeType);
+      console.log(`[DEBUG write-value] composite expand nodeType=${resolvedNodeType} -> ${JSON.stringify(writes)}`);
     } else {
       const normalized = normalizeDpWritePayload(req.body);
       writes = [normalized];

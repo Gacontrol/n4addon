@@ -288,20 +288,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
     if (!node || (node.type !== 'pump-control' && node.type !== 'aggregate-control')) return undefined;
     const cfg = node.data.config || {};
+    const isAggregate = node.type === 'aggregate-control';
     const customLabel = cfg.customLabel as string | undefined;
     const configName = (cfg.pumpName || cfg.aggregateName) as string | undefined;
     const nodeName = configName || customLabel || node.data.label || 'Aggregat';
     return {
       pumpName: nodeName,
-      pumpStartDelayMs: cfg.pumpStartDelayMs,
-      pumpStopDelayMs: cfg.pumpStopDelayMs,
-      pumpFeedbackTimeoutMs: cfg.pumpFeedbackTimeoutMs,
-      pumpEnableFeedback: cfg.pumpEnableFeedback,
-      pumpSpeedMin: cfg.pumpSpeedMin,
-      pumpSpeedMax: cfg.pumpSpeedMax,
-      pumpAntiSeizeIntervalMs: cfg.pumpAntiSeizeIntervalMs,
-      pumpAntiSeizeRunMs: cfg.pumpAntiSeizeRunMs,
-      pumpAntiSeizeSpeed: cfg.pumpAntiSeizeSpeed
+      pumpStartDelayMs: isAggregate ? (cfg.aggregateStartDelayMs ?? cfg.pumpStartDelayMs) : cfg.pumpStartDelayMs,
+      pumpStopDelayMs: isAggregate ? (cfg.aggregateStopDelayMs ?? cfg.pumpStopDelayMs) : cfg.pumpStopDelayMs,
+      pumpFeedbackTimeoutMs: isAggregate ? (cfg.aggregateFeedbackTimeoutMs ?? cfg.pumpFeedbackTimeoutMs) : cfg.pumpFeedbackTimeoutMs,
+      pumpEnableFeedback: isAggregate ? (cfg.aggregateEnableFeedback ?? cfg.pumpEnableFeedback) : cfg.pumpEnableFeedback,
+      pumpSpeedMin: isAggregate ? (cfg.aggregateSpeedMin ?? cfg.pumpSpeedMin) : cfg.pumpSpeedMin,
+      pumpSpeedMax: isAggregate ? (cfg.aggregateSpeedMax ?? cfg.pumpSpeedMax) : cfg.pumpSpeedMax,
+      pumpAntiSeizeIntervalMs: isAggregate ? (cfg.aggregateAntiSeizeIntervalMs ?? cfg.pumpAntiSeizeIntervalMs) : cfg.pumpAntiSeizeIntervalMs,
+      pumpAntiSeizeRunMs: isAggregate ? (cfg.aggregateAntiSeizeRunMs ?? cfg.pumpAntiSeizeRunMs) : cfg.pumpAntiSeizeRunMs,
+      pumpAntiSeizeSpeed: isAggregate ? (cfg.aggregateAntiSeizeSpeed ?? cfg.pumpAntiSeizeSpeed) : cfg.pumpAntiSeizeSpeed
     };
   }, [logicNodes]);
 
