@@ -81,6 +81,12 @@ export interface TimeProgramEntry {
   priority: number;
 }
 
+export type ExceptionRecurrenceType =
+  | 'once'
+  | 'monthly-day'
+  | 'weekly'
+  | 'swiss-holiday';
+
 export interface TimeProgramException {
   id: string;
   date: string;
@@ -89,6 +95,10 @@ export interface TimeProgramException {
   value: number | boolean;
   label?: string;
   enabled: boolean;
+  recurrence?: ExceptionRecurrenceType;
+  monthlyDay?: number;
+  weeklyWeekday?: number;
+  swissHolidayKey?: string;
 }
 
 export interface NodeConfig {
