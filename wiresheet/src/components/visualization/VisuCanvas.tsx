@@ -1086,6 +1086,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               onAcknowledgeAll={onAcknowledgeAll}
               onClearAlarm={onClearAlarm}
               onShelveAlarm={onShelveAlarm}
+              liveValues={liveValues}
             />
           ))}
         </div>
@@ -1160,6 +1161,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onAcknowledgeAll={onAcknowledgeAll}
           onClearAlarm={onClearAlarm}
           onShelveAlarm={onShelveAlarm}
+          liveValues={liveValues}
         />
       ))}
 
