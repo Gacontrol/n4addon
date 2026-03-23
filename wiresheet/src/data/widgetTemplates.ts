@@ -992,6 +992,24 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'read'
   },
   {
+    type: 'visu-trend-tiles',
+    label: 'Trend Kachelansicht',
+    icon: 'LayoutGrid',
+    category: 'display',
+    defaultSize: { width: 600, height: 400 },
+    defaultConfig: {
+      tileSize: 'sm',
+      tileMode: 'simple',
+      timeRange: '1h',
+      showPageHeaders: true,
+      refreshIntervalMs: 30000,
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'top' },
+    description: 'Zeigt alle aufgezeichneten Trends als anklickbare Kacheln mit Popup-Diagramm',
+    supportsBinding: false,
+    bindingDirection: 'read'
+  },
+  {
     type: 'visu-trend-chart',
     label: 'Trend-Diagramm',
     icon: 'TrendingUp',

@@ -71,6 +71,7 @@ import { VisuPID } from './VisuPID';
 import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuAlarmConsole } from './VisuAlarmConsole';
 import { VisuTrendChart } from './VisuTrendChart';
+import { VisuTrendTiles, VisuTrendTilesConfig } from './VisuTrendTiles';
 import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
 import { VisuTimeProgram } from './VisuTimeProgram';
@@ -1438,6 +1439,19 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-trend-tiles': {
+        const ttCfg = widget.config as VisuTrendTilesConfig;
+        return (
+          <VisuTrendTiles
+            config={ttCfg}
+            liveValues={liveValues}
+            isEditMode={isEditMode}
+            width={widget.size.width}
+            height={widget.size.height}
+          />
+        );
+      }
+
       case 'visu-3d-building': {
         const b3dCfg = widget.config as Building3DWidgetConfig;
         return (
@@ -1476,13 +1490,14 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isValveWidget = widget.type === 'visu-valve';
   const isSensorWidget = widget.type === 'visu-sensor';
   const isTrendWidget = widget.type === 'visu-trend-chart';
+  const isTrendTilesWidget = widget.type === 'visu-trend-tiles';
   const isPIDWidget = widget.type === 'visu-pid';
   const isHeatingCurveWidget = widget.type === 'visu-heating-curve';
   const isAlarmConsoleWidget = widget.type === 'visu-alarm-console';
   const is3DBuildingWidget = widget.type === 'visu-3d-building';
   const isLineInDrawingMode = widget.type === 'visu-line' && (widget.config as { x1?: number }).x1 === undefined;
   const isPolygonInDrawingMode = widget.type === 'visu-polygon' && (!(widget.config as { points?: unknown[] }).points || (widget.config as { points?: unknown[] }).points!.length === 0);
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget;
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isTrendTilesWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',

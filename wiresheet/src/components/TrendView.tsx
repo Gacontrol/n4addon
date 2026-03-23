@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   TrendingUp, Settings, Trash2, RefreshCw, ChevronDown, ChevronRight,
   Plus, Minus, Download, Eye, EyeOff, Clock, BarChart2, Image,
-  Layers, Calendar, X, Check, ChevronRight as ChevronRightIcon, Maximize2
+  Layers, Calendar, X, Check, ChevronRight as ChevronRightIcon, Maximize2,
+  LayoutGrid, Grid3x3, List, ZoomIn, ZoomOut, RotateCcw
 } from 'lucide-react';
 import { WiresheetPage, FlowNode, CustomBlockDefinition } from '../types/flow';
 
@@ -293,6 +294,96 @@ function drawChart(
   }
 }
 
+function drawTileChart(
+  canvas: HTMLCanvasElement,
+  seriesList: TrendSeries[],
+  rangeMs: number,
+  fromTs: number,
+  height: number
+) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth;
+  const h = height;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, w, h);
+
+  const visibleSeries = seriesList.filter(s => s.visible && s.data.length > 0);
+  if (visibleSeries.length === 0) return;
+
+  const allVals: number[] = [];
+  for (const s of visibleSeries) {
+    for (const p of s.data) {
+      if (typeof p.v === 'number') allVals.push(p.v);
+    }
+  }
+  if (allVals.length === 0) return;
+
+  const globalMin = Math.min(...allVals);
+  const globalMax = Math.max(...allVals);
+  const valuePad = (globalMax - globalMin) * 0.12 || 0.5;
+  const yMin = globalMin - valuePad;
+  const yMax = globalMax + valuePad;
+  const valueRange = yMax - yMin || 1;
+
+  visibleSeries.forEach(s => {
+    if (s.data.length < 2) return;
+    const isBool = s.data.some(p => typeof p.v === 'boolean');
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, s.color + '40');
+    gradient.addColorStop(1, s.color + '00');
+
+    if (isBool) {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let lastY: number | null = null;
+      for (const point of s.data) {
+        const x = ((point.ts - fromTs) / rangeMs) * w;
+        const v = point.v ? 1 : 0;
+        const y = h - v * h * 0.7 - h * 0.15;
+        if (lastY !== null) {
+          ctx.lineTo(x, lastY);
+          ctx.lineTo(x, y);
+        } else {
+          ctx.moveTo(x, y);
+        }
+        lastY = y;
+      }
+      ctx.stroke();
+    } else {
+      const points: [number, number][] = s.data.map(p => [
+        ((p.ts - fromTs) / rangeMs) * w,
+        h - ((((typeof p.v === 'number' ? p.v : 0) - yMin) / valueRange) * h * 0.85) - h * 0.05
+      ]);
+
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) ctx.moveTo(points[i][0], points[i][1]);
+        else ctx.lineTo(points[i][0], points[i][1]);
+      }
+      ctx.stroke();
+
+      if (points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(points[0][0], h);
+        for (const [px, py] of points) ctx.lineTo(px, py);
+        ctx.lineTo(points[points.length - 1][0], h);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+    }
+  });
+}
+
 function TrendChart({
   series,
   rangeMs,
@@ -301,6 +392,8 @@ function TrendChart({
   title,
   onExportImage,
   separateAxes,
+  canvasRef: externalCanvasRef,
+  onWheel,
 }: {
   series: TrendSeries[];
   rangeMs: number;
@@ -309,8 +402,11 @@ function TrendChart({
   title?: string;
   onExportImage?: (canvas: HTMLCanvasElement) => void;
   separateAxes: boolean;
+  canvasRef?: React.RefObject<HTMLCanvasElement>;
+  onWheel?: (e: React.WheelEvent<HTMLCanvasElement>) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const internalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = externalCanvasRef || internalCanvasRef;
   const [tooltip, setTooltip] = useState<{
     x: number; y: number;
     items: { label: string; color: string; value: string; unit?: string }[];
@@ -392,6 +488,7 @@ function TrendChart({
           style={{ height }}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setTooltip(null)}
+          onWheel={onWheel}
         />
         {tooltip && (
           <div
@@ -418,25 +515,58 @@ function TrendChart({
   );
 }
 
+type TileSize = 'xs' | 'sm' | 'md' | 'lg';
+type TileMode = 'simple' | 'detailed';
+
 function TrendTile({
   s,
   liveValues,
   onClick,
+  tileSize = 'sm',
+  tileMode = 'simple',
 }: {
   s: TrendSeries;
   liveValues: Record<string, unknown>;
   onClick: () => void;
+  tileSize?: TileSize;
+  tileMode?: TileMode;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const live = liveValues[s.nodeId];
 
+  const chartH = tileSize === 'xs' ? 40 : tileSize === 'sm' ? 60 : tileSize === 'md' ? 90 : 130;
+  const valueFontClass = tileSize === 'xs' ? 'text-base' : tileSize === 'sm' ? 'text-xl' : tileSize === 'md' ? 'text-2xl' : 'text-3xl';
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || s.data.length === 0) return;
-    const rangeMs = s.data.length > 1 ? s.data[s.data.length - 1].ts - s.data[0].ts || 3600000 : 3600000;
-    const fromTs = s.data.length > 0 ? s.data[0].ts : Date.now() - 3600000;
-    drawChart(canvas, [{ ...s, visible: true }], rangeMs, fromTs, 70, false);
-  }, [s]);
+    const rMs = s.data.length > 1 ? s.data[s.data.length - 1].ts - s.data[0].ts || 3600000 : 3600000;
+    const fTs = s.data.length > 0 ? s.data[0].ts : Date.now() - 3600000;
+    drawTileChart(canvas, [{ ...s, visible: true }], rMs, fTs, chartH);
+  }, [s, chartH]);
+
+  const displayVal = live !== undefined ? formatValue(live as number) : (s.last !== undefined ? formatValue(s.last as number) : '-');
+
+  if (tileSize === 'xs') {
+    return (
+      <div
+        onClick={onClick}
+        className={`bg-slate-900 border rounded-lg overflow-hidden cursor-pointer transition-all hover:border-slate-500 hover:shadow-md group flex items-center gap-0 ${s.visible ? 'border-slate-700' : 'border-slate-800 opacity-50'}`}
+        style={{ borderLeftColor: s.color, borderLeftWidth: 3 }}
+      >
+        <div className="px-2.5 py-2 flex-shrink-0 min-w-[90px]">
+          <div className="text-[10px] text-slate-400 truncate leading-tight mb-0.5">{s.label}</div>
+          <div className="flex items-baseline gap-1">
+            <span className={`${valueFontClass} font-mono font-bold leading-none`} style={{ color: s.color }}>{displayVal}</span>
+            {s.unit && <span className="text-[10px] text-slate-500">{s.unit}</span>}
+          </div>
+        </div>
+        <div className="flex-1 relative" style={{ height: chartH }}>
+          <canvas ref={canvasRef} className="w-full h-full" style={{ height: chartH }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -444,27 +574,29 @@ function TrendTile({
       className={`bg-slate-900 border rounded-xl overflow-hidden cursor-pointer transition-all hover:border-slate-500 hover:shadow-lg hover:shadow-black/30 group ${s.visible ? 'border-slate-700' : 'border-slate-800 opacity-50'}`}
       style={{ borderLeftColor: s.color, borderLeftWidth: 3 }}
     >
-      <div className="px-3 pt-3 pb-1">
-        <div className="flex items-center justify-between mb-0.5">
-          <span className="text-xs font-semibold text-slate-200 truncate flex-1">{s.label}</span>
+      <div className={`px-3 ${tileSize === 'lg' ? 'pt-4 pb-2' : 'pt-3 pb-1'}`}>
+        <div className="flex items-center justify-between mb-1">
+          <span className={`${tileSize === 'lg' ? 'text-sm' : 'text-xs'} font-semibold text-slate-200 truncate flex-1`}>{s.label}</span>
           <Maximize2 className="w-3 h-3 text-slate-600 group-hover:text-slate-400 transition-colors flex-shrink-0 ml-1" />
         </div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-lg font-mono font-bold leading-none" style={{ color: s.color }}>
-            {live !== undefined ? formatValue(live as number) : (s.last !== undefined ? formatValue(s.last as number) : '-')}
+          <span className={`${valueFontClass} font-mono font-bold leading-none`} style={{ color: s.color }}>
+            {displayVal}
           </span>
           {s.unit && <span className="text-xs text-slate-500">{s.unit}</span>}
         </div>
       </div>
-      <div className="relative h-[70px] w-full">
-        <canvas ref={canvasRef} className="w-full h-full" style={{ height: 70 }} />
+      <div className="relative w-full" style={{ height: chartH }}>
+        <canvas ref={canvasRef} className="w-full h-full" style={{ height: chartH }} />
       </div>
-      <div className="px-3 pb-2 pt-1 flex gap-3 text-[10px] font-mono">
-        {s.min !== undefined && <span className="text-blue-400">↓{formatValue(s.min)}</span>}
-        {s.max !== undefined && <span className="text-orange-400">↑{formatValue(s.max)}</span>}
-        {s.avg !== undefined && <span className="text-slate-500">∅{formatValue(s.avg)}</span>}
-        <span className="text-slate-700 ml-auto">{s.data.length}pt</span>
-      </div>
+      {tileMode === 'detailed' && (
+        <div className={`px-3 ${tileSize === 'lg' ? 'pb-3 pt-2' : 'pb-2 pt-1'} flex gap-3 text-[10px] font-mono border-t border-slate-800/60`}>
+          {s.min !== undefined && <span className="text-blue-400">↓{formatValue(s.min)}</span>}
+          {s.max !== undefined && <span className="text-orange-400">↑{formatValue(s.max)}</span>}
+          {s.avg !== undefined && <span className="text-slate-500">∅{formatValue(s.avg)}</span>}
+          <span className="text-slate-700 ml-auto">{s.data.length}pt</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -472,72 +604,312 @@ function TrendTile({
 function TrendPopup({
   s,
   allSeries,
-  rangeMs,
-  fromTs,
+  initialRangeMs,
   liveValues,
   onClose,
   onExportImage,
 }: {
   s: TrendSeries;
   allSeries: TrendSeries[];
-  rangeMs: number;
-  fromTs: number;
+  initialRangeMs: number;
   liveValues: Record<string, unknown>;
   onClose: () => void;
   onExportImage: (canvas: HTMLCanvasElement, name?: string) => void;
 }) {
   const live = liveValues[s.nodeId];
+  const [popupRangeIdx, setPopupRangeIdx] = useState(() => {
+    const idx = TIME_RANGES.findIndex(r => r.ms === initialRangeMs);
+    return idx >= 0 ? idx : 1;
+  });
+  const [popupCustomFrom, setPopupCustomFrom] = useState('');
+  const [popupCustomTo, setPopupCustomTo] = useState('');
+  const [usePopupCustom, setUsePopupCustom] = useState(false);
+  const [popupSeries, setPopupSeries] = useState<TrendSeries[]>([s]);
+  const [visibleInPopup, setVisibleInPopup] = useState<Set<string>>(new Set([s.nodeId]));
+  const [zoomRange, setZoomRange] = useState<{ from: number; to: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [popupLoading, setPopupLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const popupRangeMs = usePopupCustom && popupCustomFrom && popupCustomTo
+    ? new Date(popupCustomTo).getTime() - new Date(popupCustomFrom).getTime()
+    : TIME_RANGES[popupRangeIdx].ms;
+
+  const baseFromTs = usePopupCustom && popupCustomFrom
+    ? new Date(popupCustomFrom).getTime()
+    : Date.now() - popupRangeMs;
+
+  const effectiveFromTs = zoomRange ? zoomRange.from : baseFromTs;
+  const effectiveRangeMs = zoomRange ? zoomRange.to - zoomRange.from : popupRangeMs;
+
+  const loadPopupData = useCallback(async (extraNodeIds: string[] = []) => {
+    const from = zoomRange ? zoomRange.from : baseFromTs;
+    const to = zoomRange ? zoomRange.to : baseFromTs + popupRangeMs;
+    const nodeIds = [s.nodeId, ...extraNodeIds];
+    setPopupLoading(true);
+    try {
+      const params = new URLSearchParams({ nodeIds: nodeIds.join(','), from: String(from), to: String(to) });
+      const res = await fetch(`${API_BASE}/trend?${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        const newSeries: TrendSeries[] = nodeIds.map(nodeId => {
+          const existing = allSeries.find(x => x.nodeId === nodeId) || (nodeId === s.nodeId ? s : null);
+          if (!existing) return null!;
+          const raw: TrendPoint[] = json[nodeId] || [];
+          const numVals = raw.filter(p => typeof p.v === 'number').map(p => p.v as number);
+          return {
+            ...existing,
+            data: raw,
+            min: numVals.length > 0 ? Math.min(...numVals) : undefined,
+            max: numVals.length > 0 ? Math.max(...numVals) : undefined,
+            avg: numVals.length > 0 ? numVals.reduce((a, b) => a + b, 0) / numVals.length : undefined,
+            last: raw.length > 0 ? raw[raw.length - 1].v : undefined,
+            visible: visibleInPopup.has(nodeId),
+          };
+        }).filter(Boolean);
+        setPopupSeries(newSeries);
+      }
+    } catch {} finally {
+      setPopupLoading(false);
+    }
+  }, [s, allSeries, baseFromTs, popupRangeMs, zoomRange, visibleInPopup]);
+
+  useEffect(() => {
+    loadPopupData(Array.from(visibleInPopup).filter(id => id !== s.nodeId));
+  }, [popupRangeIdx, usePopupCustom, popupCustomFrom, popupCustomTo, zoomRange]);
+
+  const togglePopupSeries = (nodeId: string) => {
+    setVisibleInPopup(prev => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+    setPopupSeries(prev => prev.map(ps => ps.nodeId === nodeId ? { ...ps, visible: !ps.visible } : ps));
+    if (!visibleInPopup.has(nodeId) && !popupSeries.find(ps => ps.nodeId === nodeId)) {
+      loadPopupData(Array.from(visibleInPopup).concat(nodeId).filter(id => id !== s.nodeId));
+    }
+  };
+
+  const addSeriesIfMissing = (nodeId: string) => {
+    if (popupSeries.find(ps => ps.nodeId === nodeId)) {
+      togglePopupSeries(nodeId);
+      return;
+    }
+    setVisibleInPopup(prev => new Set([...prev, nodeId]));
+    loadPopupData(Array.from(visibleInPopup).concat(nodeId).filter(id => id !== s.nodeId));
+  };
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const padLeft = 60;
+    const chartW = canvas.offsetWidth - padLeft - 16;
+    if (mx < padLeft || mx > padLeft + chartW) return;
+
+    const factor = e.deltaY < 0 ? 0.7 : 1.3;
+    const fraction = (mx - padLeft) / chartW;
+    const pivotTs = effectiveFromTs + fraction * effectiveRangeMs;
+    const newRange = effectiveRangeMs * factor;
+    const newFrom = pivotTs - fraction * newRange;
+    setZoomRange({ from: newFrom, to: newFrom + newRange });
+  }, [effectiveFromTs, effectiveRangeMs]);
+
+  const exportCsvPopup = () => {
+    const visible = popupSeries.filter(ps => ps.visible);
+    if (visible.length === 0) return;
+    const allTs = [...new Set(visible.flatMap(ps => ps.data.map(p => p.ts)))].sort((a, b) => a - b);
+    const header = ['Zeitstempel', 'Zeit', ...visible.map(ps => `${ps.label}${ps.unit ? ` (${ps.unit})` : ''}`)].join(';');
+    const rows = allTs.map(ts => {
+      const d = new Date(ts);
+      const time = `${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE')}`;
+      const vals = visible.map(ps => {
+        const p = ps.data.find(x => x.ts === ts);
+        return p !== undefined ? String(p.v) : '';
+      });
+      return [ts, time, ...vals].join(';');
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trend_${s.label}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const displayedSeries = popupSeries.map(ps => ({
+    ...ps,
+    visible: visibleInPopup.has(ps.nodeId),
+  }));
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99998] p-4"
+      className="fixed inset-0 bg-black/75 flex items-center justify-center z-[99998] p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ width: '90vw', maxWidth: 1000, maxHeight: '90vh' }}>
-        <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-700 flex-shrink-0" style={{ borderLeftColor: s.color, borderLeftWidth: 4 }}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ width: '92vw', maxWidth: 1100, maxHeight: '92vh' }}>
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-700 flex-shrink-0" style={{ borderLeftColor: s.color, borderLeftWidth: 4 }}>
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-white truncate">{s.label}</h3>
-            {s.unit && <span className="text-xs text-slate-400">{s.unit}</span>}
+            <h3 className="text-sm font-semibold text-white truncate">{s.label}</h3>
+            {s.unit && <span className="text-[11px] text-slate-400">{s.unit}</span>}
           </div>
-          <div className="flex items-center gap-4 mr-4">
-            <div className="text-center">
-              <div className="text-[10px] text-slate-500 uppercase">Aktuell</div>
-              <div className="text-sm font-mono font-bold" style={{ color: s.color }}>
-                {live !== undefined ? formatValue(live as number) : '-'}{s.unit ? ` ${s.unit}` : ''}
-              </div>
-            </div>
-            {s.min !== undefined && (
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase">Min</div>
-                <div className="text-sm font-mono text-blue-400">{formatValue(s.min)}</div>
-              </div>
-            )}
-            {s.max !== undefined && (
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase">Max</div>
-                <div className="text-sm font-mono text-orange-400">{formatValue(s.max)}</div>
-              </div>
-            )}
-            {s.avg !== undefined && (
-              <div className="text-center">
-                <div className="text-[10px] text-slate-500 uppercase">Avg</div>
-                <div className="text-sm font-mono text-slate-300">{formatValue(s.avg)}</div>
-              </div>
-            )}
+          <div className="flex items-center gap-3">
+            {popupSeries.find(ps => ps.nodeId === s.nodeId && ps.min !== undefined) && (() => {
+              const ps = popupSeries.find(x => x.nodeId === s.nodeId)!;
+              return (
+                <div className="flex items-center gap-3 text-center border-r border-slate-700 pr-3">
+                  <div>
+                    <div className="text-[9px] text-slate-600 uppercase">Aktuell</div>
+                    <div className="text-xs font-mono font-bold" style={{ color: s.color }}>
+                      {live !== undefined ? formatValue(live as number) : (ps.last !== undefined ? formatValue(ps.last as number) : '-')}{s.unit ? ` ${s.unit}` : ''}
+                    </div>
+                  </div>
+                  {ps.min !== undefined && <div><div className="text-[9px] text-slate-600 uppercase">Min</div><div className="text-xs font-mono text-blue-400">{formatValue(ps.min)}</div></div>}
+                  {ps.max !== undefined && <div><div className="text-[9px] text-slate-600 uppercase">Max</div><div className="text-xs font-mono text-orange-400">{formatValue(ps.max)}</div></div>}
+                  {ps.avg !== undefined && <div><div className="text-[9px] text-slate-600 uppercase">Avg</div><div className="text-xs font-mono text-slate-300">{formatValue(ps.avg)}</div></div>}
+                </div>
+              );
+            })()}
+            <button
+              onClick={exportCsvPopup}
+              title="CSV exportieren"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              CSV
+            </button>
+            <button
+              onClick={() => {
+                const canvas = canvasRef.current;
+                if (canvas) onExportImage(canvas, `trend_${s.label}`);
+              }}
+              title="PNG exportieren"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <Image className="w-3.5 h-3.5" />
+              PNG
+            </button>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0 ml-1">
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
+
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60 flex-shrink-0 flex-wrap gap-y-1.5">
+          {!usePopupCustom && (
+            <div className="flex items-center gap-0.5 bg-slate-800 rounded-lg p-0.5">
+              {TIME_RANGES.map((r, i) => (
+                <button
+                  key={r.label}
+                  onClick={() => { setPopupRangeIdx(i); setZoomRange(null); }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${popupRangeIdx === i && !zoomRange ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              if (!usePopupCustom) {
+                const now = new Date();
+                const from = new Date(now.getTime() - popupRangeMs);
+                setPopupCustomFrom(from.toISOString().slice(0, 16));
+                setPopupCustomTo(now.toISOString().slice(0, 16));
+              }
+              setUsePopupCustom(v => !v);
+              setZoomRange(null);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${usePopupCustom ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-600/30' : 'text-slate-400 hover:text-white bg-slate-800'}`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            Custom
+          </button>
+
+          {usePopupCustom && (
+            <div className="flex items-center gap-2">
+              <input type="datetime-local" value={popupCustomFrom} onChange={e => setPopupCustomFrom(e.target.value)} className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-1.5 focus:outline-none focus:border-cyan-500" />
+              <ChevronRightIcon className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+              <input type="datetime-local" value={popupCustomTo} onChange={e => setPopupCustomTo(e.target.value)} className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-1.5 focus:outline-none focus:border-cyan-500" />
+              <button onClick={() => loadPopupData(Array.from(visibleInPopup).filter(id => id !== s.nodeId))} className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-cyan-600 text-white hover:bg-cyan-700 transition-colors">
+                <Check className="w-3.5 h-3.5" />
+                Laden
+              </button>
+            </div>
+          )}
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {zoomRange && (
+              <button
+                onClick={() => setZoomRange(null)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-orange-600/20 text-orange-400 border border-orange-600/30 hover:bg-orange-600/30 transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Zoom zurücksetzen
+              </button>
+            )}
+            <div className="flex gap-1 bg-slate-800 rounded-lg p-0.5">
+              <button onClick={() => { const newRange = effectiveRangeMs * 0.6; const center = effectiveFromTs + effectiveRangeMs / 2; setZoomRange({ from: center - newRange / 2, to: center + newRange / 2 }); }} className="p-1.5 text-slate-400 hover:text-white rounded-md transition-colors" title="Hineinzoomen"><ZoomIn className="w-3.5 h-3.5" /></button>
+              <button onClick={() => { const newRange = effectiveRangeMs * 1.6; const center = effectiveFromTs + effectiveRangeMs / 2; setZoomRange({ from: center - newRange / 2, to: center + newRange / 2 }); }} className="p-1.5 text-slate-400 hover:text-white rounded-md transition-colors" title="Herauszoomen"><ZoomOut className="w-3.5 h-3.5" /></button>
+            </div>
+            {popupLoading && <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-slate-800/60 flex-shrink-0">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Serien:</span>
+          {allSeries.map(as => {
+            const isVisible = visibleInPopup.has(as.nodeId);
+            return (
+              <button
+                key={as.nodeId}
+                onClick={() => addSeriesIfMissing(as.nodeId)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border"
+                style={isVisible
+                  ? { backgroundColor: as.color + '25', borderColor: as.color + '60', color: as.color }
+                  : { backgroundColor: 'transparent', borderColor: '#334155', color: '#475569' }}
+              >
+                {isVisible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                {as.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          className="flex-1 overflow-hidden p-4 select-none"
+          onMouseDown={e => { setIsDragging(true); setDragStartX(e.clientX); }}
+          onMouseMove={e => {
+            if (!isDragging) return;
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const chartW = canvas.offsetWidth - 76;
+            const dx = e.clientX - dragStartX;
+            const dTs = -(dx / chartW) * effectiveRangeMs;
+            setZoomRange({ from: effectiveFromTs + dTs, to: effectiveFromTs + dTs + effectiveRangeMs });
+            setDragStartX(e.clientX);
+          }}
+          onMouseUp={() => setIsDragging(false)}
+          onMouseLeave={() => setIsDragging(false)}
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        >
           <TrendChart
-            series={[s]}
-            rangeMs={rangeMs}
-            fromTs={fromTs}
+            series={displayedSeries}
+            rangeMs={effectiveRangeMs}
+            fromTs={effectiveFromTs}
             height={380}
             separateAxes={false}
-            onExportImage={(c) => onExportImage(c, `trend_${s.label}`)}
+            onExportImage={(c) => { onExportImage(c, `trend_${s.label}`); }}
+            canvasRef={canvasRef}
+            onWheel={handleWheel}
           />
         </div>
       </div>
@@ -562,6 +934,8 @@ export function TrendView({ pages, liveValues, customBlockDefs = [] }: Props) {
   const [visibleSeriesIds, setVisibleSeriesIds] = useState<Set<string>>(new Set());
   const [popupSeries, setPopupSeries] = useState<TrendSeries | null>(null);
   const [expandedCustomBlocks, setExpandedCustomBlocks] = useState<Set<string>>(new Set());
+  const [tileSize, setTileSize] = useState<TileSize>('sm');
+  const [tileMode, setTileMode] = useState<TileMode>('simple');
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const rangeMs = TIME_RANGES[selectedRangeIdx].ms;
@@ -914,21 +1288,46 @@ export function TrendView({ pages, liveValues, customBlockDefs = [] }: Props) {
             )}
 
             {series.length > 0 && chartMode === 'tiles' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-500">Kachelgrösse:</span>
+                  <div className="flex bg-slate-800 rounded-lg p-0.5">
+                    {([['xs', List, 'Kompakt'], ['sm', Grid3x3, 'Klein'], ['md', LayoutGrid, 'Mittel'], ['lg', BarChart2, 'Gross']] as const).map(([v, Icon, label]) => (
+                      <button key={v} onClick={() => setTileSize(v)} className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${tileSize === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                        <Icon className="w-3 h-3" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex bg-slate-800 rounded-lg p-0.5">
+                    {([['simple', 'Einfach'], ['detailed', 'Detailliert']] as const).map(([v, label]) => (
+                      <button key={v} onClick={() => setTileMode(v)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${tileMode === v ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {seriesByPage.map(([pageId, { pageName, series: pageSeries }]) => (
                   <div key={pageId}>
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-2.5">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{pageName}</span>
                       <div className="flex-1 h-px bg-slate-800" />
                       <span className="text-xs text-slate-600">{pageSeries.length}</span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div className={`grid gap-2.5 ${
+                      tileSize === 'xs' ? 'grid-cols-1 sm:grid-cols-2' :
+                      tileSize === 'sm' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
+                      tileSize === 'md' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' :
+                      'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                    }`}>
                       {pageSeries.map(s => (
                         <TrendTile
                           key={s.nodeId}
                           s={s}
                           liveValues={liveValues}
                           onClick={() => setPopupSeries(s)}
+                          tileSize={tileSize}
+                          tileMode={tileMode}
                         />
                       ))}
                     </div>
@@ -1034,8 +1433,7 @@ export function TrendView({ pages, liveValues, customBlockDefs = [] }: Props) {
         <TrendPopup
           s={popupSeries}
           allSeries={series}
-          rangeMs={useCustomRange ? (computedToTs - computedFromTs) : rangeMs}
-          fromTs={computedFromTs}
+          initialRangeMs={useCustomRange ? (computedToTs - computedFromTs) : rangeMs}
           liveValues={liveValues}
           onClose={() => setPopupSeries(null)}
           onExportImage={exportPng}

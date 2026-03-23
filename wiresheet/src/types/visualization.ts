@@ -66,6 +66,7 @@ export type WidgetType =
   | 'visu-heating-curve'
   | 'visu-alarm-console'
   | 'visu-trend-chart'
+  | 'visu-trend-tiles'
   | 'visu-3d-building'
   | 'visu-time-program';
 

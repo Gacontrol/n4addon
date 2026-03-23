@@ -1964,6 +1964,7 @@ function App() {
         <TrendView
           pages={pages}
           liveValues={liveValues}
+          customBlockDefs={customBlocks}
         />
       ) : mainView === 'building' ? (
         <BuildingView haEntities={haEntities} haLoading={haLoading} onLoadHaEntities={loadHaEntities} pages={pages} liveValues={liveValues} />
