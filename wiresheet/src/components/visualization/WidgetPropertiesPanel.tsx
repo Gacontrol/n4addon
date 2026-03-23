@@ -198,14 +198,9 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
   const params: ConfigParam[] = [];
   switch (node.type) {
     case 'pid-controller':
-      params.push({ key: 'kp', label: 'Kp (Proportional)', type: 'number' });
-      params.push({ key: 'ki', label: 'Ki (Integral)', type: 'number' });
-      params.push({ key: 'kd', label: 'Kd (Differential)', type: 'number' });
-      params.push({ key: 'outputMin', label: 'Ausgang Min', type: 'number' });
-      params.push({ key: 'outputMax', label: 'Ausgang Max', type: 'number' });
-      params.push({ key: 'pidKp', label: 'PID Kp', type: 'number' });
-      params.push({ key: 'pidKi', label: 'PID Ki', type: 'number' });
-      params.push({ key: 'pidKd', label: 'PID Kd', type: 'number' });
+      params.push({ key: 'pidKp', label: 'Kp (Proportional)', type: 'number' });
+      params.push({ key: 'pidKi', label: 'Ki (Integral)', type: 'number' });
+      params.push({ key: 'pidKd', label: 'Kd (Differential)', type: 'number' });
       params.push({ key: 'pidWindupLimit', label: 'Windup-Grenze', type: 'number' });
       params.push({ key: 'pidMinOutput', label: 'Ausgang Min', type: 'number' });
       params.push({ key: 'pidMaxOutput', label: 'Ausgang Max', type: 'number' });
