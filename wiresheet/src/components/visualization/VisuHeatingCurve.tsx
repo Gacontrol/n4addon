@@ -114,7 +114,7 @@ const CurveGraph: React.FC<{
         return (
           <g key={`x-${i}`}>
             <line x1={x} y1={padding.top} x2={x} y2={padding.top + graphHeight} stroke="#334155" strokeWidth="1" strokeDasharray="2,2" />
-            <text x={x} y={height - 10} textAnchor="middle" fontSize="10" fill="#94a3b8">{val.toFixed(0)}</text>
+            <text x={x} y={height - 10} textAnchor="middle" fontSize="10" fill="#94a3b8">{isFinite(val) ? val.toFixed(0) : '0'}</text>
           </g>
         );
       })}
@@ -125,7 +125,7 @@ const CurveGraph: React.FC<{
         return (
           <g key={`y-${i}`}>
             <line x1={padding.left} y1={y} x2={padding.left + graphWidth} y2={y} stroke="#334155" strokeWidth="1" strokeDasharray="2,2" />
-            <text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">{val.toFixed(0)}</text>
+            <text x={padding.left - 8} y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">{isFinite(val) ? val.toFixed(0) : '0'}</text>
           </g>
         );
       })}
@@ -155,14 +155,14 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [localParams, setLocalParams] = useState<HeatingCurveParams>({});
 
-  const outputValue = value?.outputValue ?? 0;
-  const inputValue = value?.inputValue ?? 0;
+  const outputValue = Number(value?.outputValue ?? 0) || 0;
+  const inputValue = Number(value?.inputValue ?? 0) || 0;
   const enable = value?.enable ?? true;
 
-  const minInput = params?.hcMinInput ?? -20;
-  const maxInput = params?.hcMaxInput ?? 20;
-  const minOutput = params?.hcMinOutput ?? 20;
-  const maxOutput = params?.hcMaxOutput ?? 80;
+  const minInput = isFinite(Number(params?.hcMinInput)) ? Number(params?.hcMinInput) : -20;
+  const maxInput = isFinite(Number(params?.hcMaxInput)) ? Number(params?.hcMaxInput) : 20;
+  const minOutput = isFinite(Number(params?.hcMinOutput)) ? Number(params?.hcMinOutput) : 20;
+  const maxOutput = isFinite(Number(params?.hcMaxOutput)) ? Number(params?.hcMaxOutput) : 80;
   const reverseDirection = params?.hcReverseDirection !== false;
 
   const paramsRef = useRef(params);
@@ -296,10 +296,10 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
             <div className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-80px)]">
               <div className="flex justify-center">
                 <CurveGraph
-                  minInput={localParams.hcMinInput ?? minInput}
-                  maxInput={localParams.hcMaxInput ?? maxInput}
-                  minOutput={localParams.hcMinOutput ?? minOutput}
-                  maxOutput={localParams.hcMaxOutput ?? maxOutput}
+                  minInput={isFinite(Number(localParams.hcMinInput)) ? Number(localParams.hcMinInput) : minInput}
+                  maxInput={isFinite(Number(localParams.hcMaxInput)) ? Number(localParams.hcMaxInput) : maxInput}
+                  minOutput={isFinite(Number(localParams.hcMinOutput)) ? Number(localParams.hcMinOutput) : minOutput}
+                  maxOutput={isFinite(Number(localParams.hcMaxOutput)) ? Number(localParams.hcMaxOutput) : maxOutput}
                   reverse={localParams.hcReverseDirection ?? reverseDirection}
                   inputValue={inputValue}
                   outputValue={outputValue}

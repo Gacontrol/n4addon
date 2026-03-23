@@ -101,12 +101,12 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [localParams, setLocalParams] = useState<PIDParams>({});
 
-  const controlOutput = value?.controlOutput ?? 0;
-  const setpoint = value?.setpoint ?? 0;
-  const actualValue = value?.actualValue ?? 0;
+  const controlOutput = Number(value?.controlOutput ?? 0) || 0;
+  const setpoint = Number(value?.setpoint ?? 0) || 0;
+  const actualValue = Number(value?.actualValue ?? 0) || 0;
   const enable = value?.enable ?? false;
   const hoaMode = value?.hoaMode ?? 'auto';
-  const manualOutput = value?.manualOutput ?? 0;
+  const manualOutput = Number(value?.manualOutput ?? 0) || 0;
 
   const minOutput = params?.pidMinOutput ?? 0;
   const maxOutput = params?.pidMaxOutput ?? 100;
@@ -114,7 +114,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
 
   const isHandMode = hoaMode === 'hand';
   const isActive = enable || isHandMode;
-  const [localManualOutput, setLocalManualOutput] = useState(manualOutput);
+  const [localManualOutput, setLocalManualOutput] = useState(Number(manualOutput) || 0);
 
   const paramsRef = useRef(params);
   paramsRef.current = params;
@@ -166,7 +166,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
   const showActualValueDisplay = config.showActualValue !== false;
   const showOutputDisplay = config.showOutput !== false;
 
-  const error = setpoint - actualValue;
+  const error = Number(setpoint - actualValue) || 0;
 
   const labelPos = config.labelPosition || 'bottom';
   const textFontSize = config.fontSize ? `${config.fontSize}px` : undefined;
