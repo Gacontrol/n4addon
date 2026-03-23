@@ -366,24 +366,25 @@ async function loadRegistries() {
 }
 
 app.get('/api/admin-check', async (req, res) => {
-  const token = getToken();
-  if (!token) {
+  const supervisorToken = getToken();
+  if (!supervisorToken) {
     return res.status(200).json({ isAdmin: true, reason: 'no-supervisor-token' });
   }
-  const haToken = req.headers['x-hassio-user'] || req.headers['authorization'];
-  if (!haToken) {
-    return res.status(403).json({ isAdmin: false, reason: 'no-user-token' });
+  const hassioUser = req.headers['x-hassio-user'];
+  if (!hassioUser) {
+    return res.status(403).json({ isAdmin: false, reason: 'no-hassio-user-header' });
   }
   try {
-    const userToken = haToken.replace(/^Bearer\s+/i, '');
-    const authRes = await axios.post('http://supervisor/auth', { token: userToken }, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
+    const usersRes = await axios.get('http://supervisor/auth/users', {
+      headers: { Authorization: `Bearer ${supervisorToken}` },
       timeout: 5000
     });
-    const isAdmin = authRes.data?.is_owner === true || authRes.data?.is_admin === true;
+    const users = usersRes.data?.data?.users || usersRes.data?.users || [];
+    const user = users.find(u => u.username === hassioUser || u.id === hassioUser || u.name === hassioUser);
+    if (!user) {
+      return res.status(403).json({ isAdmin: false, reason: 'user-not-found' });
+    }
+    const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
     if (isAdmin) {
       return res.status(200).json({ isAdmin: true });
     } else {
@@ -391,7 +392,7 @@ app.get('/api/admin-check', async (req, res) => {
     }
   } catch (err) {
     console.log('Admin-Check Fehler:', err.message);
-    return res.status(200).json({ isAdmin: true, reason: 'check-failed-allow' });
+    return res.status(403).json({ isAdmin: false, reason: 'check-failed' });
   }
 });
 
