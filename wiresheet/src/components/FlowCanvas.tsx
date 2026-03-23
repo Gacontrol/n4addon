@@ -556,6 +556,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 color={isSelected ? '#f59e0b' : '#10b981'}
                 liveValue={connValue}
                 isSelected={isSelected}
+                isSelfLoop={conn.source === conn.target}
                 onClick={(e) => handleConnectionClick(conn.id, e)}
                 onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
               />

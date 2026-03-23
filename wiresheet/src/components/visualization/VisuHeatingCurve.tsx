@@ -77,8 +77,8 @@ const CurveGraph: React.FC<{
   const graphWidth = width - padding.left - padding.right;
   const graphHeight = height - padding.top - padding.bottom;
 
-  const inputRange = maxInput - minInput;
-  const outputRange = maxOutput - minOutput;
+  const inputRange = maxInput - minInput || 1;
+  const outputRange = maxOutput - minOutput || 1;
 
   const xScale = (val: number) => padding.left + ((val - minInput) / inputRange) * graphWidth;
   const yScale = (val: number) => padding.top + graphHeight - ((val - minOutput) / outputRange) * graphHeight;
@@ -187,6 +187,9 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
+  }, []);
+
+  const handleParamCommit = useCallback((key: string, val: number | boolean) => {
     onValueChange?.({ heatingCurveControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
@@ -346,6 +349,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                         step="any"
                         value={localParams.hcMinInput ?? minInput}
                         onChange={(e) => handleParamChange('hcMinInput', parseFloat(e.target.value) || -20)}
+                        onBlur={(e) => handleParamCommit('hcMinInput', parseFloat(e.target.value) || -20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -356,6 +360,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                         step="any"
                         value={localParams.hcMaxInput ?? maxInput}
                         onChange={(e) => handleParamChange('hcMaxInput', parseFloat(e.target.value) || 20)}
+                        onBlur={(e) => handleParamCommit('hcMaxInput', parseFloat(e.target.value) || 20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -366,6 +371,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                         step="any"
                         value={localParams.hcMinOutput ?? minOutput}
                         onChange={(e) => handleParamChange('hcMinOutput', parseFloat(e.target.value) || 20)}
+                        onBlur={(e) => handleParamCommit('hcMinOutput', parseFloat(e.target.value) || 20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -376,6 +382,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                         step="any"
                         value={localParams.hcMaxOutput ?? maxOutput}
                         onChange={(e) => handleParamChange('hcMaxOutput', parseFloat(e.target.value) || 80)}
+                        onBlur={(e) => handleParamCommit('hcMaxOutput', parseFloat(e.target.value) || 80)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>

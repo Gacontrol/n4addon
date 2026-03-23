@@ -9,29 +9,40 @@ interface ConnectionLineProps {
   isActive?: boolean;
   isSelected?: boolean;
   liveValue?: unknown;
+  isSelfLoop?: boolean;
   onClick?: (e: React.MouseEvent) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 const R = 6;
 
-function buildOrthogonalPath(x1: number, y1: number, x2: number, y2: number): { path: string; labelX: number; labelY: number } {
+function buildOrthogonalPath(x1: number, y1: number, x2: number, y2: number, isSelfLoop?: boolean): { path: string; labelX: number; labelY: number } {
   const dx = x2 - x1;
   const dy = y2 - y1;
-  const isSelfLoop = Math.abs(dx) < 30 && Math.abs(dy) < 80;
 
   if (isSelfLoop) {
-    const loopOut = 44;
+    const loopOut = 60;
     const mx = x1 + loopOut;
     const my = (y1 + y2) / 2;
-    const r = Math.min(R, Math.abs(dy) / 4);
-    const signY1 = dy >= 0 ? -1 : 1;
-    const signY2 = dy >= 0 ? 1 : -1;
+    const absDy = Math.abs(dy);
+    const r = Math.min(R, absDy / 4);
+    const signY = dy >= 0 ? 1 : -1;
+    if (absDy < 4) {
+      const path = [
+        `M ${x1} ${y1}`,
+        `H ${mx - R}`,
+        `Q ${mx} ${y1} ${mx} ${y1 + R}`,
+        `V ${y2 - R}`,
+        `Q ${mx} ${y2} ${mx - R} ${y2}`,
+        `H ${x2}`
+      ].join(' ');
+      return { path, labelX: mx + 8, labelY: my };
+    }
     const path = [
       `M ${x1} ${y1}`,
       `H ${mx - r}`,
-      `Q ${mx} ${y1} ${mx} ${y1 + r * signY1 * -1}`,
-      `V ${y2 + r * signY2 * -1}`,
+      `Q ${mx} ${y1} ${mx} ${y1 + r * signY}`,
+      `V ${y2 - r * signY}`,
       `Q ${mx} ${y2} ${mx - r} ${y2}`,
       `H ${x2}`
     ].join(' ');
@@ -80,10 +91,11 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
   isActive = false,
   isSelected = false,
   liveValue,
+  isSelfLoop,
   onClick,
   onContextMenu
 }) => {
-  const { path, labelX, labelY } = buildOrthogonalPath(x1, y1, x2, y2);
+  const { path, labelX, labelY } = buildOrthogonalPath(x1, y1, x2, y2, isSelfLoop);
 
   const hasValue = liveValue !== undefined && liveValue !== null;
   const displayVal = hasValue ? String(liveValue) : null;

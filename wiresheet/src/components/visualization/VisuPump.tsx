@@ -185,6 +185,9 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
+  }, []);
+
+  const handleParamCommit = useCallback((key: string, val: number | boolean) => {
     onValueChange?.({ pumpControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
@@ -494,6 +497,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpStartDelayMs ?? 0}
                         onChange={(e) => handleParamChange('pumpStartDelayMs', parseInt(e.target.value) || 0)}
+                        onBlur={(e) => handleParamCommit('pumpStartDelayMs', parseInt(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -503,6 +507,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpStopDelayMs ?? 0}
                         onChange={(e) => handleParamChange('pumpStopDelayMs', parseInt(e.target.value) || 0)}
+                        onBlur={(e) => handleParamCommit('pumpStopDelayMs', parseInt(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -512,6 +517,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpFeedbackTimeoutMs ?? 10000}
                         onChange={(e) => handleParamChange('pumpFeedbackTimeoutMs', parseInt(e.target.value) || 10000)}
+                        onBlur={(e) => handleParamCommit('pumpFeedbackTimeoutMs', parseInt(e.target.value) || 10000)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -520,7 +526,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="checkbox"
                         id="enableFeedback"
                         checked={localParams.pumpEnableFeedback !== false}
-                        onChange={(e) => handleParamChange('pumpEnableFeedback', e.target.checked)}
+                        onChange={(e) => { handleParamChange('pumpEnableFeedback', e.target.checked); handleParamCommit('pumpEnableFeedback', e.target.checked); }}
                         className="w-4 h-4 rounded border-slate-600"
                       />
                       <label htmlFor="enableFeedback" className="text-sm text-slate-300">RM aktiv</label>
@@ -531,6 +537,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpSpeedMin ?? 0}
                         onChange={(e) => handleParamChange('pumpSpeedMin', parseInt(e.target.value) || 0)}
+                        onBlur={(e) => handleParamCommit('pumpSpeedMin', parseInt(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -540,6 +547,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpSpeedMax ?? 100}
                         onChange={(e) => handleParamChange('pumpSpeedMax', parseInt(e.target.value) || 100)}
+                        onBlur={(e) => handleParamCommit('pumpSpeedMax', parseInt(e.target.value) || 100)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -550,6 +558,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                           type="number"
                           value={Math.round((localParams.pumpAntiSeizeIntervalMs ?? 604800000) / 86400000)}
                           onChange={(e) => handleParamChange('pumpAntiSeizeIntervalMs', (parseInt(e.target.value) || 7) * 86400000)}
+                          onBlur={(e) => handleParamCommit('pumpAntiSeizeIntervalMs', (parseInt(e.target.value) || 7) * 86400000)}
                           className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                         />
                         <span className="text-xs text-slate-400">Tage</span>
@@ -562,6 +571,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                           type="number"
                           value={Math.round((localParams.pumpAntiSeizeRunMs ?? 60000) / 1000)}
                           onChange={(e) => handleParamChange('pumpAntiSeizeRunMs', (parseInt(e.target.value) || 60) * 1000)}
+                          onBlur={(e) => handleParamCommit('pumpAntiSeizeRunMs', (parseInt(e.target.value) || 60) * 1000)}
                           className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                         />
                         <span className="text-xs text-slate-400">Sek</span>
@@ -573,6 +583,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
                         type="number"
                         value={localParams.pumpAntiSeizeSpeed ?? 30}
                         onChange={(e) => handleParamChange('pumpAntiSeizeSpeed', parseInt(e.target.value) || 30)}
+                        onBlur={(e) => handleParamCommit('pumpAntiSeizeSpeed', parseInt(e.target.value) || 30)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>

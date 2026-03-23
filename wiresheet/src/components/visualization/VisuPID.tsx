@@ -142,6 +142,9 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
 
   const handleParamChange = useCallback((key: string, val: number | boolean | string) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
+  }, []);
+
+  const handleParamCommit = useCallback((key: string, val: number | boolean | string) => {
     onValueChange?.({ pidControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
@@ -385,6 +388,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         step="0.1"
                         value={localParams.pidKp ?? 1.0}
                         onChange={(e) => handleParamChange('pidKp', parseFloat(e.target.value) || 1.0)}
+                        onBlur={(e) => handleParamCommit('pidKp', parseFloat(e.target.value) || 1.0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -395,6 +399,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         step="0.01"
                         value={localParams.pidKi ?? 0.1}
                         onChange={(e) => handleParamChange('pidKi', parseFloat(e.target.value) || 0.1)}
+                        onBlur={(e) => handleParamCommit('pidKi', parseFloat(e.target.value) || 0.1)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -405,6 +410,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         step="0.01"
                         value={localParams.pidKd ?? 0.0}
                         onChange={(e) => handleParamChange('pidKd', parseFloat(e.target.value) || 0.0)}
+                        onBlur={(e) => handleParamCommit('pidKd', parseFloat(e.target.value) || 0.0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -414,6 +420,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         type="number"
                         value={localParams.pidWindupLimit ?? 100}
                         onChange={(e) => handleParamChange('pidWindupLimit', parseFloat(e.target.value) || 100)}
+                        onBlur={(e) => handleParamCommit('pidWindupLimit', parseFloat(e.target.value) || 100)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -423,6 +430,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         type="number"
                         value={localParams.pidMinOutput ?? 0}
                         onChange={(e) => handleParamChange('pidMinOutput', parseFloat(e.target.value) || 0)}
+                        onBlur={(e) => handleParamCommit('pidMinOutput', parseFloat(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
@@ -432,6 +440,7 @@ export const VisuPID: React.FC<VisuPIDProps> = ({
                         type="number"
                         value={localParams.pidMaxOutput ?? 100}
                         onChange={(e) => handleParamChange('pidMaxOutput', parseFloat(e.target.value) || 100)}
+                        onBlur={(e) => handleParamCommit('pidMaxOutput', parseFloat(e.target.value) || 100)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>

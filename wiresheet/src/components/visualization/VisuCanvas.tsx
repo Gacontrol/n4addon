@@ -455,19 +455,23 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
 
-    if (isEditMode && e.target === canvasRef.current && e.button === 0) {
-      const pos = getCanvasPos(e);
-      if (!e.ctrlKey && !e.metaKey) {
-        onSelectWidget(null);
-        onSelectWidgets?.([]);
+    if (isEditMode && e.button === 0) {
+      const target = e.target as HTMLElement;
+      const isOnWidget = target.closest('[data-widget-id]') !== null;
+      if (!isOnWidget) {
+        const pos = getCanvasPos(e);
+        if (!e.ctrlKey && !e.metaKey) {
+          onSelectWidget(null);
+          onSelectWidgets?.([]);
+        }
+        setLassoState({
+          startX: pos.x,
+          startY: pos.y,
+          currentX: pos.x,
+          currentY: pos.y
+        });
+        e.preventDefault();
       }
-      setLassoState({
-        startX: pos.x,
-        startY: pos.y,
-        currentX: pos.x,
-        currentY: pos.y
-      });
-      e.preventDefault();
     }
 
   }, [drawingState, contextMenu, isEditMode, getCanvasPos, snapPos, page.widgets, onUpdateWidget, onSelectWidget, onSelectWidgets]);
