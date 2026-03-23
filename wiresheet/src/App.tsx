@@ -138,6 +138,7 @@ function App() {
     return () => clearInterval(interval);
   }, [unshelveExpiredAlarms]);
 
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building'>('logic');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -184,6 +185,27 @@ function App() {
     const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
     return m ? `${m[1]}/api` : '/api';
   }, []);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const apiBase = getApiBase();
+        const resp = await fetch(`${apiBase}/admin-check`);
+        if (resp.ok) {
+          const data = await resp.json();
+          setIsAdmin(data.isAdmin === true);
+          if (data.isAdmin === false) {
+            setMainView('visu');
+          }
+        } else {
+          setIsAdmin(true);
+        }
+      } catch {
+        setIsAdmin(true);
+      }
+    };
+    checkAdmin();
+  }, [getApiBase]);
 
   useEffect(() => {
     const loadDriverConfig = async () => {
@@ -1332,28 +1354,32 @@ function App() {
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-700 rounded-lg p-0.5 flex-shrink-0">
-            <button
-              onClick={() => setMainView('logic')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                mainView === 'logic'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Logik</span>
-            </button>
-            <button
-              onClick={() => setMainView('drivers')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                mainView === 'drivers'
-                  ? 'bg-amber-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Network className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Treiber</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setMainView('logic')}
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  mainView === 'logic'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Logik</span>
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setMainView('drivers')}
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  mainView === 'drivers'
+                    ? 'bg-amber-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Network className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Treiber</span>
+              </button>
+            )}
             <button
               onClick={() => { setMainView('visu'); executeAllPages(); }}
               className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -1392,17 +1418,19 @@ function App() {
               <TrendingUp className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Trends</span>
             </button>
-            <button
-              onClick={() => setMainView('building')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                mainView === 'building'
-                  ? 'bg-teal-600 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Gebäude</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setMainView('building')}
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  mainView === 'building'
+                    ? 'bg-teal-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Gebäude</span>
+              </button>
+            )}
           </div>
 
           {mainView === 'logic' && (
