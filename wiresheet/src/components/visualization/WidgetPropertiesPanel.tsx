@@ -297,6 +297,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'binding' | 'style'>('general');
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [availableBuildings, setAvailableBuildings] = useState<{ id: string; name: string; floors: { id: string; name: string }[] }[]>([]);
+  const [trendSearch, setTrendSearch] = useState('');
 
   const refreshBuildings = useCallback(() => {
     const p = window.location.pathname;
@@ -2573,6 +2574,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         };
 
         const alreadyAdded = new Set(tcCfg.series.map(s => s.nodeId));
+        const filteredTrends = trackedTrends.filter(t =>
+          !alreadyAdded.has(t.nodeId) &&
+          (trendSearch === '' || t.label.toLowerCase().includes(trendSearch.toLowerCase()))
+        );
         const availableTrends = trackedTrends.filter(t => !alreadyAdded.has(t.nodeId));
 
         const addFromTrend = (trend: TrackedTrend) => {
@@ -2582,7 +2587,6 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
             color: trend.color,
             unit: trend.unit,
             visible: true,
-            chartType: tcCfg.chartType,
           };
           onUpdate({ config: { ...tcCfg, series: [...tcCfg.series, newSeries] } });
         };
@@ -2599,7 +2603,17 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               {trackedTrends.length > 0 && availableTrends.length === 0 && tcCfg.series.length > 0 && (
                 <p className="text-[10px] text-slate-500 italic">Alle konfigurierten Trends wurden bereits hinzugefügt.</p>
               )}
-              {availableTrends.map(trend => (
+              {availableTrends.length > 0 && (
+                <input
+                  type="text"
+                  value={trendSearch}
+                  onChange={(e) => setTrendSearch(e.target.value)}
+                  placeholder="Trends suchen..."
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200 placeholder-slate-500"
+                />
+              )}
+              <div className="max-h-48 overflow-y-auto space-y-1">
+              {filteredTrends.map(trend => (
                 <button
                   key={trend.nodeId}
                   onClick={() => addFromTrend(trend)}
@@ -2611,6 +2625,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   <Plus className="w-3 h-3 text-slate-500 flex-shrink-0" />
                 </button>
               ))}
+              {trendSearch !== '' && filteredTrends.length === 0 && availableTrends.length > 0 && (
+                <p className="text-[10px] text-slate-500 italic px-1">Keine Treffer für "{trendSearch}"</p>
+              )}
+              </div>
               {tcCfg.series.length > 0 && (
                 <div className="border-t border-slate-700 pt-2 space-y-1.5">
                   <label className="text-xs font-medium text-slate-400">Ausgewählte Trends</label>
@@ -2721,7 +2739,15 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
               <label className="text-xs font-medium text-slate-400">Standard-Diagrammtyp</label>
               <select
                 value={tcCfg.chartType}
-                onChange={(e) => onUpdate({ config: { ...tcCfg, chartType: e.target.value as TrendChartType } })}
+                onChange={(e) => {
+                  const newType = e.target.value as TrendChartType;
+                  const updatedSeries = tcCfg.series.map(s =>
+                    s.chartType === undefined || s.chartType === tcCfg.chartType
+                      ? { ...s, chartType: undefined }
+                      : s
+                  );
+                  onUpdate({ config: { ...tcCfg, chartType: newType, series: updatedSeries } });
+                }}
                 className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
               >
                 {CHART_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
