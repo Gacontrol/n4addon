@@ -93,7 +93,8 @@ function App() {
     duplicateBlock,
     importBlocks,
     exportBlock,
-    exportAllBlocks
+    exportAllBlocks,
+    isBuiltin
   } = useCustomBlocks();
 
   const {
@@ -1626,6 +1627,7 @@ function App() {
                     onImportBlocks={importBlocks}
                     onAddBlockToCanvas={handleAddBlockToCanvas}
                     canCreateFromSelection={selectedNodes.size >= 1}
+                    isBuiltin={isBuiltin}
                   />
                 )}
               </div>

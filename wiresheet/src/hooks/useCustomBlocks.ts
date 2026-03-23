@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { CustomBlockDefinition } from '../types/flow';
+import { allBuiltinBlocks } from '../data/builtinBlocks';
 
 function getApiBase(): string {
   const path = window.location.pathname;
@@ -22,6 +23,8 @@ export const useCustomBlocks = () => {
   const [error, setError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const builtinIds = new Set(allBuiltinBlocks.map(b => b.id));
+
   const loadBlocks = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -29,14 +32,17 @@ export const useCustomBlocks = () => {
       const res = await fetch(`${API_BASE}/blocks`);
       if (res.ok) {
         const data = await res.json();
-        setBlocks(Array.isArray(data) ? data : []);
+        const userBlocks: CustomBlockDefinition[] = Array.isArray(data) ? data.filter((b: CustomBlockDefinition) => !builtinIds.has(b.id)) : [];
+        setBlocks([...allBuiltinBlocks, ...userBlocks]);
       } else {
         console.error('loadBlocks failed:', res.status);
         setError('Laden fehlgeschlagen');
+        setBlocks([...allBuiltinBlocks]);
       }
     } catch (err) {
       console.error('loadBlocks error:', err);
       setError('Verbindung fehlgeschlagen');
+      setBlocks([...allBuiltinBlocks]);
     } finally {
       setLoading(false);
     }
@@ -46,10 +52,11 @@ export const useCustomBlocks = () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
+        const toSave = updatedBlocks.filter(b => !builtinIds.has(b.id));
         const res = await fetch(`${API_BASE}/blocks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedBlocks)
+          body: JSON.stringify(toSave)
         });
         if (!res.ok) {
           console.error('saveBlocks failed:', res.status);
@@ -87,6 +94,7 @@ export const useCustomBlocks = () => {
   }, [saveBlocks]);
 
   const deleteBlock = useCallback((blockId: string) => {
+    if (builtinIds.has(blockId)) return;
     setBlocks(prev => {
       const next = prev.filter(b => b.id !== blockId);
       saveBlocks(next);
@@ -166,6 +174,7 @@ export const useCustomBlocks = () => {
     duplicateBlock,
     importBlocks,
     exportBlock,
-    exportAllBlocks
+    exportAllBlocks,
+    isBuiltin: (blockId: string) => builtinIds.has(blockId)
   };
 };

@@ -736,5 +736,38 @@ export const nodeTemplates: NodeTemplate[] = [
       hcReverseDirection: true,
       hcName: ''
     }
+  },
+  {
+    type: 'time-program',
+    label: 'Zeitprogramm',
+    icon: 'CalendarRange',
+    category: 'complex',
+    color: '#0d9488',
+    inputs: [
+      { label: 'Enable', type: 'input' }
+    ],
+    outputs: [
+      { label: 'Ausgang', type: 'output' },
+      { label: 'Aktiv', type: 'output' }
+    ],
+    description: 'Wochenbasiertes Zeitprogramm mit Schaltzeitpunkten und Ausnahmetagen',
+    defaultConfig: {
+      timeProgramName: 'Zeitprogramm',
+      timeProgramOutputType: 'boolean',
+      timeProgramDefaultValue: false,
+      timeProgramEntries: [
+        {
+          id: 'tp-entry-1',
+          days: [1, 2, 3, 4, 5],
+          startTime: '06:00',
+          endTime: '22:00',
+          value: true,
+          label: 'Wochentage',
+          enabled: true,
+          priority: 1
+        }
+      ],
+      timeProgramExceptions: []
+    }
   }
 ];

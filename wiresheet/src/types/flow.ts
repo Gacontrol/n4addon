@@ -70,6 +70,27 @@ export interface ModbusDevice {
   configDatapoints?: ModbusDatapoint[];
 }
 
+export interface TimeProgramEntry {
+  id: string;
+  days: number[];
+  startTime: string;
+  endTime: string;
+  value: number | boolean;
+  label?: string;
+  enabled: boolean;
+  priority: number;
+}
+
+export interface TimeProgramException {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  value: number | boolean;
+  label?: string;
+  enabled: boolean;
+}
+
 export interface NodeConfig {
   delayMs?: number;
   thresholdValue?: number;
@@ -99,6 +120,11 @@ export interface NodeConfig {
   modbusDevices?: ModbusDevice[];
   modbusPollInterval?: number;
   modbusTimeout?: number;
+  timeProgramEntries?: TimeProgramEntry[];
+  timeProgramExceptions?: TimeProgramException[];
+  timeProgramDefaultValue?: number | boolean;
+  timeProgramOutputType?: 'boolean' | 'numeric';
+  timeProgramName?: string;
   [key: string]: unknown;
 }
 

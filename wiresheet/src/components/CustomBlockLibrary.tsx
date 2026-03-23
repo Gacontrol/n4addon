@@ -14,6 +14,7 @@ interface CustomBlockLibraryProps {
   onImportBlocks: (blocks: CustomBlockDefinition[]) => void;
   onAddBlockToCanvas: (block: CustomBlockDefinition) => void;
   canCreateFromSelection: boolean;
+  isBuiltin?: (blockId: string) => boolean;
 }
 
 const WIDGET_STYLE_MAP: Record<string, { bg: string; border: string; color: string; icon: string }> = {
@@ -162,7 +163,8 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
   onExportAll,
   onImportBlocks,
   onAddBlockToCanvas,
-  canCreateFromSelection
+  canCreateFromSelection,
+  isBuiltin = () => false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; block: CustomBlockDefinition } | null>(null);
@@ -325,6 +327,11 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-medium text-white truncate">{block.name}</span>
+                          {isBuiltin(block.id) && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-900/50 text-teal-400 border border-teal-700/30 flex-shrink-0">
+                              Eingebaut
+                            </span>
+                          )}
                         </div>
                         {block.description && (
                           <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{block.description}</p>
@@ -431,14 +438,18 @@ export const CustomBlockLibrary: React.FC<CustomBlockLibraryProps> = ({
               <Icons.Download className="w-3.5 h-3.5" />
               Exportieren
             </button>
-            <div className="border-t border-slate-700 my-1" />
-            <button
-              onClick={() => { setConfirmDelete(contextMenu.block.id); setContextMenu(null); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-900/30 transition-colors"
-            >
-              <Icons.Trash2 className="w-3.5 h-3.5" />
-              Loeschen
-            </button>
+            {!isBuiltin(contextMenu.block.id) && (
+              <>
+                <div className="border-t border-slate-700 my-1" />
+                <button
+                  onClick={() => { setConfirmDelete(contextMenu.block.id); setContextMenu(null); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-900/30 transition-colors"
+                >
+                  <Icons.Trash2 className="w-3.5 h-3.5" />
+                  Loeschen
+                </button>
+              </>
+            )}
           </div>
         </>
       )}

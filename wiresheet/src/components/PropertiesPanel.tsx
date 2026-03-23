@@ -6,6 +6,7 @@ import { PythonEditor } from './PythonEditor';
 import { ModbusDeviceBlockConfig } from './ModbusConfig';
 import { ModbusDriverPanel } from './ModbusDriverPanel';
 import { AlarmSettings } from './AlarmSettings';
+import { TimeProgramEditor } from './TimeProgramEditor';
 import { AlarmClass, BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from '../types/alarm';
 import { VisuPage } from '../types/visualization';
 
@@ -2116,6 +2117,25 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'time-program' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-teal-500" />
+              <label className="text-xs font-semibold text-teal-400 uppercase tracking-wider">
+                Zeitprogramm
+              </label>
+            </div>
+            <TimeProgramEditor
+              config={config}
+              onConfigChange={(updates) => {
+                const next = { ...config, ...updates };
+                setConfig(next);
+                onUpdateNode(node.id, { config: next });
+              }}
+            />
+          </div>
+        )}
+
         {node.type === 'modbus-driver' && onModbusDevicesChange && onModbusDatapointDragStart && onPingModbusDevice && onModbusDriverEnabledChange && (
           <ModbusDriverPanel
             devices={modbusDevices}
@@ -2143,7 +2163,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           />
         )}
 
-        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && !node.type.startsWith('modbus-') && (
+        {(node.data.inputs.length > 0 || node.data.outputs.length > 0) && node.type !== 'python-script' && node.type !== 'time-program' && !node.type.startsWith('modbus-') && (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Ports &amp; Festwerte

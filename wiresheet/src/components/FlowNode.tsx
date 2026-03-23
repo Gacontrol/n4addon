@@ -124,6 +124,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (node.type === 'dp-enum') return '#f97316';
     if (node.type === 'python-script') return '#3776ab';
     if (node.type === 'case-container') return '#6366f1';
+    if (node.type === 'time-program') return '#0d9488';
     if (node.type.includes('trigger')) return '#0ea5e9';
     return '#10b981';
   };

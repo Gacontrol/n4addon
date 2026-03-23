@@ -975,6 +975,7 @@ function getDefaultValueForNodeType(nodeType) {
     case 'modbus-device-output':
     case 'time-trigger':
     case 'state-trigger':
+    case 'time-program':
       return null;
     default:
       return null;
@@ -997,7 +998,9 @@ function getDefaultOutputsForNodeType(node) {
     case 'rising-edge':
     case 'falling-edge':
     case 'light-toggle':
+    case 'time-program':
       defaults['output-0'] = false;
+      defaults['output-1'] = false;
       break;
     case 'sr-flipflop':
     case 'rs-flipflop':
@@ -1700,6 +1703,68 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       }
       nodeValues[nodeId] = fired;
       nodeValues[`${nodeId}:output-0`] = fired;
+    } else if (node.type === 'time-program') {
+      const enableInput = inputVals[0];
+      const enabled = enableInput === null || enableInput === undefined ? true : toBool(enableInput);
+      const defaultValue = cfg.timeProgramDefaultValue !== undefined ? cfg.timeProgramDefaultValue : false;
+      const outputType = cfg.timeProgramOutputType || 'boolean';
+
+      let output = defaultValue;
+      let active = false;
+
+      if (enabled) {
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const nowDow = now.getDay();
+
+        const exceptions = Array.isArray(cfg.timeProgramExceptions) ? cfg.timeProgramExceptions : [];
+        const entries = Array.isArray(cfg.timeProgramEntries) ? cfg.timeProgramEntries : [];
+
+        const matchingException = exceptions
+          .filter(e => e.enabled && e.date === todayStr)
+          .find(e => {
+            const startParts = String(e.startTime || '00:00').split(':').map(Number);
+            const endParts = String(e.endTime || '23:59').split(':').map(Number);
+            const start = startParts[0] * 60 + (startParts[1] || 0);
+            const end = endParts[0] * 60 + (endParts[1] || 0);
+            return nowMinutes >= start && nowMinutes < end;
+          });
+
+        if (matchingException) {
+          output = matchingException.value;
+          active = true;
+        } else {
+          const sortedEntries = [...entries]
+            .filter(e => e.enabled && Array.isArray(e.days) && e.days.includes(nowDow))
+            .sort((a, b) => (a.priority || 99) - (b.priority || 99));
+
+          for (const entry of sortedEntries) {
+            const startParts = String(entry.startTime || '00:00').split(':').map(Number);
+            const endParts = String(entry.endTime || '00:00').split(':').map(Number);
+            const start = startParts[0] * 60 + (startParts[1] || 0);
+            const end = endParts[0] * 60 + (endParts[1] || 0);
+            if (nowMinutes >= start && nowMinutes < end) {
+              output = entry.value;
+              active = true;
+              break;
+            }
+          }
+        }
+
+        if (outputType === 'boolean') {
+          output = output === true || output === 1 || output === 'true';
+        } else {
+          output = Number(output) || 0;
+        }
+      } else {
+        output = defaultValue;
+        active = false;
+      }
+
+      nodeValues[nodeId] = output;
+      nodeValues[`${nodeId}:output-0`] = output;
+      nodeValues[`${nodeId}:output-1`] = active;
     } else if (node.type === 'state-trigger') {
       const inputVal = inputVals[0];
       const triggerState = cfg.triggerState !== undefined ? String(cfg.triggerState) : null;
