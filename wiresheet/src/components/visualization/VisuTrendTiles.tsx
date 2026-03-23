@@ -897,7 +897,9 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
   const rangeMs = TIME_RANGES.find(r => r.key === rangeKey)?.ms || 3600000;
   const refreshMs = config.refreshIntervalMs || 30000;
   const hiddenNodeIds = config.hiddenNodeIds || [];
-  const groups = config.groups || [];
+  const [backendGroups, setBackendGroups] = useState<TileGroup[]>([]);
+  const widgetGroups = config.groups || [];
+  const groups = widgetGroups.length > 0 ? widgetGroups : backendGroups;
 
   useEffect(() => {
     const load = async () => {
@@ -906,6 +908,15 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
         if (res.ok) {
           const data = await res.json();
           setTrackedNodes(data.trackedNodes || []);
+          if (data.chartGroups && Array.isArray(data.chartGroups)) {
+            const converted: TileGroup[] = data.chartGroups.map((g: { id: string; name: string; nodeIds: string[]; visible?: boolean }) => ({
+              id: g.id,
+              name: g.name,
+              nodeIds: g.nodeIds || [],
+              favorite: false,
+            }));
+            setBackendGroups(converted);
+          }
         }
       } catch {}
     };
@@ -1064,23 +1075,28 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
 
   const renderGroupSection = (group: TileGroup, series: TrendSeries[]) => {
     const isCollapsed = collapsedGroups.has(group.id);
+    const accentColor = group.color || '#22d3ee';
     return (
-      <div key={group.id}>
+      <div key={group.id} className="rounded-lg border border-slate-700/60 overflow-hidden bg-slate-900/40">
         <button
-          className="flex items-center gap-2 mb-2 w-full group"
+          className="flex items-center gap-2 px-3 py-2 w-full hover:bg-slate-800/60 transition-colors"
           onClick={() => setCollapsedGroups(prev => {
             const next = new Set(prev);
             if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
             return next;
           })}
         >
-          {isCollapsed ? <ChevronRight className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
-          {group.favorite && <Star className="w-3 h-3 text-amber-400 fill-current" />}
-          <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">{group.name}</span>
-          <span className="text-[9px] text-slate-600">({series.length})</span>
-          <div className="flex-1 h-px bg-slate-800" />
+          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+          {group.favorite && <Star className="w-3 h-3 text-amber-400 fill-current flex-shrink-0" />}
+          <span className="text-[11px] font-semibold text-slate-200 uppercase tracking-wider flex-1 text-left">{group.name}</span>
+          <span className="text-[9px] text-slate-500 mr-1">{series.length} Werte</span>
+          {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-500" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
         </button>
-        {!isCollapsed && renderTiles(series)}
+        {!isCollapsed && (
+          <div className="px-3 pb-3 pt-1 border-t border-slate-800/60">
+            {renderTiles(series)}
+          </div>
+        )}
       </div>
     );
   };
