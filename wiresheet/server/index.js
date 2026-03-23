@@ -380,10 +380,16 @@ app.get('/api/admin-check', async (req, res) => {
       timeout: 5000
     });
     const users = usersRes.data?.data?.users || usersRes.data?.users || [];
-    const user = users.find(u => u.username === hassioUser || u.id === hassioUser || u.name === hassioUser);
+    console.log('Admin-Check: hassioUser header =', hassioUser, '| users in list:', JSON.stringify(users.map(u => ({ id: u.id, username: u.username, name: u.name, is_admin: u.is_admin, is_owner: u.is_owner, group: u.group }))));
+    const user = users.find(u =>
+      u.username === hassioUser ||
+      u.id === hassioUser ||
+      u.name === hassioUser ||
+      u.local_only === false && u.username?.toLowerCase() === hassioUser?.toLowerCase()
+    );
     if (!user) {
-      console.log('Admin-Check: user not found in list, allowing access. hassioUser:', hassioUser);
-      return res.status(200).json({ isAdmin: true, reason: 'user-not-found-allow' });
+      console.log('Admin-Check: user not found in list -> denying access. hassioUser:', hassioUser);
+      return res.status(403).json({ isAdmin: false, reason: 'user-not-found-deny' });
     }
     const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
     console.log('Admin-Check: user found, isAdmin:', isAdmin, 'user:', JSON.stringify(user));
@@ -393,7 +399,7 @@ app.get('/api/admin-check', async (req, res) => {
       return res.status(403).json({ isAdmin: false });
     }
   } catch (err) {
-    console.log('Admin-Check Fehler (fallback allow):', err.message);
+    console.log('Admin-Check Fehler:', err.message);
     return res.status(200).json({ isAdmin: true, reason: 'check-failed-allow' });
   }
 });
