@@ -1131,7 +1131,56 @@ function App() {
   const handleVisuWidgetValueChange = useCallback(async (dpKey: string, value: unknown) => {
     if (!dpKey) return;
     const parsed = parseDpKey(dpKey);
-    if (parsed.segment === 'cfg' && parsed.paramKey) {
+    const nodeId = parsed.nodeId || dpKey.split(':')[0];
+
+    const compositeValue = value as Record<string, Record<string, unknown>> | null;
+    const compositeCtrl = compositeValue && typeof compositeValue === 'object'
+      ? (compositeValue.pidControl || compositeValue.heatingCurveControl || compositeValue.pumpControl || compositeValue.aggregateControl || compositeValue.valveControl || compositeValue.sensorControl)
+      : null;
+
+    if (compositeCtrl && typeof compositeCtrl === 'object') {
+      const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
+      const cfgUpdates: Record<string, unknown> = {};
+
+      const ctrl = compositeCtrl as Record<string, unknown>;
+      if ('hoaMode' in ctrl) {
+        const hoaKey = compositeValue!.pidControl ? 'pidVisuHOA'
+          : compositeValue!.valveControl ? 'valveVisuHOA'
+          : compositeValue!.sensorControl ? 'sensorVisuHOA'
+          : compositeValue!.pumpControl || compositeValue!.aggregateControl ? (compositeValue!.aggregateControl ? 'aggregateVisuHOA' : 'pumpVisuHOA')
+          : null;
+        if (hoaKey) {
+          cfgUpdates[hoaKey] = ctrl.hoaMode;
+          setLiveValue(`${nodeId}:cfg:${hoaKey}`, ctrl.hoaMode);
+        }
+      }
+      if ('manualOutput' in ctrl) {
+        cfgUpdates['pidManualOutput'] = ctrl.manualOutput;
+        setLiveValue(`${nodeId}:cfg:pidManualOutput`, ctrl.manualOutput);
+      }
+      if ('manualValue' in ctrl) {
+        cfgUpdates['sensorManualValue'] = ctrl.manualValue;
+        setLiveValue(`${nodeId}:cfg:sensorManualValue`, ctrl.manualValue);
+      }
+      if ('handStart' in ctrl) {
+        const prefix = compositeValue!.aggregateControl ? 'aggregate' : 'pump';
+        cfgUpdates[`${prefix}VisuHandStart`] = ctrl.handStart;
+        setLiveValue(`${nodeId}:cfg:${prefix}VisuHandStart`, ctrl.handStart);
+      }
+      for (const key of Object.keys(ctrl)) {
+        if (key.startsWith('param_')) {
+          const cfgKey = key.slice(6);
+          cfgUpdates[cfgKey] = ctrl[key];
+          setLiveValue(`${nodeId}:cfg:${cfgKey}`, ctrl[key]);
+        }
+      }
+
+      if (targetNode && Object.keys(cfgUpdates).length > 0) {
+        updateNodeData(targetNode.id, {
+          config: { ...targetNode.data.config, ...cfgUpdates }
+        });
+      }
+    } else if (parsed.segment === 'cfg' && parsed.paramKey) {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === parsed.nodeId);
       if (targetNode) {
         updateNodeData(targetNode.id, {
@@ -1139,10 +1188,10 @@ function App() {
         });
       }
       setLiveValue(dpKey, value);
-    }
-    if (parsed.segment !== 'cfg') {
+    } else {
       setLiveValue(dpKey, value);
     }
+
     try {
       const apiBase = (() => {
         const path = window.location.pathname;
