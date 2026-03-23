@@ -31,10 +31,12 @@ let buildingConfigFile = path.join(dataDir, 'building-config.json');
 
 const trendConfig = { trackedNodes: [] };
 const trendBuffers = new Map();
+const trendLastRecorded = new Map();
 const TREND_FLUSH_INTERVAL = 30000;
 const TREND_MAX_BUFFER = 500;
 const TREND_MAX_POINTS_PER_FILE = 86400;
 let trendFlushTimer = null;
+let trendRetentionTimer = null;
 
 const runningPages = new Map();
 const pageNodeStates = new Map();
@@ -667,11 +669,17 @@ function recordTrendValue(nodeId, value, timestamp) {
   const tracked = trendConfig.trackedNodes.find(n => n.nodeId === nodeId);
   if (!tracked || !tracked.enabled) return;
 
+  const now = timestamp || Date.now();
+  const intervalMs = tracked.sampleIntervalMs || 1000;
+  const lastTs = trendLastRecorded.get(nodeId) || 0;
+  if (now - lastTs < intervalMs) return;
+  trendLastRecorded.set(nodeId, now);
+
   if (!trendBuffers.has(nodeId)) {
     trendBuffers.set(nodeId, []);
   }
   const buf = trendBuffers.get(nodeId);
-  buf.push({ ts: timestamp || Date.now(), v: value });
+  buf.push({ ts: now, v: value });
 
   if (buf.length >= TREND_MAX_BUFFER) {
     flushTrendBuffer(nodeId);
@@ -712,6 +720,40 @@ async function flushAllTrendBuffers() {
 function startTrendFlush() {
   if (trendFlushTimer) clearInterval(trendFlushTimer);
   trendFlushTimer = setInterval(flushAllTrendBuffers, TREND_FLUSH_INTERVAL);
+}
+
+async function runTrendRetention() {
+  try {
+    const files = await fs.readdir(trendDataDir);
+    const now = Date.now();
+    for (const file of files) {
+      if (!file.endsWith('.jsonl')) continue;
+      const match = file.match(/_(\d{4}-\d{2}-\d{2})\.jsonl$/);
+      if (!match) continue;
+      const fileDate = new Date(match[1]).getTime();
+      const safePrefix = file.replace(/_\d{4}-\d{2}-\d{2}\.jsonl$/, '');
+      const tracked = trendConfig.trackedNodes.find(n => {
+        const safe = n.nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+        return safe === safePrefix;
+      });
+      const retentionDays = (tracked && tracked.retentionDays) ? tracked.retentionDays : 30;
+      const ageMs = now - fileDate;
+      if (ageMs > retentionDays * 86400000) {
+        try {
+          await fs.unlink(path.join(trendDataDir, file));
+          console.log(`Trend-Datei geloescht (Retention ${retentionDays}d): ${file}`);
+        } catch {}
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('Trend-Retention Fehler:', err.message);
+  }
+}
+
+function startTrendRetention() {
+  if (trendRetentionTimer) clearInterval(trendRetentionTimer);
+  runTrendRetention();
+  trendRetentionTimer = setInterval(runTrendRetention, 3600000);
 }
 
 async function readTrendData(nodeId, fromTs, toTs) {
@@ -782,8 +824,38 @@ app.post(['/trend-config', '/api/trend-config'], async (req, res) => {
     trendConfig.trackedNodes = trackedNodes || [];
     if (chartGroups !== undefined) trendConfig.chartGroups = chartGroups;
     await saveTrendConfig();
+    startTrendRetention();
     res.json({ success: true });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get(['/trend-disk-usage', '/api/trend-disk-usage'], async (req, res) => {
+  try {
+    const files = await fs.readdir(trendDataDir);
+    const usageMap = {};
+    let totalBytes = 0;
+    for (const file of files) {
+      if (!file.endsWith('.jsonl')) continue;
+      const filePath = path.join(trendDataDir, file);
+      try {
+        const stat = await fs.stat(filePath);
+        const safePrefix = file.replace(/_\d{4}-\d{2}-\d{2}\.jsonl$/, '');
+        const tracked = trendConfig.trackedNodes.find(n => {
+          const safe = n.nodeId.replace(/[^a-zA-Z0-9\-_:]/g, '_');
+          return safe === safePrefix;
+        });
+        const nodeId = tracked ? tracked.nodeId : safePrefix;
+        if (!usageMap[nodeId]) usageMap[nodeId] = { bytes: 0, files: 0 };
+        usageMap[nodeId].bytes += stat.size;
+        usageMap[nodeId].files += 1;
+        totalBytes += stat.size;
+      } catch {}
+    }
+    res.json({ usage: usageMap, totalBytes });
+  } catch (err) {
+    if (err.code === 'ENOENT') return res.json({ usage: {}, totalBytes: 0 });
     res.status(500).json({ error: err.message });
   }
 });
@@ -3992,6 +4064,7 @@ async function start() {
     await loadDriverConfig();
     await loadTrendConfig();
     startTrendFlush();
+    startTrendRetention();
 
     console.log(`--- Umgebungsvariablen ---`);
     console.log(`SUPERVISOR_TOKEN: ${process.env.SUPERVISOR_TOKEN ? 'ja (' + process.env.SUPERVISOR_TOKEN.substring(0,10) + '...)' : 'NEIN'}`);

@@ -26,6 +26,9 @@ interface TrackedNode {
   enabled: boolean;
   color: string;
   unit?: string;
+  sampleIntervalMs?: number;
+  retentionDays?: number;
+  deleted?: boolean;
 }
 
 interface TrendPoint {
@@ -1443,6 +1446,39 @@ export function TrendView({ pages, liveValues, customBlockDefs = [] }: Props) {
   );
 }
 
+const SAMPLE_INTERVALS = [
+  { label: '1 Sek', ms: 1000 },
+  { label: '5 Sek', ms: 5000 },
+  { label: '10 Sek', ms: 10000 },
+  { label: '30 Sek', ms: 30000 },
+  { label: '1 Min', ms: 60000 },
+  { label: '5 Min', ms: 300000 },
+  { label: '15 Min', ms: 900000 },
+  { label: '1 Std', ms: 3600000 },
+];
+
+const RETENTION_OPTIONS = [
+  { label: '1 Tag', days: 1 },
+  { label: '3 Tage', days: 3 },
+  { label: '7 Tage', days: 7 },
+  { label: '14 Tage', days: 14 },
+  { label: '30 Tage', days: 30 },
+  { label: '60 Tage', days: 60 },
+  { label: '90 Tage', days: 90 },
+  { label: '1 Jahr', days: 365 },
+];
+
+function formatBytes(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1048576).toFixed(1)} MB`;
+}
+
+function estimateDailyBytes(sampleIntervalMs: number): number {
+  const pointsPerDay = Math.floor(86400000 / sampleIntervalMs);
+  return pointsPerDay * 30;
+}
+
 function ConfigView({
   pages,
   trackedNodes,
@@ -1472,6 +1508,32 @@ function ConfigView({
   saveConfig: (nodes: TrackedNode[]) => void;
   customBlockDefs: CustomBlockDefinition[];
 }) {
+  const [diskUsage, setDiskUsage] = useState<Record<string, { bytes: number; files: number }>>({});
+  const [totalBytes, setTotalBytes] = useState(0);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/trend-disk-usage`);
+        if (res.ok) {
+          const data = await res.json();
+          setDiskUsage(data.usage || {});
+          setTotalBytes(data.totalBytes || 0);
+        }
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
+
+  const updateNode = (nodeId: string, updates: Partial<TrackedNode>) => {
+    const next = trackedNodes.map(n => n.nodeId === nodeId ? { ...n, ...updates } : n);
+    setTrackedNodes(next);
+    saveConfig(next);
+  };
+
   return (
     <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4">
@@ -1488,58 +1550,119 @@ function ConfigView({
               <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700">
                 <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="text-sm font-medium text-white">Aufgezeichnete Datenpunkte</span>
-                <span className="ml-auto text-xs text-slate-500">{trackedNodes.filter(n => n.enabled).length} aktiv</span>
+                <span className="text-xs text-slate-500 ml-2">{trackedNodes.filter(n => n.enabled).length} aktiv</span>
+                {totalBytes > 0 && (
+                  <span className="ml-auto text-xs text-slate-500">Gesamt: <span className="text-slate-300 font-mono">{formatBytes(totalBytes)}</span></span>
+                )}
               </div>
               <div className="divide-y divide-slate-800">
-                {trackedNodes.map(tn => (
-                  <div key={tn.nodeId} className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tn.color }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white font-medium truncate">{tn.label}</div>
-                      <div className="text-xs text-slate-500">{tn.pageName} {tn.unit ? `· ${tn.unit}` : ''}</div>
+                {trackedNodes.map(tn => {
+                  const isExpanded = expandedNodes.has(tn.nodeId);
+                  const usage = diskUsage[tn.nodeId];
+                  const intervalMs = tn.sampleIntervalMs || 1000;
+                  const retention = tn.retentionDays || 30;
+                  const dailyEst = estimateDailyBytes(intervalMs);
+                  const totalEst = dailyEst * retention;
+                  return (
+                    <div key={tn.nodeId} className="border-b border-slate-800 last:border-0">
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tn.color }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white font-medium truncate">{tn.label}</span>
+                            {tn.deleted && <span className="text-[10px] text-red-500 font-medium border border-red-800 rounded px-1 py-0.5">Gelöscht</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-500">{tn.pageName}{tn.unit ? ` · ${tn.unit}` : ''}</span>
+                            <span className="text-[10px] text-slate-600">·</span>
+                            <span className="text-[10px] text-slate-500">{SAMPLE_INTERVALS.find(s => s.ms === intervalMs)?.label || `${intervalMs}ms`}</span>
+                            <span className="text-[10px] text-slate-600">·</span>
+                            <span className="text-[10px] text-slate-500">{retention}T Aufbew.</span>
+                            {usage && <><span className="text-[10px] text-slate-600">·</span><span className="text-[10px] font-mono text-emerald-600">{formatBytes(usage.bytes)}</span></>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={tn.color}
+                            onChange={e => updateNode(tn.nodeId, { color: e.target.value })}
+                            className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent p-0"
+                            title="Farbe"
+                          />
+                          <button
+                            onClick={() => updateNode(tn.nodeId, { enabled: !tn.enabled })}
+                            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${tn.enabled ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-600/30' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
+                          >
+                            {tn.enabled ? 'Aktiv' : 'Pausiert'}
+                          </button>
+                          <button
+                            onClick={() => setExpandedNodes(prev => { const n = new Set(prev); if (n.has(tn.nodeId)) n.delete(tn.nodeId); else n.add(tn.nodeId); return n; })}
+                            className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+                            title="Einstellungen"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Alle Trenddaten fuer "${tn.label}" loeschen?`)) return;
+                              await fetch(`${API_BASE}/trend-data?nodeId=${encodeURIComponent(tn.nodeId)}`, { method: 'DELETE' });
+                            }}
+                            className="p-1.5 rounded text-slate-500 hover:text-orange-400 hover:bg-orange-400/10 transition-colors"
+                            title="Daten loeschen"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => removeTracked(tn.nodeId)}
+                            className="p-1.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                            title="Entfernen"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-4 pb-4 bg-slate-800/40 border-t border-slate-800 space-y-4">
+                          <div className="pt-3 grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                                <Clock className="w-3 h-3" />Abtastintervall
+                              </label>
+                              <div className="grid grid-cols-4 gap-1">
+                                {SAMPLE_INTERVALS.map(s => (
+                                  <button key={s.ms} onClick={() => updateNode(tn.nodeId, { sampleIntervalMs: s.ms })}
+                                    className={`py-1 rounded text-[10px] font-medium transition-colors ${intervalMs === s.ms ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-400 hover:text-white'}`}>
+                                    {s.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-1">
+                                Ca. <span className="text-slate-300 font-mono">{formatBytes(dailyEst)}</span>/Tag
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                                <Trash2 className="w-3 h-3" />Aufbewahrung
+                              </label>
+                              <div className="grid grid-cols-4 gap-1">
+                                {RETENTION_OPTIONS.map(r => (
+                                  <button key={r.days} onClick={() => updateNode(tn.nodeId, { retentionDays: r.days })}
+                                    className={`py-1 rounded text-[10px] font-medium transition-colors ${retention === r.days ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-400 hover:text-white'}`}>
+                                    {r.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-1">
+                                Max. ca. <span className="text-slate-300 font-mono">{formatBytes(totalEst)}</span> gesamt
+                                {usage && <span className="ml-2 text-emerald-600">(aktuell {formatBytes(usage.bytes)})</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={tn.color}
-                        onChange={e => {
-                          const next = trackedNodes.map(n => n.nodeId === tn.nodeId ? { ...n, color: e.target.value } : n);
-                          setTrackedNodes(next);
-                          saveConfig(next);
-                        }}
-                        className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent p-0"
-                        title="Farbe"
-                      />
-                      <button
-                        onClick={() => {
-                          const next = trackedNodes.map(n => n.nodeId === tn.nodeId ? { ...n, enabled: !n.enabled } : n);
-                          setTrackedNodes(next);
-                          saveConfig(next);
-                        }}
-                        className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${tn.enabled ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-600/30' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}
-                      >
-                        {tn.enabled ? 'Aktiv' : 'Pausiert'}
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`Alle Trenddaten fuer "${tn.label}" loeschen?`)) return;
-                          await fetch(`${API_BASE}/trend-data?nodeId=${encodeURIComponent(tn.nodeId)}`, { method: 'DELETE' });
-                        }}
-                        className="p-1.5 rounded text-slate-500 hover:text-orange-400 hover:bg-orange-400/10 transition-colors"
-                        title="Daten loeschen"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => removeTracked(tn.nodeId)}
-                        className="p-1.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                        title="Entfernen"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
