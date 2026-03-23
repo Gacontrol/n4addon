@@ -2756,7 +2756,18 @@ async function runPageCycle(pageId) {
   if (!pageInfo || !pageInfo.running) return;
 
   try {
-    const data = await fs.readFile(pagesFile, 'utf-8');
+    let data;
+    try {
+      data = await fs.readFile(pagesFile, 'utf-8');
+    } catch (fileErr) {
+      if (fileErr.code === 'ENOENT') {
+        if (pageInfo.running) {
+          pageInfo.timeout = setTimeout(() => runPageCycle(pageId), Math.max(pageInfo.cycleMs, 2000));
+        }
+        return;
+      }
+      throw fileErr;
+    }
     const pages = JSON.parse(data);
     const page = pages.find(p => p.id === pageId);
 
@@ -3230,13 +3241,18 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 
 const wsClients = new Set();
+const sseClients = new Set();
 
 function broadcastSSE(event, data) {
-  const msg = JSON.stringify({ event, data });
+  const wsMsg = JSON.stringify({ event, data });
   for (const ws of wsClients) {
     try {
-      if (ws.readyState === 1) ws.send(msg);
+      if (ws.readyState === 1) ws.send(wsMsg);
     } catch {}
+  }
+  const sseMsg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) {
+    try { res.write(sseMsg); } catch { sseClients.delete(res); }
   }
 }
 
@@ -3300,7 +3316,17 @@ app.get(['/sse', '/api/sse'], (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
   res.write(': ok\n\n');
-  res.end();
+
+  sseClients.add(res);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
 });
 
 visuApp.get(['/sse', '/api/sse'], (req, res) => {
@@ -3310,7 +3336,17 @@ visuApp.get(['/sse', '/api/sse'], (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
   res.write(': ok\n\n');
-  res.end();
+
+  sseClients.add(res);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
 });
 
 const net = require('net');
