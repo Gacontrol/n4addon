@@ -113,6 +113,8 @@ export interface FlowNode {
   id: string;
   type: string;
   position: Position;
+  width?: number;
+  height?: number;
   data: {
     label: string;
     icon?: string;

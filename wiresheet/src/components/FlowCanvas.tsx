@@ -36,6 +36,7 @@ interface FlowCanvasProps {
   onDeleteSelected: () => void;
   onContainerResize?: (nodeId: string, width: number, height: number) => void;
   onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
+  onNodeResize?: (nodeId: string, width: number, height: number) => void;
   onMoveNodeToContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   onMoveNodeOutOfContainer?: (nodeId: string) => void;
   onDuplicateSelected?: () => void;
@@ -81,6 +82,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onDeleteSelected,
   onContainerResize,
   onCaseResize,
+  onNodeResize,
   onMoveNodeToContainer,
   onMoveNodeOutOfContainer,
   onDuplicateSelected,
@@ -635,6 +637,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onMultiDragStart={handleMultiDragStart}
                 onContainerResize={onContainerResize}
                 onCaseResize={onCaseResize}
+                onNodeResize={onNodeResize}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}
                 isDraggingMultiple={isDraggingMultiple}
                 zoom={zoom}
@@ -747,6 +750,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onMultiDragStart={handleMultiDragStart}
                 onContainerResize={onContainerResize}
                 onCaseResize={onCaseResize}
+                onNodeResize={onNodeResize}
                 onDropIntoContainer={onMoveNodeToContainer}
                 onDropOutOfContainer={onMoveNodeOutOfContainer}
                 isMultiSelected={selectedNodes.size > 1 && selectedNodes.has(node.id)}

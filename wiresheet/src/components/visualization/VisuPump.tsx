@@ -171,16 +171,16 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
   }, [isEditMode]);
 
   const handleHOAChange = useCallback((mode: number) => {
-    onValueChange?.({ hoaMode: mode });
+    onValueChange?.({ pumpControl: { hoaMode: mode } });
   }, [onValueChange]);
 
   const handleReset = useCallback(() => {
-    onValueChange?.({ reset: true });
-    setTimeout(() => onValueChange?.({ reset: false }), 100);
+    onValueChange?.({ pumpControl: { reset: true } });
+    setTimeout(() => onValueChange?.({ pumpControl: { reset: false } }), 100);
   }, [onValueChange]);
 
   const handleHandStartToggle = useCallback(() => {
-    onValueChange?.({ handStart: !handStart });
+    onValueChange?.({ pumpControl: { handStart: !handStart } });
   }, [onValueChange, handStart]);
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {

@@ -187,7 +187,7 @@ export const VisuValve: React.FC<VisuValveProps> = ({
 
   const handleHOAChange = useCallback((mode: number) => {
     setLocalHOA(mode);
-    onValueChange?.({ valveControl: { hoa: mode } });
+    onValueChange?.({ valveControl: { hoaMode: mode } });
   }, [onValueChange]);
 
   const handleParamChange = useCallback((key: string, val: number | boolean) => {

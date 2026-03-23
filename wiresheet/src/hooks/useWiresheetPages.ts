@@ -712,6 +712,13 @@ export const useWiresheetPages = () => {
     setConnectingFrom(null);
   }, []);
 
+  const updateNodeSize = useCallback((nodeId: string, width: number, height: number) => {
+    updateActivePage(p => ({
+      ...p,
+      nodes: p.nodes.map(n => n.id === nodeId ? { ...n, width, height } : n)
+    }));
+  }, [updateActivePage]);
+
   const updateContainerSize = useCallback((nodeId: string, width: number, height: number) => {
     updateActivePage(p => ({
       ...p,
@@ -932,6 +939,7 @@ export const useWiresheetPages = () => {
     startConnection,
     endConnection,
     cancelConnection,
+    updateNodeSize,
     updateContainerSize,
     updateCaseSize,
     moveNodeToContainer,

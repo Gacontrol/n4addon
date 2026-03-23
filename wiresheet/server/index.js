@@ -2876,6 +2876,7 @@ function expandCompositeControl(nodeId, ctrl, rawValue, resolvedNodeType) {
     if (valveCtrl.setpoint !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuSetpoint`, value: valveCtrl.setpoint });
     if (valveCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuReset`, value: valveCtrl.reset });
     if (valveCtrl.hoa !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuHOA`, value: valveCtrl.hoa });
+    if (valveCtrl.hoaMode !== undefined) writes.push({ dpKey: `${nodeId}:cfg:valveVisuHOA`, value: valveCtrl.hoaMode });
     for (const key of Object.keys(valveCtrl)) {
       if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: valveCtrl[key] });
     }

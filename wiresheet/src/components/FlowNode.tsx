@@ -36,6 +36,7 @@ interface FlowNodeProps {
   onMultiDragStart?: (nodeId: string, e: React.PointerEvent) => void;
   onContainerResize?: (nodeId: string, width: number, height: number) => void;
   onCaseResize?: (nodeId: string, caseIndex: number, height: number) => void;
+  onNodeResize?: (nodeId: string, width: number, height: number) => void;
   onDropIntoContainer?: (nodeId: string, containerId: string, caseIndex: number) => void;
   onDropOutOfContainer?: (nodeId: string) => void;
   onRenameNode?: (nodeId: string, newLabel: string) => void;
@@ -67,6 +68,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onMultiDragStart,
   onContainerResize,
   onCaseResize,
+  onNodeResize,
   onDropIntoContainer,
   onDropOutOfContainer,
   onRenameNode,
@@ -93,6 +95,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   const [bindingContextMenu, setBindingContextMenu] = useState<{ x: number; y: number; binding: DriverBinding } | null>(null);
   const [overrideInput, setOverrideInput] = useState<string>('');
   const resizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
+  const [isNodeResizing, setIsNodeResizing] = useState(false);
+  const nodeResizeStartRef = useRef<{ width: number; height: number; mouseX: number; mouseY: number } | null>(null);
   const caseResizeStartRef = useRef<{ height: number; mouseY: number; caseIndex: number } | null>(null);
   const [showOverrideInput, setShowOverrideInput] = useState(false);
   const [isRenamingNode, setIsRenamingNode] = useState(false);
@@ -275,7 +279,9 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     ? getEnumLabel(liveValue)
     : node.type === 'dp-boolean'
       ? getBooleanLabel(liveValue)
-      : String(liveValue);
+      : liveValue !== null && typeof liveValue === 'object'
+        ? String((liveValue as Record<string, unknown>)?.value ?? JSON.stringify(liveValue))
+        : String(liveValue);
 
   const getDriverBindingForPort = (portId: string): ExtendedDriverBinding | undefined => {
     return driverBindings.find(b => b.nodeId === node.id && b.portId === portId);
@@ -318,6 +324,38 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     }
   }, [isResizing]);
+
+  const handleNodeResizePointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const rect = nodeRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsNodeResizing(true);
+    nodeResizeStartRef.current = {
+      width: node.width ?? rect.width / zoom,
+      height: node.height ?? rect.height / zoom,
+      mouseX: e.clientX,
+      mouseY: e.clientY
+    };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [node.width, node.height, zoom]);
+
+  const handleNodeResizePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isNodeResizing || !nodeResizeStartRef.current || !onNodeResize) return;
+    const dx = (e.clientX - nodeResizeStartRef.current.mouseX) / zoom;
+    const dy = (e.clientY - nodeResizeStartRef.current.mouseY) / zoom;
+    const newWidth = Math.max(120, nodeResizeStartRef.current.width + dx);
+    const newHeight = Math.max(40, nodeResizeStartRef.current.height + dy);
+    onNodeResize(node.id, newWidth, newHeight);
+  }, [isNodeResizing, node.id, onNodeResize, zoom]);
+
+  const handleNodeResizePointerUp = useCallback((e: React.PointerEvent) => {
+    if (isNodeResizing) {
+      setIsNodeResizing(false);
+      nodeResizeStartRef.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  }, [isNodeResizing]);
 
   const handleCaseResizePointerDown = useCallback((caseIdx: number, currentHeight: number, e: React.PointerEvent) => {
     e.stopPropagation();
@@ -654,9 +692,11 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           left: node.position.x,
           top: node.position.y,
           zIndex: isSelected || isDragging ? 20 : (isInContainer && isContainerSelected ? 10 : 1),
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: isNodeResizing ? 'nwse-resize' : isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
-          minWidth: 180,
+          minWidth: node.width ? undefined : 180,
+          width: node.width ? node.width : undefined,
+          height: node.height ? node.height : undefined,
           opacity: isDimmed ? 0.6 : 1
         }}
         onPointerDown={handlePointerDown}
@@ -1036,6 +1076,10 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   outVal = data.override?.value;
                 } else if (isPythonScript) {
                   outVal = liveValues[`${node.id}:${output.id}`] ?? liveValues[node.id];
+                } else if (data.outputs && data.outputs.length > 1) {
+                  const portVal = liveValues[`${node.id}:${output.id}`];
+                  const primaryVal = liveValues[node.id];
+                  outVal = portVal !== undefined ? portVal : (primaryVal !== null && typeof primaryVal === 'object' ? undefined : primaryVal);
                 } else {
                   outVal = liveValues[node.id];
                 }
@@ -1126,6 +1170,29 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           </div>
 
         </div>
+
+        {isSelected && !isCaseContainer && !isTextAnnotation && onNodeResize && (
+          <div
+            style={{
+              position: 'absolute',
+              right: -4,
+              bottom: -4,
+              width: 12,
+              height: 12,
+              background: '#10b981',
+              border: '2px solid #065f46',
+              borderRadius: 3,
+              cursor: 'nwse-resize',
+              zIndex: 30,
+              touchAction: 'none'
+            }}
+            onPointerDown={handleNodeResizePointerDown}
+            onPointerMove={handleNodeResizePointerMove}
+            onPointerUp={handleNodeResizePointerUp}
+            onPointerCancel={handleNodeResizePointerUp}
+            title="Groesse aendern"
+          />
+        )}
 
         {getVisuBindingsWithoutPort().length > 0 && (
           <div className="absolute left-0 right-0 flex flex-col gap-0.5" style={{ top: '100%', marginTop: '4px' }}>

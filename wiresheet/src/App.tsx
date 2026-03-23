@@ -73,6 +73,7 @@ function App() {
     endConnection,
     cancelConnection,
     addConnection,
+    updateNodeSize,
     updateContainerSize,
     updateCaseSize,
     moveNodeToContainer,
@@ -1616,6 +1617,7 @@ function App() {
               onCopy={copySelection}
               onPaste={pasteClipboard}
               onDeleteSelected={deleteSelected}
+              onNodeResize={updateNodeSize}
               onContainerResize={updateContainerSize}
               onCaseResize={updateCaseSize}
               onMoveNodeToContainer={(nodeId, containerId, caseIndex) => moveNodeToContainer(nodeId, containerId, caseIndex)}
