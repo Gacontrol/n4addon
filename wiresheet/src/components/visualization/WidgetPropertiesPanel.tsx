@@ -82,12 +82,14 @@ const VALVE_WIDGET_TYPE = 'visu-valve';
 const SENSOR_WIDGET_TYPE = 'visu-sensor';
 const PID_WIDGET_TYPE = 'visu-pid';
 const HEATING_CURVE_WIDGET_TYPE = 'visu-heating-curve';
+const TIME_PROGRAM_WIDGET_TYPE = 'visu-time-program';
 const PUMP_CONTROL_NODE_TYPE = 'pump-control';
 const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
 const VALVE_CONTROL_NODE_TYPE = 'valve-control';
 const SENSOR_CONTROL_NODE_TYPE = 'sensor-control';
 const PID_CONTROL_NODE_TYPE = 'pid-controller';
 const HEATING_CURVE_NODE_TYPE = 'heating-curve';
+const TIME_PROGRAM_NODE_TYPE = 'time-program';
 
 const SYMBOL_OPTIONS = [
   { value: 'pump', label: 'Pumpe' },
@@ -338,6 +340,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isSensorWidget = widget.type === SENSOR_WIDGET_TYPE;
   const isPIDWidget = widget.type === PID_WIDGET_TYPE;
   const isHeatingCurveWidget = widget.type === HEATING_CURVE_WIDGET_TYPE;
+  const isTimeProgramWidget = widget.type === TIME_PROGRAM_WIDGET_TYPE;
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
   const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
@@ -345,6 +348,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const sensorControlNodes = availableNodes.filter(n => n.type === SENSOR_CONTROL_NODE_TYPE);
   const pidControlNodes = availableNodes.filter(n => n.type === PID_CONTROL_NODE_TYPE);
   const heatingCurveNodes = availableNodes.filter(n => n.type === HEATING_CURVE_NODE_TYPE);
+  const timeProgramNodes = availableNodes.filter(n => n.type === TIME_PROGRAM_NODE_TYPE);
 
   const nodesByCategory = (() => {
     if (logicSheets && logicSheets.length > 0) {
@@ -2318,6 +2322,62 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-time-program': {
+        const tpCfg = config as { tpName?: string; normalColor?: string; activeColor?: string; symbolSize?: number };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name</label>
+              <input
+                type="text"
+                value={tpCfg.tpName || ''}
+                onChange={(e) => onUpdate({ config: { ...config, tpName: e.target.value } })}
+                placeholder="Zeitprogramm"
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Symbolgroesse</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={20}
+                  max={100}
+                  value={tpCfg.symbolSize ?? 60}
+                  onChange={(e) => onUpdate({ config: { ...config, symbolSize: Number(e.target.value) } })}
+                  className="flex-1"
+                />
+                <span className="text-xs text-slate-400 w-8 text-right">{tpCfg.symbolSize ?? 60}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe (Aktiv)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={tpCfg.activeColor || '#0d9488'}
+                  onChange={(e) => onUpdate({ config: { ...config, activeColor: e.target.value } })}
+                  className="w-8 h-8 rounded cursor-pointer border border-slate-600 bg-transparent"
+                />
+                <span className="text-xs text-slate-400">{tpCfg.activeColor || '#0d9488'}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Farbe (Inaktiv)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={tpCfg.normalColor || '#475569'}
+                  onChange={(e) => onUpdate({ config: { ...config, normalColor: e.target.value } })}
+                  className="w-8 h-8 rounded cursor-pointer border border-slate-600 bg-transparent"
+                />
+                <span className="text-xs text-slate-400">{tpCfg.normalColor || '#475569'}</span>
+              </div>
+            </div>
+          </>
+        );
+      }
+
       case 'visu-alarm-console': {
         const acCfg = config as AlarmConsoleWidgetConfig;
         return (
@@ -3351,6 +3411,38 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <Activity className="w-3 h-3 text-sky-400 shrink-0" />
                     <span className="text-[10px] text-slate-400">Ausgang:</span>
                     <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)}</span>
+                  </div>
+                )}
+              </>
+            ) : isTimeProgramWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe das Zeitprogramm-Widget mit einem Zeitprogramm-Baustein in der Logik.
+                </p>
+                {timeProgramNodes.length === 0 ? (
+                  <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
+                    <Settings className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-400">Kein Zeitprogramm-Baustein in der Logik vorhanden. Bitte zuerst einen Zeitprogramm-Baustein hinzufuegen.</span>
+                  </div>
+                ) : (
+                  <NodeBrowser
+                    nodes={timeProgramNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Ausgang:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">
+                      {liveValues[`${bindingNodeId}:output-0`] ? 'Ein' : 'Aus'}
+                    </span>
                   </div>
                 )}
               </>

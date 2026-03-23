@@ -541,6 +541,7 @@ export const VisuTimeProgram: React.FC<VisuTimeProgramProps> = ({
   const activeColor = config.activeColor || '#0d9488';
   const normalColor = config.normalColor || '#475569';
   const statusColor = isActive ? activeColor : normalColor;
+  const symbolSize = (config as { symbolSize?: number }).symbolSize ?? 60;
 
   useEffect(() => {
     if (showPopup && paramsRef.current) {
@@ -768,8 +769,8 @@ export const VisuTimeProgram: React.FC<VisuTimeProgramProps> = ({
         onClick={handleClick}
         style={{ backgroundColor: 'transparent' }}
       >
-        <div className="relative flex items-center justify-center" style={{ width: '60%', height: '55%', maxWidth: 80, maxHeight: 80 }}>
-          <TimeProgramSymbol size={60} color={statusColor} active={isActive} />
+        <div className="relative flex items-center justify-center" style={{ width: symbolSize + 20, height: symbolSize + 20 }}>
+          <TimeProgramSymbol size={symbolSize} color={statusColor} active={isActive} />
         </div>
         <div className="text-center px-1 mt-1">
           <span className="text-xs text-slate-300 truncate block px-1 max-w-full">{tpName}</span>

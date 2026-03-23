@@ -32,7 +32,7 @@ export interface VisuTrendTilesConfig {
 interface VisuTrendTilesProps {
   config: VisuTrendTilesConfig;
   liveValues: Record<string, unknown>;
-  isEditMode: boolean;
+  isEditMode?: boolean;
   width: number;
   height: number;
 }
@@ -626,7 +626,7 @@ interface TrackedNodeEntry {
 }
 
 export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
-  config, liveValues, isEditMode, width, height
+  config, liveValues, width, height
 }) => {
   const API_BASE = getApiBase();
   const [trackedNodes, setTrackedNodes] = useState<TrackedNodeEntry[]>([]);
@@ -714,24 +714,13 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
     tileSize === 'md' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' :
     'grid-cols-1 sm:grid-cols-2';
 
-  if (isEditMode) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900/50 rounded border border-slate-700 border-dashed">
-        <div className="text-center">
-          <div className="text-sm font-medium text-slate-400">Trend Kachelansicht</div>
-          <div className="text-xs text-slate-600 mt-1">Zeigt alle aufgezeichneten Trends als Kacheln</div>
-          <div className="text-[10px] text-slate-700 mt-0.5">{rangeKey} · {tileSize} · {tileMode}</div>
-        </div>
-      </div>
-    );
-  }
-
   if (trackedNodes.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: config.backgroundColor || 'transparent' }}>
+      <div className="w-full h-full flex items-center justify-center bg-slate-900/50 rounded border border-slate-700 border-dashed" style={{ backgroundColor: config.backgroundColor || 'transparent' }}>
         <div className="text-center">
-          <div className="text-sm text-slate-500">Keine Trends konfiguriert</div>
-          <div className="text-xs text-slate-600 mt-1">Konfiguriere Trends im Trends-Bereich</div>
+          <div className="text-sm font-medium text-slate-400">Trend Kachelansicht</div>
+          <div className="text-xs text-slate-600 mt-1">Keine Trends konfiguriert</div>
+          <div className="text-[10px] text-slate-700 mt-0.5">{rangeKey} · {tileSize} · {tileMode}</div>
         </div>
       </div>
     );
