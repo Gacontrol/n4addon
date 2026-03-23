@@ -16,28 +16,69 @@ interface CustomBlockLibraryProps {
   canCreateFromSelection: boolean;
 }
 
+const WIDGET_STYLE_MAP: Record<string, { bg: string; border: string; color: string; icon: string }> = {
+  'visu-switch':      { bg: 'rgba(59,130,246,0.25)',  border: '#3b82f6', color: '#93c5fd', icon: 'ToggleLeft' },
+  'visu-button':      { bg: 'rgba(34,197,94,0.25)',   border: '#22c55e', color: '#86efac', icon: 'MousePointerClick' },
+  'visu-slider':      { bg: 'rgba(245,158,11,0.25)',  border: '#f59e0b', color: '#fcd34d', icon: 'SlidersHorizontal' },
+  'visu-display':     { bg: 'rgba(20,184,166,0.25)',  border: '#14b8a6', color: '#5eead4', icon: 'MonitorDot' },
+  'visu-gauge':       { bg: 'rgba(239,68,68,0.25)',   border: '#ef4444', color: '#fca5a5', icon: 'Gauge' },
+  'visu-led':         { bg: 'rgba(234,179,8,0.25)',   border: '#eab308', color: '#fde047', icon: 'Lightbulb' },
+  'visu-bar':         { bg: 'rgba(99,102,241,0.25)',  border: '#6366f1', color: '#a5b4fc', icon: 'BarChart3' },
+  'visu-label':       { bg: 'rgba(100,116,139,0.2)',  border: '#64748b', color: '#94a3b8', icon: 'Type' },
+  'visu-thermometer': { bg: 'rgba(239,68,68,0.2)',    border: '#ef4444', color: '#fca5a5', icon: 'Thermometer' },
+  'visu-tank':        { bg: 'rgba(59,130,246,0.2)',   border: '#3b82f6', color: '#93c5fd', icon: 'Droplets' },
+  'visu-pump':        { bg: 'rgba(6,182,212,0.25)',   border: '#06b6d4', color: '#67e8f9', icon: 'Wind' },
+  'visu-valve':       { bg: 'rgba(245,158,11,0.25)',  border: '#f59e0b', color: '#fcd34d', icon: 'Settings' },
+  'visu-sensor':      { bg: 'rgba(34,197,94,0.25)',   border: '#22c55e', color: '#86efac', icon: 'Activity' },
+  'visu-pid':         { bg: 'rgba(239,68,68,0.25)',   border: '#ef4444', color: '#fca5a5', icon: 'Target' },
+  'visu-incrementer': { bg: 'rgba(245,158,11,0.2)',   border: '#f59e0b', color: '#fcd34d', icon: 'PlusCircle' },
+  'visu-input':       { bg: 'rgba(99,102,241,0.2)',   border: '#6366f1', color: '#a5b4fc', icon: 'TextCursorInput' },
+  'visu-multistate':  { bg: 'rgba(168,85,247,0.2)',   border: '#a855f7', color: '#d8b4fe', icon: 'List' },
+  'visu-image':       { bg: 'rgba(100,116,139,0.2)',  border: '#64748b', color: '#94a3b8', icon: 'Image' },
+  'visu-frame':       { bg: 'rgba(100,116,139,0.1)',  border: '#475569', color: '#94a3b8', icon: 'LayoutDashboard' },
+  'visu-heating-curve': { bg: 'rgba(239,68,68,0.2)', border: '#ef4444', color: '#fca5a5', icon: 'TrendingUp' },
+  'modern-switch':    { bg: 'rgba(59,130,246,0.25)',  border: '#3b82f6', color: '#93c5fd', icon: 'ToggleLeft' },
+  'modern-button':    { bg: 'rgba(34,197,94,0.25)',   border: '#22c55e', color: '#86efac', icon: 'MousePointerClick' },
+  'modern-gauge':     { bg: 'rgba(239,68,68,0.25)',   border: '#ef4444', color: '#fca5a5', icon: 'Gauge' },
+  'modern-display':   { bg: 'rgba(20,184,166,0.25)',  border: '#14b8a6', color: '#5eead4', icon: 'MonitorDot' },
+};
+
+const getWidgetStyle = (type: string) => {
+  if (WIDGET_STYLE_MAP[type]) return WIDGET_STYLE_MAP[type];
+  if (type.startsWith('dash-')) return { bg: 'rgba(99,102,241,0.2)', border: '#6366f1', color: '#a5b4fc', icon: 'LayoutGrid' };
+  if (type.includes('rect') || type.includes('circle') || type.includes('line') || type.includes('arrow')) {
+    return { bg: 'rgba(100,116,139,0.15)', border: '#475569', color: '#94a3b8', icon: 'Square' };
+  }
+  return { bg: 'rgba(100,116,139,0.2)', border: '#64748b', color: '#94a3b8', icon: 'Box' };
+};
+
 const VisuPagePreview: React.FC<{ block: CustomBlockDefinition; onClose: () => void }> = ({ block, onClose }) => {
   const page = block.visuPageData;
   if (!page) return null;
 
   const canvasW = page.canvasWidth || 1280;
   const canvasH = page.canvasHeight || 800;
-  const previewW = 560;
-  const previewH = Math.round(previewW * (canvasH / canvasW));
-  const scale = previewW / canvasW;
+  const maxPreviewW = Math.min(window.innerWidth * 0.85, 800);
+  const maxPreviewH = window.innerHeight * 0.75;
+  const scaleByW = maxPreviewW / canvasW;
+  const scaleByH = maxPreviewH / canvasH;
+  const scale = Math.min(scaleByW, scaleByH);
+  const previewW = Math.round(canvasW * scale);
+  const previewH = Math.round(canvasH * scale);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75" onClick={onClose}>
       <div
         className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+        style={{ maxWidth: '92vw', maxHeight: '92vh' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <Icons.Monitor className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-medium text-white">{block.name} – Visu-Vorschau</span>
-            <span className="text-xs text-slate-400">{page.name}</span>
+            <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded">{page.name}</span>
+            <span className="text-xs text-slate-500">{canvasW} × {canvasH}</span>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
             <Icons.X className="w-4 h-4" />
@@ -50,36 +91,61 @@ const VisuPagePreview: React.FC<{ block: CustomBlockDefinition; onClose: () => v
               height: previewH,
               backgroundColor: page.backgroundColor || '#1e293b',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              borderRadius: 6,
+              flexShrink: 0
             }}
           >
             <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: canvasW, height: canvasH, position: 'absolute' }}>
-              {page.widgets.map((widget: VisuWidget) => (
-                <div
-                  key={widget.id}
-                  style={{
-                    position: 'absolute',
-                    left: widget.position.x,
-                    top: widget.position.y,
-                    width: widget.size.width,
-                    height: widget.size.height,
-                    background: 'rgba(100,116,139,0.3)',
-                    border: '1px solid rgba(148,163,184,0.2)',
-                    borderRadius: 4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 10,
-                    color: '#94a3b8',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <span className="truncate px-1">{widget.label || widget.type.replace('visu-', '').replace('modern-', '').replace('dash-', '')}</span>
-                </div>
-              ))}
+              {page.widgets.map((widget: VisuWidget) => {
+                const style = getWidgetStyle(widget.type);
+                const IconComp = Icons[style.icon as keyof typeof Icons] as React.FC<{ style?: React.CSSProperties }> | undefined;
+                const isShape = ['visu-rect', 'visu-circle', 'visu-line', 'visu-arrow', 'visu-polygon', 'visu-star', 'visu-diamond', 'visu-cross', 'visu-polyline'].includes(widget.type);
+                return (
+                  <div
+                    key={widget.id}
+                    style={{
+                      position: 'absolute',
+                      left: widget.position.x,
+                      top: widget.position.y,
+                      width: widget.size.width,
+                      height: widget.size.height,
+                      background: isShape ? 'rgba(100,116,139,0.15)' : style.bg,
+                      border: `1.5px solid ${style.border}`,
+                      borderRadius: widget.type === 'visu-circle' ? '50%' : 6,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      overflow: 'hidden',
+                      opacity: 0.9
+                    }}
+                  >
+                    {IconComp && widget.size.height > 28 && (
+                      <IconComp style={{ width: Math.min(16, widget.size.width * 0.3), height: Math.min(16, widget.size.height * 0.3), color: style.color, flexShrink: 0 }} />
+                    )}
+                    {widget.size.height > 18 && (
+                      <span style={{
+                        fontSize: Math.max(9, Math.min(13, widget.size.height * 0.18)),
+                        color: style.color,
+                        textAlign: 'center',
+                        padding: '0 4px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                        lineHeight: 1.2
+                      }}>
+                        {widget.label || widget.type.replace('visu-', '').replace('modern-', '').replace('dash-', '')}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 mt-2 text-center">{page.widgets.length} Widgets auf dieser Seite</p>
+          <p className="text-[10px] text-slate-500 mt-2 text-center">{page.widgets.length} Widgets · {canvasW}×{canvasH}px</p>
         </div>
       </div>
     </div>

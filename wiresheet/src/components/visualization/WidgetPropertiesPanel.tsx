@@ -3163,51 +3163,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe das Pumpen-Widget mit einem Pumpenbaustein in der Logik. Alle Ein- und Ausgaenge werden automatisch verknuepft.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Pumpenbaustein</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {pumpControlNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {getNodeLabel(node)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {pumpControlNodes.length === 0 && (
+                {pumpControlNodes.length === 0 ? (
                   <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
                     <Settings className="w-4 h-4 text-amber-500" />
                     <span className="text-xs text-amber-400">Kein Pumpenbaustein in der Logik vorhanden. Bitte zuerst einen Pumpenbaustein hinzufuegen.</span>
                   </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || pumpControlNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[`${bindingNodeId}:output-2`] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Laeuft:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{liveValues[`${bindingNodeId}:output-2`] ? 'Ja' : 'Nein'}</span>
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  <NodeBrowser
+                    nodes={pumpControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-2`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Laeuft:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{liveValues[`${bindingNodeId}:output-2`] ? 'Ja' : 'Nein'}</span>
                   </div>
                 )}
               </>
@@ -3216,51 +3193,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe das Ventil-Widget mit einem Ventilbaustein in der Logik. Alle Ein- und Ausgaenge werden automatisch verknuepft.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Ventilbaustein</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {valveControlNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {getNodeLabel(node)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {valveControlNodes.length === 0 && (
+                {valveControlNodes.length === 0 ? (
                   <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
                     <Settings className="w-4 h-4 text-amber-500" />
                     <span className="text-xs text-amber-400">Kein Ventilbaustein in der Logik vorhanden. Bitte zuerst einen Ventilbaustein hinzufuegen.</span>
                   </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || valveControlNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (alle Signale)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Ventilstellung:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  <NodeBrowser
+                    nodes={valveControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Ventilstellung:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
                   </div>
                 )}
               </>
@@ -3269,51 +3223,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe dieses Sensor-Widget mit einem Sensorbaustein um den Messwert und Alarmzustand anzuzeigen.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Sensorbaustein</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {sensorControlNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {getNodeLabel(node)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {sensorControlNodes.length === 0 && (
+                {sensorControlNodes.length === 0 ? (
                   <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
                     <Settings className="w-4 h-4 text-amber-500" />
                     <span className="text-xs text-amber-400">Kein Sensorbaustein in der Logik vorhanden. Bitte zuerst einen Sensorbaustein hinzufuegen.</span>
                   </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || sensorControlNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Messwert + Alarm)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Messwert:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(2).replace(/\.00$/, '')}</span>
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  <NodeBrowser
+                    nodes={sensorControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Messwert:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(2).replace(/\.00$/, '')}</span>
                   </div>
                 )}
               </>
@@ -3322,51 +3253,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe dieses PID-Widget mit einem PID-Regler um Sollwert, Istwert und Stellgroesse anzuzeigen.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">PID-Regler</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {pidControlNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {getNodeLabel(node)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {pidControlNodes.length === 0 && (
+                {pidControlNodes.length === 0 ? (
                   <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
                     <Settings className="w-4 h-4 text-amber-500" />
                     <span className="text-xs text-amber-400">Kein PID-Regler in der Logik vorhanden. Bitte zuerst einen PID-Regler hinzufuegen.</span>
                   </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || pidControlNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Sollwert, Istwert, Stellgroesse)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Stellgroesse:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  <NodeBrowser
+                    nodes={pidControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Stellgroesse:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)} %</span>
                   </div>
                 )}
               </>
@@ -3375,51 +3283,28 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 <p className="text-xs text-slate-400 leading-relaxed">
                   Verknuepfe dieses Widget mit einem Heizkurven-Baustein um Ein-/Ausgangswerte anzuzeigen und Parameter zu aendern.
                 </p>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Heizkurven-Baustein</label>
-                  <select
-                    value={bindingNodeId || ''}
-                    onChange={(e) => handleNodeChange(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
-                  >
-                    <option value="">-- Keine Verknuepfung --</option>
-                    {heatingCurveNodes.map((node) => (
-                      <option key={node.id} value={node.id}>
-                        {getNodeLabel(node)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {heatingCurveNodes.length === 0 && (
+                {heatingCurveNodes.length === 0 ? (
                   <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
                     <Settings className="w-4 h-4 text-amber-500" />
                     <span className="text-xs text-amber-400">Kein Heizkurven-Baustein in der Logik vorhanden. Bitte zuerst einen Heizkurven-Baustein hinzufuegen.</span>
                   </div>
-                )}
-                {widget.binding ? (
-                  <div className="flex flex-col gap-1.5 p-2 bg-green-900/20 border border-green-700 rounded">
-                    <div className="flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-green-500 shrink-0" />
-                      <div className="text-xs text-green-400 flex-1 min-w-0">
-                        <p className="font-medium truncate">{getNodeLabel(selectedNode || heatingCurveNodes.find(n => n.id === bindingNodeId))}</p>
-                        <p className="text-green-600/50 mt-0.5">Vollstaendige Verknuepfung (Eingang, Ausgang, Parameter)</p>
-                      </div>
-                      <button onClick={() => onUpdate({ binding: undefined })} className="text-slate-400 hover:text-red-400 shrink-0">
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    {liveValues[`${bindingNodeId}:output-0`] !== undefined && (
-                      <div className="flex items-center gap-2 px-1 py-1 bg-slate-900/50 rounded border border-slate-700/50">
-                        <Activity className="w-3 h-3 text-sky-400 shrink-0" />
-                        <span className="text-[10px] text-slate-400">Ausgang:</span>
-                        <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)}</span>
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 p-2 bg-slate-800 border border-slate-600 rounded">
-                    <Unlink className="w-4 h-4 text-slate-500" />
-                    <span className="text-xs text-slate-400">Keine Verknuepfung</span>
+                  <NodeBrowser
+                    nodes={heatingCurveNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Ausgang:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(1)}</span>
                   </div>
                 )}
               </>

@@ -130,6 +130,12 @@ export const NodeBrowser: React.FC<NodeBrowserProps> = ({
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-green-500 shrink-0" />
             <div className="text-xs text-green-400 flex-1 min-w-0">
+              {nodeIdToSheet.get(selectedNodeId) && (
+                <p className="text-[10px] text-green-600/70 mb-0.5 flex items-center gap-1 truncate">
+                  <Layers className="w-2.5 h-2.5 flex-shrink-0" />
+                  {nodeIdToSheet.get(selectedNodeId)}
+                </p>
+              )}
               <p className="font-medium truncate">{selectedNode ? getNodeLabel(selectedNode) : selectedNodeId}</p>
               {currentLabel() && <p className="text-green-600/60 mt-0.5 truncate">{currentLabel()}</p>}
             </div>
