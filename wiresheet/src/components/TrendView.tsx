@@ -1675,8 +1675,9 @@ function ConfigView({
           <div className="space-y-2">
             {Array.from(nodesByPage.entries()).map(([pageId, { page, nodes }]) => {
               const isExpanded = expandedPages.has(pageId);
-              const regularNodes = nodes.filter(n => n.type !== 'custom-block');
               const customBlockNodes = nodes.filter(n => n.type === 'custom-block');
+              const complexNodes = nodes.filter(n => n.type !== 'custom-block' && (n.data.inputs?.length > 0 || n.data.outputs?.length > 0));
+              const regularNodes = nodes.filter(n => n.type !== 'custom-block' && !n.data.inputs?.length && !n.data.outputs?.length);
 
               return (
                 <div key={pageId} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
@@ -1730,6 +1731,98 @@ function ConfigView({
                                 <><Plus className="w-3 h-3" />Aufzeichnen</>
                               )}
                             </button>
+                          </div>
+                        );
+                      })}
+
+                      {complexNodes.map(cNode => {
+                        const cbKey = `complex-${pageId}-${cNode.id}`;
+                        const isBlockExpanded = expandedCustomBlocks.has(cbKey);
+                        const allPorts = [
+                          ...(cNode.data.inputs || []).map(p => ({ ...p, dir: 'input' as const })),
+                          ...(cNode.data.outputs || []).map(p => ({ ...p, dir: 'output' as const })),
+                        ];
+                        return (
+                          <div key={cNode.id} className="border-t border-slate-800">
+                            <button
+                              onClick={() => setExpandedCustomBlocks((() => {
+                                const next = new Set(expandedCustomBlocks);
+                                if (next.has(cbKey)) next.delete(cbKey); else next.add(cbKey);
+                                return next;
+                              })())}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-slate-800/40 transition-colors"
+                            >
+                              {isBlockExpanded ? <ChevronDown className="w-3 h-3 text-slate-500" /> : <ChevronRight className="w-3 h-3 text-slate-500" />}
+                              <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-[10px] font-bold bg-slate-700 text-white">
+                                {cNode.data.label?.[0]?.toUpperCase() || 'B'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-slate-200 truncate">{cNode.data.label}</div>
+                                <div className="text-xs text-slate-600">Komplexer Baustein · {allPorts.length} Ports</div>
+                              </div>
+                              <span className="text-xs text-slate-500">
+                                {trackedNodes.filter(n => allPorts.some(p => `${cNode.id}:${p.id}` === n.nodeId) && n.enabled).length}/{allPorts.length}
+                              </span>
+                            </button>
+                            {isBlockExpanded && allPorts.length > 0 && (
+                              <div className="border-t border-slate-800/50 divide-y divide-slate-800/50">
+                                {allPorts.map(port => {
+                                  const portNodeId = `${cNode.id}:${port.id}`;
+                                  const portLabel = `${cNode.data.label} › ${port.label}`;
+                                  const tracked = trackedNodes.find(n => n.nodeId === portNodeId);
+                                  const liveVal = liveValues[portNodeId];
+                                  return (
+                                    <div key={port.id} className="flex items-center gap-3 pl-10 pr-4 py-2">
+                                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tracked?.color || '#334155' }} />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs text-slate-300 truncate">{port.label}</div>
+                                        <div className="text-[10px] text-slate-600 capitalize">{port.dir === 'input' ? 'Eingang' : 'Ausgang'}</div>
+                                      </div>
+                                      {liveVal !== undefined && (
+                                        <span className="text-[11px] font-mono text-cyan-400 min-w-[50px] text-right">
+                                          {formatValue(liveVal as number)}
+                                        </span>
+                                      )}
+                                      <button
+                                        onClick={() => toggleTracked(portNodeId, portLabel, page, undefined)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium transition-all ${
+                                          tracked?.enabled
+                                            ? 'bg-cyan-600 text-white hover:bg-cyan-700'
+                                            : tracked
+                                            ? 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                            : 'border border-slate-700 text-slate-500 hover:border-cyan-600/50 hover:text-cyan-400'
+                                        }`}
+                                      >
+                                        {tracked?.enabled ? (
+                                          <><Minus className="w-2.5 h-2.5" />Stop</>
+                                        ) : tracked ? (
+                                          <><Plus className="w-2.5 h-2.5" />Weiter</>
+                                        ) : (
+                                          <><Plus className="w-2.5 h-2.5" />Aufz.</>
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                                <div className="pl-10 pr-4 py-2">
+                                  <button
+                                    onClick={() => {
+                                      allPorts.forEach(port => {
+                                        const portNodeId = `${cNode.id}:${port.id}`;
+                                        const portLabel = `${cNode.data.label} › ${port.label}`;
+                                        if (!trackedNodes.find(n => n.nodeId === portNodeId)) {
+                                          toggleTracked(portNodeId, portLabel, page, undefined);
+                                        }
+                                      });
+                                    }}
+                                    className="text-[11px] text-cyan-500 hover:text-cyan-300 transition-colors flex items-center gap-1"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    Alle Ports aufzeichnen
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
