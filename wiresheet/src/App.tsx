@@ -1140,6 +1140,7 @@ function App() {
 
     if (compositeCtrl && typeof compositeCtrl === 'object') {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
+      const isAggregate = !!compositeValue!.aggregateControl || targetNode?.type === 'aggregate-control';
       const runtimeUpdates: Record<string, unknown> = {};
       const paramUpdates: Record<string, unknown> = {};
 
@@ -1148,7 +1149,7 @@ function App() {
         const hoaKey = compositeValue!.pidControl ? 'pidVisuHOA'
           : compositeValue!.valveControl ? 'valveVisuHOA'
           : compositeValue!.sensorControl ? 'sensorVisuHOA'
-          : compositeValue!.pumpControl || compositeValue!.aggregateControl ? (compositeValue!.aggregateControl ? 'aggregateVisuHOA' : 'pumpVisuHOA')
+          : (compositeValue!.pumpControl || compositeValue!.aggregateControl) ? (isAggregate ? 'aggregateVisuHOA' : 'pumpVisuHOA')
           : null;
         if (hoaKey) {
           runtimeUpdates[hoaKey] = ctrl.hoaMode;
@@ -1164,25 +1165,25 @@ function App() {
         setLiveValue(`${nodeId}:cfg:sensorManualValue`, ctrl.manualValue);
       }
       if ('handStart' in ctrl) {
-        const prefix = compositeValue!.aggregateControl ? 'aggregate' : 'pump';
+        const prefix = isAggregate ? 'aggregate' : 'pump';
         runtimeUpdates[`${prefix}VisuHandStart`] = ctrl.handStart;
         setLiveValue(`${nodeId}:cfg:${prefix}VisuHandStart`, ctrl.handStart);
       }
       for (const key of Object.keys(ctrl)) {
         if (key.startsWith('param_')) {
-          const cfgKey = key.slice(6);
+          const rawKey = key.slice(6);
+          const cfgKey = isAggregate ? rawKey.replace(/^pump/, 'aggregate') : rawKey;
           paramUpdates[cfgKey] = ctrl[key];
           setLiveValue(`${nodeId}:cfg:${cfgKey}`, ctrl[key]);
         }
       }
 
-      if (targetNode && Object.keys(runtimeUpdates).length > 0) {
+      const allUpdates = { ...runtimeUpdates, ...paramUpdates };
+      if (targetNode && Object.keys(allUpdates).length > 0) {
         updateNodeData(targetNode.id, {
-          config: { ...targetNode.data.config, ...runtimeUpdates }
+          config: { ...targetNode.data.config, ...allUpdates }
         });
       }
-
-      const hasParamUpdates = Object.keys(paramUpdates).length > 0;
 
       try {
         const apiBase = (() => {
@@ -1195,11 +1196,6 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dpKey, value })
         });
-        if (hasParamUpdates && targetNode) {
-          updateNodeData(targetNode.id, {
-            config: { ...targetNode.data.config, ...paramUpdates }
-          });
-        }
       } catch (err) {
         console.error('Failed to write visu value:', err);
       }
