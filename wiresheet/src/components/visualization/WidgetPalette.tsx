@@ -6,7 +6,7 @@ import {
   Navigation, Home, ChevronLeft, Hexagon, Star, Diamond, Plus,
   Spline, List, PanelLeft, Image as ImageIcon,
   TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
-  AlignLeft, LayoutGrid, Blocks, Package
+  AlignLeft, LayoutGrid, Blocks, Package, Cpu, Bell, Fan, Pipette
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -34,7 +34,7 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   Minus, ArrowRight, Navigation, Home, ChevronLeft, Hexagon,
   Star, Diamond, Plus, Spline, List, PanelLeft, ImageIcon,
   TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
-  AlignLeft, LayoutGrid
+  AlignLeft, LayoutGrid, Bell, Fan, Pipette
 };
 
 const groups: { key: string; label: string; categories: string[]; color: string; dot: string }[] = [
@@ -79,6 +79,27 @@ const groups: { key: string; label: string; categories: string[]; color: string;
     categories: ['dashboard'],
     color: 'rgba(245,158,11,0.06)',
     dot: '#f59e0b'
+  },
+  {
+    key: 'complex',
+    label: 'Komplexe Bausteine',
+    categories: ['complex'],
+    color: 'rgba(239,68,68,0.06)',
+    dot: '#ef4444'
+  },
+  {
+    key: 'trend',
+    label: 'Trends',
+    categories: ['trend'],
+    color: 'rgba(6,182,212,0.06)',
+    dot: '#06b6d4'
+  },
+  {
+    key: 'alarm',
+    label: 'Alarm',
+    categories: ['alarm'],
+    color: 'rgba(251,146,60,0.06)',
+    dot: '#fb923c'
   }
 ];
 

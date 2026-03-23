@@ -853,7 +853,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-pump',
     label: 'Aggregat',
     icon: 'Fan',
-    category: 'control',
+    category: 'complex',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
       pumpName: '',
@@ -876,7 +876,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-valve',
     label: 'Ventil',
     icon: 'Pipette',
-    category: 'control',
+    category: 'complex',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
       valveName: '',
@@ -897,7 +897,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-sensor',
     label: 'Sensor',
     icon: 'Thermometer',
-    category: 'display',
+    category: 'complex',
     defaultSize: { width: 110, height: 110 },
     defaultConfig: {
       sensorName: '',
@@ -918,7 +918,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-pid',
     label: 'PID Regler',
     icon: 'Activity',
-    category: 'control',
+    category: 'complex',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
       pidName: '',
@@ -939,7 +939,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-heating-curve',
     label: 'Heizkurve',
     icon: 'TrendingUp',
-    category: 'control',
+    category: 'complex',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
       hcName: '',
@@ -958,7 +958,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-time-program',
     label: 'Zeitprogramm',
     icon: 'Clock',
-    category: 'control',
+    category: 'complex',
     defaultSize: { width: 120, height: 120 },
     defaultConfig: {
       tpName: '',
@@ -974,7 +974,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-alarm-console',
     label: 'Alarmkonsole',
     icon: 'Bell',
-    category: 'display',
+    category: 'alarm',
     defaultSize: { width: 300, height: 200 },
     defaultConfig: {
       consoleId: undefined,
@@ -995,7 +995,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-trend-tiles',
     label: 'Trend Kachelansicht',
     icon: 'LayoutGrid',
-    category: 'display',
+    category: 'trend',
     defaultSize: { width: 600, height: 400 },
     defaultConfig: {
       tileSize: 'sm',
@@ -1013,7 +1013,7 @@ export const widgetTemplates: WidgetTemplate[] = [
     type: 'visu-trend-chart',
     label: 'Trend-Diagramm',
     icon: 'TrendingUp',
-    category: 'display',
+    category: 'trend',
     defaultSize: { width: 400, height: 250 },
     defaultConfig: {
       series: [],

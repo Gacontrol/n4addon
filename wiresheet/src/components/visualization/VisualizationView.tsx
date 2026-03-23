@@ -716,30 +716,32 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
         </div>
       )}
 
-      {isEditMode && selectedWidgetIds.length >= 2 && (
+      {isEditMode && (
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-slate-700 bg-slate-800/50">
-          <span className="text-xs text-slate-500 mr-1">{selectedWidgetIds.length} Widgets:</span>
+          <span className="text-[10px] text-slate-500 mr-1 flex-shrink-0">
+            {selectedWidgetIds.length >= 2 ? `${selectedWidgetIds.length} Widgets:` : 'Ausrichten:'}
+          </span>
           <div className="flex items-center gap-0.5">
-            <button onClick={() => handleAlignWidgets('left')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Links ausrichten"><AlignLeft className="w-3.5 h-3.5" /></button>
-            <button onClick={() => handleAlignWidgets('center-h')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Horizontal zentrieren"><AlignCenter className="w-3.5 h-3.5" /></button>
-            <button onClick={() => handleAlignWidgets('right')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Rechts ausrichten"><AlignRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('left')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Links ausrichten"><AlignLeft className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('center-h')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Horizontal zentrieren"><AlignCenter className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('right')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Rechts ausrichten"><AlignRight className="w-3.5 h-3.5" /></button>
           </div>
-          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="w-px h-4 bg-slate-700 mx-0.5" />
           <div className="flex items-center gap-0.5">
-            <button onClick={() => handleAlignWidgets('top')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Oben ausrichten"><AlignStartVertical className="w-3.5 h-3.5" /></button>
-            <button onClick={() => handleAlignWidgets('center-v')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Vertikal zentrieren"><AlignCenterVertical className="w-3.5 h-3.5" /></button>
-            <button onClick={() => handleAlignWidgets('bottom')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors" title="Unten ausrichten"><AlignEndVertical className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('top')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Oben ausrichten"><AlignStartVertical className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('center-v')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Vertikal zentrieren"><AlignCenterVertical className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleAlignWidgets('bottom')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Unten ausrichten"><AlignEndVertical className="w-3.5 h-3.5" /></button>
           </div>
-          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="w-px h-4 bg-slate-700 mx-0.5" />
           <div className="flex items-center gap-0.5">
-            <button onClick={() => handleDistributeWidgets('h')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Horizontal verteilen"><AlignHorizontalDistributeCenter className="w-3.5 h-3.5" /></button>
-            <button onClick={() => handleDistributeWidgets('v')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="Vertikal verteilen"><AlignVerticalDistributeCenter className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleDistributeWidgets('h')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Horizontal verteilen"><AlignHorizontalDistributeCenter className="w-3.5 h-3.5" /></button>
+            <button onClick={() => handleDistributeWidgets('v')} disabled={selectedWidgetIds.length < 3} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Vertikal verteilen"><AlignVerticalDistributeCenter className="w-3.5 h-3.5" /></button>
           </div>
-          <div className="w-px h-4 bg-slate-600 mx-0.5" />
+          <div className="w-px h-4 bg-slate-700 mx-0.5" />
           <div className="flex items-center gap-0.5">
-            <button onClick={() => handleSameSizeWidgets('width')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Breite">W</button>
-            <button onClick={() => handleSameSizeWidgets('height')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Hoehe">H</button>
-            <button onClick={() => handleSameSizeWidgets('both')} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors text-[10px] font-mono" title="Gleiche Groesse">W+H</button>
+            <button onClick={() => handleSameSizeWidgets('width')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[10px] font-mono" title="Gleiche Breite">W</button>
+            <button onClick={() => handleSameSizeWidgets('height')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[10px] font-mono" title="Gleiche Hoehe">H</button>
+            <button onClick={() => handleSameSizeWidgets('both')} disabled={selectedWidgetIds.length < 2} className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-[10px] font-mono" title="Gleiche Groesse">W+H</button>
           </div>
         </div>
       )}
