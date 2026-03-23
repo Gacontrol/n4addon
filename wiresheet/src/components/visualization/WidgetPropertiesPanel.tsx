@@ -2891,6 +2891,85 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-trend-tiles': {
+        const ttCfg = config as import('./VisuTrendTiles').VisuTrendTilesConfig;
+        const TILE_RANGES = [
+          { value: '30min', label: '30 Min' },
+          { value: '1h', label: '1 Stunde' },
+          { value: '6h', label: '6 Stunden' },
+          { value: '12h', label: '12 Stunden' },
+          { value: '24h', label: '24 Stunden' },
+          { value: '7d', label: '7 Tage' },
+          { value: '30d', label: '30 Tage' },
+        ];
+        return (
+          <>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Kachelgrösse</label>
+                <div className="grid grid-cols-4 gap-1">
+                  {(['xs', 'sm', 'md', 'lg'] as const).map(s => (
+                    <button key={s} onClick={() => onUpdate({ config: { ...ttCfg, tileSize: s } })}
+                      className={`py-1.5 rounded text-xs font-medium transition-colors ${(ttCfg.tileSize || 'sm') === s ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                      {s === 'xs' ? 'Klein' : s === 'sm' ? 'Mittel' : s === 'md' ? 'Gross' : 'XL'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Kachelmodus</label>
+                <div className="grid grid-cols-2 gap-1">
+                  {(['simple', 'detailed'] as const).map(m => (
+                    <button key={m} onClick={() => onUpdate({ config: { ...ttCfg, tileMode: m } })}
+                      className={`py-1.5 rounded text-xs font-medium transition-colors ${(ttCfg.tileMode || 'simple') === m ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                      {m === 'simple' ? 'Einfach' : 'Detailliert'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Zeitbereich</label>
+                <select
+                  value={ttCfg.timeRange || '1h'}
+                  onChange={e => onUpdate({ config: { ...ttCfg, timeRange: e.target.value as typeof ttCfg.timeRange } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200"
+                >
+                  {TILE_RANGES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Aktualisierung (Sek)</label>
+                <input
+                  type="number"
+                  value={(ttCfg.refreshIntervalMs || 30000) / 1000}
+                  onChange={e => onUpdate({ config: { ...ttCfg, refreshIntervalMs: Math.max(5, parseInt(e.target.value) || 30) * 1000 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-xs text-slate-200"
+                  min={5}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={ttCfg.showPageHeaders !== false} onChange={e => onUpdate({ config: { ...ttCfg, showPageHeaders: e.target.checked } })} className="w-3.5 h-3.5 rounded accent-cyan-500" />
+                <span className="text-xs text-slate-300">Seitennamen anzeigen</span>
+              </label>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Hintergrundfarbe</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ttCfg.backgroundColor || '#00000000'} onChange={e => onUpdate({ config: { ...ttCfg, backgroundColor: e.target.value } })} className="w-8 h-8 rounded cursor-pointer flex-shrink-0" />
+                  <button onClick={() => onUpdate({ config: { ...ttCfg, backgroundColor: undefined } })} className="text-xs text-slate-500 hover:text-slate-300">Zurücksetzen</button>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-500 italic bg-slate-800/50 rounded p-2">Gruppen und sichtbare Kacheln können direkt im Widget über die Einstellungsbuttons konfiguriert werden.</p>
+            </div>
+          </>
+        );
+      }
+
       case 'visu-3d-building': {
         const b3dCfg = config as Building3DWidgetConfig;
         return (

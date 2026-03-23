@@ -424,6 +424,27 @@ app.post(['/pages', '/api/pages'], async (req, res) => {
     }
     await fs.mkdir(dataDir, { recursive: true });
     await fs.writeFile(pagesFile, JSON.stringify(pages, null, 2));
+
+    const pageMap = new Map(pages.map(p => [p.id, p.name]));
+    const allNodeIds = new Set(pages.flatMap(p => (p.nodes || []).map(n => n.id)));
+    let trendChanged = false;
+    for (const tn of trendConfig.trackedNodes) {
+      const newName = pageMap.get(tn.pageId);
+      if (newName && newName !== tn.pageName) {
+        tn.pageName = newName;
+        trendChanged = true;
+      }
+      const nodeExists = allNodeIds.has(tn.nodeId.split(':')[0]);
+      if (!nodeExists && !tn.deleted) {
+        tn.deleted = true;
+        trendChanged = true;
+      } else if (nodeExists && tn.deleted) {
+        tn.deleted = false;
+        trendChanged = true;
+      }
+    }
+    if (trendChanged) await saveTrendConfig();
+
     console.log(`Gespeichert: ${pages.length} Seiten nach ${pagesFile}`);
     res.json({ success: true, saved: pages.length });
   } catch (err) {

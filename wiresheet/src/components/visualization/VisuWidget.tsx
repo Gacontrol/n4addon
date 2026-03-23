@@ -1450,6 +1450,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             isEditMode={isEditMode}
             width={widget.size.width}
             height={widget.size.height}
+            onUpdateConfig={onUpdateConfig ? (cfg) => onUpdateConfig(cfg as Record<string, unknown>) : undefined}
           />
         );
       }

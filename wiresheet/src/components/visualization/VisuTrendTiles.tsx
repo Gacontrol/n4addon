@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Maximize2, ZoomIn, ZoomOut, RotateCcw, Download, X, Eye, EyeOff, RefreshCw, Calendar, Check } from 'lucide-react';
+import { Maximize2, ZoomIn, ZoomOut, RotateCcw, Download, X, Eye, EyeOff, RefreshCw, Calendar, Check, ChevronDown, ChevronRight, Star, StarOff, Plus, Trash2, Settings, AlertTriangle } from 'lucide-react';
 
 interface TrendPoint {
   ts: number;
@@ -17,6 +17,15 @@ interface TrendSeries {
   max?: number;
   avg?: number;
   last?: number | boolean;
+  deleted?: boolean;
+}
+
+export interface TileGroup {
+  id: string;
+  name: string;
+  nodeIds: string[];
+  favorite: boolean;
+  color?: string;
 }
 
 export interface VisuTrendTilesConfig {
@@ -27,6 +36,8 @@ export interface VisuTrendTilesConfig {
   showPageHeaders?: boolean;
   backgroundColor?: string;
   refreshIntervalMs?: number;
+  hiddenNodeIds?: string[];
+  groups?: TileGroup[];
 }
 
 interface VisuTrendTilesProps {
@@ -35,6 +46,7 @@ interface VisuTrendTilesProps {
   isEditMode?: boolean;
   width: number;
   height: number;
+  onUpdateConfig?: (config: VisuTrendTilesConfig) => void;
 }
 
 function getApiBase(): string {
@@ -240,13 +252,14 @@ function drawPopupChart(
 }
 
 function MiniTile({
-  s, liveValues, tileSize, tileMode, onClick
+  s, liveValues, tileSize, tileMode, onClick, isDeleted
 }: {
   s: TrendSeries;
   liveValues: Record<string, unknown>;
   tileSize: 'xs' | 'sm' | 'md' | 'lg';
   tileMode: 'simple' | 'detailed';
   onClick: () => void;
+  isDeleted?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const live = liveValues[s.nodeId];
@@ -267,6 +280,25 @@ function MiniTile({
   }, [s, chartH]);
 
   const displayVal = live !== undefined ? formatValue(live as number) : (s.last !== undefined ? formatValue(s.last as number) : '-');
+
+  if (isDeleted) {
+    const tileH = tileSize === 'xs' ? 54 : tileSize === 'sm' ? 90 : tileSize === 'md' ? 120 : 170;
+    return (
+      <div
+        onClick={onClick}
+        className="bg-slate-800/60 border border-red-900/50 rounded-xl overflow-hidden cursor-pointer opacity-70"
+        style={{ borderLeftColor: '#ef4444', borderLeftWidth: 3, minHeight: tileH }}
+      >
+        <div className="p-2 flex items-center gap-1.5">
+          <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />
+          <span className="text-[10px] text-red-400 truncate">{s.label}</span>
+        </div>
+        <div className="px-2 pb-2">
+          <span className="text-[9px] text-red-600 italic">Datenpunkt gelöscht</span>
+        </div>
+      </div>
+    );
+  }
 
   if (tileSize === 'xs') {
     return (
@@ -623,16 +655,240 @@ interface TrackedNodeEntry {
   enabled: boolean;
   color: string;
   unit?: string;
+  deleted?: boolean;
+}
+
+interface GroupEditorProps {
+  groups: TileGroup[];
+  allNodes: TrackedNodeEntry[];
+  onSave: (groups: TileGroup[]) => void;
+  onClose: () => void;
+}
+
+function GroupEditor({ groups, allNodes, onSave, onClose }: GroupEditorProps) {
+  const [localGroups, setLocalGroups] = useState<TileGroup[]>(groups.map(g => ({ ...g, nodeIds: [...g.nodeIds] })));
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
+
+  const addGroup = () => {
+    const id = `group-${Date.now()}`;
+    const g: TileGroup = { id, name: 'Neue Gruppe', nodeIds: [], favorite: false };
+    setLocalGroups(prev => [...prev, g]);
+    setEditingId(id);
+    setNewName('Neue Gruppe');
+  };
+
+  const removeGroup = (id: string) => {
+    setLocalGroups(prev => prev.filter(g => g.id !== id));
+  };
+
+  const toggleFavorite = (id: string) => {
+    setLocalGroups(prev => prev.map(g => g.id === id ? { ...g, favorite: !g.favorite } : g));
+  };
+
+  const toggleNode = (groupId: string, nodeId: string) => {
+    setLocalGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      const has = g.nodeIds.includes(nodeId);
+      return { ...g, nodeIds: has ? g.nodeIds.filter(n => n !== nodeId) : [...g.nodeIds, nodeId] };
+    }));
+  };
+
+  const commitRename = (id: string) => {
+    if (newName.trim()) {
+      setLocalGroups(prev => prev.map(g => g.id === id ? { ...g, name: newName.trim() } : g));
+    }
+    setEditingId(null);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[99999] p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ width: 520, maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <h3 className="text-sm font-semibold text-white">Gruppen verwalten</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onSave(localGroups)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1"><Check className="w-3 h-3" />Speichern</button>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"><X className="w-4 h-4 text-slate-400" /></button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {localGroups.length === 0 && (
+            <p className="text-xs text-slate-500 text-center py-4">Noch keine Gruppen. Erstelle eine Gruppe um Kacheln zu organisieren.</p>
+          )}
+
+          {localGroups.map(g => (
+            <div key={g.id} className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700/50">
+                {editingId === g.id ? (
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onBlur={() => commitRename(g.id)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitRename(g.id); if (e.key === 'Escape') setEditingId(null); }}
+                    className="flex-1 bg-slate-700 border border-slate-600 text-white text-xs rounded px-2 py-1 focus:outline-none focus:border-cyan-500"
+                  />
+                ) : (
+                  <button onClick={() => { setEditingId(g.id); setNewName(g.name); }} className="flex-1 text-left text-sm font-medium text-white hover:text-cyan-400 transition-colors truncate">{g.name}</button>
+                )}
+                <button onClick={() => toggleFavorite(g.id)} className={`p-1 rounded transition-colors ${g.favorite ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}>
+                  {g.favorite ? <Star className="w-3.5 h-3.5 fill-current" /> : <StarOff className="w-3.5 h-3.5" />}
+                </button>
+                {g.favorite && <span className="text-[9px] text-amber-500 font-medium uppercase">Favorit</span>}
+                <button onClick={() => removeGroup(g.id)} className="p-1 text-slate-600 hover:text-red-400 rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+              <div className="p-2 max-h-40 overflow-y-auto">
+                {allNodes.length === 0 && <p className="text-[10px] text-slate-600 text-center py-1">Keine Datenpunkte verfügbar</p>}
+                <div className="grid grid-cols-1 gap-0.5">
+                  {allNodes.map(n => {
+                    const inGroup = g.nodeIds.includes(n.nodeId);
+                    return (
+                      <button
+                        key={n.nodeId}
+                        onClick={() => toggleNode(g.id, n.nodeId)}
+                        className={`flex items-center gap-2 px-2 py-1 rounded text-left transition-colors text-xs ${inGroup ? 'bg-cyan-900/30 text-cyan-300' : 'text-slate-400 hover:bg-slate-700'}`}
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: n.color }} />
+                        <span className="flex-1 truncate">{n.label}</span>
+                        <span className="text-[9px] text-slate-600 truncate max-w-[80px]">{n.pageName}</span>
+                        {inGroup && <Check className="w-3 h-3 text-cyan-400 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-4 pb-4 pt-2">
+          <button onClick={addGroup} className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-slate-700 hover:border-cyan-600 text-slate-500 hover:text-cyan-400 rounded-xl text-xs transition-colors">
+            <Plus className="w-3.5 h-3.5" />Gruppe hinzufügen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SettingsPanelProps {
+  config: VisuTrendTilesConfig;
+  allNodes: TrackedNodeEntry[];
+  onSave: (config: VisuTrendTilesConfig) => void;
+  onClose: () => void;
+}
+
+function SettingsPanel({ config, allNodes, onSave, onClose }: SettingsPanelProps) {
+  const [localConfig, setLocalConfig] = useState<VisuTrendTilesConfig>({ ...config, hiddenNodeIds: [...(config.hiddenNodeIds || [])] });
+
+  const toggleHidden = (nodeId: string) => {
+    setLocalConfig(prev => {
+      const hidden = prev.hiddenNodeIds || [];
+      const isHidden = hidden.includes(nodeId);
+      return { ...prev, hiddenNodeIds: isHidden ? hidden.filter(id => id !== nodeId) : [...hidden, nodeId] };
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[99999] p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ width: 460, maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <h3 className="text-sm font-semibold text-white">Ansicht konfigurieren</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => onSave(localConfig)} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1"><Check className="w-3 h-3" />Übernehmen</button>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"><X className="w-4 h-4 text-slate-400" /></button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Kachelgrösse</label>
+            <div className="grid grid-cols-4 gap-1">
+              {(['xs', 'sm', 'md', 'lg'] as const).map(s => (
+                <button key={s} onClick={() => setLocalConfig(prev => ({ ...prev, tileSize: s }))}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${localConfig.tileSize === s ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                  {s === 'xs' ? 'Klein' : s === 'sm' ? 'Mittel' : s === 'md' ? 'Gross' : 'XL'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Kachelmodus</label>
+            <div className="grid grid-cols-2 gap-1">
+              {(['simple', 'detailed'] as const).map(m => (
+                <button key={m} onClick={() => setLocalConfig(prev => ({ ...prev, tileMode: m }))}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${localConfig.tileMode === m ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                  {m === 'simple' ? 'Einfach' : 'Detailliert'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Zeitbereich</label>
+            <div className="grid grid-cols-4 gap-1">
+              {TIME_RANGES.map(r => (
+                <button key={r.key} onClick={() => setLocalConfig(prev => ({ ...prev, timeRange: r.key as VisuTrendTilesConfig['timeRange'] }))}
+                  className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${localConfig.timeRange === r.key ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Weitere Optionen</label>
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={localConfig.showPageHeaders !== false} onChange={e => setLocalConfig(prev => ({ ...prev, showPageHeaders: e.target.checked }))} className="w-3.5 h-3.5 accent-cyan-500" />
+                <span className="text-xs text-slate-300">Seitennamen anzeigen</span>
+              </label>
+            </div>
+          </div>
+
+          {allNodes.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Sichtbare Kacheln</label>
+              <p className="text-[10px] text-slate-500">Deaktivierte Kacheln werden ausgeblendet.</p>
+              <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                {allNodes.map(n => {
+                  const isHidden = (localConfig.hiddenNodeIds || []).includes(n.nodeId);
+                  return (
+                    <button
+                      key={n.nodeId}
+                      onClick={() => toggleHidden(n.nodeId)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${isHidden ? 'bg-slate-800/40 text-slate-600' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    >
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: isHidden ? '#475569' : n.color }} />
+                      <span className="flex-1 text-left truncate">{n.label}</span>
+                      <span className="text-[9px] text-slate-600 truncate max-w-[80px]">{n.pageName}</span>
+                      {isHidden ? <EyeOff className="w-3 h-3 text-slate-600 flex-shrink-0" /> : <Eye className="w-3 h-3 text-cyan-500 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
-  config, liveValues, width, height
+  config, liveValues, width, height, onUpdateConfig
 }) => {
   const API_BASE = getApiBase();
   const [trackedNodes, setTrackedNodes] = useState<TrackedNodeEntry[]>([]);
   const [seriesData, setSeriesData] = useState<TrendSeries[]>([]);
   const [loading, setLoading] = useState(false);
   const [popupSeries, setPopupSeries] = useState<TrendSeries | null>(null);
+  const [collapsedPages, setCollapsedPages] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showGroupEditor, setShowGroupEditor] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tileSize = config.tileSize || 'sm';
@@ -640,6 +896,8 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
   const rangeKey = config.timeRange || '1h';
   const rangeMs = TIME_RANGES.find(r => r.key === rangeKey)?.ms || 3600000;
   const refreshMs = config.refreshIntervalMs || 30000;
+  const hiddenNodeIds = config.hiddenNodeIds || [];
+  const groups = config.groups || [];
 
   useEffect(() => {
     const load = async () => {
@@ -655,7 +913,7 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
   }, [API_BASE]);
 
   const fetchData = useCallback(async () => {
-    const enabled = trackedNodes.filter(n => n.enabled);
+    const enabled = trackedNodes.filter(n => n.enabled && !n.deleted);
     if (enabled.length === 0) return;
     setLoading(true);
     const from = Date.now() - rangeMs;
@@ -676,13 +934,23 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
             unit: tn.unit,
             data: raw,
             visible: true,
+            deleted: tn.deleted,
             min: numVals.length > 0 ? Math.min(...numVals) : undefined,
             max: numVals.length > 0 ? Math.max(...numVals) : undefined,
             avg: numVals.length > 0 ? numVals.reduce((a, b) => a + b, 0) / numVals.length : undefined,
             last: raw.length > 0 ? raw[raw.length - 1].v : undefined,
           };
         });
-        setSeriesData(series);
+        const deletedSeries: TrendSeries[] = trackedNodes.filter(n => n.deleted).map(tn => ({
+          nodeId: tn.nodeId,
+          label: tn.label,
+          color: tn.color,
+          unit: tn.unit,
+          data: [],
+          visible: true,
+          deleted: true,
+        }));
+        setSeriesData([...series, ...deletedSeries]);
       }
     } catch {} finally { setLoading(false); }
   }, [trackedNodes, rangeMs, API_BASE]);
@@ -697,9 +965,11 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
     return () => { if (refreshRef.current) clearInterval(refreshRef.current); };
   }, [fetchData, refreshMs]);
 
+  const visibleSeriesData = useMemo(() => seriesData.filter(s => !hiddenNodeIds.includes(s.nodeId)), [seriesData, hiddenNodeIds]);
+
   const seriesByPage = useMemo(() => {
     const map = new Map<string, { pageName: string; series: TrendSeries[] }>();
-    for (const s of seriesData) {
+    for (const s of visibleSeriesData) {
       const tn = trackedNodes.find(n => n.nodeId === s.nodeId);
       const key = tn?.pageId || 'unknown';
       const name = tn?.pageName || 'Unbekannt';
@@ -707,12 +977,113 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
       map.get(key)!.series.push(s);
     }
     return Array.from(map.entries()).sort((a, b) => a[1].pageName.localeCompare(b[1].pageName));
-  }, [seriesData, trackedNodes]);
+  }, [visibleSeriesData, trackedNodes]);
+
+  const groupedSeriesMap = useMemo(() => {
+    const map = new Map<string, TrendSeries[]>();
+    for (const g of groups) {
+      const gSeries = g.nodeIds.map(nid => visibleSeriesData.find(s => s.nodeId === nid)).filter(Boolean) as TrendSeries[];
+      if (gSeries.length > 0) map.set(g.id, gSeries);
+    }
+    return map;
+  }, [groups, visibleSeriesData]);
+
+  const allGroupedNodeIds = useMemo(() => new Set(groups.flatMap(g => g.nodeIds)), [groups]);
+
+  const ungroupedByPage = useMemo(() => {
+    const filtered = visibleSeriesData.filter(s => !allGroupedNodeIds.has(s.nodeId));
+    const map = new Map<string, { pageName: string; series: TrendSeries[] }>();
+    for (const s of filtered) {
+      const tn = trackedNodes.find(n => n.nodeId === s.nodeId);
+      const key = tn?.pageId || 'unknown';
+      const name = tn?.pageName || 'Unbekannt';
+      if (!map.has(key)) map.set(key, { pageName: name, series: [] });
+      map.get(key)!.series.push(s);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].pageName.localeCompare(b[1].pageName));
+  }, [visibleSeriesData, trackedNodes, allGroupedNodeIds]);
 
   const gridClass = tileSize === 'xs' ? 'grid-cols-1 sm:grid-cols-2' :
     tileSize === 'sm' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' :
     tileSize === 'md' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' :
     'grid-cols-1 sm:grid-cols-2';
+
+  const handleSaveGroups = (newGroups: TileGroup[]) => {
+    if (onUpdateConfig) onUpdateConfig({ ...config, groups: newGroups });
+    setShowGroupEditor(false);
+  };
+
+  const handleSaveSettings = (newConfig: VisuTrendTilesConfig) => {
+    if (onUpdateConfig) onUpdateConfig(newConfig);
+    setShowSettings(false);
+  };
+
+  const favoriteGroups = groups.filter(g => g.favorite && groupedSeriesMap.has(g.id));
+  const regularGroups = groups.filter(g => !g.favorite && groupedSeriesMap.has(g.id));
+  const showGrouped = groups.length > 0;
+
+  const renderTiles = (series: TrendSeries[]) => (
+    <div className={`grid ${gridClass} gap-2`}>
+      {series.map(s => (
+        <MiniTile
+          key={s.nodeId}
+          s={s}
+          liveValues={liveValues}
+          tileSize={tileSize}
+          tileMode={tileMode}
+          isDeleted={s.deleted}
+          onClick={() => !s.deleted && setPopupSeries(s)}
+        />
+      ))}
+    </div>
+  );
+
+  const renderPageSection = (pageId: string, pageName: string, series: TrendSeries[]) => {
+    const isCollapsed = collapsedPages.has(pageId);
+    return (
+      <div key={pageId}>
+        {config.showPageHeaders !== false && (
+          <button
+            className="flex items-center gap-2 mb-2 w-full group"
+            onClick={() => setCollapsedPages(prev => {
+              const next = new Set(prev);
+              if (next.has(pageId)) next.delete(pageId); else next.add(pageId);
+              return next;
+            })}
+          >
+            {isCollapsed ? <ChevronRight className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{pageName}</span>
+            <span className="text-[9px] text-slate-600">({series.length})</span>
+            <div className="flex-1 h-px bg-slate-800" />
+          </button>
+        )}
+        {!isCollapsed && renderTiles(series)}
+      </div>
+    );
+  };
+
+  const renderGroupSection = (group: TileGroup, series: TrendSeries[]) => {
+    const isCollapsed = collapsedGroups.has(group.id);
+    return (
+      <div key={group.id}>
+        <button
+          className="flex items-center gap-2 mb-2 w-full group"
+          onClick={() => setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+            return next;
+          })}
+        >
+          {isCollapsed ? <ChevronRight className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+          {group.favorite && <Star className="w-3 h-3 text-amber-400 fill-current" />}
+          <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider">{group.name}</span>
+          <span className="text-[9px] text-slate-600">({series.length})</span>
+          <div className="flex-1 h-px bg-slate-800" />
+        </button>
+        {!isCollapsed && renderTiles(series)}
+      </div>
+    );
+  };
 
   if (trackedNodes.length === 0) {
     return (
@@ -727,46 +1098,70 @@ export const VisuTrendTiles: React.FC<VisuTrendTilesProps> = ({
   }
 
   return (
-    <div className="w-full h-full overflow-auto" style={{ backgroundColor: config.backgroundColor || 'transparent', width, height }}>
+    <div className="w-full h-full overflow-auto flex flex-col" style={{ backgroundColor: config.backgroundColor || 'transparent', width, height }}>
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-slate-800/60 flex-shrink-0">
+        <RefreshCw className={`w-3 h-3 flex-shrink-0 ${loading ? 'text-cyan-400 animate-spin' : 'text-slate-700'}`} />
+        <span className="text-[9px] text-slate-600 flex-1">{visibleSeriesData.filter(s => !s.deleted).length} aktiv · {rangeKey}</span>
+        {onUpdateConfig && (
+          <>
+            <button onClick={() => setShowGroupEditor(true)} title="Gruppen" className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+              <Star className="w-3 h-3" />Gruppen
+            </button>
+            <button onClick={() => setShowSettings(true)} title="Einstellungen" className="p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+              <Settings className="w-3 h-3" />
+            </button>
+          </>
+        )}
+      </div>
+
       {loading && seriesData.length === 0 && (
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center flex-1">
           <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin" />
         </div>
       )}
 
       {seriesData.length > 0 && (
-        <div className="p-2 space-y-3">
-          {seriesByPage.map(([pageId, { pageName, series }]) => (
-            <div key={pageId}>
-              {config.showPageHeaders !== false && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{pageName}</span>
-                  <div className="flex-1 h-px bg-slate-800" />
+        <div className="flex-1 overflow-y-auto p-2 space-y-3">
+          {showGrouped ? (
+            <>
+              {favoriteGroups.map(g => renderGroupSection(g, groupedSeriesMap.get(g.id)!))}
+              {regularGroups.map(g => renderGroupSection(g, groupedSeriesMap.get(g.id)!))}
+              {ungroupedByPage.length > 0 && (
+                <div className="space-y-3">
+                  {ungroupedByPage.map(([pageId, { pageName, series }]) => renderPageSection(pageId, pageName, series))}
                 </div>
               )}
-              <div className={`grid ${gridClass} gap-2`}>
-                {series.map(s => (
-                  <MiniTile
-                    key={s.nodeId}
-                    s={s}
-                    liveValues={liveValues}
-                    tileSize={tileSize}
-                    tileMode={tileMode}
-                    onClick={() => setPopupSeries(s)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            </>
+          ) : (
+            seriesByPage.map(([pageId, { pageName, series }]) => renderPageSection(pageId, pageName, series))
+          )}
         </div>
       )}
 
       {popupSeries && (
         <TilePopup
           s={popupSeries}
-          allSeries={seriesData}
+          allSeries={seriesData.filter(s => !s.deleted)}
           liveValues={liveValues}
           onClose={() => setPopupSeries(null)}
+        />
+      )}
+
+      {showGroupEditor && (
+        <GroupEditor
+          groups={groups}
+          allNodes={trackedNodes.filter(n => n.enabled)}
+          onSave={handleSaveGroups}
+          onClose={() => setShowGroupEditor(false)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsPanel
+          config={config}
+          allNodes={trackedNodes.filter(n => n.enabled)}
+          onSave={handleSaveSettings}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
