@@ -1140,7 +1140,8 @@ function App() {
 
     if (compositeCtrl && typeof compositeCtrl === 'object') {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
-      const cfgUpdates: Record<string, unknown> = {};
+      const runtimeUpdates: Record<string, unknown> = {};
+      const paramUpdates: Record<string, unknown> = {};
 
       const ctrl = compositeCtrl as Record<string, unknown>;
       if ('hoaMode' in ctrl) {
@@ -1150,36 +1151,59 @@ function App() {
           : compositeValue!.pumpControl || compositeValue!.aggregateControl ? (compositeValue!.aggregateControl ? 'aggregateVisuHOA' : 'pumpVisuHOA')
           : null;
         if (hoaKey) {
-          cfgUpdates[hoaKey] = ctrl.hoaMode;
+          runtimeUpdates[hoaKey] = ctrl.hoaMode;
           setLiveValue(`${nodeId}:cfg:${hoaKey}`, ctrl.hoaMode);
         }
       }
       if ('manualOutput' in ctrl) {
-        cfgUpdates['pidManualOutput'] = ctrl.manualOutput;
+        runtimeUpdates['pidManualOutput'] = ctrl.manualOutput;
         setLiveValue(`${nodeId}:cfg:pidManualOutput`, ctrl.manualOutput);
       }
       if ('manualValue' in ctrl) {
-        cfgUpdates['sensorManualValue'] = ctrl.manualValue;
+        runtimeUpdates['sensorManualValue'] = ctrl.manualValue;
         setLiveValue(`${nodeId}:cfg:sensorManualValue`, ctrl.manualValue);
       }
       if ('handStart' in ctrl) {
         const prefix = compositeValue!.aggregateControl ? 'aggregate' : 'pump';
-        cfgUpdates[`${prefix}VisuHandStart`] = ctrl.handStart;
+        runtimeUpdates[`${prefix}VisuHandStart`] = ctrl.handStart;
         setLiveValue(`${nodeId}:cfg:${prefix}VisuHandStart`, ctrl.handStart);
       }
       for (const key of Object.keys(ctrl)) {
         if (key.startsWith('param_')) {
           const cfgKey = key.slice(6);
-          cfgUpdates[cfgKey] = ctrl[key];
+          paramUpdates[cfgKey] = ctrl[key];
           setLiveValue(`${nodeId}:cfg:${cfgKey}`, ctrl[key]);
         }
       }
 
-      if (targetNode && Object.keys(cfgUpdates).length > 0) {
+      if (targetNode && Object.keys(runtimeUpdates).length > 0) {
         updateNodeData(targetNode.id, {
-          config: { ...targetNode.data.config, ...cfgUpdates }
+          config: { ...targetNode.data.config, ...runtimeUpdates }
         });
       }
+
+      const hasParamUpdates = Object.keys(paramUpdates).length > 0;
+
+      try {
+        const apiBase = (() => {
+          const path = window.location.pathname;
+          const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+          return m ? `${m[1]}/api` : '/api';
+        })();
+        await fetch(`${apiBase}/visu/write-value`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dpKey, value })
+        });
+        if (hasParamUpdates && targetNode) {
+          updateNodeData(targetNode.id, {
+            config: { ...targetNode.data.config, ...paramUpdates }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to write visu value:', err);
+      }
+      return;
     } else if (parsed.segment === 'cfg' && parsed.paramKey) {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === parsed.nodeId);
       if (targetNode) {
