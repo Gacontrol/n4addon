@@ -955,6 +955,22 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'readwrite'
   },
   {
+    type: 'visu-time-program',
+    label: 'Zeitprogramm',
+    icon: 'Clock',
+    category: 'control',
+    defaultSize: { width: 120, height: 120 },
+    defaultConfig: {
+      tpName: '',
+      normalColor: '#475569',
+      activeColor: '#0d9488'
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Zeitprogramm-Widget mit Wochenplan-Popup und Drag-and-Drop Schaltzeiten',
+    supportsBinding: true,
+    bindingDirection: 'readwrite'
+  },
+  {
     type: 'visu-alarm-console',
     label: 'Alarmkonsole',
     icon: 'Bell',

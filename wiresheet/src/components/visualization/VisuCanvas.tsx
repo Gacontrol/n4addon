@@ -257,6 +257,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-time-program') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'time-program') return null;
+      return {
+        output: liveValues[`${nodeId}:output-0`] ?? false,
+        active: liveValues[`${nodeId}:output-1`] ?? false
+      };
+    }
+
     if (segment === 'cfg' && cfgParamKey) {
       const cfgLiveVal = liveValues[dpKey];
       if (cfgLiveVal !== undefined) return cfgLiveVal;
@@ -378,6 +387,21 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       hcMinOutput: cfg.hcMinOutput,
       hcMaxOutput: cfg.hcMaxOutput,
       hcReverseDirection: cfg.hcReverseDirection
+    };
+  }, [logicNodes]);
+
+  const getTimeProgramWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-time-program' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
+    if (!node || node.type !== 'time-program') return undefined;
+    const cfg = node.data.config || {};
+    const nodeName = (cfg.timeProgramName as string) || node.data.label || 'Zeitprogramm';
+    return {
+      tpName: nodeName,
+      timeProgramOutputType: cfg.timeProgramOutputType,
+      timeProgramDefaultValue: cfg.timeProgramDefaultValue,
+      timeProgramEntries: cfg.timeProgramEntries,
+      timeProgramExceptions: cfg.timeProgramExceptions
     };
   }, [logicNodes]);
 
@@ -1024,6 +1048,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               sensorParams={getSensorWidgetParams(widget)}
               pidParams={getPIDWidgetParams(widget)}
               heatingCurveParams={getHeatingCurveWidgetParams(widget)}
+              timeProgramParams={getTimeProgramWidgetParams(widget)}
               isHighlighted={highlightedWidgetId === widget.id}
               alarmClasses={alarmClasses}
               alarmConsoles={alarmConsoles}
@@ -1096,6 +1121,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           sensorParams={getSensorWidgetParams(widget)}
           pidParams={getPIDWidgetParams(widget)}
           heatingCurveParams={getHeatingCurveWidgetParams(widget)}
+          timeProgramParams={getTimeProgramWidgetParams(widget)}
           isHighlighted={highlightedWidgetId === widget.id}
           alarmClasses={alarmClasses}
           alarmConsoles={alarmConsoles}

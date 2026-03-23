@@ -1204,6 +1204,27 @@ function App() {
       ? (compositeValue.pidControl || compositeValue.heatingCurveControl || compositeValue.pumpControl || compositeValue.aggregateControl || compositeValue.valveControl || compositeValue.sensorControl)
       : null;
 
+    if (compositeValue && typeof compositeValue === 'object' && compositeValue.timeProgramControl) {
+      const tpCtrl = compositeValue.timeProgramControl as Record<string, unknown>;
+      const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
+      if (targetNode) {
+        const cfgUpdates: Record<string, unknown> = {};
+        for (const key of ['timeProgramEntries', 'timeProgramExceptions', 'timeProgramOutputType', 'timeProgramDefaultValue', 'timeProgramName']) {
+          if (key in tpCtrl) cfgUpdates[key] = tpCtrl[key];
+        }
+        updateNodeData(targetNode.id, { config: { ...targetNode.data.config, ...cfgUpdates } });
+      }
+      try {
+        const apiBase = (() => {
+          const path = window.location.pathname;
+          const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+          return m ? `${m[1]}/api` : '/api';
+        })();
+        await fetch(`${apiBase}/visu/write-value`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dpKey, value }) });
+      } catch {}
+      return;
+    }
+
     if (compositeCtrl && typeof compositeCtrl === 'object') {
       const targetNode = pages.flatMap(p => p.nodes).find(n => n.id === nodeId);
       const isAggregate = !!compositeValue!.aggregateControl || targetNode?.type === 'aggregate-control';

@@ -66,7 +66,8 @@ export type WidgetType =
   | 'visu-heating-curve'
   | 'visu-alarm-console'
   | 'visu-trend-chart'
-  | 'visu-3d-building';
+  | 'visu-3d-building'
+  | 'visu-time-program';
 
 export interface WidgetBinding {
   dpKey: string;
@@ -853,6 +854,24 @@ export interface Building3DWidgetConfig {
   wallsTransparent?: boolean;
   xrayOpacity?: number;
   lockTarget?: boolean;
+}
+
+export interface TimeProgramWidgetConfig {
+  tpName?: string;
+  normalColor?: string;
+  activeColor?: string;
+  widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
+}
+
+export interface TimeProgramParams {
+  tpName?: string;
+  timeProgramOutputType?: string;
+  timeProgramDefaultValue?: boolean | number;
+  timeProgramEntries?: unknown[];
+  timeProgramExceptions?: unknown[];
 }
 
 export interface WidgetTemplate {

@@ -58,7 +58,9 @@ import {
   PIDWidgetConfig,
   AlarmConsoleWidgetConfig,
   TrendChartConfig,
-  Building3DWidgetConfig
+  Building3DWidgetConfig,
+  TimeProgramWidgetConfig,
+  TimeProgramParams
 } from '../../types/visualization';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuFrame } from './VisuFrame';
@@ -71,6 +73,7 @@ import { VisuAlarmConsole } from './VisuAlarmConsole';
 import { VisuTrendChart } from './VisuTrendChart';
 import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
+import { VisuTimeProgram } from './VisuTimeProgram';
 import { getThemeVars } from '../../utils/widgetThemes';
 
 class Widget3DErrorBoundary extends React.Component<
@@ -233,6 +236,7 @@ interface VisuWidgetProps {
   sensorParams?: SensorParams;
   pidParams?: PIDParams;
   heatingCurveParams?: HeatingCurveParams;
+  timeProgramParams?: TimeProgramParams;
   isHighlighted?: boolean;
   alarmClasses?: AlarmClass[];
   alarmConsoles?: AlarmConsole[];
@@ -312,6 +316,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   sensorParams,
   pidParams,
   heatingCurveParams,
+  timeProgramParams,
   isHighlighted = false,
   alarmClasses = [],
   alarmConsoles = [],
@@ -1353,6 +1358,20 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={pidParams}
+          />
+        );
+      }
+
+      case 'visu-time-program': {
+        const tpCfg = widget.config as TimeProgramWidgetConfig;
+        const tpValues = value as { active?: boolean; output?: boolean | number } | null;
+        return (
+          <VisuTimeProgram
+            config={tpCfg}
+            value={tpValues}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={timeProgramParams}
           />
         );
       }
