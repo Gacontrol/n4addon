@@ -22,7 +22,8 @@ import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarm
 import {
   Workflow, Plus, X, Play, Square, ChevronDown, ChevronUp,
   Clock, Save, Check, AlertCircle, Pencil, Blocks, LayoutGrid,
-  Monitor, Cpu, DatabaseBackup, Network, Bell, TrendingUp, Building2
+  Monitor, Cpu, DatabaseBackup, Network, Bell, TrendingUp, Building2,
+  FilePlus2, Layers
 } from 'lucide-react';
 
 function App() {
@@ -144,6 +145,7 @@ function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showBlockEditor, setShowBlockEditor] = useState(false);
   const [editingBlock, setEditingBlock] = useState<CustomBlockDefinition | null>(null);
+  const [pendingBlockInsert, setPendingBlockInsert] = useState<CustomBlockDefinition | null>(null);
   const [pendingVisuInsert, setPendingVisuInsert] = useState<{ block: CustomBlockDefinition; idMap: Map<string, string> } | null>(null);
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -545,42 +547,58 @@ function App() {
   }, [addBlock]);
 
   const handleAddBlockToCanvas = useCallback((block: CustomBlockDefinition) => {
-    const now = Date.now();
-    const idMap = new Map<string, string>();
+    setPendingBlockInsert(block);
+  }, []);
 
-    const baseX = 200;
-    const baseY = 200;
+  const handleConfirmBlockInsert = useCallback((targetNewPage: boolean) => {
+    const block = pendingBlockInsert;
+    if (!block) return;
+    setPendingBlockInsert(null);
 
-    const newNodes: FlowNode[] = block.nodes.map(node => {
-      const newId = `node-${now}-${Math.random().toString(36).substr(2, 9)}`;
-      idMap.set(node.id, newId);
-      return {
-        ...node,
-        id: newId,
-        position: {
-          x: node.position.x + baseX,
-          y: node.position.y + baseY
-        }
-      };
-    });
+    const doInsert = () => {
+      const now = Date.now();
+      const idMap = new Map<string, string>();
+      const baseX = 200;
+      const baseY = 200;
 
-    const newConns: Connection[] = block.connections.map(conn => ({
-      ...conn,
-      id: `${idMap.get(conn.source)}-${conn.sourcePort}-${idMap.get(conn.target)}-${conn.targetPort}`,
-      source: idMap.get(conn.source)!,
-      target: idMap.get(conn.target)!
-    }));
+      const newNodes: FlowNode[] = block.nodes.map(node => {
+        const newId = `node-${now}-${Math.random().toString(36).substr(2, 9)}`;
+        idMap.set(node.id, newId);
+        return {
+          ...node,
+          id: newId,
+          position: {
+            x: node.position.x + baseX,
+            y: node.position.y + baseY
+          }
+        };
+      });
 
-    newNodes.forEach(n => addNode(n));
-    setTimeout(() => {
-      newConns.forEach(c => addConnection(c));
-      selectNodes(newNodes.map(n => n.id));
-    }, 50);
+      const newConns: Connection[] = block.connections.map(conn => ({
+        ...conn,
+        id: `${idMap.get(conn.source)}-${conn.sourcePort}-${idMap.get(conn.target)}-${conn.targetPort}`,
+        source: idMap.get(conn.source)!,
+        target: idMap.get(conn.target)!
+      }));
 
-    if (block.visuPageData) {
-      setPendingVisuInsert({ block, idMap });
+      newNodes.forEach(n => addNode(n));
+      setTimeout(() => {
+        newConns.forEach(c => addConnection(c));
+        selectNodes(newNodes.map(n => n.id));
+      }, 50);
+
+      if (block.visuPageData) {
+        setPendingVisuInsert({ block, idMap });
+      }
+    };
+
+    if (targetNewPage) {
+      addPage();
+      setTimeout(doInsert, 50);
+    } else {
+      doInsert();
     }
-  }, [addNode, addConnection, selectNodes]);
+  }, [pendingBlockInsert, addNode, addConnection, selectNodes, addPage]);
 
   const handleConfirmVisuInsert = useCallback(() => {
     if (!pendingVisuInsert) return;
@@ -1775,6 +1793,64 @@ function App() {
               onSave={handleSaveBlock}
               onCancel={() => { setShowBlockEditor(false); setEditingBlock(null); }}
             />
+          )}
+
+          {pendingBlockInsert && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+              <div className="bg-slate-800 border border-slate-600 rounded-xl w-[460px] shadow-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: pendingBlockInsert.color + '30', color: pendingBlockInsert.color }}
+                  >
+                    <Blocks className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-white">{pendingBlockInsert.name}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {pendingBlockInsert.nodes.length} Bausteine · {pendingBlockInsert.inputs.length} Eingaenge · {pendingBlockInsert.outputs.length} Ausgaenge
+                    </p>
+                  </div>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-sm text-slate-300 mb-4">Wo soll der Baustein eingefuegt werden?</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handleConfirmBlockInsert(false)}
+                      className="flex flex-col items-center gap-2.5 p-4 bg-slate-700/60 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl transition-all text-left group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-blue-900/40 flex items-center justify-center group-hover:bg-blue-900/60 transition-colors">
+                        <Layers className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">Aktuelle Seite</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 truncate max-w-[140px]">{activePage.name}</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleConfirmBlockInsert(true)}
+                      className="flex flex-col items-center gap-2.5 p-4 bg-slate-700/60 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl transition-all text-left group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-emerald-900/40 flex items-center justify-center group-hover:bg-emerald-900/60 transition-colors">
+                        <FilePlus2 className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">Neue Seite</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Neue Logikseite erstellen</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+                <div className="px-5 py-3 border-t border-slate-700">
+                  <button
+                    onClick={() => setPendingBlockInsert(null)}
+                    className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded-lg transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {pendingVisuInsert && (
