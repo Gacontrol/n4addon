@@ -262,12 +262,12 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       onConnectionStart(nodeId, portId);
     } else {
       console.log('[handlePortClick] Connection in progress from:', currentConnecting);
-      if (currentConnecting.nodeId !== nodeId) {
+      if (currentConnecting.portId !== portId || currentConnecting.nodeId !== nodeId) {
         console.log('[handlePortClick] Completing connection to:', nodeId, portId);
         onConnectionEnd(nodeId, portId, currentConnecting.nodeId, currentConnecting.portId);
         connectionJustEndedRef.current = now;
       } else {
-        console.log('[handlePortClick] Same node clicked - canceling');
+        console.log('[handlePortClick] Same port clicked - canceling');
         onConnectionCancel();
         connectionJustEndedRef.current = now;
       }

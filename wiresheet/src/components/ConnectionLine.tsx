@@ -25,10 +25,28 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
   onClick,
   onContextMenu
 }) => {
-  const midX = (x1 + x2) / 2;
-  const midY = (y1 + y2) / 2;
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  const isSelfLoop = dx < 30 && dy < 80;
 
-  const path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+  let path: string;
+  let midX: number;
+  let midY: number;
+
+  if (isSelfLoop) {
+    const loopR = 40;
+    const cx1 = x1 + loopR;
+    const cy1 = y1 - loopR;
+    const cx2 = x2 + loopR;
+    const cy2 = y2 + loopR;
+    midX = x1 + loopR * 1.4;
+    midY = (y1 + y2) / 2;
+    path = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
+  } else {
+    midX = (x1 + x2) / 2;
+    midY = (y1 + y2) / 2;
+    path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+  }
 
   const hasValue = liveValue !== undefined && liveValue !== null;
   const displayVal = hasValue ? String(liveValue) : null;
