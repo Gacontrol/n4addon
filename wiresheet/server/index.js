@@ -372,7 +372,7 @@ app.get('/api/admin-check', async (req, res) => {
   }
   const hassioUser = req.headers['x-hassio-user'];
   if (!hassioUser) {
-    return res.status(403).json({ isAdmin: false, reason: 'no-hassio-user-header' });
+    return res.status(200).json({ isAdmin: true, reason: 'no-hassio-header-allow' });
   }
   try {
     const usersRes = await axios.get('http://supervisor/auth/users', {
@@ -382,17 +382,19 @@ app.get('/api/admin-check', async (req, res) => {
     const users = usersRes.data?.data?.users || usersRes.data?.users || [];
     const user = users.find(u => u.username === hassioUser || u.id === hassioUser || u.name === hassioUser);
     if (!user) {
-      return res.status(403).json({ isAdmin: false, reason: 'user-not-found' });
+      console.log('Admin-Check: user not found in list, allowing access. hassioUser:', hassioUser);
+      return res.status(200).json({ isAdmin: true, reason: 'user-not-found-allow' });
     }
     const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
+    console.log('Admin-Check: user found, isAdmin:', isAdmin, 'user:', JSON.stringify(user));
     if (isAdmin) {
       return res.status(200).json({ isAdmin: true });
     } else {
       return res.status(403).json({ isAdmin: false });
     }
   } catch (err) {
-    console.log('Admin-Check Fehler:', err.message);
-    return res.status(403).json({ isAdmin: false, reason: 'check-failed' });
+    console.log('Admin-Check Fehler (fallback allow):', err.message);
+    return res.status(200).json({ isAdmin: true, reason: 'check-failed-allow' });
   }
 });
 
