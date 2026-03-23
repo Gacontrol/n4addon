@@ -35,6 +35,7 @@ interface VisualizationViewProps {
   onUpdateVisuPage: (pageId: string, updates: Partial<VisuPage>) => void;
   liveValues: Record<string, unknown>;
   logicNodes: FlowNode[];
+  logicSheets?: { id: string; name: string; nodeIds: string[] }[];
   onWidgetValueChange: (dpKey: string, value: unknown) => void;
   highlightedWidgetId?: string | null;
   alarmClasses?: AlarmClass[];
@@ -56,6 +57,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   onUpdateVisuPage,
   liveValues,
   logicNodes,
+  logicSheets,
   onWidgetValueChange,
   highlightedWidgetId,
   alarmClasses = [],
@@ -697,6 +699,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
           <WidgetPropertiesPanel
             widget={selectedWidget}
             availableNodes={logicNodes}
+            logicSheets={logicSheets}
             visuPages={visuPages.map(p => ({ id: p.id, name: p.name }))}
             alarmConsoles={alarmConsoles}
             trackedTrends={trackedTrends}

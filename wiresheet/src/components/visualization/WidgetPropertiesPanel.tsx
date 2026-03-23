@@ -61,6 +61,7 @@ export interface TrackedTrend {
 interface WidgetPropertiesPanelProps {
   widget: VisuWidget;
   availableNodes: FlowNode[];
+  logicSheets?: { id: string; name: string; nodeIds: string[] }[];
   visuPages?: { id: string; name: string }[];
   alarmConsoles?: AlarmConsole[];
   trackedTrends?: TrackedTrend[];
@@ -288,6 +289,7 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
 export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   widget,
   availableNodes,
+  logicSheets,
   visuPages = [],
   alarmConsoles = [],
   trackedTrends = [],
@@ -347,12 +349,35 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const pidControlNodes = availableNodes.filter(n => n.type === PID_CONTROL_NODE_TYPE);
   const heatingCurveNodes = availableNodes.filter(n => n.type === HEATING_CURVE_NODE_TYPE);
 
-  const nodesByCategory = bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
-    const cat = getNodeCategory(node.type);
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(node);
-    return acc;
-  }, {});
+  const nodesByCategory = (() => {
+    if (logicSheets && logicSheets.length > 0) {
+      const nodeIdToSheet = new Map<string, string>();
+      for (const sheet of logicSheets) {
+        for (const nodeId of sheet.nodeIds) {
+          nodeIdToSheet.set(nodeId, sheet.name);
+        }
+      }
+      const grouped: Record<string, FlowNode[]> = {};
+      for (const node of bindableNodes) {
+        const sheetName = nodeIdToSheet.get(node.id) || 'Sonstige';
+        if (!grouped[sheetName]) grouped[sheetName] = [];
+        grouped[sheetName].push(node);
+      }
+      const orderedSheetNames = logicSheets.map(s => s.name);
+      const result: Record<string, FlowNode[]> = {};
+      for (const name of orderedSheetNames) {
+        if (grouped[name]) result[name] = grouped[name];
+      }
+      if (grouped['Sonstige']) result['Sonstige'] = grouped['Sonstige'];
+      return result;
+    }
+    return bindableNodes.reduce<Record<string, FlowNode[]>>((acc, node) => {
+      const cat = getNodeCategory(node.type);
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(node);
+      return acc;
+    }, {});
+  })();
 
   const bindingNodeId = widget.binding
     ? (parseDpKey(widget.binding.dpKey).nodeId || (widget.binding as unknown as { nodeId?: string }).nodeId || '')

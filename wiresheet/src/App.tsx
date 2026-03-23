@@ -1787,6 +1787,7 @@ function App() {
           onUpdateVisuPage={handleUpdateVisuPage}
           liveValues={liveValues}
           logicNodes={allLogicNodes}
+          logicSheets={pages.map(p => ({ id: p.id, name: p.name, nodeIds: p.nodes.map(n => n.id) }))}
           onWidgetValueChange={handleVisuWidgetValueChange}
           highlightedWidgetId={highlightedWidgetId}
           alarmClasses={alarmClasses}

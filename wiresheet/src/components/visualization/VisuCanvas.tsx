@@ -458,9 +458,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (isEditMode && e.button === 0) {
       const target = e.target as HTMLElement;
       const isOnWidget = target.closest('[data-widget-id]') !== null;
-      if (!isOnWidget) {
+      if (!isOnWidget || e.shiftKey) {
         const pos = getCanvasPos(e);
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
           onSelectWidget(null);
           onSelectWidgets?.([]);
         }
@@ -493,6 +493,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       setContextMenu(null);
       return;
     }
+
+    if (e.shiftKey) return;
 
     if (drawingState) return;
 

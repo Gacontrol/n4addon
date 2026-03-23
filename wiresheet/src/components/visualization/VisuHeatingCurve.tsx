@@ -154,6 +154,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   const [showPopup, setShowPopup] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [localParams, setLocalParams] = useState<HeatingCurveParams>({});
+  const [localRaw, setLocalRaw] = useState<Record<string, string>>({});
 
   const outputValue = Number(value?.outputValue ?? 0) || 0;
   const inputValue = Number(value?.inputValue ?? 0) || 0;
@@ -171,6 +172,7 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
   useEffect(() => {
     if (showPopup && paramsRef.current) {
       setLocalParams(paramsRef.current);
+      setLocalRaw({});
     }
   }, [showPopup]);
 
@@ -185,11 +187,19 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
     }
   }, [isEditMode]);
 
-  const handleParamChange = useCallback((key: string, val: number | boolean) => {
-    setLocalParams(prev => ({ ...prev, [key]: val }));
+  const handleParamChange = useCallback((key: string, rawVal: string, fallback: number) => {
+    setLocalRaw(prev => ({ ...prev, [key]: rawVal }));
+    const parsed = parseFloat(rawVal);
+    if (isFinite(parsed)) {
+      setLocalParams(prev => ({ ...prev, [key]: parsed }));
+    }
   }, []);
 
-  const handleParamCommit = useCallback((key: string, val: number | boolean) => {
+  const handleParamCommit = useCallback((key: string, rawVal: string, fallback: number) => {
+    const parsed = parseFloat(rawVal);
+    const val = isFinite(parsed) ? parsed : fallback;
+    setLocalRaw(prev => ({ ...prev, [key]: String(val) }));
+    setLocalParams(prev => ({ ...prev, [key]: val }));
     onValueChange?.({ heatingCurveControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
@@ -345,44 +355,44 @@ export const VisuHeatingCurve: React.FC<VisuHeatingCurveProps> = ({
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Min. Eingang</label>
                       <input
-                        type="number"
-                        step="any"
-                        value={localParams.hcMinInput ?? minInput}
-                        onChange={(e) => handleParamChange('hcMinInput', parseFloat(e.target.value) || -20)}
-                        onBlur={(e) => handleParamCommit('hcMinInput', parseFloat(e.target.value) || -20)}
+                        type="text"
+                        inputMode="numeric"
+                        value={localRaw.hcMinInput ?? String(localParams.hcMinInput ?? minInput)}
+                        onChange={(e) => handleParamChange('hcMinInput', e.target.value, -20)}
+                        onBlur={(e) => handleParamCommit('hcMinInput', e.target.value, -20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Max. Eingang</label>
                       <input
-                        type="number"
-                        step="any"
-                        value={localParams.hcMaxInput ?? maxInput}
-                        onChange={(e) => handleParamChange('hcMaxInput', parseFloat(e.target.value) || 20)}
-                        onBlur={(e) => handleParamCommit('hcMaxInput', parseFloat(e.target.value) || 20)}
+                        type="text"
+                        inputMode="numeric"
+                        value={localRaw.hcMaxInput ?? String(localParams.hcMaxInput ?? maxInput)}
+                        onChange={(e) => handleParamChange('hcMaxInput', e.target.value, 20)}
+                        onBlur={(e) => handleParamCommit('hcMaxInput', e.target.value, 20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Min. Ausgang</label>
                       <input
-                        type="number"
-                        step="any"
-                        value={localParams.hcMinOutput ?? minOutput}
-                        onChange={(e) => handleParamChange('hcMinOutput', parseFloat(e.target.value) || 20)}
-                        onBlur={(e) => handleParamCommit('hcMinOutput', parseFloat(e.target.value) || 20)}
+                        type="text"
+                        inputMode="numeric"
+                        value={localRaw.hcMinOutput ?? String(localParams.hcMinOutput ?? minOutput)}
+                        onChange={(e) => handleParamChange('hcMinOutput', e.target.value, 20)}
+                        onBlur={(e) => handleParamCommit('hcMinOutput', e.target.value, 20)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1">Max. Ausgang</label>
                       <input
-                        type="number"
-                        step="any"
-                        value={localParams.hcMaxOutput ?? maxOutput}
-                        onChange={(e) => handleParamChange('hcMaxOutput', parseFloat(e.target.value) || 80)}
-                        onBlur={(e) => handleParamCommit('hcMaxOutput', parseFloat(e.target.value) || 80)}
+                        type="text"
+                        inputMode="numeric"
+                        value={localRaw.hcMaxOutput ?? String(localParams.hcMaxOutput ?? maxOutput)}
+                        onChange={(e) => handleParamChange('hcMaxOutput', e.target.value, 80)}
+                        onBlur={(e) => handleParamCommit('hcMaxOutput', e.target.value, 80)}
                         className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white"
                       />
                     </div>

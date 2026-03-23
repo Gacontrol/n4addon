@@ -180,6 +180,32 @@ export function parseBackupFile(text: string): { backup: WiresheetBackup | null;
   }
 }
 
+function patchImageUrlsInPages(pages: VisuPage[], images: BackupImage[]): VisuPage[] {
+  if (!images || images.length === 0) return pages;
+  const urlToBase64 = new Map<string, string>();
+  for (const img of images) {
+    if (img.url && img.data) {
+      urlToBase64.set(img.url, img.data);
+      const filename = img.url.split('/').pop() || '';
+      if (filename) urlToBase64.set(filename, img.data);
+    }
+  }
+  return pages.map(page => ({
+    ...page,
+    widgets: page.widgets.map(widget => {
+      const cfg = widget.config as Record<string, unknown>;
+      if (!cfg?.imageUrl || typeof cfg.imageUrl !== 'string') return widget;
+      const imageUrl = cfg.imageUrl as string;
+      if (imageUrl.startsWith('data:')) return widget;
+      const base64 = urlToBase64.get(imageUrl)
+        || urlToBase64.get(imageUrl.split('/').pop() || '')
+        || null;
+      if (!base64) return widget;
+      return { ...widget, config: { ...cfg, imageUrl: base64, storagePath: imageUrl } };
+    })
+  }));
+}
+
 export function applyImport(
   selection: BackupImportSelection,
   backup: WiresheetBackup,
@@ -217,7 +243,10 @@ export function applyImport(
       };
     }
 
-    return { wiresheets: newWiresheets, visuPages: newVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig };
+    const patchedVisuPages = selection.includeImages && backup.images?.length
+      ? patchImageUrlsInPages(newVisuPages, backup.images)
+      : newVisuPages;
+    return { wiresheets: newWiresheets, visuPages: patchedVisuPages, customBlocks: newBlocks, driverConfig: finalDriverConfig };
   }
 
   const existingWiresheetIds = new Set(currentWiresheets.map(w => w.id));
@@ -299,5 +328,8 @@ export function applyImport(
     };
   }
 
-  return { wiresheets: mergedWiresheets, visuPages: mergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };
+  const patchedMergedVisuPages = selection.includeImages && backup.images?.length
+    ? patchImageUrlsInPages(mergedVisuPages, backup.images)
+    : mergedVisuPages;
+  return { wiresheets: mergedWiresheets, visuPages: patchedMergedVisuPages, customBlocks: mergedBlocks, driverConfig: finalDriverConfig };
 }
