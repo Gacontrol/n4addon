@@ -56,6 +56,7 @@ interface FlowCanvasProps {
   onDriverBindingDelete?: (binding: DriverBinding) => void;
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
   onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
+  onInsertNodeIntoConnection?: (nodeId: string, connectionId: string) => void;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -101,8 +102,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onDriverBindingClick,
   onDriverBindingDelete,
   onVisuBindingClick,
-  onVisuBindingDelete
+  onVisuBindingDelete,
+  onInsertNodeIntoConnection
 }) => {
+
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
     const result: VisuBindingInfo[] = [];
     const WRITE_TYPES = ['visu-switch', 'visu-slider', 'visu-incrementer', 'visu-input', 'visu-button'];
@@ -248,6 +251,37 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       y: (portRect.top - canvasRect.top + portRect.height / 2 + scrollTop) / zoom
     };
   }, [zoom]);
+
+  const pointToSegmentDist = (px: number, py: number, x1: number, y1: number, x2: number, y2: number): number => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  };
+
+  const checkNodeDropOnConnection = useCallback((nodeId: string) => {
+    if (!onInsertNodeIntoConnection) return;
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    const nodeW = node.width || 180;
+    const nodeH = node.height || 60;
+    const nodeCx = node.position.x + nodeW / 2;
+    const nodeCy = node.position.y + nodeH / 2;
+
+    for (const conn of connections) {
+      if (conn.source === nodeId || conn.target === nodeId) continue;
+      const start = getPortCenter(conn.source, conn.sourcePort);
+      const end = getPortCenter(conn.target, conn.targetPort);
+      if (!start || !end) continue;
+      const dist = pointToSegmentDist(nodeCx, nodeCy, start.x, start.y, end.x, end.y);
+      if (dist < 20) {
+        onInsertNodeIntoConnection(nodeId, conn.id);
+        return;
+      }
+    }
+  }, [nodes, connections, getPortCenter, onInsertNodeIntoConnection]);
 
   const handlePortClick = useCallback((nodeId: string, portId: string, isOutput: boolean) => {
     const now = Date.now();
@@ -516,7 +550,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 50,
+          zIndex: 2,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
@@ -593,7 +627,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 5,
+          zIndex: 10,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
@@ -764,6 +798,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 onDriverBindingDelete={onDriverBindingDelete}
                 onVisuBindingClick={onVisuBindingClick}
                 onVisuBindingDelete={onVisuBindingDelete}
+                onDragEnd={checkNodeDropOnConnection}
               />
             );
           })}

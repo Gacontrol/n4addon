@@ -522,6 +522,35 @@ export const useWiresheetPages = () => {
     updateActivePage(p => ({ ...p, connections: [...p.connections, ...newConns] }));
   }, [updateActivePage]);
 
+  const insertNodeIntoConnection = useCallback((nodeId: string, connectionId: string) => {
+    updateActivePage(p => {
+      const conn = p.connections.find(c => c.id === connectionId);
+      const node = p.nodes.find(n => n.id === nodeId);
+      if (!conn || !node) return p;
+      const firstInput = node.data.inputs[0];
+      const firstOutput = node.data.outputs[0];
+      if (!firstInput || !firstOutput) return p;
+      const newConn1: Connection = {
+        id: `${conn.source}-${conn.sourcePort}-${nodeId}-${firstInput.id}`,
+        source: conn.source,
+        sourcePort: conn.sourcePort,
+        target: nodeId,
+        targetPort: firstInput.id
+      };
+      const newConn2: Connection = {
+        id: `${nodeId}-${firstOutput.id}-${conn.target}-${conn.targetPort}`,
+        source: nodeId,
+        sourcePort: firstOutput.id,
+        target: conn.target,
+        targetPort: conn.targetPort
+      };
+      const already1 = p.connections.some(c => c.target === newConn1.target && c.targetPort === newConn1.targetPort);
+      const already2 = p.connections.some(c => c.target === newConn2.target && c.targetPort === newConn2.targetPort);
+      if (already1 || already2) return p;
+      return { ...p, connections: [...p.connections.filter(c => c.id !== connectionId), newConn1, newConn2] };
+    });
+  }, [updateActivePage]);
+
   const deleteConnection = useCallback((connectionId: string) => {
     updateActivePage(p => ({ ...p, connections: p.connections.filter(c => c.id !== connectionId) }));
     if (selectedConnection === connectionId) {
@@ -944,6 +973,7 @@ export const useWiresheetPages = () => {
     startConnection,
     endConnection,
     cancelConnection,
+    insertNodeIntoConnection,
     updateNodeSize,
     updateContainerSize,
     updateCaseSize,

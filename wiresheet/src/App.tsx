@@ -74,6 +74,7 @@ function App() {
     startConnection,
     endConnection,
     cancelConnection,
+    insertNodeIntoConnection,
     addConnection,
     updateNodeSize,
     updateContainerSize,
@@ -1731,6 +1732,7 @@ function App() {
               }}
               onVisuBindingClick={handleVisuBindingClick}
               onVisuBindingDelete={handleVisuBindingDelete}
+              onInsertNodeIntoConnection={insertNodeIntoConnection}
             />
 
             <DriverPanel

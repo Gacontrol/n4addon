@@ -72,6 +72,36 @@ export const useFlowEditor = () => {
     setConnectingFrom(null);
   }, []);
 
+  const insertNodeIntoConnection = useCallback((nodeId: string, connectionId: string) => {
+    setNodes(nodesSnap => {
+      const node = nodesSnap.find(n => n.id === nodeId);
+      if (!node) return nodesSnap;
+      const firstInput = node.data.inputs[0];
+      const firstOutput = node.data.outputs[0];
+      if (!firstInput || !firstOutput) return nodesSnap;
+      setConnections(prev => {
+        const conn = prev.find(c => c.id === connectionId);
+        if (!conn) return prev;
+        const newConn1: Connection = {
+          id: `${conn.source}-${conn.sourcePort}-${nodeId}-${firstInput.id}`,
+          source: conn.source,
+          sourcePort: conn.sourcePort,
+          target: nodeId,
+          targetPort: firstInput.id
+        };
+        const newConn2: Connection = {
+          id: `${nodeId}-${firstOutput.id}-${conn.target}-${conn.targetPort}`,
+          source: nodeId,
+          sourcePort: firstOutput.id,
+          target: conn.target,
+          targetPort: conn.targetPort
+        };
+        return [...prev.filter(x => x.id !== connectionId), newConn1, newConn2];
+      });
+      return nodesSnap;
+    });
+  }, []);
+
   const updateContainerSize = useCallback((nodeId: string, width: number, height: number) => {
     setNodes(prev =>
       prev.map(node =>
@@ -105,6 +135,7 @@ export const useFlowEditor = () => {
     endConnection,
     cancelConnection,
     setSelectedNode,
-    updateContainerSize
+    updateContainerSize,
+    insertNodeIntoConnection
   };
 };

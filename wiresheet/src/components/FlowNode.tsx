@@ -44,6 +44,7 @@ interface FlowNodeProps {
   onDriverBindingDelete?: (binding: DriverBinding) => void;
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
   onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
+  onDragEnd?: (nodeId: string) => void;
   isConnecting: boolean;
   connectingFromNodeId?: string | null;
   liveValues?: Record<string, unknown>;
@@ -76,6 +77,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
   onDriverBindingDelete,
   onVisuBindingClick,
   onVisuBindingDelete,
+  onDragEnd,
   isConnecting,
   connectingFromNodeId,
   liveValues = {},
@@ -178,6 +180,7 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
     if (!isDragging) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     setIsDragging(false);
+    onDragEnd?.(node.id);
 
     if (node.type !== 'case-container') {
       if (parentContainer) {

@@ -96,6 +96,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   onShelveAlarm
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const lassoJustCompletedRef = useRef(0);
 
   const nodeIdToSheetId = useMemo(() => {
     const map = new Map<string, string>();
@@ -444,6 +445,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) return;
+    if (Date.now() - lassoJustCompletedRef.current < 200) return;
     if (e.target === canvasRef.current) {
       onSelectWidget(null);
       onSelectWidgets?.([]);
@@ -805,6 +807,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         }
       }
 
+      lassoJustCompletedRef.current = Date.now();
       setLassoState(null);
       return;
     }
