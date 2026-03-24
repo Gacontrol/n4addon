@@ -1014,9 +1014,11 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const canvasW = hasFixedSize ? page.canvasWidth! : widgetsBounds.maxX;
     const canvasH = hasFixedSize ? page.canvasHeight! : widgetsBounds.maxY;
 
+    if (!canvasW || !canvasH) return 1;
+
     const scaleX = containerSize.width / canvasW;
     const scaleY = containerSize.height / canvasH;
-    return Math.min(1, scaleX, scaleY);
+    return Math.min(scaleX, scaleY);
   }, [isEditMode, hasFixedSize, containerSize, page.canvasWidth, page.canvasHeight, widgetsBounds]);
 
   const shouldScale = !isEditMode && responsiveScale !== 1;
@@ -1040,6 +1042,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
             height: scaledHeight,
             position: 'relative',
             flexShrink: 0,
+            overflow: 'hidden',
           }}
         >
         <div
@@ -1048,7 +1051,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           style={{
             width: canvasW,
             height: canvasH,
-            transform: shouldScale ? `scale(${responsiveScale})` : undefined,
+            transform: `scale(${responsiveScale})`,
             transformOrigin: 'top left',
             backgroundColor: page.backgroundColor || '#0f172a',
           }}
