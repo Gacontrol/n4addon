@@ -1,43 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
     <style>
-      body { background-color: #0f172a; }
-      #rotate-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        background-color: #0f172a;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 20px;
-        color: #f1f5f9;
-        font-family: system-ui, sans-serif;
-        text-align: center;
-        padding: 24px;
-      }
-      #rotate-overlay svg {
-        animation: rotate-hint 2s ease-in-out infinite;
-      }
-      @keyframes rotate-hint {
-        0%, 100% { transform: rotate(0deg); }
-        40% { transform: rotate(90deg); }
-        60% { transform: rotate(90deg); }
-      }
-      #rotate-overlay p {
-        font-size: 18px;
-        font-weight: 500;
-        color: #94a3b8;
+      html, body {
         margin: 0;
+        padding: 0;
+        background-color: #0f172a;
+        width: 100%;
+        min-height: 100%;
       }
-      @media screen and (max-aspect-ratio: 13/9) and (max-width: 768px) {
-        #rotate-overlay { display: flex; }
-        #root { display: none; }
+
+      body {
+        overflow-x: hidden;
+      }
+
+      #root {
+        min-height: 100vh;
       }
     </style>
     <title>GA-Control - keep it simple</title>
@@ -46,13 +27,6 @@
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
   </head>
   <body>
-    <div id="rotate-overlay">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-        <line x1="12" y1="18" x2="12.01" y2="18"/>
-      </svg>
-      <p>Bitte Telefon drehen</p>
-    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
