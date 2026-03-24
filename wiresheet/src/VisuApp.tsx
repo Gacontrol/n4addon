@@ -136,6 +136,10 @@ export function VisuApp() {
   const [outgoingPageId, setOutgoingPageId] = useState<string | null>(null);
   const [incomingPageId, setIncomingPageId] = useState<string | null>(null);
   const [displayedPageId, setDisplayedPageId] = useState<string>('');
+  const [pinchZoom, setPinchZoom] = useState(1);
+  const [pinchOrigin, setPinchOrigin] = useState({ x: 0, y: 0 });
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef(1);
   const transitionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const displayedPageIdRef = useRef<string>('');
   const pageHistoryRef = useRef<string[]>([]);
@@ -591,14 +595,71 @@ export function VisuApp() {
 
   const needsPerspective = transitioning && (currentEffect === 'cube-left' || currentEffect === 'cube-right' || currentEffect === 'flip');
 
+  const handlePinchTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
+      pinchStartZoomRef.current = pinchZoom;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      setPinchOrigin({ x: cx, y: cy });
+    }
+  }, [pinchZoom]);
+
+  const handlePinchTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const scale = dist / pinchStartDistRef.current;
+      const newZoom = Math.min(4, Math.max(0.5, pinchStartZoomRef.current * scale));
+      setPinchZoom(newZoom);
+    }
+  }, []);
+
+  const handlePinchTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchStartDistRef.current = null;
+      if (pinchZoom < 0.75) {
+        setPinchZoom(1);
+      }
+    }
+  }, [pinchZoom]);
+
+  const handleDoubleTap = useCallback(() => {
+    setPinchZoom(1);
+    setPinchOrigin({ x: 0, y: 0 });
+  }, []);
+
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden" style={{ touchAction: 'pan-x pan-y pinch-zoom' }}>
+    <div
+      className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden"
+      style={{ touchAction: pinchZoom !== 1 ? 'none' : 'pan-x pan-y' }}
+      onTouchStart={handlePinchTouchStart}
+      onTouchMove={handlePinchTouchMove}
+      onTouchEnd={handlePinchTouchEnd}
+    >
       <div
-        className="flex-1 overflow-hidden relative"
+        className="flex-1 relative"
         style={{
+          overflow: pinchZoom !== 1 ? 'visible' : 'hidden',
           background: transitioning && bgTransparent ? 'transparent' : undefined,
         }}
       >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            transform: pinchZoom !== 1 ? `scale(${pinchZoom})` : undefined,
+            transformOrigin: pinchZoom !== 1 ? `${pinchOrigin.x}px ${pinchOrigin.y}px` : undefined,
+            transition: pinchStartDistRef.current === null && pinchZoom === 1 ? 'transform 0.3s ease' : undefined,
+          }}
+          onDoubleClick={handleDoubleTap}
+        >
         {!transitioning && (
           <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
             <VisuCanvas page={displayedPage} {...sharedCanvasProps} />
@@ -668,6 +729,7 @@ export function VisuApp() {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
