@@ -1204,7 +1204,20 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           value={getWidgetValue(widget)}
           statusValue={getWidgetStatusValue(widget)}
           onValueChange={(value) => { const dpKey = getWidgetDpKey(widget); if (dpKey) onWidgetValueChange(dpKey, value); }}
-          onUpdateConfig={(config) => onUpdateWidget(widget.id, { config: config as VisuWidget['config'] })}
+          onUpdateConfig={(config) => {
+            const cfg = config as Record<string, unknown>;
+            if ((widget.type === 'visu-line' || widget.type === 'visu-arrow') &&
+                cfg.x1 !== undefined && cfg.y1 !== undefined && cfg.x2 !== undefined && cfg.y2 !== undefined) {
+              const x1 = cfg.x1 as number, y1 = cfg.y1 as number, x2 = cfg.x2 as number, y2 = cfg.y2 as number;
+              onUpdateWidget(widget.id, {
+                config: cfg as VisuWidget['config'],
+                position: { x: Math.min(x1, x2), y: Math.min(y1, y2) },
+                size: { width: Math.max(Math.abs(x2 - x1), 1), height: Math.max(Math.abs(y2 - y1), 1) }
+              });
+            } else {
+              onUpdateWidget(widget.id, { config: cfg as VisuWidget['config'] });
+            }
+          }}
           isEditMode={isEditMode}
           isSelected={selectedWidgetId === widget.id || isMultiSelected(widget.id)}
           isMultiSelected={isMultiSelected(widget.id)}

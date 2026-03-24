@@ -617,45 +617,54 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         const isHidden = lCfg.visibilityBinding && value === false;
         if (isHidden) return null;
         if (lCfg.x1 === undefined) return null;
-        let x1: number, y1: number, x2: number, y2: number;
+        let x1abs: number, y1abs: number, x2abs: number, y2abs: number;
         if (lCfg.x1 !== undefined && lCfg.y1 !== undefined && lCfg.x2 !== undefined && lCfg.y2 !== undefined) {
-          x1 = lCfg.x1; y1 = lCfg.y1; x2 = lCfg.x2; y2 = lCfg.y2;
+          x1abs = lCfg.x1; y1abs = lCfg.y1; x2abs = lCfg.x2; y2abs = lCfg.y2;
         } else {
           const angle = lCfg.angle ?? 0;
           const w = widget.size.width;
           const h = widget.size.height;
-          const cx = w / 2, cy = h / 2;
+          const cx = widget.position.x + w / 2;
+          const cy = widget.position.y + h / 2;
           const len = Math.sqrt(w * w + h * h) / 2;
           const rad = (angle * Math.PI) / 180;
-          x1 = cx - len * Math.cos(rad); y1 = cy - len * Math.sin(rad);
-          x2 = cx + len * Math.cos(rad); y2 = cy + len * Math.sin(rad);
+          x1abs = cx - len * Math.cos(rad); y1abs = cy - len * Math.sin(rad);
+          x2abs = cx + len * Math.cos(rad); y2abs = cy + len * Math.sin(rad);
         }
+        const pad = 12;
+        const offsetX = widget.position.x;
+        const offsetY = widget.position.y;
+        const x1 = x1abs - offsetX;
+        const y1 = y1abs - offsetY;
+        const x2 = x2abs - offsetX;
+        const y2 = y2abs - offsetY;
+        const svgLeft = Math.min(x1, x2) - pad;
+        const svgTop = Math.min(y1, y2) - pad;
+        const svgW = Math.abs(x2 - x1) + pad * 2;
+        const svgH = Math.abs(y2 - y1) + pad * 2;
         const strokeColor = resolveLineColor(lCfg, value);
         const hasNav = !!lCfg.navigateToPageId && !isEditMode;
-        const minX = Math.min(x1, x2) - 20;
-        const minY = Math.min(y1, y2) - 20;
-        const svgW = Math.abs(x2 - x1) + 40;
-        const svgH = Math.abs(y2 - y1) + 40;
+        const sw = lCfg.strokeWidth ?? 2;
         return (
           <svg
             ref={svgRef}
-            style={{ position: 'absolute', left: minX, top: minY, overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            style={{ position: 'absolute', left: svgLeft, top: svgTop, overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
             width={svgW} height={svgH}
-            viewBox={`${minX} ${minY} ${svgW} ${svgH}`}
+            viewBox={`${svgLeft} ${svgTop} ${svgW} ${svgH}`}
             onClick={() => handleShapeClick(lCfg)}
           >
             <line
               x1={x1} y1={y1} x2={x2} y2={y2}
               stroke={strokeColor}
-              strokeWidth={lCfg.strokeWidth ?? 2}
+              strokeWidth={sw}
               strokeLinecap="round"
             />
             {isEditMode && isSelected && (
               <>
-                <circle cx={x1} cy={y1} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
-                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 0, { x: x1, y: y1 })} />
-                <circle cx={x2} cy={y2} r={6} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
-                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 1, { x: x2, y: y2 })} />
+                <circle cx={x1} cy={y1} r={sw + 3} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 0, { x: x1abs, y: y1abs })} />
+                <circle cx={x2} cy={y2} r={sw + 3} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                  onMouseDown={(e) => handleVertexMouseDown(e, 'line', 1, { x: x2abs, y: y2abs })} />
               </>
             )}
           </svg>
