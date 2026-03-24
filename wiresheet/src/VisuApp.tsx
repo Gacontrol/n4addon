@@ -3,7 +3,7 @@ import { VisuCanvas } from './components/visualization/VisuCanvas';
 import { VisuPage, VisuWidget, PageTransitionEffect, migrateBinding } from './types/visualization';
 import { FlowNode } from './types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from './types/alarm';
-import { Monitor } from 'lucide-react';
+import { Monitor, RotateCcw } from 'lucide-react';
 
 const DUAL_LAYER_EFFECTS: PageTransitionEffect[] = ['slide-left', 'slide-right', 'slide-up', 'slide-down', 'cube-left', 'cube-right', 'zoom-in-out', 'zoom-out-in'];
 
@@ -138,6 +138,7 @@ export function VisuApp() {
   const [displayedPageId, setDisplayedPageId] = useState<string>('');
   const [pinchZoom, setPinchZoom] = useState(1);
   const [pinchOrigin, setPinchOrigin] = useState({ x: 0, y: 0 });
+  const [isPortrait, setIsPortrait] = useState(false);
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartZoomRef = useRef(1);
   const transitionTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -245,6 +246,23 @@ export function VisuApp() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const portrait = window.matchMedia('(orientation: portrait) and (max-width: 768px)').matches;
+      setIsPortrait(portrait);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    const mq = window.matchMedia('(orientation: portrait) and (max-width: 768px)');
+    mq.addEventListener('change', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+      mq.removeEventListener('change', checkOrientation);
+    };
+  }, []);
 
   const sseActiveRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -632,6 +650,33 @@ export function VisuApp() {
     setPinchZoom(1);
     setPinchOrigin({ x: 0, y: 0 });
   }, []);
+
+  if (isPortrait) {
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-950 gap-6">
+        <div
+          style={{
+            animation: 'rotate-hint 2s ease-in-out infinite',
+            color: '#60a5fa',
+          }}
+        >
+          <RotateCcw style={{ width: 56, height: 56 }} />
+        </div>
+        <div className="text-center px-8">
+          <p className="text-white text-lg font-semibold mb-2">Bitte Gerat drehen</p>
+          <p className="text-slate-400 text-sm">Drehen Sie Ihr Gerat in die Querausrichtung um die Visualisierung zu sehen.</p>
+        </div>
+        <style>{`
+          @keyframes rotate-hint {
+            0%, 100% { transform: rotate(0deg); }
+            30% { transform: rotate(-90deg); }
+            60% { transform: rotate(-90deg); }
+            90% { transform: rotate(0deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div
