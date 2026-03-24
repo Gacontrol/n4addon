@@ -1010,12 +1010,39 @@ export const useWiresheetPages = () => {
     updateCaseSize,
     moveNodeToContainer,
     releaseContainerNodes,
-    setAllPages: (newPages: WiresheetPage[]) => {
+    setAllPages: async (newPages: WiresheetPage[]) => {
       const safePages = newPages.length > 0 ? newPages : [defaultPage()];
-      setPages(safePages);
-      setActivePageId(safePages[0].id);
+
+      Object.keys(localCycleTimers.current).forEach(id => {
+        clearInterval(localCycleTimers.current[id]);
+        delete localCycleTimers.current[id];
+        fetch(`${API_BASE}/pages/${id}/stop`, { method: 'POST' }).catch(() => {});
+      });
+
+      const resetPages = safePages.map(p => ({ ...p, running: false }));
+      setPages(resetPages);
+      pagesRef.current = resetPages;
+      setActivePageId(resetPages[0].id);
       setSaveStatus('unsaved');
-      savePages(safePages);
+      await savePages(resetPages);
+
+      for (const page of safePages) {
+        if (page.running) {
+          const pageId = page.id;
+          try {
+            await fetch(`${API_BASE}/pages/${pageId}/start`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cycleMs: page.cycleMs || 250 })
+            });
+          } catch {}
+          setPages(prev => prev.map(p => p.id === pageId ? { ...p, running: true } : p));
+          pagesRef.current = pagesRef.current.map(p => p.id === pageId ? { ...p, running: true } : p);
+          executePageRef.current(pageId);
+          const interval = Math.max(200, page.cycleMs || 250);
+          localCycleTimers.current[pageId] = setInterval(() => executePageRef.current(pageId), interval);
+        }
+      }
     },
     updateNodeConfigOnPage: (pageId: string, nodeId: string, configUpdates: Record<string, unknown>) => {
       setPages(prev => {
