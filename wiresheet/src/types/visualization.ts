@@ -68,7 +68,8 @@ export type WidgetType =
   | 'visu-trend-chart'
   | 'visu-trend-tiles'
   | 'visu-3d-building'
-  | 'visu-time-program';
+  | 'visu-time-program'
+  | 'visu-sequence';
 
 export interface WidgetBinding {
   dpKey: string;
@@ -454,7 +455,8 @@ export type WidgetConfig =
   | HeatingCurveWidgetConfig
   | AlarmConsoleWidgetConfig
   | TrendChartConfig
-  | Building3DWidgetConfig;
+  | Building3DWidgetConfig
+  | SequenceWidgetConfig;
 
 export interface VisuWidget {
   id: string;
@@ -757,6 +759,16 @@ export interface HeatingCurveWidgetConfig {
   rotation?: 0 | 90 | 180 | 270;
   showInput?: boolean;
   showOutput?: boolean;
+  widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
+}
+
+export interface SequenceWidgetConfig {
+  seqName?: string;
+  normalColor?: string;
+  activeColor?: string;
   widgetSize?: WidgetSizePreset;
   labelPosition?: LabelPosition;
   fontSize?: number;

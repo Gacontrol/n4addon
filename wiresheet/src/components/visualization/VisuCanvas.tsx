@@ -289,6 +289,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-sequence') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'sequence-control') return null;
+      return {
+        input: liveValues[`${nodeId}:input-0`] ?? 0,
+        outputs: [0, 1, 2, 3, 4, 5].map(i => Number(liveValues[`${nodeId}:output-${i}`] ?? 0)),
+        seqStatus: liveValues[`${nodeId}:seqStatus`] as unknown[] ?? undefined,
+        error: liveValues[`${nodeId}:output-6`] ?? false
+      };
+    }
+
     if (segment === 'cfg' && cfgParamKey) {
       const cfgLiveVal = liveValues[dpKey];
       if (cfgLiveVal !== undefined) return cfgLiveVal;
@@ -429,6 +440,26 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       timeProgramDefaultValue: cfg.timeProgramDefaultValue,
       timeProgramEntries: cfg.timeProgramEntries,
       timeProgramExceptions: cfg.timeProgramExceptions
+    };
+  }, [logicNodes]);
+
+  const getSequenceWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-sequence' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
+    if (!node || node.type !== 'sequence-control') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const configName = cfg.seqName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Sequenz';
+    return {
+      seqName: nodeName,
+      seqCount: cfg.seqCount,
+      seq1Name: cfg.seq1Name, seq1MinIn: cfg.seq1MinIn, seq1MaxIn: cfg.seq1MaxIn, seq1MinOut: cfg.seq1MinOut, seq1MaxOut: cfg.seq1MaxOut, seq1Enable: cfg.seq1Enable, seq1Reverse: cfg.seq1Reverse,
+      seq2Name: cfg.seq2Name, seq2MinIn: cfg.seq2MinIn, seq2MaxIn: cfg.seq2MaxIn, seq2MinOut: cfg.seq2MinOut, seq2MaxOut: cfg.seq2MaxOut, seq2Enable: cfg.seq2Enable, seq2Reverse: cfg.seq2Reverse,
+      seq3Name: cfg.seq3Name, seq3MinIn: cfg.seq3MinIn, seq3MaxIn: cfg.seq3MaxIn, seq3MinOut: cfg.seq3MinOut, seq3MaxOut: cfg.seq3MaxOut, seq3Enable: cfg.seq3Enable, seq3Reverse: cfg.seq3Reverse,
+      seq4Name: cfg.seq4Name, seq4MinIn: cfg.seq4MinIn, seq4MaxIn: cfg.seq4MaxIn, seq4MinOut: cfg.seq4MinOut, seq4MaxOut: cfg.seq4MaxOut, seq4Enable: cfg.seq4Enable, seq4Reverse: cfg.seq4Reverse,
+      seq5Name: cfg.seq5Name, seq5MinIn: cfg.seq5MinIn, seq5MaxIn: cfg.seq5MaxIn, seq5MinOut: cfg.seq5MinOut, seq5MaxOut: cfg.seq5MaxOut, seq5Enable: cfg.seq5Enable, seq5Reverse: cfg.seq5Reverse,
+      seq6Name: cfg.seq6Name, seq6MinIn: cfg.seq6MinIn, seq6MaxIn: cfg.seq6MaxIn, seq6MinOut: cfg.seq6MinOut, seq6MaxOut: cfg.seq6MaxOut, seq6Enable: cfg.seq6Enable, seq6Reverse: cfg.seq6Reverse,
     };
   }, [logicNodes]);
 
@@ -1081,6 +1112,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               pidParams={getPIDWidgetParams(widget)}
               heatingCurveParams={getHeatingCurveWidgetParams(widget)}
               timeProgramParams={getTimeProgramWidgetParams(widget)}
+              sequenceParams={getSequenceWidgetParams(widget)}
               isHighlighted={highlightedWidgetId === widget.id}
               alarmClasses={alarmClasses}
               alarmConsoles={alarmConsoles}
@@ -1155,6 +1187,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           pidParams={getPIDWidgetParams(widget)}
           heatingCurveParams={getHeatingCurveWidgetParams(widget)}
           timeProgramParams={getTimeProgramWidgetParams(widget)}
+          sequenceParams={getSequenceWidgetParams(widget)}
           isHighlighted={highlightedWidgetId === widget.id}
           isCrossPageBinding={isCrossPageBinding(widget)}
           alarmClasses={alarmClasses}

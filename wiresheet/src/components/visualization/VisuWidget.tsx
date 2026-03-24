@@ -60,7 +60,8 @@ import {
   TrendChartConfig,
   Building3DWidgetConfig,
   TimeProgramWidgetConfig,
-  TimeProgramParams
+  TimeProgramParams,
+  SequenceWidgetConfig
 } from '../../types/visualization';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuFrame } from './VisuFrame';
@@ -75,6 +76,7 @@ import { VisuTrendTiles, VisuTrendTilesConfig } from './VisuTrendTiles';
 import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
 import { VisuTimeProgram } from './VisuTimeProgram';
+import { VisuSequence } from './VisuSequence';
 import { getThemeVars } from '../../utils/widgetThemes';
 import { VisuSwitch } from './VisuSwitch';
 import { VisuButton } from './VisuButton';
@@ -213,6 +215,17 @@ interface HeatingCurveParams {
   hcReverseDirection?: boolean;
 }
 
+interface SequenceParams {
+  seqName?: string;
+  seqCount?: number;
+  seq1Name?: string; seq1MinIn?: number; seq1MaxIn?: number; seq1MinOut?: number; seq1MaxOut?: number; seq1Enable?: boolean; seq1Reverse?: boolean;
+  seq2Name?: string; seq2MinIn?: number; seq2MaxIn?: number; seq2MinOut?: number; seq2MaxOut?: number; seq2Enable?: boolean; seq2Reverse?: boolean;
+  seq3Name?: string; seq3MinIn?: number; seq3MaxIn?: number; seq3MinOut?: number; seq3MaxOut?: number; seq3Enable?: boolean; seq3Reverse?: boolean;
+  seq4Name?: string; seq4MinIn?: number; seq4MaxIn?: number; seq4MinOut?: number; seq4MaxOut?: number; seq4Enable?: boolean; seq4Reverse?: boolean;
+  seq5Name?: string; seq5MinIn?: number; seq5MaxIn?: number; seq5MinOut?: number; seq5MaxOut?: number; seq5Enable?: boolean; seq5Reverse?: boolean;
+  seq6Name?: string; seq6MinIn?: number; seq6MaxIn?: number; seq6MinOut?: number; seq6MaxOut?: number; seq6Enable?: boolean; seq6Reverse?: boolean;
+}
+
 interface VisuWidgetProps {
   widget: VisuWidgetType;
   value: unknown;
@@ -236,6 +249,7 @@ interface VisuWidgetProps {
   pidParams?: PIDParams;
   heatingCurveParams?: HeatingCurveParams;
   timeProgramParams?: TimeProgramParams;
+  sequenceParams?: SequenceParams;
   isHighlighted?: boolean;
   isCrossPageBinding?: boolean;
   alarmClasses?: AlarmClass[];
@@ -318,6 +332,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   pidParams,
   heatingCurveParams,
   timeProgramParams,
+  sequenceParams,
   isHighlighted = false,
   isCrossPageBinding = false,
   alarmClasses = [],
@@ -1464,6 +1479,30 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
               isEditMode={isEditMode}
             />
           </Widget3DErrorBoundary>
+        );
+      }
+
+      case 'visu-sequence': {
+        const seqCfg = widget.config as SequenceWidgetConfig;
+        const seqValues = value as {
+          input?: number;
+          outputs?: number[];
+          seqStatus?: Array<{ active: boolean; locked: boolean; reverse: boolean; paramError: boolean; inRange: boolean }>;
+          error?: boolean;
+        } | null;
+        return (
+          <VisuSequence
+            config={seqCfg}
+            value={seqValues ? {
+              input: seqValues.input ?? 0,
+              outputs: seqValues.outputs ?? [0, 0, 0, 0, 0, 0],
+              seqStatus: seqValues.seqStatus,
+              error: seqValues.error ?? false
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={sequenceParams}
+          />
         );
       }
 

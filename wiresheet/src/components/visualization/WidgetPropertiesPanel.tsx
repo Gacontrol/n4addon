@@ -83,6 +83,7 @@ const SENSOR_WIDGET_TYPE = 'visu-sensor';
 const PID_WIDGET_TYPE = 'visu-pid';
 const HEATING_CURVE_WIDGET_TYPE = 'visu-heating-curve';
 const TIME_PROGRAM_WIDGET_TYPE = 'visu-time-program';
+const SEQUENCE_WIDGET_TYPE = 'visu-sequence';
 const PUMP_CONTROL_NODE_TYPE = 'pump-control';
 const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
 const VALVE_CONTROL_NODE_TYPE = 'valve-control';
@@ -90,6 +91,7 @@ const SENSOR_CONTROL_NODE_TYPE = 'sensor-control';
 const PID_CONTROL_NODE_TYPE = 'pid-controller';
 const HEATING_CURVE_NODE_TYPE = 'heating-curve';
 const TIME_PROGRAM_NODE_TYPE = 'time-program';
+const SEQUENCE_CONTROL_NODE_TYPE = 'sequence-control';
 
 const SYMBOL_OPTIONS = [
   { value: 'pump', label: 'Pumpe' },
@@ -341,6 +343,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isPIDWidget = widget.type === PID_WIDGET_TYPE;
   const isHeatingCurveWidget = widget.type === HEATING_CURVE_WIDGET_TYPE;
   const isTimeProgramWidget = widget.type === TIME_PROGRAM_WIDGET_TYPE;
+  const isSequenceWidget = widget.type === SEQUENCE_WIDGET_TYPE;
 
   const bindableNodes = availableNodes.filter(n => !NON_BINDABLE_TYPES.has(n.type));
   const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
@@ -349,6 +352,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const pidControlNodes = availableNodes.filter(n => n.type === PID_CONTROL_NODE_TYPE);
   const heatingCurveNodes = availableNodes.filter(n => n.type === HEATING_CURVE_NODE_TYPE);
   const timeProgramNodes = availableNodes.filter(n => n.type === TIME_PROGRAM_NODE_TYPE);
+  const sequenceControlNodes = availableNodes.filter(n => n.type === SEQUENCE_CONTROL_NODE_TYPE);
 
   const nodesByCategory = (() => {
     if (logicSheets && logicSheets.length > 0) {
@@ -405,6 +409,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     }
     if (isValveWidget && node?.type === VALVE_CONTROL_NODE_TYPE) {
       onUpdate({ binding: migrateBinding({ nodeId, direction: 'readwrite' }) });
+      return;
+    }
+    if (isSequenceWidget && node?.type === SEQUENCE_CONTROL_NODE_TYPE) {
+      onUpdate({ binding: migrateBinding({ nodeId, direction: 'read' }) });
       return;
     }
     const ports = node ? getNodePorts(node) : [];
@@ -3522,6 +3530,36 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <span className="text-[10px] font-mono text-sky-300 ml-auto">
                       {liveValues[`${bindingNodeId}:output-0`] ? 'Ein' : 'Aus'}
                     </span>
+                  </div>
+                )}
+              </>
+            ) : isSequenceWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe das Sequenzbaustein-Widget mit einem Sequenzbaustein in der Logik.
+                </p>
+                {sequenceControlNodes.length === 0 ? (
+                  <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
+                    <Settings className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-400">Kein Sequenzbaustein in der Logik vorhanden. Bitte zuerst einen Sequenzbaustein hinzufuegen.</span>
+                  </div>
+                ) : (
+                  <NodeBrowser
+                    nodes={sequenceControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && bindingNodeId && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Eingang:</span>
+                    <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:input-0`] ?? 0).toFixed(1)} %</span>
                   </div>
                 )}
               </>

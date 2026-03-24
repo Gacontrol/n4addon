@@ -971,6 +971,22 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'readwrite'
   },
   {
+    type: 'visu-sequence',
+    label: 'Sequenzbaustein',
+    icon: 'Layers',
+    category: 'complex',
+    defaultSize: { width: 160, height: 140 },
+    defaultConfig: {
+      seqName: '',
+      normalColor: '#64748b',
+      activeColor: '#0d9488'
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Sequenzbaustein-Widget mit grafischer Kennlinie und Popup-Parametrierung',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
     type: 'visu-alarm-console',
     label: 'Alarmkonsole',
     icon: 'Bell',

@@ -2360,6 +2360,66 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       nodeValues[`${nodeId}:input-0`] = inputValue;
       nodeValues[`${nodeId}:input-1`] = enable;
       nodeValues[`${nodeId}:input-2`] = nightReductionActive;
+    } else if (node.type === 'sequence-control') {
+      const inputVal = toNumber(inputVals[0]);
+      const lockInputs = [
+        toBool(inputVals[1]),
+        toBool(inputVals[2]),
+        toBool(inputVals[3]),
+        toBool(inputVals[4]),
+        toBool(inputVals[5]),
+        toBool(inputVals[6])
+      ];
+
+      const seqCount = Math.max(1, Math.min(6, toNumber(cfg.seqCount) || 3));
+      let hasError = false;
+      const outputs = [0, 0, 0, 0, 0, 0];
+      const seqStatus = [];
+
+      for (let i = 0; i < 6; i++) {
+        const n = i + 1;
+        const enable = cfg[`seq${n}Enable`] !== false;
+        const reverse = cfg[`seq${n}Reverse`] === true;
+        const locked = lockInputs[i];
+        const minIn = toNumber(cfg[`seq${n}MinIn`]) ?? 0;
+        const maxIn = toNumber(cfg[`seq${n}MaxIn`]) ?? 100;
+        const minOut = toNumber(cfg[`seq${n}MinOut`]) ?? 0;
+        const maxOut = toNumber(cfg[`seq${n}MaxOut`]) ?? 100;
+
+        let paramError = false;
+        if (maxIn <= minIn) paramError = true;
+
+        if (i < seqCount && enable && !locked && !paramError && inputVal !== null && inputVal !== undefined && !isNaN(inputVal)) {
+          let ratio;
+          const range = maxIn - minIn;
+          if (inputVal <= minIn) {
+            ratio = 0;
+          } else if (inputVal >= maxIn) {
+            ratio = 1;
+          } else {
+            ratio = (inputVal - minIn) / range;
+          }
+          if (reverse) ratio = 1 - ratio;
+          outputs[i] = minOut + ratio * (maxOut - minOut);
+          outputs[i] = Math.max(Math.min(minOut, maxOut), Math.min(Math.max(minOut, maxOut), outputs[i]));
+        } else {
+          outputs[i] = 0;
+        }
+
+        if (paramError && i < seqCount) hasError = true;
+
+        const inRange = i < seqCount && !locked && !paramError && inputVal !== null && inputVal !== undefined && !isNaN(inputVal) && inputVal >= minIn && inputVal <= maxIn;
+        seqStatus.push({ active: enable && i < seqCount, locked, reverse, paramError, inRange });
+      }
+
+      for (let i = 0; i < 6; i++) {
+        nodeValues[`${nodeId}:output-${i}`] = outputs[i];
+      }
+      nodeValues[`${nodeId}:output-6`] = hasError;
+      nodeValues[nodeId] = outputs[0];
+      nodeValues[`${nodeId}:input-0`] = inputVal;
+      nodeValues[`${nodeId}:seqStatus`] = seqStatus;
+
     } else if (node.type === 'light-toggle') {
       const taster = toBool(inputVals[0]);
       const rueckmeldung = toBool(inputVals[1]);
