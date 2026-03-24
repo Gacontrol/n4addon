@@ -99,14 +99,27 @@ function getLayerStyle(
   return base;
 }
 
+function getIngressPrefix(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  if (m) return m[1];
+  const segments = p.split('/').filter(Boolean);
+  if (segments.length >= 2) {
+    return '/' + segments[0];
+  }
+  return '';
+}
+
 function getApiBase(): string {
-  return '/api';
+  const prefix = getIngressPrefix();
+  return prefix ? `${prefix}/api` : '/api';
 }
 
 function getWsBase(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
-  return `${proto}//${host}/ws`;
+  const prefix = getIngressPrefix();
+  return prefix ? `${proto}//${host}${prefix}/ws` : `${proto}//${host}/ws`;
 }
 
 export function VisuApp() {
