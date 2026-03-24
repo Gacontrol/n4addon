@@ -25,6 +25,31 @@ export interface DriverConfig {
   customModbusLibrary: CustomLibraryDevice[];
 }
 
+export interface TrackedNode {
+  nodeId: string;
+  label: string;
+  pageId: string;
+  pageName: string;
+  enabled: boolean;
+  color: string;
+  unit?: string;
+  sampleIntervalMs?: number;
+  retentionDays?: number;
+  deleted?: boolean;
+}
+
+export interface ChartGroup {
+  id: string;
+  name: string;
+  nodeIds: string[];
+  visible: boolean;
+}
+
+export interface TrendConfig {
+  trackedNodes: TrackedNode[];
+  chartGroups?: ChartGroup[];
+}
+
 export interface WiresheetBackup {
   version: number;
   exportedAt: string;
@@ -34,6 +59,7 @@ export interface WiresheetBackup {
   customBlocks: CustomBlockDefinition[];
   images?: BackupImage[];
   driverConfig?: DriverConfig;
+  trendConfig?: TrendConfig;
 }
 
 function getApiBase(): string {
@@ -101,6 +127,7 @@ export interface BackupImportSelection {
   customLibrary: string[];
   includeBindings: boolean;
   includeImages: boolean;
+  includeTrends: boolean;
 }
 
 export interface BackupExportSelection {
@@ -111,6 +138,7 @@ export interface BackupExportSelection {
   customLibrary: string[];
   includeBindings: boolean;
   includeImages: boolean;
+  includeTrends: boolean;
 }
 
 export function createBackup(
@@ -118,7 +146,8 @@ export function createBackup(
   visuPages: VisuPage[],
   customBlocks: CustomBlockDefinition[],
   images?: BackupImage[],
-  driverConfig?: DriverConfig
+  driverConfig?: DriverConfig,
+  trendConfig?: TrendConfig
 ): WiresheetBackup {
   return {
     version: BACKUP_VERSION,
@@ -128,8 +157,29 @@ export function createBackup(
     visuPages,
     customBlocks,
     images: images || [],
-    driverConfig
+    driverConfig,
+    trendConfig
   };
+}
+
+export async function fetchTrendConfig(apiBase: string): Promise<TrendConfig | null> {
+  try {
+    const res = await fetch(`${apiBase}/api/trend-config`);
+    if (!res.ok) return null;
+    return await res.json() as TrendConfig;
+  } catch {
+    return null;
+  }
+}
+
+export async function restoreTrendConfig(apiBase: string, trendConfig: TrendConfig): Promise<void> {
+  try {
+    await fetch(`${apiBase}/api/trend-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(trendConfig)
+    });
+  } catch {}
 }
 
 export function downloadBackup(backup: WiresheetBackup, filename?: string): void {

@@ -2,8 +2,9 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   X, Download, Upload, Check, AlertCircle, ChevronDown, ChevronRight,
   FileJson, Workflow, Monitor, Blocks, RefreshCw, FolderOpen, Image as ImageIcon,
-  Server, Library, Link2
+  Server, Library, Link2, TrendingUp
 } from 'lucide-react';
+
 import { WiresheetPage } from '../types/flow';
 import { VisuPage, } from '../types/visualization';
 import { CustomBlockDefinition } from '../types/flow';
@@ -17,10 +18,18 @@ import {
   applyImport,
   fetchImagesForBackup,
   restoreImagesFromBackup,
+  fetchTrendConfig,
+  restoreTrendConfig,
   DriverConfig,
   CustomLibraryDevice
 } from '../utils/backup';
 import { ModbusDevice, DriverBinding } from '../types/flow';
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
 
 interface BackupModalProps {
   wiresheets: WiresheetPage[];
@@ -63,7 +72,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     modbusDevices: [],
     customLibrary: [],
     includeBindings: true,
-    includeImages: true
+    includeImages: true,
+    includeTrends: true
   });
   const customLibrary: CustomLibraryDevice[] = JSON.parse(localStorage.getItem('wiresheet-custom-modbus-library') || '[]');
   const [exportSelection, setExportSelection] = useState<BackupExportSelection>({
@@ -73,7 +83,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     modbusDevices: modbusDevices.map(d => d.id),
     customLibrary: customLibrary.map(l => l.id),
     includeBindings: true,
-    includeImages: true
+    includeImages: true,
+    includeTrends: true
   });
   const [importDone, setImportDone] = useState(false);
   const [wiresheetsOpen, setWiresheetsOpen] = useState(true);
@@ -104,7 +115,8 @@ export const BackupModal: React.FC<BackupModalProps> = ({
         modbusDevices: backup.driverConfig?.modbusDevices.map(d => d.id) || [],
         customLibrary: backup.driverConfig?.customModbusLibrary.map(l => l.id) || [],
         includeBindings: true,
-        includeImages: true
+        includeImages: true,
+        includeTrends: !!backup.trendConfig
       });
       setView('import-select');
     };
@@ -127,7 +139,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleExportFlag = (key: 'includeBindings' | 'includeImages') => {
+  const toggleExportFlag = (key: 'includeBindings' | 'includeImages' | 'includeTrends') => {
     setExportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -146,26 +158,28 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     });
   };
 
-  const toggleImportFlag = (key: 'includeBindings' | 'includeImages') => {
+  const toggleImportFlag = (key: 'includeBindings' | 'includeImages' | 'includeTrends') => {
     setImportSelection(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleExport = async () => {
     setExporting(true);
     try {
+      const apiBase = getApiBase();
       const selectedWiresheets = wiresheets.filter(w => exportSelection.wiresheets.includes(w.id));
       const selectedVisus = visuPages.filter(v => exportSelection.visuPages.includes(v.id));
       const selectedBlocks = customBlocks.filter(b => exportSelection.customBlocks.includes(b.id));
       const selectedDevices = modbusDevices.filter(d => exportSelection.modbusDevices.includes(d.id));
       const selectedLibrary = customLibrary.filter(l => exportSelection.customLibrary.includes(l.id));
       const images = exportSelection.includeImages ? await fetchImagesForBackup(selectedVisus) : [];
+      const trendConfig = exportSelection.includeTrends ? await fetchTrendConfig(apiBase) : undefined;
       const driverConfig: DriverConfig = {
         modbusDevices: selectedDevices,
         modbusDriverEnabled,
         driverBindings: exportSelection.includeBindings ? driverBindings : [],
         customModbusLibrary: selectedLibrary
       };
-      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig);
+      const backup = createBackup(selectedWiresheets, selectedVisus, selectedBlocks, images, driverConfig, trendConfig ?? undefined);
       downloadBackup(backup);
       onClose();
     } finally {
@@ -177,8 +191,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     if (!loadedBackup) return;
     setImporting(true);
     try {
+      const apiBase = getApiBase();
       if (importSelection.includeImages && loadedBackup.images && loadedBackup.images.length > 0) {
         await restoreImagesFromBackup(loadedBackup.images);
+      }
+      if (importSelection.includeTrends && loadedBackup.trendConfig) {
+        await restoreTrendConfig(apiBase, loadedBackup.trendConfig);
       }
       const currentDriverConfig: DriverConfig = {
         modbusDevices,
@@ -442,6 +460,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     checked={exportSelection.includeImages}
                     onChange={() => toggleExportFlag('includeImages')}
                   />
+                  <CheckItem
+                    label="Trend-Konfiguration"
+                    sublabel="Getrackte Knoten und Diagrammgruppen"
+                    checked={exportSelection.includeTrends}
+                    onChange={() => toggleExportFlag('includeTrends')}
+                  />
                 </div>
               </div>
             </div>
@@ -464,6 +488,9 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     )}
                     {loadedBackup.images && loadedBackup.images.length > 0 && (
                       <> &nbsp;·&nbsp; {loadedBackup.images.length} Bilder</>
+                    )}
+                    {loadedBackup.trendConfig && loadedBackup.trendConfig.trackedNodes.length > 0 && (
+                      <> &nbsp;·&nbsp; {loadedBackup.trendConfig.trackedNodes.length} Trends</>
                     )}
                   </p>
                   <p className="text-[10px] text-slate-500 mt-0.5">
@@ -639,6 +666,14 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                       sublabel={`${loadedBackup.images.length} eingebettete Bilder`}
                       checked={importSelection.includeImages}
                       onChange={() => toggleImportFlag('includeImages')}
+                    />
+                  )}
+                  {loadedBackup.trendConfig && loadedBackup.trendConfig.trackedNodes.length > 0 && (
+                    <CheckItem
+                      label="Trend-Konfiguration"
+                      sublabel={`${loadedBackup.trendConfig.trackedNodes.length} getrackte Knoten${loadedBackup.trendConfig.chartGroups?.length ? `, ${loadedBackup.trendConfig.chartGroups.length} Diagrammgruppen` : ''}`}
+                      checked={importSelection.includeTrends}
+                      onChange={() => toggleImportFlag('includeTrends')}
                     />
                   )}
                 </div>
