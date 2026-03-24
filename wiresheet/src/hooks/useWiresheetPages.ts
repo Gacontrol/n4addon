@@ -82,10 +82,22 @@ export const useWiresheetPages = () => {
           setPages(data);
           setActivePageId(data[0].id);
 
+          pagesRef.current = data;
+
           for (const page of data) {
-            if (page.running && !localCycleTimers.current[page.id]) {
+            if (page.running) {
+              if (localCycleTimers.current[page.id]) {
+                clearInterval(localCycleTimers.current[page.id]);
+              }
+              executePage(page.id);
               const interval = Math.max(200, page.cycleMs || 250);
               localCycleTimers.current[page.id] = setInterval(() => executePage(page.id), interval);
+
+              fetch(`${API_BASE}/pages/${page.id}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cycleMs: page.cycleMs || 250 })
+              }).catch(() => {});
             }
           }
         }
@@ -279,10 +291,22 @@ export const useWiresheetPages = () => {
     const newPage = defaultPage();
     newPage.id = `page-${Date.now()}`;
     newPage.name = `Seite ${pages.length + 1}`;
+    newPage.running = true;
     updatePages(prev => [...prev, newPage]);
     setActivePageId(newPage.id);
+
+    fetch(`${API_BASE}/pages/${newPage.id}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cycleMs: newPage.cycleMs })
+    }).catch(() => {});
+
+    if (localCycleTimers.current[newPage.id]) clearInterval(localCycleTimers.current[newPage.id]);
+    const interval = Math.max(200, newPage.cycleMs);
+    localCycleTimers.current[newPage.id] = setInterval(() => executePage(newPage.id), interval);
+
     return newPage.id;
-  }, [pages.length, updatePages]);
+  }, [pages.length, updatePages, executePage]);
 
   const addNodesToPage = useCallback((pageId: string, newNodes: FlowNode[], newConns: Connection[]) => {
     updatePages(prev => prev.map(p => {
