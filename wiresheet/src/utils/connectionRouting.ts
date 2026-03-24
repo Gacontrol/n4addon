@@ -93,26 +93,46 @@ export function buildSelfLoopPath(
   const nodeH = sourceNode?.height ?? 60;
   const nodeY = sourceNode?.position.y ?? y1 - 30;
 
-  const outX = nodeX + nodeW + NODE_MARGIN + 24;
-  const topY = nodeY - NODE_MARGIN - 20;
-  const botY = nodeY + nodeH + NODE_MARGIN + 20;
-  const labelMidY = (y1 + y2) / 2;
+  const LOOP_GAP = 28;
+  const rightX = nodeX + nodeW + LOOP_GAP;
+  const leftX = nodeX - LOOP_GAP;
 
-  const pts: [number, number][] = [
-    [x1, y1],
-    [outX, y1],
-    [outX, y2 < y1 ? topY : botY],
-    [outX, y2],
-    [x2, y2],
-  ];
+  const nodeTop = nodeY - NODE_MARGIN;
+  const nodeBot = nodeY + nodeH + NODE_MARGIN;
 
-  pts[2] = [outX, (y1 + y2) / 2];
+  const loopAbove = y2 < y1;
 
-  return {
-    path: corneredPath(pts, CORNER_R),
-    labelX: outX + 8,
-    labelY: labelMidY,
-  };
+  if (loopAbove) {
+    const loopY = nodeTop - LOOP_GAP;
+    const pts: [number, number][] = [
+      [x1, y1],
+      [rightX, y1],
+      [rightX, loopY],
+      [leftX, loopY],
+      [leftX, y2],
+      [x2, y2],
+    ];
+    return {
+      path: corneredPath(pts, CORNER_R),
+      labelX: (rightX + leftX) / 2,
+      labelY: loopY - 10,
+    };
+  } else {
+    const loopY = nodeBot + LOOP_GAP;
+    const pts: [number, number][] = [
+      [x1, y1],
+      [rightX, y1],
+      [rightX, loopY],
+      [leftX, loopY],
+      [leftX, y2],
+      [x2, y2],
+    ];
+    return {
+      path: corneredPath(pts, CORNER_R),
+      labelX: (rightX + leftX) / 2,
+      labelY: loopY + 10,
+    };
+  }
 }
 
 export function buildRoutedPath(
