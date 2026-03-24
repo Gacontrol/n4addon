@@ -675,8 +675,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
 
     if (multiDragState) {
-      const rawDeltaX = e.clientX - multiDragState.startX;
-      const rawDeltaY = e.clientY - multiDragState.startY;
+      const rawDeltaX = (e.clientX - multiDragState.startX) / zoom;
+      const rawDeltaY = (e.clientY - multiDragState.startY) / zoom;
       if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
       const gridSize = page.gridSize || 10;
       let dx = rawDeltaX;
@@ -713,8 +713,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
 
     if (dragState) {
-      const rawDeltaX = e.clientX - dragState.startX;
-      const rawDeltaY = e.clientY - dragState.startY;
+      const rawDeltaX = (e.clientX - dragState.startX) / zoom;
+      const rawDeltaY = (e.clientY - dragState.startY) / zoom;
       if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
       const gridSize = page.gridSize || 10;
 
@@ -770,8 +770,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     }
 
     if (resizeState) {
-      const deltaX = e.clientX - resizeState.startX;
-      const deltaY = e.clientY - resizeState.startY;
+      const deltaX = (e.clientX - resizeState.startX) / zoom;
+      const deltaY = (e.clientY - resizeState.startY) / zoom;
       const gridSize = page.gridSize || 10;
       const minSize = 40;
 
@@ -1245,6 +1245,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
           onClearAlarm={onClearAlarm}
           onShelveAlarm={onShelveAlarm}
           liveValues={liveValues}
+          zoom={zoom}
         />
       ))}
 

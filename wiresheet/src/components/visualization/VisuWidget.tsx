@@ -260,6 +260,7 @@ interface VisuWidgetProps {
   onClearAlarm?: (alarmId: string) => void;
   onShelveAlarm?: (alarmId: string, durationMs: number, reason?: string) => void;
   liveValues?: Record<string, unknown>;
+  zoom?: number;
 }
 
 function makePolygonPoints(cx: number, cy: number, rx: number, ry: number, sides: number): string {
@@ -342,7 +343,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   onAcknowledgeAll,
   onClearAlarm,
   onShelveAlarm,
-  liveValues = {}
+  liveValues = {},
+  zoom = 1
 }) => {
   const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -356,8 +358,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   useEffect(() => {
     if (!draggingVertex) return;
     const handleMove = (e: MouseEvent) => {
-      const dx = e.clientX - draggingVertex.startX;
-      const dy = e.clientY - draggingVertex.startY;
+      const dx = (e.clientX - draggingVertex.startX) / zoom;
+      const dy = (e.clientY - draggingVertex.startY) / zoom;
       const nx = draggingVertex.origX + dx;
       const ny = draggingVertex.origY + dy;
       if (draggingVertex.type === 'polyline') {
@@ -648,7 +650,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         return (
           <svg
             ref={svgRef}
-            style={{ position: 'absolute', left: svgLeft, top: svgTop, overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit' }}
+            style={{ position: 'absolute', left: svgLeft, top: svgTop, overflow: 'visible', opacity: lCfg.opacity ?? 1, cursor: hasNav ? 'pointer' : 'inherit', background: 'transparent' }}
             width={svgW} height={svgH}
             viewBox={`${svgLeft} ${svgTop} ${svgW} ${svgH}`}
             onClick={() => handleShapeClick(lCfg)}
@@ -661,9 +663,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             />
             {isEditMode && isSelected && (
               <>
-                <circle cx={x1} cy={y1} r={sw + 3} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                <circle cx={x1} cy={y1} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'grab' }}
                   onMouseDown={(e) => handleVertexMouseDown(e, 'line', 0, { x: x1abs, y: y1abs })} />
-                <circle cx={x2} cy={y2} r={sw + 3} fill="#3b82f6" stroke="white" strokeWidth={2} style={{ cursor: 'grab' }}
+                <circle cx={x2} cy={y2} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'grab' }}
                   onMouseDown={(e) => handleVertexMouseDown(e, 'line', 1, { x: x2abs, y: y2abs })} />
               </>
             )}
