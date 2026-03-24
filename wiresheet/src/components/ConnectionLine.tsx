@@ -48,7 +48,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     return (
       <path
         d={path}
-        stroke="transparent"
+        stroke="rgba(0,0,0,0.01)"
         strokeWidth={14}
         fill="none"
         onClick={onClick}

@@ -619,7 +619,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 20,
+          zIndex: 40,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
@@ -630,8 +630,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           fill: 'none',
           pointerEvents: 'all'
         }}
+        onPointerDown={(e) => handleCanvasPointerDown(e as unknown as React.PointerEvent<HTMLDivElement>)}
+        onPointerMove={(e) => handleCanvasPointerMove(e as unknown as React.PointerEvent<HTMLDivElement>)}
+        onPointerUp={(e) => handleCanvasPointerUp(e as unknown as React.PointerEvent<HTMLDivElement>)}
       >
-        <g>
+        <g style={{ pointerEvents: 'none' }}>
           {connections.map(conn => {
             const start = getPortCenter(conn.source, conn.sourcePort);
             const end = getPortCenter(conn.target, conn.targetPort);
@@ -663,13 +666,14 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           position: 'absolute',
           left: 0,
           top: 0,
-          zIndex: 30,
+          zIndex: 50,
           transform: `scale(${zoom})`,
           transformOrigin: '0 0',
           width: '5000px',
           height: '5000px',
           minWidth: `${100 / zoom}%`,
-          minHeight: `${100 / zoom}%`
+          minHeight: `${100 / zoom}%`,
+          pointerEvents: 'none'
         }}
       >
         {nodes

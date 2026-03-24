@@ -411,7 +411,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           zIndex: isDragging ? 2 : 0,
           touchAction: 'none',
           width: containerWidth,
-          height: finalHeight
+          height: finalHeight,
+          pointerEvents: 'all'
         }}
       >
         <div
@@ -644,7 +645,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           zIndex: isSelected || isDragging ? 20 : 1,
           cursor: isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
-          opacity: isDimmed ? 0.6 : 1
+          opacity: isDimmed ? 0.6 : 1,
+          pointerEvents: 'all'
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -701,7 +703,8 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
           minWidth: node.width ? undefined : 180,
           width: node.width ? node.width : undefined,
           height: node.height ? node.height : undefined,
-          opacity: isDimmed ? 0.6 : 1
+          opacity: isDimmed ? 0.6 : 1,
+          pointerEvents: 'all'
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
