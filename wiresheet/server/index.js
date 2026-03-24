@@ -510,6 +510,13 @@ app.get(['/pages', '/api/pages'], async (req, res) => {
       const defaultPages = [
         { id: 'page-1', name: 'Seite 1', cycleMs: 250, running: true, nodes: [], connections: [] }
       ];
+      try {
+        await fs.mkdir(dataDir, { recursive: true });
+        await fs.writeFile(pagesFile, JSON.stringify(defaultPages, null, 2));
+        console.log('Standard-Seite gespeichert, Logik-Zyklus kann starten');
+      } catch (writeErr) {
+        console.error('Fehler beim Speichern der Standard-Seite:', writeErr.message);
+      }
       res.json(defaultPages);
     } else {
       console.error('Fehler beim Laden:', err);
@@ -3964,6 +3971,16 @@ async function restoreRunningPages() {
     }
   } catch (err) {
     if (err.code === 'ENOENT') {
+      const defaultPages = [
+        { id: 'page-1', name: 'Seite 1', cycleMs: 250, running: true, nodes: [], connections: [] }
+      ];
+      try {
+        await fs.mkdir(dataDir, { recursive: true });
+        await fs.writeFile(pagesFile, JSON.stringify(defaultPages, null, 2));
+        console.log('Neue Installation: Standard-Seite erstellt und gespeichert');
+      } catch (writeErr) {
+        console.error('Fehler beim Erstellen der Standard-Seite:', writeErr.message);
+      }
       startPage('page-1', 250);
       console.log('Neue Installation: Seite 1 automatisch gestartet');
     } else {
