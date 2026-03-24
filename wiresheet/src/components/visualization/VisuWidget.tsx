@@ -76,6 +76,46 @@ import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
 import { VisuTimeProgram } from './VisuTimeProgram';
 import { getThemeVars } from '../../utils/widgetThemes';
+import { VisuSwitch } from './VisuSwitch';
+import { VisuButton } from './VisuButton';
+import { VisuSlider } from './VisuSlider';
+import { VisuIncrementer } from './VisuIncrementer';
+import { VisuInput } from './VisuInput';
+import { VisuGauge } from './VisuGauge';
+import { VisuDisplay } from './VisuDisplay';
+import { VisuLed } from './VisuLed';
+import { VisuBar } from './VisuBar';
+import { VisuTank } from './VisuTank';
+import { VisuThermometer } from './VisuThermometer';
+import { VisuLabel } from './VisuLabel';
+import { VisuMultistate } from './VisuMultistate';
+import {
+  ModernSwitch,
+  ModernButton,
+  ModernGauge,
+  ModernDisplay,
+  ModernBar,
+  ModernLed,
+  ModernSlider,
+  ModernMultistate
+} from './ModernWidgets';
+import {
+  DashStat,
+  DashProgress,
+  DashValueCard,
+  DashToggleCard,
+  DashBattery,
+  DashSignal,
+  DashSparkline,
+  DashMultivalue,
+  DashHeatbar,
+  DashCompass,
+  DashClock,
+  DashRating,
+  DashLevel,
+  DashWind,
+  DashMultistate
+} from './DashboardWidgets';
 
 class Widget3DErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -120,48 +160,6 @@ class Widget3DErrorBoundary extends React.Component<
     );
   }
 }
-import {
-  VisuSwitch,
-  VisuButton,
-  VisuSlider,
-  VisuIncrementer,
-  VisuInput,
-  VisuGauge,
-  VisuDisplay,
-  VisuLed,
-  VisuBar,
-  VisuTank,
-  VisuThermometer,
-  VisuLabel,
-  VisuMultistate
-} from './index';
-import {
-  ModernSwitch,
-  ModernButton,
-  ModernGauge,
-  ModernDisplay,
-  ModernBar,
-  ModernLed,
-  ModernSlider,
-  ModernMultistate
-} from './ModernWidgets';
-import {
-  DashStat,
-  DashProgress,
-  DashValueCard,
-  DashToggleCard,
-  DashBattery,
-  DashSignal,
-  DashSparkline,
-  DashMultivalue,
-  DashHeatbar,
-  DashCompass,
-  DashClock,
-  DashRating,
-  DashLevel,
-  DashWind,
-  DashMultistate
-} from './DashboardWidgets';
 
 interface PumpParams {
   pumpName?: string;
