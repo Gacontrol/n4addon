@@ -2869,7 +2869,13 @@ async function runPageCycle(pageId) {
         pendingResets.push({ dpKey, val: item.val, resetVal: item.resetVal });
       }
 
-      const nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
+      let nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
+
+      if (pageInfo.cycleCount === 0) {
+        lastNodeValues.set(pageId, nodeValues);
+        nodeValues = await executePageLogic(page.nodes, page.connections, manualOverrides, pageId);
+        console.log(`Seite ${pageId}: Warm-up zweiter Cycle ausgefuehrt (Self-Loop Initialisierung)`);
+      }
 
       for (const item of pendingResets) {
         if (item.val === item.resetVal) continue;
@@ -2910,6 +2916,12 @@ function startPage(pageId, cycleMs) {
     if (existing.timeout) clearTimeout(existing.timeout);
   }
 
+  if (!lastNodeValues.has(pageId)) {
+    const snapshot = dpStore.getSnapshot();
+    lastNodeValues.set(pageId, snapshot);
+    console.log(`Seite ${pageId}: lastNodeValues mit dpStore-Snapshot vorinitialisiert (${Object.keys(snapshot).length} Werte)`);
+  }
+
   const pageInfo = {
     running: true,
     cycleMs: Math.max(20, cycleMs || 250),
@@ -2933,7 +2945,6 @@ function stopPage(pageId) {
     }
     runningPages.delete(pageId);
     pageNodeStates.delete(pageId);
-    lastNodeValues.delete(pageId);
     console.log(`Seite ${pageId} gestoppt`);
   }
 }
