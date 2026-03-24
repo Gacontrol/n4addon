@@ -55,16 +55,14 @@ export const useFlowEditor = () => {
   }, []);
 
   const endConnection = useCallback((targetNodeId: string, targetPortId: string, sourceNodeId: string, sourcePortId: string) => {
-    if (sourceNodeId !== targetNodeId) {
-      const connection: Connection = {
-        id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
-        source: sourceNodeId,
-        sourcePort: sourcePortId,
-        target: targetNodeId,
-        targetPort: targetPortId
-      };
-      addConnection(connection);
-    }
+    const connection: Connection = {
+      id: `${sourceNodeId}-${sourcePortId}-${targetNodeId}-${targetPortId}`,
+      source: sourceNodeId,
+      sourcePort: sourcePortId,
+      target: targetNodeId,
+      targetPort: targetPortId
+    };
+    addConnection(connection);
     setConnectingFrom(null);
   }, [addConnection]);
 

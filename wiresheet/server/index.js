@@ -1550,8 +1550,15 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         if (nodeValues[portKey] !== undefined) {
           return nodeValues[portKey];
         }
+        const prevVal = prevValues[portKey];
+        if (prevVal !== undefined) {
+          return prevVal;
+        }
       }
-      return nodeValues[conn.source];
+      if (nodeValues[conn.source] !== undefined) {
+        return nodeValues[conn.source];
+      }
+      return prevValues[conn.source];
     };
 
     const nodeInputs = node.data.inputs || [];
