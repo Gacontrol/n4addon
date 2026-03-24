@@ -547,38 +547,35 @@ export function VisuApp() {
   }, [apiBase]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const handlePinchTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
-      pinchStartZoomRef.current = pinchZoom;
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      setPinchOrigin({ x: cx, y: cy });
-    }
-  }, [pinchZoom]);
-
-  const handlePinchTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      pinchStartDistRef.current = null;
-      if (pinchZoom < 0.75) {
-        setPinchZoom(1);
-      }
-    }
-  }, [pinchZoom]);
-
-  const handleDoubleTap = useCallback(() => {
-    setPinchZoom(1);
-    setPinchOrigin({ x: 0, y: 0 });
-  }, []);
+  const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
+        pinchStartZoomRef.current = pinchZoom;
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        setPinchOrigin({ x: cx, y: cy });
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - lastTapRef.current < 300) {
+          setPinchZoom(1);
+          setPinchOrigin({ x: 0, y: 0 });
+        }
+        lastTapRef.current = now;
+      }
+    };
+
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
+        e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -587,9 +584,25 @@ export function VisuApp() {
         setPinchZoom(newZoom);
       }
     };
-    el.addEventListener('touchmove', onTouchMove, { passive: true });
-    return () => el.removeEventListener('touchmove', onTouchMove);
-  }, []);
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        pinchStartDistRef.current = null;
+        if (pinchZoom < 0.75) {
+          setPinchZoom(1);
+        }
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [pinchZoom]);
 
   const activePage = visuPages.find(p => p.id === activePageId) || visuPages[0];
   const displayedPage = visuPages.find(p => p.id === displayedPageId) || activePage;
@@ -715,9 +728,7 @@ export function VisuApp() {
     <div
       ref={containerRef}
       className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden"
-      style={{ touchAction: 'manipulation' }}
-      onTouchStart={handlePinchTouchStart}
-      onTouchEnd={handlePinchTouchEnd}
+      style={{ touchAction: 'none' }}
     >
       <div
         className="flex-1 relative"
@@ -736,7 +747,6 @@ export function VisuApp() {
             transformOrigin: pinchZoom !== 1 ? `${pinchOrigin.x}px ${pinchOrigin.y}px` : undefined,
             transition: pinchStartDistRef.current === null && pinchZoom === 1 ? 'transform 0.3s ease' : undefined,
           }}
-          onDoubleClick={handleDoubleTap}
         >
         {!transitioning && (
           <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
