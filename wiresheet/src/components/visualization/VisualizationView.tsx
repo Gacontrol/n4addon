@@ -388,32 +388,105 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
 
   const sortedWidgets = [...activePage.widgets].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
 
+  const getWidgetBounds = (w: VisuWidget): { left: number; top: number; right: number; bottom: number } => {
+    if ((w.type === 'visu-line' || w.type === 'visu-arrow')) {
+      const cfg = w.config as { x1?: number; y1?: number; x2?: number; y2?: number };
+      if (cfg.x1 !== undefined && cfg.y1 !== undefined && cfg.x2 !== undefined && cfg.y2 !== undefined) {
+        return {
+          left: Math.min(cfg.x1, cfg.x2),
+          top: Math.min(cfg.y1, cfg.y2),
+          right: Math.max(cfg.x1, cfg.x2),
+          bottom: Math.max(cfg.y1, cfg.y2)
+        };
+      }
+    }
+    if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+      const cfg = w.config as { points?: { x: number; y: number }[] };
+      if (cfg.points && cfg.points.length > 0) {
+        const xs = cfg.points.map(p => p.x);
+        const ys = cfg.points.map(p => p.y);
+        return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+      }
+    }
+    return { left: w.position.x, top: w.position.y, right: w.position.x + w.size.width, bottom: w.position.y + w.size.height };
+  };
+
+  const buildLineUpdate = (w: VisuWidget, dx: number, dy: number): Partial<VisuWidget> => {
+    if ((w.type === 'visu-line' || w.type === 'visu-arrow')) {
+      const cfg = w.config as { x1?: number; y1?: number; x2?: number; y2?: number };
+      if (cfg.x1 !== undefined && cfg.y1 !== undefined && cfg.x2 !== undefined && cfg.y2 !== undefined) {
+        const nx1 = cfg.x1 + dx, ny1 = cfg.y1 + dy, nx2 = cfg.x2 + dx, ny2 = cfg.y2 + dy;
+        return {
+          config: { ...w.config, x1: nx1, y1: ny1, x2: nx2, y2: ny2 },
+          position: { x: Math.min(nx1, nx2), y: Math.min(ny1, ny2) },
+          size: { width: Math.max(Math.abs(nx2 - nx1), 1), height: Math.max(Math.abs(ny2 - ny1), 1) }
+        };
+      }
+    }
+    if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+      const cfg = w.config as { points?: { x: number; y: number }[] };
+      if (cfg.points) {
+        const newPts = cfg.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+        const xs = newPts.map(p => p.x), ys = newPts.map(p => p.y);
+        return {
+          config: { ...w.config, points: newPts },
+          position: { x: Math.min(...xs), y: Math.min(...ys) },
+          size: { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+        };
+      }
+    }
+    return { position: { x: w.position.x + dx, y: w.position.y + dy } };
+  };
+
   const handleAlignWidgets = useCallback((alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
     if (selectedWidgetIds.length < 2) return;
     const widgets = selectedWidgetIds.map(id => activePage.widgets.find(w => w.id === id)).filter(Boolean) as VisuWidget[];
     let updates: { widgetId: string; updates: Partial<VisuWidget> }[] = [];
+
     if (alignment === 'left') {
-      const minX = Math.min(...widgets.map(w => w.position.x));
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: minX, y: w.position.y } } }));
+      const target = Math.min(...widgets.map(w => getWidgetBounds(w).left));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        return { widgetId: w.id, updates: buildLineUpdate(w, target - b.left, 0) };
+      });
     } else if (alignment === 'right') {
-      const maxX = Math.max(...widgets.map(w => w.position.x + w.size.width));
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: maxX - w.size.width, y: w.position.y } } }));
+      const target = Math.max(...widgets.map(w => getWidgetBounds(w).right));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        return { widgetId: w.id, updates: buildLineUpdate(w, target - b.right, 0) };
+      });
     } else if (alignment === 'center-h') {
-      const minX = Math.min(...widgets.map(w => w.position.x));
-      const maxX = Math.max(...widgets.map(w => w.position.x + w.size.width));
+      const allBounds = widgets.map(w => getWidgetBounds(w));
+      const minX = Math.min(...allBounds.map(b => b.left));
+      const maxX = Math.max(...allBounds.map(b => b.right));
       const centerX = (minX + maxX) / 2;
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: centerX - w.size.width / 2, y: w.position.y } } }));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        const cx = (b.left + b.right) / 2;
+        return { widgetId: w.id, updates: buildLineUpdate(w, centerX - cx, 0) };
+      });
     } else if (alignment === 'top') {
-      const minY = Math.min(...widgets.map(w => w.position.y));
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: minY } } }));
+      const target = Math.min(...widgets.map(w => getWidgetBounds(w).top));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        return { widgetId: w.id, updates: buildLineUpdate(w, 0, target - b.top) };
+      });
     } else if (alignment === 'bottom') {
-      const maxY = Math.max(...widgets.map(w => w.position.y + w.size.height));
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: maxY - w.size.height } } }));
+      const target = Math.max(...widgets.map(w => getWidgetBounds(w).bottom));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        return { widgetId: w.id, updates: buildLineUpdate(w, 0, target - b.bottom) };
+      });
     } else if (alignment === 'center-v') {
-      const minY = Math.min(...widgets.map(w => w.position.y));
-      const maxY = Math.max(...widgets.map(w => w.position.y + w.size.height));
+      const allBounds = widgets.map(w => getWidgetBounds(w));
+      const minY = Math.min(...allBounds.map(b => b.top));
+      const maxY = Math.max(...allBounds.map(b => b.bottom));
       const centerY = (minY + maxY) / 2;
-      updates = widgets.map(w => ({ widgetId: w.id, updates: { position: { x: w.position.x, y: centerY - w.size.height / 2 } } }));
+      updates = widgets.map(w => {
+        const b = getWidgetBounds(w);
+        const cy = (b.top + b.bottom) / 2;
+        return { widgetId: w.id, updates: buildLineUpdate(w, 0, centerY - cy) };
+      });
     }
     handleUpdateWidgets(updates);
   }, [selectedWidgetIds, activePage.widgets, handleUpdateWidgets]);

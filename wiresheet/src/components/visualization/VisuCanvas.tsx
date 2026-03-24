@@ -496,7 +496,9 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
     if (drawingState) {
-      if (e.target !== canvasRef.current) return;
+      const isOnOwnWidget = (e.target as HTMLElement).closest(`[data-widget-id="${drawingState.widgetId}"]`) !== null;
+      const isOnCanvas = e.target === canvasRef.current || (e.target as HTMLElement).closest('[data-visu-canvas]') !== null;
+      if (!isOnCanvas && !isOnOwnWidget && drawingState.type === 'line' && drawingState.linePhase === 0) return;
       e.stopPropagation();
       e.preventDefault();
 
@@ -508,11 +510,17 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         } else {
           const pts = drawingState.points;
           if (pts.length >= 1) {
+            const startPt = pts[0];
+            const endPt = pos;
             const lCfg = page.widgets.find(w => w.id === drawingState.widgetId)?.config as LineConfig;
+            const bx = Math.min(startPt.x, endPt.x);
+            const by = Math.min(startPt.y, endPt.y);
+            const bw = Math.max(Math.abs(endPt.x - startPt.x), 1);
+            const bh = Math.max(Math.abs(endPt.y - startPt.y), 1);
             onUpdateWidget(drawingState.widgetId, {
-              config: { ...lCfg, x1: pts[0].x, y1: pts[0].y, x2: pos.x, y2: pos.y },
-              position: { x: 0, y: 0 },
-              size: { width: 1, height: 1 }
+              config: { ...lCfg, x1: startPt.x, y1: startPt.y, x2: endPt.x, y2: endPt.y },
+              position: { x: bx, y: by },
+              size: { width: bw, height: bh }
             });
             setDrawingState(null);
           }
@@ -724,14 +732,14 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         if (widget.type === 'visu-line') {
           const lCfg = cfg as { x1?: number; y1?: number; x2?: number; y2?: number };
           if (lCfg.x1 !== undefined) {
+            const nx1 = (lCfg.x1 ?? 0) + dx;
+            const ny1 = (lCfg.y1 ?? 0) + dy;
+            const nx2 = (lCfg.x2 ?? 0) + dx;
+            const ny2 = (lCfg.y2 ?? 0) + dy;
             onUpdateWidget(dragState.widgetId, {
-              config: {
-                ...cfg,
-                x1: (lCfg.x1 ?? 0) + dx,
-                y1: (lCfg.y1 ?? 0) + dy,
-                x2: (lCfg.x2 ?? 0) + dx,
-                y2: (lCfg.y2 ?? 0) + dy,
-              }
+              config: { ...cfg, x1: nx1, y1: ny1, x2: nx2, y2: ny2 },
+              position: { x: Math.min(nx1, nx2), y: Math.min(ny1, ny2) },
+              size: { width: Math.max(Math.abs(nx2 - nx1), 1), height: Math.max(Math.abs(ny2 - ny1), 1) }
             });
           }
         } else if (widget.type === 'visu-polyline' || widget.type === 'visu-polygon') {
@@ -820,10 +828,35 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
       if (lassoRect.width > 5 || lassoRect.height > 5) {
         const intersectingWidgets = page.widgets.filter(widget => {
-          const wx = widget.position.x;
-          const wy = widget.position.y;
-          const ww = widget.size.width;
-          const wh = widget.size.height;
+          let wx: number, wy: number, ww: number, wh: number;
+          if (widget.type === 'visu-line' || widget.type === 'visu-arrow') {
+            const cfg = widget.config as { x1?: number; y1?: number; x2?: number; y2?: number };
+            if (cfg.x1 !== undefined && cfg.y1 !== undefined && cfg.x2 !== undefined && cfg.y2 !== undefined) {
+              wx = Math.min(cfg.x1, cfg.x2);
+              wy = Math.min(cfg.y1, cfg.y2);
+              ww = Math.abs(cfg.x2 - cfg.x1);
+              wh = Math.abs(cfg.y2 - cfg.y1);
+              const pad = 8;
+              wx -= pad; wy -= pad; ww += pad * 2; wh += pad * 2;
+            } else {
+              wx = widget.position.x; wy = widget.position.y;
+              ww = widget.size.width; wh = widget.size.height;
+            }
+          } else if (widget.type === 'visu-polyline' || widget.type === 'visu-polygon') {
+            const cfg = widget.config as { points?: { x: number; y: number }[] };
+            if (cfg.points && cfg.points.length > 0) {
+              const xs = cfg.points.map(p => p.x);
+              const ys = cfg.points.map(p => p.y);
+              wx = Math.min(...xs); wy = Math.min(...ys);
+              ww = Math.max(...xs) - wx; wh = Math.max(...ys) - wy;
+            } else {
+              wx = widget.position.x; wy = widget.position.y;
+              ww = widget.size.width; wh = widget.size.height;
+            }
+          } else {
+            wx = widget.position.x; wy = widget.position.y;
+            ww = widget.size.width; wh = widget.size.height;
+          }
 
           return !(wx + ww < lassoRect.x || wx > lassoRect.x + lassoRect.width ||
                    wy + wh < lassoRect.y || wy > lassoRect.y + lassoRect.height);
@@ -1133,6 +1166,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
   return (
     <div
       ref={canvasRef}
+      data-visu-canvas="true"
       className="relative"
       style={{
         backgroundColor: page.backgroundColor || '#0f172a',
