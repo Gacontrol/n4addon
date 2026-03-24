@@ -100,19 +100,13 @@ function getLayerStyle(
 }
 
 function getApiBase(): string {
-  const p = window.location.pathname;
-  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
-  const base = m ? `${m[1]}/api` : '/api';
-  console.log(`[DEBUG 8098] getApiBase: pathname='${p}' -> apiBase='${base}'`);
-  return base;
+  return '/api';
 }
 
 function getWsBase(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
-  const p = window.location.pathname;
-  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
-  return m ? `${proto}//${host}${m[1]}/ws` : `${proto}//${host}/ws`;
+  return `${proto}//${host}/ws`;
 }
 
 export function VisuApp() {
