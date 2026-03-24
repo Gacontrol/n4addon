@@ -128,6 +128,19 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     return () => el.removeEventListener('wheel', handler);
   }, [isEditMode]);
 
+  useEffect(() => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) return;
+    if (!isEditMode) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    } else {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=yes');
+    }
+    return () => {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=yes');
+    };
+  }, [isEditMode]);
+
   const handleNavigateToPage = useCallback((pageId: string) => {
     pageHistoryRef.current = [...pageHistoryRef.current, pageId];
     onSetActiveVisuPage(pageId);

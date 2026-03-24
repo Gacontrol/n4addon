@@ -716,7 +716,7 @@ export function VisuApp() {
     <div
       ref={containerRef}
       className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden"
-      style={{ touchAction: pinchZoom !== 1 ? 'none' : 'pan-x pan-y' }}
+      style={{ touchAction: 'none' }}
       onTouchStart={handlePinchTouchStart}
       onTouchEnd={handlePinchTouchEnd}
     >
