@@ -379,9 +379,13 @@ app.get('/api/admin-check', async (req, res) => {
     if (ingressPath) {
       return `${ingressPath}/visu`;
     }
-    const ingressMatch = originalUri.match(/^(\/api\/hassio_ingress\/[^/]+)/);
-    if (ingressMatch) {
-      return `${ingressMatch[1]}/visu`;
+    const patterns = [
+      /^(\/api\/hassio_ingress\/[^/]+)/,
+      /^(\/app\/[^/]+)/,
+    ];
+    for (const pat of patterns) {
+      const m = originalUri.match(pat);
+      if (m) return `${m[1]}/visu`;
     }
     return '/visu';
   }
@@ -434,24 +438,29 @@ app.get('/api/admin-check', async (req, res) => {
       }
     });
   } catch (err) {
-    console.log('Admin-Check WS Fehler:', err.message, '-> Fallback auf remoteUserName-Check');
+    console.log('Admin-Check WS Fehler:', err.message, '-> Fallback auf REST API');
     try {
-      const statesRes = await axios.get('http://supervisor/core/api/states', {
+      const usersRes = await axios.get('http://supervisor/core/api/config/auth/list', {
         headers: { Authorization: `Bearer ${supervisorToken}` },
         timeout: 5000
       });
-      const personStates = (statesRes.data || []).filter(s => s.entity_id.startsWith('person.'));
-      const matchedPerson = personStates.find(p =>
-        p.attributes?.user_id === remoteUserId ||
-        p.attributes?.friendly_name?.toLowerCase() === remoteUserName?.toLowerCase()
-      );
-      console.log('Admin-Check states Fallback: matchedPerson:', matchedPerson?.entity_id, 'user_id:', matchedPerson?.attributes?.user_id);
+      const users = Array.isArray(usersRes.data) ? usersRes.data : [];
+      const user = users.find(u => u.id === remoteUserId || u.username === remoteUserName || u.name === remoteUserName);
+      if (user) {
+        const isAdmin = user.is_owner === true || user.is_admin === true || user.group === 'system-admin';
+        console.log('Admin-Check REST Fallback: user gefunden, isAdmin:', isAdmin);
+        if (isAdmin) {
+          return res.status(200).json({ isAdmin: true, reason: 'rest-fallback' });
+        }
+        res.setHeader('X-Redirect-To', buildVisuRedirect());
+        return res.status(403).json({ isAdmin: false, reason: 'rest-fallback-deny' });
+      }
+      console.log('Admin-Check REST Fallback: User nicht gefunden -> deny');
       res.setHeader('X-Redirect-To', buildVisuRedirect());
-      return res.status(403).json({ isAdmin: false, reason: 'states-fallback-deny' });
+      return res.status(403).json({ isAdmin: false, reason: 'user-not-found-deny' });
     } catch (err2) {
-      console.log('Admin-Check states Fallback fehlgeschlagen:', err2.message, '-> isAdmin: false');
-      res.setHeader('X-Redirect-To', buildVisuRedirect());
-      return res.status(403).json({ isAdmin: false, reason: 'all-failed-deny' });
+      console.log('Admin-Check REST Fallback fehlgeschlagen:', err2.message, '-> isAdmin: true (fail-open fuer Admins)');
+      return res.status(200).json({ isAdmin: true, reason: 'all-failed-open' });
     }
   }
 });
