@@ -2037,7 +2037,10 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       const initStartCount = cfg.pumpStartCount ?? cfg.aggregateStartCount ?? 0;
       if (st.operatingHoursMs === undefined) st.operatingHoursMs = initOpHours * 3600000;
       if (st.startCount === undefined) st.startCount = initStartCount;
-      if (st.aggregateCmd === undefined) st.aggregateCmd = false;
+      if (st.aggregateCmd === undefined) {
+        const prevCmd = prevValues[`${nodeId}:output-0`];
+        st.aggregateCmd = prevCmd !== undefined ? toBool(prevCmd) : false;
+      }
       if (st.fault === undefined) st.fault = false;
       if (st.faultLatch === undefined) st.faultLatch = false;
       if (st.feedbackFault === undefined) st.feedbackFault = false;
@@ -2046,8 +2049,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       if (st.antiSeizeStartTs === undefined) st.antiSeizeStartTs = null;
       if (st.startDelayTs === undefined) st.startDelayTs = null;
       if (st.stopDelayTs === undefined) st.stopDelayTs = null;
-      if (st.startTs === undefined) st.startTs = null;
-      if (st.prevAggregateCmd === undefined) st.prevAggregateCmd = false;
+      if (st.startTs === undefined) st.startTs = (st.aggregateCmd ? now : null);
+      if (st.prevAggregateCmd === undefined) st.prevAggregateCmd = st.aggregateCmd;
       if (st.lastTickTs === undefined) st.lastTickTs = now;
 
       if (resetInput && (st.faultLatch || st.feedbackFault)) {
@@ -2944,7 +2947,6 @@ function stopPage(pageId) {
       clearTimeout(pageInfo.timeout);
     }
     runningPages.delete(pageId);
-    pageNodeStates.delete(pageId);
     console.log(`Seite ${pageId} gestoppt`);
   }
 }
