@@ -562,18 +562,6 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           pointerEvents: 'none'
         }}
       >
-        <defs>
-          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#10b981" opacity="0.8" />
-          </marker>
-          <marker id="arr-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#60a5fa" />
-          </marker>
-          <marker id="arr-selected" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" />
-          </marker>
-        </defs>
-
         <g>
           {connections.map(conn => {
             const start = getPortCenter(conn.source, conn.sourcePort);
@@ -582,6 +570,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             const portKey = conn.sourcePort ? `${conn.source}:${conn.sourcePort}` : null;
             const connValue = (portKey && liveValues[portKey] !== undefined) ? liveValues[portKey] : liveValues[conn.source];
             const isSelected = selectedConnection === conn.id;
+            const isSelfLoop = conn.source === conn.target;
+            const sourceNode = nodes.find(n => n.id === conn.source);
             return (
               <ConnectionLine
                 key={conn.id}
@@ -590,9 +580,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
                 color={isSelected ? '#f59e0b' : '#10b981'}
                 liveValue={connValue}
                 isSelected={isSelected}
-                isSelfLoop={conn.source === conn.target}
-                onClick={(e) => handleConnectionClick(conn.id, e)}
-                onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
+                isSelfLoop={isSelfLoop}
+                sourceNode={sourceNode}
+                nodes={nodes}
+                sourceId={conn.source}
+                targetId={conn.target}
               />
             );
           })}
@@ -619,6 +611,50 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             strokeDasharray="4 2"
           />
         )}
+      </svg>
+
+      <svg
+        className="origin-top-left"
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          zIndex: 20,
+          transform: `scale(${zoom})`,
+          transformOrigin: '0 0',
+          width: '5000px',
+          height: '5000px',
+          minWidth: `${100 / zoom}%`,
+          minHeight: `${100 / zoom}%`,
+          overflow: 'visible',
+          fill: 'none',
+          pointerEvents: 'all'
+        }}
+      >
+        <g>
+          {connections.map(conn => {
+            const start = getPortCenter(conn.source, conn.sourcePort);
+            const end = getPortCenter(conn.target, conn.targetPort);
+            if (!start || !end) return null;
+            const isSelfLoop = conn.source === conn.target;
+            const sourceNode = nodes.find(n => n.id === conn.source);
+            return (
+              <ConnectionLine
+                key={conn.id}
+                x1={start.x} y1={start.y}
+                x2={end.x} y2={end.y}
+                isSelfLoop={isSelfLoop}
+                sourceNode={sourceNode}
+                nodes={nodes}
+                sourceId={conn.source}
+                targetId={conn.target}
+                onClick={(e) => handleConnectionClick(conn.id, e)}
+                onContextMenu={(e) => handleConnectionContextMenu(conn.id, e)}
+                hitOnly
+              />
+            );
+          })}
+        </g>
       </svg>
 
       <div
