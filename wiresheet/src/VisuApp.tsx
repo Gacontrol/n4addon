@@ -579,7 +579,6 @@ export function VisuApp() {
     if (!el) return;
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
-        e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -588,7 +587,7 @@ export function VisuApp() {
         setPinchZoom(newZoom);
       }
     };
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
     return () => el.removeEventListener('touchmove', onTouchMove);
   }, []);
 
@@ -716,7 +715,7 @@ export function VisuApp() {
     <div
       ref={containerRef}
       className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden"
-      style={{ touchAction: 'pan-x pan-y' }}
+      style={{ touchAction: 'manipulation' }}
       onTouchStart={handlePinchTouchStart}
       onTouchEnd={handlePinchTouchEnd}
     >
