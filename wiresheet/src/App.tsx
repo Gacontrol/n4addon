@@ -192,9 +192,17 @@ function App() {
         const apiBase = getApiBase();
         const resp = await fetch(`${apiBase}/admin-check`);
         const data = await resp.json().catch(() => ({}));
-        const admin = data.isAdmin === true;
-        setIsAdmin(admin);
-        setMainView(admin ? 'logic' : 'visu');
+        if (resp.ok && data.isAdmin === true) {
+          setIsAdmin(true);
+          setMainView('logic');
+        } else if (!resp.ok && Object.keys(data).length === 0) {
+          setIsAdmin(true);
+          setMainView('logic');
+        } else {
+          const admin = data.isAdmin === true;
+          setIsAdmin(admin);
+          setMainView(admin ? 'logic' : 'visu');
+        }
       } catch {
         setIsAdmin(true);
         setMainView('logic');
