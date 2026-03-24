@@ -238,12 +238,17 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [zoom, onZoomChange]);
 
-  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+  const pinchRef = useRef<{ dist: number } | null>(null);
   const touchPanRef = useRef<{ x: number; y: number } | null>(null);
+  const zoomRef = useRef(zoom);
+  const onZoomChangeRef = useRef(onZoomChange);
+
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { onZoomChangeRef.current = onZoomChange; }, [onZoomChange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !onZoomChange) return;
+    if (!canvas) return;
 
     const getTouchDist = (t: TouchList) => {
       const dx = t[0].clientX - t[1].clientX;
@@ -254,11 +259,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault();
-        pinchRef.current = {
-          dist: getTouchDist(e.touches),
-          midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-          midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-        };
+        pinchRef.current = { dist: getTouchDist(e.touches) };
         touchPanRef.current = null;
       } else if (e.touches.length === 1) {
         touchPanRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -271,9 +272,10 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         e.preventDefault();
         const newDist = getTouchDist(e.touches);
         const scale = newDist / pinchRef.current.dist;
-        const newZoom = Math.min(2, Math.max(0.25, zoom * scale));
+        const newZoom = Math.min(2, Math.max(0.25, zoomRef.current * scale));
         pinchRef.current.dist = newDist;
-        onZoomChange(newZoom);
+        zoomRef.current = newZoom;
+        onZoomChangeRef.current?.(newZoom);
       } else if (e.touches.length === 1 && touchPanRef.current) {
         const dx = e.touches[0].clientX - touchPanRef.current.x;
         const dy = e.touches[0].clientY - touchPanRef.current.y;
@@ -296,7 +298,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [zoom, onZoomChange]);
+  }, []);
 
   const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
     if (!canvasRef.current) return null;
@@ -379,6 +381,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
 
   const handleCanvasPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    if (e.pointerType === 'touch') return;
     const target = e.target as HTMLElement;
     if (target.closest('[data-node-id]') || target.closest('.port') || target.closest('.node-port')) return;
 
@@ -572,7 +575,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
       style={{
         background: '#0f172a',
         backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
-        backgroundSize: `${24 * zoom}px ${24 * zoom}px`
+        backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+        touchAction: 'none'
       }}
     >
       {onZoomChange && (
