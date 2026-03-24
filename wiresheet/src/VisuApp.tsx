@@ -546,6 +546,52 @@ export function VisuApp() {
     }
   }, [apiBase]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handlePinchTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
+      pinchStartZoomRef.current = pinchZoom;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      setPinchOrigin({ x: cx, y: cy });
+    }
+  }, [pinchZoom]);
+
+  const handlePinchTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinchStartDistRef.current = null;
+      if (pinchZoom < 0.75) {
+        setPinchZoom(1);
+      }
+    }
+  }, [pinchZoom]);
+
+  const handleDoubleTap = useCallback(() => {
+    setPinchZoom(1);
+    setPinchOrigin({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const scale = dist / pinchStartDistRef.current;
+        const newZoom = Math.min(4, Math.max(0.5, pinchStartZoomRef.current * scale));
+        setPinchZoom(newZoom);
+      }
+    };
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onTouchMove);
+  }, []);
+
   const activePage = visuPages.find(p => p.id === activePageId) || visuPages[0];
   const displayedPage = visuPages.find(p => p.id === displayedPageId) || activePage;
   const outgoingPage = outgoingPageId ? visuPages.find(p => p.id === outgoingPageId) : null;
@@ -610,80 +656,68 @@ export function VisuApp() {
   }
 
   const dual = isDualLayer(currentEffect);
-
   const needsPerspective = transitioning && (currentEffect === 'cube-left' || currentEffect === 'cube-right' || currentEffect === 'flip');
-
-  const handlePinchTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchStartDistRef.current = Math.sqrt(dx * dx + dy * dy);
-      pinchStartZoomRef.current = pinchZoom;
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      setPinchOrigin({ x: cx, y: cy });
-    }
-  }, [pinchZoom]);
-
-  const handlePinchTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const scale = dist / pinchStartDistRef.current;
-      const newZoom = Math.min(4, Math.max(0.5, pinchStartZoomRef.current * scale));
-      setPinchZoom(newZoom);
-    }
-  }, []);
-
-  const handlePinchTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      pinchStartDistRef.current = null;
-      if (pinchZoom < 0.75) {
-        setPinchZoom(1);
-      }
-    }
-  }, [pinchZoom]);
-
-  const handleDoubleTap = useCallback(() => {
-    setPinchZoom(1);
-    setPinchOrigin({ x: 0, y: 0 });
-  }, []);
 
   if (isPortrait) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-950 gap-6">
-        <div
-          style={{
-            animation: 'rotate-hint 2s ease-in-out infinite',
-            color: '#60a5fa',
-          }}
-        >
-          <RotateCcw style={{ width: 56, height: 56 }} />
-        </div>
-        <div className="text-center px-8">
-          <p className="text-white text-lg font-semibold mb-2">Bitte Gerat drehen</p>
-          <p className="text-slate-400 text-sm">Drehen Sie Ihr Gerat in die Querausrichtung um die Visualisierung zu sehen.</p>
-        </div>
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-950">
         <style>{`
           @keyframes rotate-hint {
             0%, 100% { transform: rotate(0deg); }
-            30% { transform: rotate(-90deg); }
-            60% { transform: rotate(-90deg); }
-            90% { transform: rotate(0deg); }
+            25% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
+            75% { transform: rotate(-90deg); }
+          }
+          @keyframes pulse-ring {
+            0%, 100% { opacity: 0.15; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(1.15); }
           }
         `}</style>
+        <div className="relative flex items-center justify-center mb-8">
+          <div style={{
+            position: 'absolute',
+            width: 120,
+            height: 120,
+            borderRadius: '50%',
+            background: 'rgba(59,130,246,0.12)',
+            animation: 'pulse-ring 2.5s ease-in-out infinite',
+          }} />
+          <div style={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            background: 'rgba(59,130,246,0.1)',
+            border: '1.5px solid rgba(59,130,246,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <RotateCcw style={{
+              width: 36,
+              height: 36,
+              color: '#60a5fa',
+              animation: 'rotate-hint 2.5s ease-in-out infinite',
+            }} />
+          </div>
+        </div>
+        <div className="text-center px-10">
+          <p className="text-white text-xl font-semibold mb-3">Bitte Gerat drehen</p>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Drehen Sie Ihr Gerat in die<br />
+            <span className="text-blue-400 font-medium">Querausrichtung</span>, um die<br />
+            Visualisierung zu verwenden.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 flex flex-col bg-slate-950 overflow-hidden"
       style={{ touchAction: pinchZoom !== 1 ? 'none' : 'pan-x pan-y' }}
       onTouchStart={handlePinchTouchStart}
-      onTouchMove={handlePinchTouchMove}
       onTouchEnd={handlePinchTouchEnd}
     >
       <div
