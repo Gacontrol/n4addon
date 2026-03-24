@@ -67,6 +67,47 @@ export const useWiresheetPages = () => {
 
   const activePage = pages.find(p => p.id === activePageId) || pages[0];
 
+  const executePageRef = useRef<(pageId: string) => Promise<void>>(async () => {});
+
+  const executePage = useCallback(async (pageId: string) => {
+    const page = pagesRef.current.find(p => p.id === pageId);
+    if (!page) return;
+
+    const now = Date.now();
+    const prev = lastExecuteStart.current[pageId];
+    if (prev !== undefined) {
+      const measured = now - prev;
+      setMeasuredCycleTimes(m => ({ ...m, [pageId]: measured }));
+    }
+    lastExecuteStart.current[pageId] = now;
+
+    const manualOverrides: Record<string, unknown> = {};
+    for (const node of page.nodes) {
+      if (node.data.override?.manual) {
+        manualOverrides[node.id] = node.data.override.value;
+      }
+    }
+
+    const visuOverrides = { ...visuOverridesRef.current };
+
+    try {
+      const res = await fetch(`${API_BASE}/pages/${pageId}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides, visuOverrides })
+      });
+      if (res.ok) {
+        const { nodeValues } = await res.json();
+        setLiveValues(prev => ({ ...prev, ...nodeValues }));
+      }
+    } catch {
+    }
+  }, []);
+
+  useEffect(() => {
+    executePageRef.current = executePage;
+  }, [executePage]);
+
   const loadPages = useCallback(async (retryCount = 0) => {
     setLoadError(null);
     try {
@@ -90,9 +131,9 @@ export const useWiresheetPages = () => {
               if (localCycleTimers.current[page.id]) {
                 clearInterval(localCycleTimers.current[page.id]);
               }
-              executePage(page.id);
+              executePageRef.current(page.id);
               const interval = Math.max(200, page.cycleMs || 250);
-              localCycleTimers.current[page.id] = setInterval(() => executePage(page.id), interval);
+              localCycleTimers.current[page.id] = setInterval(() => executePageRef.current(page.id), interval);
 
               fetch(`${API_BASE}/pages/${page.id}/start`, {
                 method: 'POST',
@@ -304,10 +345,10 @@ export const useWiresheetPages = () => {
 
     if (localCycleTimers.current[newPage.id]) clearInterval(localCycleTimers.current[newPage.id]);
     const interval = Math.max(200, newPage.cycleMs);
-    localCycleTimers.current[newPage.id] = setInterval(() => executePage(newPage.id), interval);
+    localCycleTimers.current[newPage.id] = setInterval(() => executePageRef.current(newPage.id), interval);
 
     return newPage.id;
-  }, [pages.length, updatePages, executePage]);
+  }, [pages.length, updatePages]);
 
   const addNodesToPage = useCallback((pageId: string, newNodes: FlowNode[], newConns: Connection[]) => {
     updatePages(prev => prev.map(p => {
@@ -348,41 +389,6 @@ export const useWiresheetPages = () => {
     }
   }, [pages, updatePages]);
 
-  const executePage = useCallback(async (pageId: string) => {
-    const page = pagesRef.current.find(p => p.id === pageId);
-    if (!page) return;
-
-    const now = Date.now();
-    const prev = lastExecuteStart.current[pageId];
-    if (prev !== undefined) {
-      const measured = now - prev;
-      setMeasuredCycleTimes(m => ({ ...m, [pageId]: measured }));
-    }
-    lastExecuteStart.current[pageId] = now;
-
-    const manualOverrides: Record<string, unknown> = {};
-    for (const node of page.nodes) {
-      if (node.data.override?.manual) {
-        manualOverrides[node.id] = node.data.override.value;
-      }
-    }
-
-    const visuOverrides = { ...visuOverridesRef.current };
-
-    try {
-      const res = await fetch(`${API_BASE}/pages/${pageId}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes: page.nodes, connections: page.connections, manualOverrides, visuOverrides })
-      });
-      if (res.ok) {
-        const { nodeValues } = await res.json();
-        setLiveValues(prev => ({ ...prev, ...nodeValues }));
-      }
-    } catch {
-    }
-  }, []);
-
   const startPage = useCallback(async (pageId: string) => {
     const page = pagesRef.current.find(p => p.id === pageId);
     if (!page) return;
@@ -399,10 +405,10 @@ export const useWiresheetPages = () => {
     }
 
     if (localCycleTimers.current[pageId]) clearInterval(localCycleTimers.current[pageId]);
-    executePage(pageId);
+    executePageRef.current(pageId);
     const interval = Math.max(200, page.cycleMs);
-    localCycleTimers.current[pageId] = setInterval(() => executePage(pageId), interval);
-  }, [updatePages, executePage]);
+    localCycleTimers.current[pageId] = setInterval(() => executePageRef.current(pageId), interval);
+  }, [updatePages]);
 
   const stopPage = useCallback(async (pageId: string) => {
     updatePages(prev => prev.map(p => p.id === pageId ? { ...p, running: false } : p));
