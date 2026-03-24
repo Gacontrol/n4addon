@@ -238,6 +238,66 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [zoom, onZoomChange]);
 
+  const pinchRef = useRef<{ dist: number; midX: number; midY: number } | null>(null);
+  const touchPanRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !onZoomChange) return;
+
+    const getTouchDist = (t: TouchList) => {
+      const dx = t[0].clientX - t[1].clientX;
+      const dy = t[0].clientY - t[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        pinchRef.current = {
+          dist: getTouchDist(e.touches),
+          midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        };
+        touchPanRef.current = null;
+      } else if (e.touches.length === 1) {
+        touchPanRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        pinchRef.current = null;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const newDist = getTouchDist(e.touches);
+        const scale = newDist / pinchRef.current.dist;
+        const newZoom = Math.min(2, Math.max(0.25, zoom * scale));
+        pinchRef.current.dist = newDist;
+        onZoomChange(newZoom);
+      } else if (e.touches.length === 1 && touchPanRef.current) {
+        const dx = e.touches[0].clientX - touchPanRef.current.x;
+        const dy = e.touches[0].clientY - touchPanRef.current.y;
+        touchPanRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        canvas.scrollLeft -= dx;
+        canvas.scrollTop -= dy;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      pinchRef.current = null;
+      touchPanRef.current = null;
+    };
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd);
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [zoom, onZoomChange]);
+
   const getPortCenter = useCallback((nodeId: string, portId: string): { x: number; y: number } | null => {
     if (!canvasRef.current) return null;
     const el = canvasRef.current.querySelector(`[data-port-id="${nodeId}|${portId}"]`);
