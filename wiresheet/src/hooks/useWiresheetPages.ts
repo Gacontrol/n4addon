@@ -42,8 +42,9 @@ const defaultPage = (): WiresheetPage => ({
 });
 
 export const useWiresheetPages = () => {
-  const [pages, setPages] = useState<WiresheetPage[]>([defaultPage()]);
-  const [activePageId, setActivePageId] = useState<string>(pages[0].id);
+  const initialPage = defaultPage();
+  const [pages, setPages] = useState<WiresheetPage[]>([initialPage]);
+  const [activePageId, setActivePageId] = useState<string>(initialPage.id);
   const [liveValues, setLiveValues] = useState<Record<string, unknown>>({});
   const [driverLiveValues, setDriverLiveValues] = useState<{ modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> }>({ modbus: {}, ha: {} });
   const [modbusDeviceStatusSSE, setModbusDeviceStatusSSE] = useState<Record<string, { online: boolean; lastSeen?: number }>>({});

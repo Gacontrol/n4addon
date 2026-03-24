@@ -28,8 +28,9 @@ const defaultVisuPage = (canvasWidth = 1900, canvasHeight = 900): VisuPage => ({
 });
 
 export const useVisualization = () => {
-  const [visuPages, setVisuPages] = useState<VisuPage[]>([defaultVisuPage()]);
-  const [activeVisuPageId, setActiveVisuPageId] = useState<string>(visuPages[0].id);
+  const initialPage = defaultVisuPage();
+  const [visuPages, setVisuPages] = useState<VisuPage[]>([initialPage]);
+  const [activeVisuPageId, setActiveVisuPageId] = useState<string>(initialPage.id);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInProgress = useRef(false);
