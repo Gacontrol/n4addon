@@ -783,6 +783,28 @@ export const DriversView: React.FC<DriversViewProps> = ({
                 </div>
               </button>
             ))}
+            {haInstances.length === 0 && (
+              <div className="mt-1 rounded-lg border border-dashed border-slate-600 bg-slate-800/40 px-3 py-3">
+                <p className="text-[11px] text-slate-500 text-center mb-2">Keine weiteren HA-Instanzen</p>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={handleDiscoverHa}
+                    disabled={isDiscovering}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-cyan-300 rounded text-[11px] font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isDiscovering ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                    Netzwerk scannen
+                  </button>
+                  <button
+                    onClick={() => setShowAddHaInstance(true)}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-cyan-300 rounded text-[11px] font-medium transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Manuell
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1367,7 +1389,23 @@ export const DriversView: React.FC<DriversViewProps> = ({
                 <div className="text-center py-8">
                   <Wifi className="w-8 h-8 text-slate-600 mx-auto mb-3" />
                   <p className="text-sm text-slate-400">Keine HA-Instanzen gefunden</p>
-                  <p className="text-xs text-slate-500 mt-1">Stelle sicher, dass HA auf Port 8123 erreichbar ist</p>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">Stelle sicher, dass HA auf Port 8123 erreichbar ist</p>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={handleDiscoverHa}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs font-medium transition-colors"
+                    >
+                      <Wifi className="w-3.5 h-3.5" />
+                      Erneut scannen
+                    </button>
+                    <button
+                      onClick={() => { setShowDiscovery(false); setShowAddHaInstance(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Manuell hinzufuegen
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="space-y-2">
@@ -1396,6 +1434,24 @@ export const DriversView: React.FC<DriversViewProps> = ({
                   );
                 })}
               </div>
+              {!isDiscovering && discoveredHosts.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-700 flex items-center justify-between">
+                  <button
+                    onClick={handleDiscoverHa}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    <Wifi className="w-3 h-3" />
+                    Erneut scannen
+                  </button>
+                  <button
+                    onClick={() => { setShowDiscovery(false); setShowAddHaInstance(true); }}
+                    className="flex items-center gap-1.5 text-xs text-cyan-500 hover:text-cyan-400 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Manuell hinzufuegen
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
