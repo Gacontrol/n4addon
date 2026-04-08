@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Link2, Unlink, Trash2, Settings, Plus, Monitor, Ban, FolderOpen, RefreshCw, Activity, Layers } from 'lucide-react';
 
 interface ColorPickerProps {
@@ -296,6 +296,7 @@ const RemoteVisuConfigPanel: React.FC<{
   const [loadingPages, setLoadingPages] = useState(false);
   const [pagesError, setPagesError] = useState<string | null>(null);
   const [availablePages, setAvailablePages] = useState<RemoteVisuPage[]>(cfg.availablePages || []);
+  const pendingBaseRef = useRef<{ instanceId: string; instanceUrl: string; instanceToken: string } | null>(null);
 
   const loadPages = useCallback(async (instanceId: string) => {
     if (!instanceId) return;
@@ -309,10 +310,20 @@ const RemoteVisuConfigPanel: React.FC<{
         setPagesError(data.error);
         setAvailablePages([]);
       } else {
-        setAvailablePages(data.pages || []);
-        setPagesError(data.error && data.pages?.length === 0 ? data.error : null);
+        const pages = data.pages || [];
+        setAvailablePages(pages);
+        setPagesError(data.error && pages.length === 0 ? data.error : null);
         if (data.visuBaseUrl) {
-          onUpdate({ ...cfg, instanceId, visuBaseUrl: data.visuBaseUrl, availablePages: data.pages || [] });
+          const base = pendingBaseRef.current;
+          onUpdate({
+            ...cfg,
+            instanceId: base?.instanceId || instanceId,
+            instanceUrl: base?.instanceUrl || cfg.instanceUrl || '',
+            instanceToken: base?.instanceToken || cfg.instanceToken || '',
+            visuBaseUrl: data.visuBaseUrl,
+            availablePages: pages,
+          });
+          pendingBaseRef.current = null;
         }
       }
     } catch (e) {
@@ -337,7 +348,10 @@ const RemoteVisuConfigPanel: React.FC<{
     onUpdate(updated);
     setAvailablePages([]);
     setPagesError(null);
-    if (inst?.id) loadPages(inst.id);
+    if (inst?.id) {
+      pendingBaseRef.current = { instanceId: inst.id, instanceUrl: inst.url, instanceToken: inst.token };
+      loadPages(inst.id);
+    }
   }, [cfg, haInstances, onUpdate, loadPages]);
 
   const handlePageChange = useCallback((pageId: string) => {

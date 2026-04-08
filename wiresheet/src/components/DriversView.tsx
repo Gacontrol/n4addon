@@ -117,6 +117,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [manualAuthLoading, setManualAuthLoading] = useState(false);
   const [manualAuthError, setManualAuthError] = useState<string | null>(null);
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
+  const [instanceVisus, setInstanceVisus] = useState<Record<string, { id: string; name: string; widgetCount: number; backgroundColor?: string }[]>>({});
   const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
   const [haInstanceSearchQuery, setHaInstanceSearchQuery] = useState<Record<string, string>>({});
   const [showTokens, setShowTokens] = useState<Set<string>>(new Set());
@@ -1352,6 +1353,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
               apiBase={getApiBase()}
               preloadedGaPages={instanceGaPages[selectedInstance.id]}
               preloadedDriverPoints={instanceDriverPoints[selectedInstance.id]}
+              preloadedVisus={instanceVisus[selectedInstance.id]}
+              onVisuLoaded={(id, visus) => setInstanceVisus(prev => ({ ...prev, [id]: visus }))}
             />
           );
         })()}

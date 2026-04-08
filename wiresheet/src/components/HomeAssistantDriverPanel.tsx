@@ -87,6 +87,8 @@ interface HomeAssistantDriverPanelProps {
   apiBase: string;
   preloadedGaPages?: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown; inputs?: GaSlot[]; outputs?: GaSlot[] }[] }[];
   preloadedDriverPoints?: { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] };
+  preloadedVisus?: VisuPage[];
+  onVisuLoaded?: (instanceId: string, visus: VisuPage[]) => void;
 }
 
 const WRITABLE_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
@@ -760,6 +762,8 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
   apiBase,
   preloadedGaPages,
   preloadedDriverPoints,
+  preloadedVisus,
+  onVisuLoaded,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('entities');
   const [editing, setEditing] = useState(false);
@@ -769,11 +773,12 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
 
   const hasPreloadedGa = !!(preloadedGaPages && preloadedGaPages.length >= 0);
   const hasPreloadedDp = !!(preloadedDriverPoints && (preloadedDriverPoints.sheets || preloadedDriverPoints.modbusDevices));
+  const hasPreloadedVisus = !!(preloadedVisus && preloadedVisus.length >= 0);
 
   const [data, setData] = useState<InstanceData>(() => ({
     entities: [],
     gaPages: hasPreloadedGa ? (preloadedGaPages as InstanceData['gaPages']) : [],
-    visus: [],
+    visus: hasPreloadedVisus ? preloadedVisus! : [],
     driverPoints: hasPreloadedDp
       ? { sheets: preloadedDriverPoints!.sheets || [], modbusDevices: preloadedDriverPoints!.modbusDevices || [], haRemoteInstances: [] }
       : emptyDriverPoints
@@ -785,7 +790,7 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
   const [entityError, setEntityError] = useState<string | null>(null);
   const [entitiesLoaded, setEntitiesLoaded] = useState(false);
   const [gaLoaded, setGaLoaded] = useState(hasPreloadedGa);
-  const [visuLoaded, setVisuLoaded] = useState(false);
+  const [visuLoaded, setVisuLoaded] = useState(hasPreloadedVisus);
   const [driverPointsLoaded, setDriverPointsLoaded] = useState(hasPreloadedDp);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testing, setTesting] = useState(false);
@@ -811,6 +816,13 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
       setDriverPointsLoaded(true);
     }
   }, [preloadedDriverPoints]);
+
+  useEffect(() => {
+    if (preloadedVisus) {
+      setData(prev => ({ ...prev, visus: preloadedVisus }));
+      setVisuLoaded(true);
+    }
+  }, [preloadedVisus]);
 
   const loadEntities = useCallback(async () => {
     setLoadingEntities(true);
@@ -850,14 +862,16 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     try {
       const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/visus`);
       const d = await resp.json();
-      setData(prev => ({ ...prev, visus: d.visus || [], visuError: d.error }));
+      const visus = d.visus || [];
+      setData(prev => ({ ...prev, visus, visuError: d.error }));
       setVisuLoaded(true);
+      onVisuLoaded?.(instance.id, visus);
     } catch (e) {
       setData(prev => ({ ...prev, visus: [], visuError: e instanceof Error ? e.message : 'Fehler' }));
     } finally {
       setLoadingVisus(false);
     }
-  }, [instance.id, apiBase]);
+  }, [instance.id, apiBase, onVisuLoaded]);
 
   const loadDriverPoints = useCallback(async () => {
     setLoadingDriverPoints(true);
