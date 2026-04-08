@@ -822,9 +822,90 @@ app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus
       backgroundColor: p.backgroundColor
     }));
 
-    res.json({ visus });
+    res.json({ visus, wiresheetVisuBase: wiresheetApiBase ? `${wiresheetApiBase.replace(/\/api\/hassio_ingress\/[^/]+$/, '')}` : null, wiresheetApiBase });
   } catch (err) {
     res.json({ visus: [], error: err.message });
+  }
+});
+
+app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/visu-pages'], async (req, res) => {
+  const { instanceId } = req.params;
+  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
+
+  let wiresheetApiBase = null;
+  let visuBaseUrl = null;
+
+  try {
+    const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    if (addonsRes.ok) {
+      const addonsData = await addonsRes.json();
+      const addons = addonsData.data?.addons || addonsData.addons || [];
+      const wsAddon = addons.find(a =>
+        (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+        (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+      );
+      if (wsAddon) wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+    }
+  } catch {}
+
+  if (!wiresheetApiBase) {
+    const commonSlugs = ['wiresheet', 'ga_control', 'ga-control'];
+    for (const slug of commonSlugs) {
+      try {
+        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/visu-pages`, { headers, signal: AbortSignal.timeout(3000) });
+        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+      } catch {}
+    }
+  }
+
+  if (wiresheetApiBase) {
+    const hostMatch = base.match(/^(https?:\/\/[^:\/]+)/);
+    if (hostMatch) {
+      for (const port of [8101, 8100]) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (!wiresheetApiBase && !visuBaseUrl) {
+    const hostMatch = base.match(/^(https?:\/\/[^:\/]+)/);
+    if (hostMatch) {
+      for (const port of [8101, 8100, 3000]) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (!wiresheetApiBase && !visuBaseUrl) {
+    return res.json({ pages: [], visuBaseUrl: null, error: 'Wiresheet Addon nicht gefunden auf der externen Instanz' });
+  }
+
+  try {
+    const apiBase = wiresheetApiBase || visuBaseUrl;
+    const visuRes = await fetch(`${apiBase}/api/visu-pages`, { headers, signal: AbortSignal.timeout(8000) });
+    if (!visuRes.ok) return res.json({ pages: [], visuBaseUrl, error: `Visu-Seiten konnten nicht geladen werden (${visuRes.status})` });
+
+    const pagesData = await visuRes.json();
+    const pages = (Array.isArray(pagesData) ? pagesData : []).map(p => ({
+      id: p.id,
+      name: p.name || p.id,
+      widgetCount: (p.widgets || []).length,
+      backgroundColor: p.backgroundColor
+    }));
+
+    const effectiveVisuBase = visuBaseUrl || wiresheetApiBase;
+    res.json({ pages, visuBaseUrl: effectiveVisuBase, wiresheetApiBase });
+  } catch (err) {
+    res.json({ pages: [], visuBaseUrl, error: err.message });
   }
 });
 
@@ -1317,14 +1398,14 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
 app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   const { url: rawUrl, token } = req.query;
   if (!rawUrl || !token) {
-    return res.status(400).send('Missing url or token');
+    return res.status(400).json({ __proxyError: true, message: 'Fehlende Parameter (url oder token)' });
   }
   let targetUrl;
   try {
-    targetUrl = decodeURIComponent(rawUrl);
+    targetUrl = rawUrl;
     new URL(targetUrl);
   } catch {
-    return res.status(400).send('Invalid URL');
+    return res.status(400).json({ __proxyError: true, message: 'Ungültige URL' });
   }
   try {
     const upstreamRes = await fetch(targetUrl, {
@@ -1337,48 +1418,56 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       redirect: 'follow'
     });
 
+    if (!upstreamRes.ok) {
+      return res.status(upstreamRes.status).json({
+        __proxyError: true,
+        message: `Externe Instanz antwortete mit ${upstreamRes.status} ${upstreamRes.statusText}`,
+        status: upstreamRes.status
+      });
+    }
+
     const contentType = upstreamRes.headers.get('content-type') || 'text/html';
+
+    if (!contentType.includes('text/html')) {
+      const buf = await upstreamRes.arrayBuffer();
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'no-cache');
+      return res.send(Buffer.from(buf));
+    }
+
     const body = await upstreamRes.text();
 
-    res.status(upstreamRes.status);
-    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Cache-Control', 'no-cache');
 
     const baseUrl = new URL(targetUrl);
     const origin = `${baseUrl.protocol}//${baseUrl.host}`;
-    const basePath = baseUrl.pathname.split('/').slice(0, -1).join('/') || '/';
 
-    let processed = body;
     const injectScript = `
 <script>
 (function() {
-  var HA_TOKEN = ${JSON.stringify(token)};
-  var HA_ORIGIN = ${JSON.stringify(origin)};
+  var WS_TOKEN = ${JSON.stringify(token)};
+  var WS_ORIGIN = ${JSON.stringify(origin)};
   try {
     localStorage.setItem('hassTokens', JSON.stringify({
-      access_token: HA_TOKEN,
+      access_token: WS_TOKEN,
       token_type: 'Bearer',
       expires_in: 1800,
-      hassUrl: HA_ORIGIN,
+      hassUrl: WS_ORIGIN,
       clientId: null,
       expires: Date.now() + 1800000,
       refresh_token: ''
     }));
-    localStorage.setItem('hassUrl', HA_ORIGIN);
+    localStorage.setItem('hassUrl', WS_ORIGIN);
   } catch(e) {}
-  document.addEventListener('DOMContentLoaded', function() {
-    try {
-      if (window.__stateObj) {
-        window.__stateObj.hassTokens = JSON.parse(localStorage.getItem('hassTokens'));
-      }
-    } catch(e) {}
-  });
+  window.__WIRESHEET_PROXY_TOKEN__ = WS_TOKEN;
+  window.__WIRESHEET_PROXY_ORIGIN__ = WS_ORIGIN;
 })();
 </script>`;
 
+    let processed = body;
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
     } else if (processed.includes('<body')) {
@@ -1387,19 +1476,10 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       processed = injectScript + processed;
     }
 
-    const proxyPrefix = '/api/remote-visu-proxy?url=' + encodeURIComponent(origin) + '&token=' + encodeURIComponent(token);
-    processed = processed.replace(
-      /(<base\s+href=["'])([^"']*)["']/gi,
-      (m, prefix, href) => {
-        if (href.startsWith('http') || href.startsWith('//')) return m;
-        return prefix + href + '"';
-      }
-    );
-
     res.send(processed);
   } catch (err) {
     console.error('[remote-visu-proxy] error:', err.message);
-    res.status(502).send(`Proxy error: ${err.message}`);
+    res.status(502).json({ __proxyError: true, message: `Verbindungsfehler: ${err.message}` });
   }
 });
 

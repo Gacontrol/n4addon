@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Globe, RefreshCw, AlertTriangle, Loader2, ExternalLink, Maximize2 } from 'lucide-react';
+import { Globe, RefreshCw, AlertTriangle, Loader2, ExternalLink, Maximize2, WifiOff } from 'lucide-react';
 import { RemoteVisuConfig } from '../../types/visualization';
 
 interface VisuRemoteVisuProps {
@@ -12,7 +12,17 @@ interface VisuRemoteVisuProps {
 function getApiBase(): string {
   const path = window.location.pathname;
   const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
-  return m ? `${m[1]}/api` : '/api';
+  return m ? `${m[1]}` : '';
+}
+
+function buildVisuUrl(config: RemoteVisuConfig): string | null {
+  if (!config.instanceToken) return null;
+
+  const base = (config.visuBaseUrl || '').replace(/\/$/, '');
+  if (!base) return null;
+
+  const pageParam = config.visuPageId ? `?page=${encodeURIComponent(config.visuPageId)}` : '';
+  return `${base}/${pageParam}`;
 }
 
 export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
@@ -26,17 +36,42 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const reloadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const hasConfig = !!(config.instanceUrl && config.instanceToken);
+  const visuUrl = buildVisuUrl(config);
+  const hasConfig = !!(config.visuBaseUrl && config.instanceToken && config.visuPageId);
 
-  const targetPath = config.targetPath || '/';
-  const cleanPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
-
-  const proxyUrl = hasConfig
-    ? `${getApiBase()}/remote-visu-proxy?url=${encodeURIComponent(config.instanceUrl!)}${encodeURIComponent(cleanPath)}&token=${encodeURIComponent(config.instanceToken!)}&_rk=${reloadKey}`
+  const apiBase = getApiBase();
+  const proxyUrl = (hasConfig && visuUrl)
+    ? `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&_rk=${reloadKey}`
     : null;
 
   const scale = config.scale ?? 1;
+
+  const checkProxyError = useCallback(async (url: string) => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+    try {
+      const resp = await fetch(url, { signal: abortRef.current.signal });
+      if (!resp.ok) {
+        const contentType = resp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await resp.json();
+          if (data.__proxyError) {
+            setError(data.message || `Fehler ${resp.status}`);
+            setLoading(false);
+            return;
+          }
+        }
+        setError(`Externe Instanz nicht erreichbar (${resp.status})`);
+        setLoading(false);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      setError('Verbindung fehlgeschlagen');
+      setLoading(false);
+    }
+  }, []);
 
   const handleLoad = useCallback(() => {
     setLoading(false);
@@ -67,11 +102,18 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
   }, [config.refreshIntervalMs, hasConfig]);
 
   useEffect(() => {
-    if (hasConfig) {
+    if (hasConfig && proxyUrl) {
       setLoading(true);
       setError(null);
+      checkProxyError(proxyUrl);
     }
-  }, [config.instanceUrl, config.instanceToken, config.targetPath, reloadKey, hasConfig]);
+  }, [proxyUrl, hasConfig]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   const borderRadius = config.borderRadius ?? 6;
   const borderStyle = config.showBorder
@@ -79,6 +121,12 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
     : 'none';
 
   if (!hasConfig) {
+    const notConfiguredMsg = !config.instanceId
+      ? 'Instanz auswählen'
+      : !config.visuPageId
+      ? 'Visu-Seite auswählen'
+      : 'Nicht konfiguriert';
+
     return (
       <div
         className="w-full h-full flex flex-col items-center justify-center gap-2 bg-slate-900/80 rounded"
@@ -88,9 +136,7 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
         <div className="text-center px-3">
           <div className="text-xs font-medium text-slate-400 mb-1">Externe Visu</div>
           <div className="text-[10px] text-slate-600">
-            {isEditMode
-              ? 'Instanz und Pfad in den Einstellungen konfigurieren'
-              : 'Nicht konfiguriert'}
+            {isEditMode ? notConfiguredMsg : 'Nicht konfiguriert'}
           </div>
         </div>
       </div>
@@ -105,19 +151,25 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
       className="w-full h-full relative overflow-hidden"
       style={{ borderRadius, border: borderStyle, background: '#0f172a' }}
     >
-      {loading && config.showLoadingIndicator !== false && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 bg-slate-900/70 pointer-events-none">
+      {loading && config.showLoadingIndicator !== false && !error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-slate-900/70 pointer-events-none gap-2">
           <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+          <div className="text-[10px] text-slate-500 truncate max-w-[80%]">
+            {config.visuPageName || 'Lade...'}
+          </div>
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-2 bg-slate-900/90">
-          <AlertTriangle className="w-6 h-6 text-red-400" />
-          <div className="text-xs text-red-300 text-center px-4">{error}</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 gap-2.5 bg-slate-900/95 px-4">
+          <WifiOff className="w-8 h-8 text-slate-600" />
+          <div className="text-center">
+            <div className="text-xs font-medium text-slate-400 mb-1">Externe Visu nicht erreichbar</div>
+            <div className="text-[10px] text-slate-500 leading-relaxed">{error}</div>
+          </div>
           <button
             onClick={triggerReload}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded text-xs transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded text-xs transition-colors mt-1"
           >
             <RefreshCw className="w-3 h-3" />
             Neu laden
@@ -134,15 +186,17 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
           >
             <RefreshCw className="w-3 h-3" />
           </button>
-          <a
-            href={`${config.instanceUrl}${cleanPath}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-400 rounded transition-colors"
-            title="In neuem Tab öffnen"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
+          {config.visuBaseUrl && (
+            <a
+              href={visuUrl || config.visuBaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-400 rounded transition-colors"
+              title="In neuem Tab öffnen"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
         </div>
       )}
 
@@ -155,22 +209,24 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
           >
             <RefreshCw className="w-3 h-3" />
           </button>
-          <a
-            href={`${config.instanceUrl}${cleanPath}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-400 rounded transition-colors"
-            title="Vollbild öffnen"
-          >
-            <Maximize2 className="w-3 h-3" />
-          </a>
+          {config.visuBaseUrl && (
+            <a
+              href={visuUrl || config.visuBaseUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1 bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-cyan-400 rounded transition-colors"
+              title="Vollbild öffnen"
+            >
+              <Maximize2 className="w-3 h-3" />
+            </a>
+          )}
         </div>
       )}
 
       {proxyUrl && !error && (
         <iframe
           ref={iframeRef}
-          key={`rv-${reloadKey}-${config.instanceUrl}-${config.targetPath}`}
+          key={`rv-${reloadKey}-${config.visuBaseUrl}-${config.visuPageId}`}
           src={proxyUrl}
           onLoad={handleLoad}
           onError={handleError}
@@ -185,7 +241,7 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
           }}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
           allow="fullscreen"
-          title={`Remote Visu: ${config.instanceUrl}`}
+          title={`Remote Visu: ${config.visuPageName || config.visuPageId}`}
         />
       )}
     </div>

@@ -881,11 +881,21 @@ export interface TimeProgramWidgetConfig {
   fontFamily?: FontFamily;
 }
 
+export interface RemoteVisuPage {
+  id: string;
+  name: string;
+  widgetCount?: number;
+  backgroundColor?: string;
+}
+
 export interface RemoteVisuConfig {
   instanceId?: string;
   instanceUrl?: string;
   instanceToken?: string;
-  targetPath?: string;
+  visuBaseUrl?: string;
+  visuPageId?: string;
+  visuPageName?: string;
+  availablePages?: RemoteVisuPage[];
   scale?: number;
   refreshIntervalMs?: number;
   showBorder?: boolean;

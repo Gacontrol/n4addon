@@ -40,7 +40,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey, RemoteVisuConfig } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey, RemoteVisuConfig, RemoteVisuPage } from '../../types/visualization';
 import { HaInstance } from '../../types/flow';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
@@ -286,6 +286,150 @@ const getNodeConfigParams = (node: FlowNode): ConfigParam[] => {
       break;
   }
   return params;
+};
+
+const RemoteVisuConfigPanel: React.FC<{
+  cfg: RemoteVisuConfig;
+  haInstances: HaInstance[];
+  onUpdate: (cfg: RemoteVisuConfig) => void;
+}> = ({ cfg, haInstances, onUpdate }) => {
+  const [loadingPages, setLoadingPages] = useState(false);
+  const [pagesError, setPagesError] = useState<string | null>(null);
+  const [availablePages, setAvailablePages] = useState<RemoteVisuPage[]>(cfg.availablePages || []);
+
+  const loadPages = useCallback(async (instanceId: string) => {
+    if (!instanceId) return;
+    setLoadingPages(true);
+    setPagesError(null);
+    try {
+      const apiBase = getApiBase();
+      const resp = await fetch(`${apiBase}/api/ha/instances/${instanceId}/visu-pages`);
+      const data = await resp.json();
+      if (data.error && (!data.pages || data.pages.length === 0)) {
+        setPagesError(data.error);
+        setAvailablePages([]);
+      } else {
+        setAvailablePages(data.pages || []);
+        setPagesError(data.error && data.pages?.length === 0 ? data.error : null);
+        if (data.visuBaseUrl) {
+          onUpdate({ ...cfg, instanceId, visuBaseUrl: data.visuBaseUrl, availablePages: data.pages || [] });
+        }
+      }
+    } catch (e) {
+      setPagesError(e instanceof Error ? e.message : 'Verbindungsfehler');
+    } finally {
+      setLoadingPages(false);
+    }
+  }, [cfg, onUpdate]);
+
+  const handleInstanceChange = useCallback((instanceId: string) => {
+    const inst = haInstances.find(i => i.id === instanceId);
+    const updated: RemoteVisuConfig = {
+      ...cfg,
+      instanceId: inst?.id || '',
+      instanceUrl: inst?.url || '',
+      instanceToken: inst?.token || '',
+      visuBaseUrl: undefined,
+      visuPageId: undefined,
+      visuPageName: undefined,
+      availablePages: [],
+    };
+    onUpdate(updated);
+    setAvailablePages([]);
+    setPagesError(null);
+    if (inst?.id) loadPages(inst.id);
+  }, [cfg, haInstances, onUpdate, loadPages]);
+
+  const handlePageChange = useCallback((pageId: string) => {
+    const page = availablePages.find(p => p.id === pageId);
+    onUpdate({ ...cfg, visuPageId: pageId, visuPageName: page?.name });
+  }, [cfg, availablePages, onUpdate]);
+
+  const selectedInstance = haInstances.find(i => i.id === cfg.instanceId);
+
+  return (
+    <>
+      <div>
+        <label className="block text-xs text-slate-400 mb-1">HA-Instanz</label>
+        {haInstances.length === 0 ? (
+          <div className="text-xs text-slate-500 bg-slate-800 rounded px-2 py-1.5">
+            Keine verbundenen Instanzen. Zuerst im Treiber-Panel konfigurieren.
+          </div>
+        ) : (
+          <select
+            value={cfg.instanceId || ''}
+            onChange={(e) => handleInstanceChange(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
+          >
+            <option value="">-- Instanz wählen --</option>
+            {haInstances.map(inst => (
+              <option key={inst.id} value={inst.id}>{inst.name} ({inst.url.replace(/^https?:\/\//, '')})</option>
+            ))}
+          </select>
+        )}
+        {selectedInstance && (
+          <div className="mt-1 text-[10px] text-slate-500 truncate">{selectedInstance.url}</div>
+        )}
+      </div>
+
+      {cfg.instanceId && (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs text-slate-400">Visu-Seite</label>
+            <button
+              onClick={() => loadPages(cfg.instanceId!)}
+              disabled={loadingPages}
+              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-cyan-400 transition-colors disabled:opacity-40"
+              title="Seiten neu laden"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingPages ? 'animate-spin' : ''}`} />
+              {loadingPages ? 'Laden...' : 'Aktualisieren'}
+            </button>
+          </div>
+
+          {pagesError && (
+            <div className="flex items-start gap-1.5 p-2 bg-amber-900/20 border border-amber-700/40 rounded text-[10px] text-amber-300 mb-1.5">
+              <Activity className="w-3 h-3 shrink-0 mt-0.5 text-amber-400" />
+              <span>{pagesError}</span>
+            </div>
+          )}
+
+          {!loadingPages && availablePages.length === 0 && !pagesError && cfg.instanceId && (
+            <div className="text-[10px] text-slate-500 bg-slate-800/60 rounded px-2 py-1.5 mb-1.5">
+              Keine Visu-Seiten gefunden. Wiresheet-Addon auf der Zielinstanz prüfen.
+              <button
+                onClick={() => loadPages(cfg.instanceId!)}
+                className="ml-1 text-cyan-400 hover:text-cyan-300 underline"
+              >
+                Erneut versuchen
+              </button>
+            </div>
+          )}
+
+          {availablePages.length > 0 && (
+            <select
+              value={cfg.visuPageId || ''}
+              onChange={(e) => handlePageChange(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
+            >
+              <option value="">-- Seite wählen --</option>
+              {availablePages.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.widgetCount ? ` (${p.widgetCount} Widgets)` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {cfg.visuBaseUrl && (
+            <div className="mt-1 text-[9px] text-slate-600 font-mono truncate" title={cfg.visuBaseUrl}>
+              {cfg.visuBaseUrl}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
 };
 
 export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
@@ -3264,51 +3408,13 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
 
       case 'visu-remote-visu': {
         const rvCfg = widget.config as RemoteVisuConfig;
-        const selectedInstance = haInstances.find(i => i.id === rvCfg.instanceId);
         return (
           <>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">HA-Instanz</label>
-              {haInstances.length === 0 ? (
-                <div className="text-xs text-slate-500 bg-slate-800 rounded px-2 py-1.5">
-                  Keine verbundenen Instanzen. Zuerst im Treiber-Panel konfigurieren.
-                </div>
-              ) : (
-                <select
-                  value={rvCfg.instanceId || ''}
-                  onChange={(e) => {
-                    const inst = haInstances.find(i => i.id === e.target.value);
-                    onUpdate({ config: {
-                      ...rvCfg,
-                      instanceId: inst?.id || '',
-                      instanceUrl: inst?.url || '',
-                      instanceToken: inst?.token || ''
-                    }});
-                  }}
-                  className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
-                >
-                  <option value="">-- Instanz wählen --</option>
-                  {haInstances.map(inst => (
-                    <option key={inst.id} value={inst.id}>{inst.name} ({inst.url.replace(/^https?:\/\//, '')})</option>
-                  ))}
-                </select>
-              )}
-              {selectedInstance && (
-                <div className="mt-1 text-[10px] text-slate-500 truncate">{selectedInstance.url}</div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Zielpfad (URL-Pfad)</label>
-              <input
-                type="text"
-                value={rvCfg.targetPath || '/visu'}
-                onChange={(e) => onUpdate({ config: { ...rvCfg, targetPath: e.target.value } })}
-                placeholder="/visu"
-                className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
-              />
-              <div className="text-[10px] text-slate-500 mt-0.5">z.B. /visu oder /lovelace/0</div>
-            </div>
+            <RemoteVisuConfigPanel
+              cfg={rvCfg}
+              haInstances={haInstances}
+              onUpdate={(newCfg) => onUpdate({ config: newCfg })}
+            />
 
             <div>
               <label className="block text-xs text-slate-400 mb-1">Zoom / Skalierung ({Math.round((rvCfg.scale ?? 1) * 100)}%)</label>
