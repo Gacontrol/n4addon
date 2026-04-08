@@ -842,9 +842,11 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
         setEntitiesLoaded(true);
       } else {
         setEntityError(d.error || 'Unbekannter Fehler');
+        setEntitiesLoaded(false);
       }
     } catch (e) {
       setEntityError(e instanceof Error ? e.message : 'Netzwerkfehler');
+      setEntitiesLoaded(false);
     } finally {
       setLoadingEntities(false);
     }

@@ -477,7 +477,6 @@ export const DriversView: React.FC<DriversViewProps> = ({
         setInstanceEntities(prev => ({ ...prev, [instance.id]: data.entities }));
       }
     } catch {
-      setInstanceEntities(prev => ({ ...prev, [instance.id]: [] }));
     } finally {
       setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: false }));
     }

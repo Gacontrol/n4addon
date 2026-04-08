@@ -419,11 +419,9 @@ function App() {
   }, [instanceEntities, extractDeviceName]);
 
   const loadInstanceEntities = useCallback(async (instances?: HaInstance[]) => {
-    const enabledInstances = (instances || haInstances).filter(i => i.enabled && i.url && i.token);
+    const allInstances = instances || haInstances;
+    const enabledInstances = allInstances.filter(i => i.enabled && i.url && i.token);
     if (enabledInstances.length === 0) {
-      setInstanceEntities({});
-      setInstanceEntitiesLoading({});
-      setInstanceEntitiesError({});
       return;
     }
     const apiBase = getApiBase();

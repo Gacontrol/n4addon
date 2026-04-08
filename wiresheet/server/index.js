@@ -776,12 +776,16 @@ app.get(['/modbus-device-status', '/api/modbus-device-status'], (req, res) => {
 app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
   try {
     const cfg = req.body;
+    const incomingInstances = cfg.haInstances || [];
+    const preservedInstances = (incomingInstances.length === 0 && (driverConfig.haInstances || []).length > 0)
+      ? driverConfig.haInstances
+      : incomingInstances;
     driverConfig = {
       modbusDevices: cfg.modbusDevices || [],
       modbusDriverEnabled: cfg.modbusDriverEnabled !== false,
       driverBindings: cfg.driverBindings || [],
       haDriverEnabled: cfg.haDriverEnabled !== false,
-      haInstances: cfg.haInstances || []
+      haInstances: preservedInstances
     };
     await saveDriverConfig();
     startDriverPolling();
@@ -794,7 +798,16 @@ app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
 
 app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/states'], async (req, res) => {
   const { instanceId } = req.params;
-  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) {
+        driverConfig.haInstances = diskData.haInstances;
+        instance = diskData.haInstances.find(i => i.id === instanceId);
+      }
+    } catch {}
+  }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
@@ -854,7 +867,13 @@ app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/stat
 
 app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/ga-control'], async (req, res) => {
   const { instanceId } = req.params;
-  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
@@ -965,7 +984,13 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
 
 app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus'], async (req, res) => {
   const { instanceId } = req.params;
-  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
@@ -1030,7 +1055,13 @@ app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus
 
 app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/visu-pages'], async (req, res) => {
   const { instanceId } = req.params;
-  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
@@ -1111,7 +1142,13 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
 
 app.get(['/ha/instances/:instanceId/driver-points', '/api/ha/instances/:instanceId/driver-points'], async (req, res) => {
   const { instanceId } = req.params;
-  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
