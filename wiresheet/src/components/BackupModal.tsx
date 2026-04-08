@@ -42,7 +42,8 @@ interface BackupModalProps {
     wiresheets: WiresheetPage[],
     visuPages: VisuPage[],
     customBlocks: CustomBlockDefinition[],
-    driverConfig?: DriverConfig
+    driverConfig?: DriverConfig,
+    mode?: 'merge' | 'replace'
   ) => void;
   onClose: () => void;
 }
@@ -216,7 +217,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
       if (result.driverConfig?.customModbusLibrary) {
         localStorage.setItem('wiresheet-custom-modbus-library', JSON.stringify(result.driverConfig.customModbusLibrary));
       }
-      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig);
+      onImport(result.wiresheets, result.visuPages, result.customBlocks, result.driverConfig, importMode);
       setImportDone(true);
       setTimeout(() => onClose(), 1200);
     } finally {

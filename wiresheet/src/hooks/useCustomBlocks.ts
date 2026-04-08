@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { CustomBlockDefinition } from '../types/flow';
 import { allBuiltinBlocks } from '../data/builtinBlocks';
 
@@ -23,7 +23,7 @@ export const useCustomBlocks = () => {
   const [error, setError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const builtinIds = new Set(allBuiltinBlocks.map(b => b.id));
+  const builtinIds = useMemo(() => new Set(allBuiltinBlocks.map(b => b.id)), []);
 
   const loadBlocks = useCallback(async () => {
     setLoading(true);
@@ -119,23 +119,27 @@ export const useCustomBlocks = () => {
     return newBlock;
   }, [saveBlocks]);
 
-  const importBlocks = useCallback((newBlocks: CustomBlockDefinition[]) => {
-    const now = Date.now();
+  const importBlocks = useCallback((newBlocks: CustomBlockDefinition[], overwrite = false) => {
     const validBlocks = newBlocks.filter(b => b.id && b.name && Array.isArray(b.nodes));
 
     setBlocks(prev => {
-      const existingIds = new Set(prev.map(b => b.id));
-      const toAdd = validBlocks.map(b => {
-        if (existingIds.has(b.id)) {
-          return { ...b, id: `custom-block-${now}-${Math.random().toString(36).substr(2, 5)}` };
+      if (overwrite) {
+        const userBlocks = validBlocks.filter(b => !builtinIds.has(b.id));
+        const next = [...allBuiltinBlocks, ...userBlocks];
+        saveBlocks(next);
+        return next;
+      }
+      const blockMap = new Map(prev.map(b => [b.id, b]));
+      for (const b of validBlocks) {
+        if (!builtinIds.has(b.id)) {
+          blockMap.set(b.id, b);
         }
-        return b;
-      });
-      const next = [...prev, ...toAdd];
+      }
+      const next = [...blockMap.values()];
       saveBlocks(next);
       return next;
     });
-  }, [saveBlocks]);
+  }, [saveBlocks, builtinIds]);
 
   const exportBlock = useCallback((block: CustomBlockDefinition) => {
     const json = JSON.stringify(block, null, 2);

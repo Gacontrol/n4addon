@@ -2052,10 +2052,10 @@ function App() {
           modbusDevices={modbusDevices}
           modbusDriverEnabled={modbusDriverEnabled}
           driverBindings={driverBindings}
-          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig) => {
+          onImport={(newWiresheets, newVisuPages, newBlocks, importedDriverConfig, importMode) => {
             setAllPages(newWiresheets as WiresheetPage[]);
             setAllVisuPages(newVisuPages as VisuPage[]);
-            importBlocks(newBlocks as CustomBlockDefinition[]);
+            importBlocks(newBlocks as CustomBlockDefinition[], importMode === 'replace');
             if (importedDriverConfig) {
               setModbusDevicesState(importedDriverConfig.modbusDevices);
               setModbusDriverEnabledState(importedDriverConfig.modbusDriverEnabled);
