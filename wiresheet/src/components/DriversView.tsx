@@ -31,7 +31,7 @@ interface DriversViewProps {
   haInstances?: HaInstance[];
   onHaInstancesChange?: (instances: HaInstance[]) => void;
   driverLiveValues?: { modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> };
-  instanceGaPages?: Record<string, { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] }[]>;
+  instanceGaPages?: Record<string, { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown; inputs?: { id: string; label: string }[]; outputs?: { id: string; label: string }[] }[] }[]>;
   instanceDriverPoints?: Record<string, { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] }>;
 }
 

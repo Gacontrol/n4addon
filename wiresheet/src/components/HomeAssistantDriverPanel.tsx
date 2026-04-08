@@ -2,6 +2,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Home, Wifi, RefreshCw, ChevronRight, ChevronDown, AlertCircle, Loader2, Lightbulb, Power, Gauge, Activity, Thermometer, Eye, Film, Lock, Radio, Zap, Wind, Droplets, Sun, CheckSquare, Sliders, ToggleRight, ToggleLeft, Trash2, CreditCard as Edit2, Check, X, Eye as EyeIcon, EyeOff, Monitor, LayoutGrid as Layout, Database, Layers, Server, Plus, Save, ArrowLeft, Info, Circle } from 'lucide-react';
 import { HaEntity, HaInstance } from '../types/flow';
 
+interface GaSlot {
+  id: string;
+  label: string;
+}
+
 interface GaControlPage {
   id: string;
   name: string;
@@ -12,6 +17,8 @@ interface GaControlPage {
     unit: string;
     value?: unknown;
     description: string;
+    inputs?: GaSlot[];
+    outputs?: GaSlot[];
   }[];
 }
 
@@ -78,7 +85,7 @@ interface HomeAssistantDriverPanelProps {
   onUpdate: (id: string, updates: Partial<HaInstance>) => void;
   onBack: () => void;
   apiBase: string;
-  preloadedGaPages?: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] }[];
+  preloadedGaPages?: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown; inputs?: GaSlot[]; outputs?: GaSlot[] }[] }[];
   preloadedDriverPoints?: { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] };
 }
 
@@ -214,9 +221,18 @@ const GaControlSection: React.FC<{
   onRefresh: () => void;
 }> = ({ pages, error, loading, onRefresh }) => {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const togglePage = (id: string) => {
     setExpandedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleNode = (id: string) => {
+    setExpandedNodes(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -293,19 +309,83 @@ const GaControlSection: React.FC<{
                     {dpCount === 0 && (
                       <p className="text-xs text-slate-600 text-center py-2">Keine Datenpunkte auf dieser Seite</p>
                     )}
-                    {page.nodes.map(node => (
-                      <div key={node.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-slate-900/60 border border-slate-700/40 hover:bg-slate-800/60 transition-colors">
-                        {getNodeTypeIcon(node.type)}
-                        <span className="text-white text-xs flex-1 min-w-0 truncate" title={node.label}>{node.label}</span>
-                        {node.unit && <span className="text-slate-600 text-[10px] shrink-0">{node.unit}</span>}
-                        {node.value !== undefined && (
-                          <span className="font-mono text-xs text-cyan-400 shrink-0 min-w-[40px] text-right">
-                            {String(node.value)}
-                          </span>
-                        )}
-                        <span className="text-slate-700 text-[9px] shrink-0 font-mono">{node.type}</span>
-                      </div>
-                    ))}
+                    {page.nodes.map(node => {
+                      const nodeKey = `${page.id}-${node.id}`;
+                      const hasSlots = (node.inputs && node.inputs.length > 0) || (node.outputs && node.outputs.length > 0);
+                      const nodeExp = expandedNodes.has(nodeKey);
+                      return (
+                        <div key={node.id} className="rounded border border-slate-700/40 overflow-hidden">
+                          <div
+                            className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-900/60 hover:bg-slate-800/60 transition-colors cursor-pointer"
+                            onClick={() => hasSlots && toggleNode(nodeKey)}
+                          >
+                            {getNodeTypeIcon(node.type)}
+                            <span className="text-white text-xs flex-1 min-w-0 truncate" title={node.label}>{node.label}</span>
+                            {node.unit && <span className="text-slate-600 text-[10px] shrink-0">{node.unit}</span>}
+                            {node.value !== undefined && (
+                              <span className="font-mono text-xs text-cyan-400 shrink-0 min-w-[40px] text-right">
+                                {String(node.value)}
+                              </span>
+                            )}
+                            {hasSlots && (nodeExp ? <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" /> : <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />)}
+                          </div>
+                          {hasSlots && nodeExp && (
+                            <div className="bg-slate-950/70 border-t border-slate-700/30">
+                              {(node.inputs || []).map(slot => (
+                                <div
+                                  key={`in-${slot.id}`}
+                                  className="flex items-center gap-2 px-3 py-1 hover:bg-slate-800/40 cursor-grab transition-colors"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                      type: 'remote-ga-slot',
+                                      slotDirection: 'input',
+                                      pageId: page.id,
+                                      pageName: page.name,
+                                      nodeId: node.id,
+                                      nodeName: node.label,
+                                      slotId: slot.id,
+                                      slotLabel: slot.label,
+                                      unit: node.unit,
+                                      nodeType: node.type,
+                                    }));
+                                  }}
+                                >
+                                  <div className="w-2 h-2 rounded-full border border-teal-500/60 bg-teal-900/30 shrink-0" />
+                                  <span className="text-[10px] text-teal-300/90 flex-1 truncate">{slot.label}</span>
+                                  <span className="text-[9px] text-slate-600 font-mono">IN</span>
+                                </div>
+                              ))}
+                              {(node.outputs || []).map(slot => (
+                                <div
+                                  key={`out-${slot.id}`}
+                                  className="flex items-center gap-2 px-3 py-1 hover:bg-slate-800/40 cursor-grab transition-colors"
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                      type: 'remote-ga-slot',
+                                      slotDirection: 'output',
+                                      pageId: page.id,
+                                      pageName: page.name,
+                                      nodeId: node.id,
+                                      nodeName: node.label,
+                                      slotId: slot.id,
+                                      slotLabel: slot.label,
+                                      unit: node.unit,
+                                      nodeType: node.type,
+                                    }));
+                                  }}
+                                >
+                                  <div className="w-2 h-2 rounded-full border border-amber-500/60 bg-amber-900/30 shrink-0" />
+                                  <span className="text-[10px] text-amber-300/90 flex-1 truncate">{slot.label}</span>
+                                  <span className="text-[9px] text-slate-600 font-mono">OUT</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

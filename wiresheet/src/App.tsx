@@ -170,7 +170,7 @@ function App() {
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
   const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
   const [instanceEntitiesError, setInstanceEntitiesError] = useState<Record<string, string>>({});
-  const [instanceGaPages, setInstanceGaPages] = useState<Record<string, {id: string; name: string; nodes: {id: string; type: string; label: string; unit: string; value?: unknown}[]}[]>>({});
+  const [instanceGaPages, setInstanceGaPages] = useState<Record<string, {id: string; name: string; nodes: {id: string; type: string; label: string; unit: string; value?: unknown; inputs?: {id: string; label: string}[]; outputs?: {id: string; label: string}[]}[]}[]>>({});
   const [instanceDriverPoints, setInstanceDriverPoints] = useState<Record<string, {sheets: {id: string; name: string; nodes: {id: string; type: string; label: string; unit: string; entityId: string}[]}[]; modbusDevices: {id: string; name: string; datapoints: {id: string; name: string; unit: string; type: string; register?: number}[]}[]}>>({});
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);

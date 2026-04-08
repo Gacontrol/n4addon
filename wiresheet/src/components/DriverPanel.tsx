@@ -5,7 +5,8 @@ import { ModbusDevice, DriverBinding, HaDevice, HaEntity, HaInstance } from '../
 type InstanceDriverSheet = { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] };
 type InstanceModbusDevice = { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] };
 type InstanceDriverPoints = { sheets: InstanceDriverSheet[]; modbusDevices: InstanceModbusDevice[] };
-type GaPage = { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] };
+type GaSlot = { id: string; label: string };
+type GaPage = { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown; inputs?: GaSlot[]; outputs?: GaSlot[] }[] };
 
 const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
 
@@ -839,31 +840,99 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                   </button>
                                   {expandedHaDevices.has(`ga-page-${page.id}`) && (
                                     <div className="bg-slate-900/50">
-                                      {page.nodes.map(node => (
-                                        <div
-                                          key={node.id}
-                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
-                                          draggable
-                                          onDragStart={(e) => {
-                                            e.dataTransfer.setData('application/json', JSON.stringify({
-                                              type: 'remote-ga-point',
-                                              instanceId: instance.id,
-                                              instanceName: instance.name,
-                                              pageId: page.id,
-                                              pageName: page.name,
-                                              nodeId: node.id,
-                                              nodeName: node.label,
-                                              unit: node.unit,
-                                              nodeType: node.type,
-                                            }));
-                                          }}
-                                        >
-                                          <div className="w-1.5 h-1.5 rounded-full bg-teal-500/70 flex-shrink-0" />
-                                          <Gauge className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                          <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label || node.id}</span>
-                                          {node.unit && <span className="text-[9px] text-slate-500">{node.unit}</span>}
-                                        </div>
-                                      ))}
+                                      {page.nodes.map(node => {
+                                        const nodeKey = `ga-node-${instance.id}-${page.id}-${node.id}`;
+                                        const hasSlots = (node.inputs && node.inputs.length > 0) || (node.outputs && node.outputs.length > 0);
+                                        const nodeExpanded = expandedHaDevices.has(nodeKey);
+                                        return (
+                                          <div key={node.id}>
+                                            <div
+                                              className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                              draggable
+                                              onDragStart={(e) => {
+                                                e.dataTransfer.setData('application/json', JSON.stringify({
+                                                  type: 'remote-ga-point',
+                                                  instanceId: instance.id,
+                                                  instanceName: instance.name,
+                                                  pageId: page.id,
+                                                  pageName: page.name,
+                                                  nodeId: node.id,
+                                                  nodeName: node.label,
+                                                  unit: node.unit,
+                                                  nodeType: node.type,
+                                                }));
+                                              }}
+                                              onClick={() => hasSlots && toggleHaDevice(nodeKey)}
+                                            >
+                                              <div className="w-1.5 h-1.5 rounded-full bg-teal-500/70 flex-shrink-0" />
+                                              <Gauge className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                              <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label || node.id}</span>
+                                              {node.unit && <span className="text-[9px] text-slate-500 mr-1">{node.unit}</span>}
+                                              {hasSlots && (nodeExpanded ? <ChevronUp className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />)}
+                                            </div>
+                                            {hasSlots && nodeExpanded && (
+                                              <div className="bg-slate-950/60 border-l border-teal-900/40 ml-7">
+                                                {(node.inputs || []).map(slot => (
+                                                  <div
+                                                    key={`in-${slot.id}`}
+                                                    className="flex items-center gap-2 px-3 py-0.5 hover:bg-slate-700/20 cursor-grab transition-colors"
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                      e.stopPropagation();
+                                                      e.dataTransfer.setData('application/json', JSON.stringify({
+                                                        type: 'remote-ga-slot',
+                                                        slotDirection: 'input',
+                                                        instanceId: instance.id,
+                                                        instanceName: instance.name,
+                                                        pageId: page.id,
+                                                        pageName: page.name,
+                                                        nodeId: node.id,
+                                                        nodeName: node.label,
+                                                        slotId: slot.id,
+                                                        slotLabel: slot.label,
+                                                        unit: node.unit,
+                                                        nodeType: node.type,
+                                                      }));
+                                                    }}
+                                                  >
+                                                    <div className="w-2 h-2 rounded-full border border-teal-500/60 bg-teal-900/30 flex-shrink-0" />
+                                                    <span className="text-[9px] text-teal-300/80 truncate">{slot.label}</span>
+                                                    <span className="text-[8px] text-slate-600 ml-auto">IN</span>
+                                                  </div>
+                                                ))}
+                                                {(node.outputs || []).map(slot => (
+                                                  <div
+                                                    key={`out-${slot.id}`}
+                                                    className="flex items-center gap-2 px-3 py-0.5 hover:bg-slate-700/20 cursor-grab transition-colors"
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                      e.stopPropagation();
+                                                      e.dataTransfer.setData('application/json', JSON.stringify({
+                                                        type: 'remote-ga-slot',
+                                                        slotDirection: 'output',
+                                                        instanceId: instance.id,
+                                                        instanceName: instance.name,
+                                                        pageId: page.id,
+                                                        pageName: page.name,
+                                                        nodeId: node.id,
+                                                        nodeName: node.label,
+                                                        slotId: slot.id,
+                                                        slotLabel: slot.label,
+                                                        unit: node.unit,
+                                                        nodeType: node.type,
+                                                      }));
+                                                    }}
+                                                  >
+                                                    <div className="w-2 h-2 rounded-full border border-amber-500/60 bg-amber-900/30 flex-shrink-0" />
+                                                    <span className="text-[9px] text-amber-300/80 truncate">{slot.label}</span>
+                                                    <span className="text-[8px] text-slate-600 ml-auto">OUT</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>

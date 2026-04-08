@@ -753,7 +753,9 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
         label: node.data?.label || node.data?.name || node.id,
         unit: node.data?.unit || '',
         value: node.data?.value,
-        description: node.data?.description || ''
+        description: node.data?.description || '',
+        inputs: (node.inputs || []).map(s => ({ id: s.id || s.label || s, label: s.label || s.id || s })),
+        outputs: (node.outputs || []).map(s => ({ id: s.id || s.label || s, label: s.label || s.id || s }))
       }))
     }));
 
