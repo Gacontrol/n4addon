@@ -1270,6 +1270,12 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   }
   const base = url.replace(/\/$/, '');
 
+  const tryParseJson = async (resp) => {
+    const text = await resp.text();
+    try { return { data: JSON.parse(text), text }; }
+    catch { return { data: null, text }; }
+  };
+
   if (directToken) {
     try {
       const testResp = await fetch(`${base}/api/`, {
@@ -1289,6 +1295,39 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
     return res.status(400).json({ ok: false, msg: 'Benutzername und Passwort oder Token erforderlich' });
   }
 
+  const supervisorToken = getToken();
+
+  if (supervisorToken) {
+    try {
+      const authCheckResp = await fetch('http://supervisor/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supervisorToken}`,
+        },
+        body: JSON.stringify({ username, password }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (authCheckResp.status === 200) {
+        const testResp = await fetch(`${base}/api/`, {
+          headers: { Authorization: `Bearer ${supervisorToken}` },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (testResp.ok) {
+          return res.json({ ok: true, token: supervisorToken, msg: 'Anmeldung erfolgreich' });
+        }
+        return res.json({ ok: true, token: supervisorToken, msg: 'Anmeldung erfolgreich (Supervisor)' });
+      } else if (authCheckResp.status === 401) {
+        return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
+      } else {
+        console.warn('[HA auth] Supervisor auth returned', authCheckResp.status, '- falling back to OAuth flow');
+      }
+    } catch (err) {
+      console.warn('[HA auth] Supervisor auth endpoint failed:', err.message, '- falling back to OAuth flow');
+    }
+  }
+
   let parsed;
   try {
     parsed = new URL(base);
@@ -1297,12 +1336,6 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   }
   const clientId = `${parsed.protocol}//${parsed.host}/`;
   const redirectUri = `${parsed.protocol}//${parsed.host}/?auth_callback=1`;
-
-  const tryParseJson = async (resp) => {
-    const text = await resp.text();
-    try { return { data: JSON.parse(text), text }; }
-    catch { return { data: null, text }; }
-  };
 
   try {
     const flow1Resp = await fetch(`${base}/auth/login_flow`, {
@@ -1323,7 +1356,7 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
     const { data: flow1Data, text: flow1Text } = await tryParseJson(flow1Resp);
 
     if (!flow1Data) {
-      console.error('HA auth flow1 non-JSON:', flow1Text.slice(0, 300));
+      console.error('[HA auth] flow1 non-JSON:', flow1Text.slice(0, 300));
       return res.json({ ok: false, msg: `HA Antwort konnte nicht verarbeitet werden (HTTP ${flow1Resp.status})` });
     }
 
@@ -1332,13 +1365,9 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
       return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen (${flow1Resp.status}): ${detail}` });
     }
 
-    if (flow1Data.errors && Object.keys(flow1Data.errors).length > 0) {
-      return res.json({ ok: false, msg: `Login-Flow Fehler: ${JSON.stringify(flow1Data.errors)}` });
-    }
-
     const flowId = flow1Data.flow_id;
     if (!flowId) {
-      console.error('HA auth flow1 no flow_id:', flow1Data);
+      console.error('[HA auth] flow1 no flow_id:', flow1Data);
       return res.json({ ok: false, msg: `Kein Flow-ID erhalten. HA-Antwort: ${JSON.stringify(flow1Data).slice(0, 200)}` });
     }
 
@@ -1360,7 +1389,7 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
       return res.json({ ok: false, msg: `Anmelde-Antwort konnte nicht verarbeitet werden (HTTP ${flow2Resp.status})` });
     }
 
-    console.log('[HA auth] flow2 response type:', flow2Data.type, 'result:', flow2Data.result ? '[present]' : '[absent]', 'errors:', flow2Data.errors);
+    console.log('[HA auth] flow2 type:', flow2Data.type, 'result:', flow2Data.result ? '[present]' : '[absent]', 'errors:', flow2Data.errors);
 
     if (flow2Data.type === 'abort') {
       const reason = flow2Data.reason || flow2Data.description || 'unbekannter Grund';
@@ -1377,7 +1406,7 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
       if (stepId === 'totp' || stepId === 'mfa' || (flow2Data.description_placeholders && flow2Data.description_placeholders.mfa_module)) {
         return res.json({ ok: false, msg: 'Zwei-Faktor-Authentifizierung aktiv. Bitte Long-Lived Token verwenden.' });
       }
-      return res.json({ ok: false, msg: `Benutzername oder Passwort falsch` });
+      return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
     }
 
     if (!flow2Resp.ok) {
@@ -1412,7 +1441,7 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
 
     res.json({ ok: true, token: tokenData.access_token, msg: 'Anmeldung erfolgreich' });
   } catch (err) {
-    console.error('HA auth error:', err);
+    console.error('[HA auth] error:', err);
     res.json({ ok: false, msg: `Verbindungsfehler: ${err.message}` });
   }
 });
