@@ -21,6 +21,8 @@ interface Visu3DBuildingProps {
 
 export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   config,
+  width,
+  height,
   isEditMode,
   instanceId,
 }) => {
@@ -292,7 +294,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const canClickFloors = floorsClickable && !config.showAllFloors;
 
   return (
-    <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
+    <div className="absolute inset-0" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={filteredBuildings}
         activeFloorId={displayedFloorId}
@@ -314,8 +316,11 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
         wallsTransparent={config.wallsTransparent ?? false}
         xrayOpacity={config.xrayOpacity ?? 0.2}
         lockTarget={lockTarget}
+        compact={true}
         onFloorClick={canClickFloors && activeFloorId !== null && !floorIsolated ? handleFloorClick : undefined}
         onRoomZoom={floorIsolated && activeFloorId !== null ? handleRoomZoom : undefined}
+        widgetWidth={width}
+        widgetHeight={height}
       />
       {floorIsolated && (
         <button

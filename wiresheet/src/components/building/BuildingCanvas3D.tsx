@@ -77,6 +77,8 @@ interface Props {
   lockTarget?: boolean;
   focusDuctId?: string | null;
   compact?: boolean;
+  widgetWidth?: number;
+  widgetHeight?: number;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -1521,6 +1523,8 @@ export function BuildingCanvas3D({
   lockTarget = false,
   focusDuctId,
   compact = false,
+  widgetWidth,
+  widgetHeight,
   onFloorClick,
   onRoomZoom,
 }: Props) {
@@ -1536,7 +1540,7 @@ export function BuildingCanvas3D({
 
   return (
     <CanvasErrorBoundary>
-    <div className="relative w-full h-full select-none" style={bgTransparent ? { background: 'transparent' } : undefined}>
+    <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
         shadows={lighting.shadowEnabled ? 'soft' : false}
         camera={{ position: initCamPos, fov: 45, near: 0.1, far: 1000 }}
@@ -1549,7 +1553,15 @@ export function BuildingCanvas3D({
           powerPreference: 'high-performance',
         }}
         onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); onSelectFurniture?.(null); }}
-        style={{ background: bgTransparent ? 'transparent' : bgColor, position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+        style={{
+          background: bgTransparent ? 'transparent' : bgColor,
+          display: 'block',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: widgetWidth ?? '100%',
+          height: widgetHeight ?? '100%',
+        }}
       >
         {!bgTransparent && <color attach="background" args={[bgColor]} />}
         {!bgTransparent && <fog attach="fog" args={[effectiveBgColor, 60, 200]} />}
