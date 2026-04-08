@@ -1,6 +1,5 @@
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType } from '../../types/building';
 
@@ -175,6 +174,106 @@ function SpinningFan({ color }: { color: string }) {
         </mesh>
       ))}
     </group>
+  );
+}
+
+function makeWidgetLabelTexture(
+  label: string,
+  value: string,
+  unit: string,
+  color: string,
+  alarmActive: boolean,
+  isBoolean: boolean,
+  showLabel: boolean,
+  showValue: boolean,
+  displaySize: number,
+): THREE.CanvasTexture {
+  const W = 256;
+  const H = showLabel && showValue ? 96 : 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+
+  const borderColor = alarmActive ? '#ef4444' : color;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(10,18,36,0.88)';
+  const r = 18;
+  ctx.beginPath();
+  ctx.moveTo(r, 0); ctx.lineTo(W - r, 0);
+  ctx.quadraticCurveTo(W, 0, W, r);
+  ctx.lineTo(W, H - r);
+  ctx.quadraticCurveTo(W, H, W - r, H);
+  ctx.lineTo(r, H);
+  ctx.quadraticCurveTo(0, H, 0, H - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  if (showLabel && label) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = `${Math.round(22 * Math.min(displaySize, 1.5))}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const labelY = showValue ? H * 0.32 : H * 0.5;
+    ctx.fillText(label, W / 2, labelY);
+  }
+
+  if (showValue) {
+    const valText = isBoolean ? value : (unit ? `${value} ${unit}` : value);
+    const accentColor = alarmActive ? '#ef4444' : color;
+    ctx.fillStyle = accentColor;
+    ctx.font = `bold ${Math.round(30 * Math.min(displaySize, 1.5))}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const valY = showLabel && label ? H * 0.68 : H * 0.5;
+    ctx.fillText(valText, W / 2, valY);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+interface WidgetLabel3DProps {
+  label: string;
+  value: string;
+  unit: string;
+  color: string;
+  alarmActive: boolean;
+  isBoolean: boolean;
+  showLabel: boolean;
+  showValue: boolean;
+  posY: number;
+  displaySize: number;
+}
+
+function WidgetLabel3D({ label, value, unit, color, alarmActive, isBoolean, showLabel, showValue, posY, displaySize }: WidgetLabel3DProps) {
+  const spriteRef = useRef<THREE.Sprite>(null);
+  const matRef = useRef<THREE.SpriteMaterial>(null);
+
+  const texture = useMemo(() => makeWidgetLabelTexture(
+    label, value, unit, color, alarmActive, isBoolean, showLabel, showValue, displaySize
+  ), [label, value, unit, color, alarmActive, isBoolean, showLabel, showValue, displaySize]);
+
+  useEffect(() => {
+    return () => { texture.dispose(); };
+  }, [texture]);
+
+  const aspect = (showLabel && showValue) ? (256 / 96) : (256 / 64);
+  const spriteW = 0.72 * displaySize * aspect;
+  const spriteH = 0.72 * displaySize;
+
+  return (
+    <sprite ref={spriteRef} position={[0, posY, 0]} scale={[spriteW, spriteH, 1]}>
+      <spriteMaterial ref={matRef} map={texture} transparent depthTest={true} depthWrite={false} sizeAttenuation={true} />
+    </sprite>
   );
 }
 
@@ -412,50 +511,20 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         </mesh>
       )}
 
-      <Html
-        position={[0, isDuct ? 0.55 + 0.15 * displaySize : 0.18, 0]}
-        center
-        sprite
-        distanceFactor={6}
-        zIndexRange={[100, 0]}
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        <div style={{
-          background: 'rgba(10,18,36,0.88)',
-          border: `2px solid ${alarmActive ? '#ef4444' : baseColor}`,
-          borderRadius: Math.round(12 * displaySize) + 'px',
-          padding: `${Math.round(4 * displaySize)}px ${Math.round(10 * displaySize)}px`,
-          minWidth: Math.round(60 * displaySize) + 'px',
-          textAlign: 'center',
-          backdropFilter: 'blur(6px)',
-          boxShadow: `0 0 ${Math.round(6 * displaySize)}px ${alarmActive ? '#ef444480' : baseColor + '50'}`,
-          whiteSpace: 'nowrap',
-        }}>
-          {widget.showLabel !== false && (
-            <div style={{ fontSize: Math.round(9 * displaySize), color: '#94a3b8', fontFamily: 'sans-serif', lineHeight: 1.2 }}>
-              {widget.label || WIDGET_LABELS[widget.type]}
-            </div>
-          )}
-          {widget.showValue !== false && !isBoolean && (
-            <div style={{
-              fontSize: Math.round(13 * displaySize), fontWeight: 700,
-              color: alarmActive ? '#ef4444' : baseColor,
-              fontFamily: 'monospace', lineHeight: 1.2, letterSpacing: '-0.02em',
-            }}>
-              {displayValue}{unit ? <span style={{ fontSize: Math.round(9 * displaySize), color: '#64748b', marginLeft: 2 }}>{unit}</span> : null}
-            </div>
-          )}
-          {isBoolean && widget.showValue !== false && (
-            <div style={{
-              fontSize: Math.round(11 * displaySize), fontWeight: 700,
-              color: (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? baseColor : '#475569',
-              fontFamily: 'monospace', lineHeight: 1.2,
-            }}>
-              {(liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? 'ON' : 'OFF'}
-            </div>
-          )}
-        </div>
-      </Html>
+      <WidgetLabel3D
+        label={widget.showLabel !== false ? (widget.label || WIDGET_LABELS[widget.type]) : ''}
+        value={isBoolean
+          ? ((liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === '1') ? 'ON' : 'OFF')
+          : displayValue}
+        unit={isBoolean ? '' : unit}
+        color={alarmActive ? '#ef4444' : baseColor}
+        alarmActive={!!alarmActive}
+        isBoolean={isBoolean}
+        showLabel={widget.showLabel !== false}
+        showValue={widget.showValue !== false}
+        posY={isDuct ? 0.55 + 0.15 * displaySize : 0.42}
+        displaySize={displaySize}
+      />
     </group>
   );
 }
