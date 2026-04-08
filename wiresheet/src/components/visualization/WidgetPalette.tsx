@@ -6,7 +6,7 @@ import {
   Navigation, Home, ChevronLeft, Hexagon, Star, Diamond, Plus,
   Spline, List, PanelLeft, Image as ImageIcon,
   TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
-  AlignLeft, LayoutGrid, Blocks, Package, Cpu, Bell, Fan, Pipette
+  AlignLeft, LayoutGrid, Blocks, Package, Cpu, Bell, Fan, Pipette, Globe
 } from 'lucide-react';
 import { WidgetTemplate } from '../../types/visualization';
 import { widgetTemplates } from '../../data/widgetTemplates';
@@ -34,7 +34,7 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
   Minus, ArrowRight, Navigation, Home, ChevronLeft, Hexagon,
   Star, Diamond, Plus, Spline, List, PanelLeft, ImageIcon,
   TrendingUp, Activity, Zap, Wind, Battery, Wifi, Clock,
-  AlignLeft, LayoutGrid, Bell, Fan, Pipette
+  AlignLeft, LayoutGrid, Bell, Fan, Pipette, Globe
 };
 
 const groups: { key: string; label: string; categories: string[]; color: string; dot: string }[] = [
@@ -100,6 +100,13 @@ const groups: { key: string; label: string; categories: string[]; color: string;
     categories: ['alarm'],
     color: 'rgba(251,146,60,0.06)',
     dot: '#fb923c'
+  },
+  {
+    key: 'remote',
+    label: 'Remote / Extern',
+    categories: ['remote'],
+    color: 'rgba(6,182,212,0.06)',
+    dot: '#06b6d4'
   }
 ];
 

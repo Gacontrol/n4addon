@@ -69,7 +69,8 @@ export type WidgetType =
   | 'visu-trend-tiles'
   | 'visu-3d-building'
   | 'visu-time-program'
-  | 'visu-sequence';
+  | 'visu-sequence'
+  | 'visu-remote-visu';
 
 export interface WidgetBinding {
   dpKey: string;
@@ -456,7 +457,8 @@ export type WidgetConfig =
   | AlarmConsoleWidgetConfig
   | TrendChartConfig
   | Building3DWidgetConfig
-  | SequenceWidgetConfig;
+  | SequenceWidgetConfig
+  | RemoteVisuConfig;
 
 export interface VisuWidget {
   id: string;
@@ -879,6 +881,19 @@ export interface TimeProgramWidgetConfig {
   fontFamily?: FontFamily;
 }
 
+export interface RemoteVisuConfig {
+  instanceId?: string;
+  instanceUrl?: string;
+  instanceToken?: string;
+  targetPath?: string;
+  scale?: number;
+  refreshIntervalMs?: number;
+  showBorder?: boolean;
+  borderColor?: string;
+  borderRadius?: number;
+  showLoadingIndicator?: boolean;
+}
+
 export interface TimeProgramParams {
   tpName?: string;
   timeProgramOutputType?: string;
@@ -891,7 +906,7 @@ export interface WidgetTemplate {
   type: WidgetType;
   label: string;
   icon: string;
-  category: 'control' | 'display' | 'indicator' | 'decoration' | 'modern' | 'dashboard' | 'navigation';
+  category: 'control' | 'display' | 'indicator' | 'decoration' | 'modern' | 'dashboard' | 'navigation' | 'complex' | 'trend' | 'alarm' | 'remote';
   defaultSize: Size;
   defaultConfig: WidgetConfig;
   defaultStyle: WidgetStyle;

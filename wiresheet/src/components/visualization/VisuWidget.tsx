@@ -77,6 +77,7 @@ import { VisuImage } from './VisuImage';
 import { Visu3DBuilding } from './Visu3DBuilding';
 import { VisuTimeProgram } from './VisuTimeProgram';
 import { VisuSequence } from './VisuSequence';
+import { VisuRemoteVisu } from './VisuRemoteVisu';
 import { getThemeVars } from '../../utils/widgetThemes';
 import { VisuSwitch } from './VisuSwitch';
 import { VisuButton } from './VisuButton';
@@ -1531,6 +1532,18 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             isEditMode={isEditMode}
             onValueChange={(updates) => onValueChange(updates)}
             params={sequenceParams}
+          />
+        );
+      }
+
+      case 'visu-remote-visu': {
+        const rvCfg = widget.config as import('../../types/visualization').RemoteVisuConfig;
+        return (
+          <VisuRemoteVisu
+            config={rvCfg}
+            isEditMode={isEditMode}
+            width={widget.size.width}
+            height={widget.size.height}
           />
         );
       }

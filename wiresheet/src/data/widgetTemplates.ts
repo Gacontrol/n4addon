@@ -1077,6 +1077,29 @@ export const widgetTemplates: WidgetTemplate[] = [
     description: '3D Gebäude-Viewer mit interaktiver Kamera und Live-Datenpunkten',
     supportsBinding: false,
     bindingDirection: 'read'
+  },
+  {
+    type: 'visu-remote-visu',
+    label: 'Externe Visu',
+    icon: 'Globe',
+    category: 'remote',
+    defaultSize: { width: 600, height: 400 },
+    defaultConfig: {
+      instanceId: '',
+      instanceUrl: '',
+      instanceToken: '',
+      targetPath: '/visu',
+      scale: 1,
+      refreshIntervalMs: 0,
+      showBorder: true,
+      borderColor: '#334155',
+      borderRadius: 6,
+      showLoadingIndicator: true
+    },
+    defaultStyle: { showLabel: true, labelPosition: 'top' },
+    description: 'Bettet eine Visualisierung einer externen Home-Assistant-Instanz live ein',
+    supportsBinding: false,
+    bindingDirection: 'read'
   }
 ];
 

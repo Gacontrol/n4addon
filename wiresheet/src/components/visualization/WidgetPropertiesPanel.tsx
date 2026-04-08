@@ -40,7 +40,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ value, defaultColor, onChange
     </div>
   );
 };
-import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey } from '../../types/visualization';
+import { VisuWidget, WidgetBinding, migrateBinding, parseDpKey, WidgetTheme, SliderConfig, GaugeConfig, BarConfig, TankConfig, ThermometerConfig, IncrementerConfig, InputConfig, DisplayConfig, LedConfig, SwitchConfig, ButtonConfig, LabelConfig, RectConfig, CircleConfig, LineConfig, ArrowConfig, PolygonConfig, StarConfig, DiamondConfig, CrossConfig, PolylineConfig, NavButtonConfig, HomeButtonConfig, BackButtonConfig, MultistateConfig, MultistateOption, ImageConfig, AlarmConsoleWidgetConfig, TrendChartConfig, TrendSeries, TrendChartType, Building3DWidgetConfig, VisuLayerKey, RemoteVisuConfig } from '../../types/visualization';
+import { HaInstance } from '../../types/flow';
 import { FlowNode } from '../../types/flow';
 import { AlarmConsole } from '../../types/alarm';
 import { FileManager } from './FileManager';
@@ -67,6 +68,7 @@ interface WidgetPropertiesPanelProps {
   alarmConsoles?: AlarmConsole[];
   trackedTrends?: TrackedTrend[];
   liveValues?: Record<string, unknown>;
+  haInstances?: HaInstance[];
   onUpdate: (updates: Partial<VisuWidget>) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -294,6 +296,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   alarmConsoles = [],
   trackedTrends = [],
   liveValues = {},
+  haInstances = [],
   onUpdate,
   onDelete,
   onClose
@@ -3254,6 +3257,133 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                   Gebäude immer mittig
                 </label>
               </div>
+            </div>
+          </>
+        );
+      }
+
+      case 'visu-remote-visu': {
+        const rvCfg = widget.config as RemoteVisuConfig;
+        const selectedInstance = haInstances.find(i => i.id === rvCfg.instanceId);
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">HA-Instanz</label>
+              {haInstances.length === 0 ? (
+                <div className="text-xs text-slate-500 bg-slate-800 rounded px-2 py-1.5">
+                  Keine verbundenen Instanzen. Zuerst im Treiber-Panel konfigurieren.
+                </div>
+              ) : (
+                <select
+                  value={rvCfg.instanceId || ''}
+                  onChange={(e) => {
+                    const inst = haInstances.find(i => i.id === e.target.value);
+                    onUpdate({ config: {
+                      ...rvCfg,
+                      instanceId: inst?.id || '',
+                      instanceUrl: inst?.url || '',
+                      instanceToken: inst?.token || ''
+                    }});
+                  }}
+                  className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
+                >
+                  <option value="">-- Instanz wählen --</option>
+                  {haInstances.map(inst => (
+                    <option key={inst.id} value={inst.id}>{inst.name} ({inst.url.replace(/^https?:\/\//, '')})</option>
+                  ))}
+                </select>
+              )}
+              {selectedInstance && (
+                <div className="mt-1 text-[10px] text-slate-500 truncate">{selectedInstance.url}</div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Zielpfad (URL-Pfad)</label>
+              <input
+                type="text"
+                value={rvCfg.targetPath || '/visu'}
+                onChange={(e) => onUpdate({ config: { ...rvCfg, targetPath: e.target.value } })}
+                placeholder="/visu"
+                className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
+              />
+              <div className="text-[10px] text-slate-500 mt-0.5">z.B. /visu oder /lovelace/0</div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Zoom / Skalierung ({Math.round((rvCfg.scale ?? 1) * 100)}%)</label>
+              <input
+                type="range"
+                min={0.25}
+                max={2}
+                step={0.05}
+                value={rvCfg.scale ?? 1}
+                onChange={(e) => onUpdate({ config: { ...rvCfg, scale: parseFloat(e.target.value) } })}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                <span>25%</span><span>100%</span><span>200%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Auto-Aktualisierung</label>
+              <select
+                value={rvCfg.refreshIntervalMs ?? 0}
+                onChange={(e) => onUpdate({ config: { ...rvCfg, refreshIntervalMs: parseInt(e.target.value) } })}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200"
+              >
+                <option value={0}>Kein Auto-Reload</option>
+                <option value={30000}>Alle 30 Sekunden</option>
+                <option value={60000}>Alle 60 Sekunden</option>
+                <option value={300000}>Alle 5 Minuten</option>
+                <option value={600000}>Alle 10 Minuten</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rvCfg.showBorder ?? true}
+                  onChange={(e) => onUpdate({ config: { ...rvCfg, showBorder: e.target.checked } })}
+                  className="rounded w-3 h-3"
+                />
+                Rahmen anzeigen
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rvCfg.showLoadingIndicator ?? true}
+                  onChange={(e) => onUpdate({ config: { ...rvCfg, showLoadingIndicator: e.target.checked } })}
+                  className="rounded w-3 h-3"
+                />
+                Ladeanimation anzeigen
+              </label>
+            </div>
+
+            {rvCfg.showBorder && (
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Rahmenfarbe</label>
+                <ColorPicker
+                  value={rvCfg.borderColor}
+                  defaultColor="#334155"
+                  onChange={(c) => onUpdate({ config: { ...rvCfg, borderColor: c } })}
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Eckenradius ({rvCfg.borderRadius ?? 6}px)</label>
+              <input
+                type="range"
+                min={0}
+                max={24}
+                step={1}
+                value={rvCfg.borderRadius ?? 6}
+                onChange={(e) => onUpdate({ config: { ...rvCfg, borderRadius: parseInt(e.target.value) } })}
+                className="w-full"
+              />
             </div>
           </>
         );

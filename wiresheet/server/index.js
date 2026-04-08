@@ -1178,6 +1178,95 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   }
 });
 
+app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
+  const { url: rawUrl, token } = req.query;
+  if (!rawUrl || !token) {
+    return res.status(400).send('Missing url or token');
+  }
+  let targetUrl;
+  try {
+    targetUrl = decodeURIComponent(rawUrl);
+    new URL(targetUrl);
+  } catch {
+    return res.status(400).send('Invalid URL');
+  }
+  try {
+    const upstreamRes = await fetch(targetUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'WiresheetProxy/1.0'
+      },
+      signal: AbortSignal.timeout(15000),
+      redirect: 'follow'
+    });
+
+    const contentType = upstreamRes.headers.get('content-type') || 'text/html';
+    const body = await upstreamRes.text();
+
+    res.status(upstreamRes.status);
+    res.setHeader('Content-Type', contentType);
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    const baseUrl = new URL(targetUrl);
+    const origin = `${baseUrl.protocol}//${baseUrl.host}`;
+    const basePath = baseUrl.pathname.split('/').slice(0, -1).join('/') || '/';
+
+    let processed = body;
+    const injectScript = `
+<script>
+(function() {
+  var HA_TOKEN = ${JSON.stringify(token)};
+  var HA_ORIGIN = ${JSON.stringify(origin)};
+  try {
+    localStorage.setItem('hassTokens', JSON.stringify({
+      access_token: HA_TOKEN,
+      token_type: 'Bearer',
+      expires_in: 1800,
+      hassUrl: HA_ORIGIN,
+      clientId: null,
+      expires: Date.now() + 1800000,
+      refresh_token: ''
+    }));
+    localStorage.setItem('hassUrl', HA_ORIGIN);
+  } catch(e) {}
+  document.addEventListener('DOMContentLoaded', function() {
+    try {
+      if (window.__stateObj) {
+        window.__stateObj.hassTokens = JSON.parse(localStorage.getItem('hassTokens'));
+      }
+    } catch(e) {}
+  });
+})();
+</script>`;
+
+    if (processed.includes('</head>')) {
+      processed = processed.replace('</head>', injectScript + '</head>');
+    } else if (processed.includes('<body')) {
+      processed = processed.replace('<body', injectScript + '<body');
+    } else {
+      processed = injectScript + processed;
+    }
+
+    const proxyPrefix = '/api/remote-visu-proxy?url=' + encodeURIComponent(origin) + '&token=' + encodeURIComponent(token);
+    processed = processed.replace(
+      /(<base\s+href=["'])([^"']*)["']/gi,
+      (m, prefix, href) => {
+        if (href.startsWith('http') || href.startsWith('//')) return m;
+        return prefix + href + '"';
+      }
+    );
+
+    res.send(processed);
+  } catch (err) {
+    console.error('[remote-visu-proxy] error:', err.message);
+    res.status(502).send(`Proxy error: ${err.message}`);
+  }
+});
+
 app.get(['/driver-live-values', '/api/driver-live-values'], (req, res) => {
   res.json({
     modbus: Object.fromEntries(modbusLiveValues),

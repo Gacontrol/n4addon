@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter } from 'lucide-react';
 import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig, LineConfig, PolygonConfig } from '../../types/visualization';
-import { FlowNode } from '../../types/flow';
+import { FlowNode, HaInstance } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
 import { WidgetPalette, CustomBlockEntry } from './WidgetPalette';
@@ -46,6 +46,7 @@ interface VisualizationViewProps {
   onAcknowledgeAll?: () => void;
   onClearAlarm?: (alarmId: string) => void;
   onShelveAlarm?: (alarmId: string, durationMs: number, reason?: string) => void;
+  haInstances?: HaInstance[];
 }
 
 export const VisualizationView: React.FC<VisualizationViewProps> = ({
@@ -68,7 +69,8 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
   onAcknowledgeAlarm,
   onAcknowledgeAll,
   onClearAlarm,
-  onShelveAlarm
+  onShelveAlarm,
+  haInstances = []
 }) => {
   const CLIPBOARD_KEY = 'visu-clipboard';
   const MULTI_CLIPBOARD_KEY = 'visu-multi-clipboard';
@@ -972,6 +974,7 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
             alarmConsoles={alarmConsoles}
             trackedTrends={trackedTrends}
             liveValues={liveValues}
+            haInstances={haInstances}
             onUpdate={(updates) => handleUpdateWidget(selectedWidget.id, updates)}
             onDelete={() => handleDeleteWidget(selectedWidget.id)}
             onClose={() => setShowProperties(false)}

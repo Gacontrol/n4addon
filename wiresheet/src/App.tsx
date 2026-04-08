@@ -2121,6 +2121,7 @@ function App() {
           onAcknowledgeAll={acknowledgeAll}
           onClearAlarm={clearAlarm}
           onShelveAlarm={shelveAlarm}
+          haInstances={haInstances}
         />
       )}
 
