@@ -346,7 +346,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   liveValues = {},
   zoom = 1
 }) => {
-  const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number } | null>(null);
+  const [draggingVertex, setDraggingVertex] = useState<{ type: 'polyline' | 'polygon' | 'line'; index: number; startX: number; startY: number; origX: number; origY: number; shiftLock?: 'h' | 'v' | null } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const handleVertexMouseDown = useCallback((e: React.MouseEvent, type: 'polyline' | 'polygon' | 'line', index: number, pt: { x: number; y: number }) => {
@@ -358,8 +358,21 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   useEffect(() => {
     if (!draggingVertex) return;
     const handleMove = (e: MouseEvent) => {
-      const dx = (e.clientX - draggingVertex.startX) / zoom;
-      const dy = (e.clientY - draggingVertex.startY) / zoom;
+      let dx = (e.clientX - draggingVertex.startX) / zoom;
+      let dy = (e.clientY - draggingVertex.startY) / zoom;
+
+      if (e.shiftKey) {
+        let lock = draggingVertex.shiftLock;
+        if (!lock) {
+          lock = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+          setDraggingVertex(prev => prev ? { ...prev, shiftLock: lock } : null);
+        }
+        if (lock === 'h') dy = 0;
+        else dx = 0;
+      } else if (draggingVertex.shiftLock) {
+        setDraggingVertex(prev => prev ? { ...prev, shiftLock: null } : null);
+      }
+
       const nx = draggingVertex.origX + dx;
       const ny = draggingVertex.origY + dy;
       if (draggingVertex.type === 'polyline') {
@@ -391,7 +404,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-  }, [draggingVertex, widget.config, onUpdateConfig]);
+  }, [draggingVertex, widget.config, onUpdateConfig, zoom]);
 
   const handleShapeClick = (cfg: { navigateToPageId?: string }) => {
     if (isEditMode) return;

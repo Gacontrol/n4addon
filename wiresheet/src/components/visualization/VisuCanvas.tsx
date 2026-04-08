@@ -97,6 +97,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const lassoJustCompletedRef = useRef(0);
+  const dragActivatedRef = useRef(false);
+  const multiDragActivatedRef = useRef(false);
 
   const nodeIdToSheetId = useMemo(() => {
     const map = new Map<string, string>();
@@ -646,6 +648,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
             }
           }
         }
+        multiDragActivatedRef.current = false;
         setMultiDragState({
           widgetIds: selectedWidgetIds,
           startX: e.clientX,
@@ -655,6 +658,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         });
       } else {
         const isVertex = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
+        dragActivatedRef.current = false;
         setDragState({
           widgetId,
           startX: e.clientX,
@@ -685,7 +689,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (multiDragState) {
       const rawDeltaX = (e.clientX - multiDragState.startX) / zoom;
       const rawDeltaY = (e.clientY - multiDragState.startY) / zoom;
-      if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
+      if (!multiDragActivatedRef.current) {
+        if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
+        multiDragActivatedRef.current = true;
+      }
       const gridSize = page.gridSize || 10;
       let dx = rawDeltaX;
       let dy = rawDeltaY;
@@ -741,7 +748,10 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     if (dragState) {
       const rawDeltaX = (e.clientX - dragState.startX) / zoom;
       const rawDeltaY = (e.clientY - dragState.startY) / zoom;
-      if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
+      if (!dragActivatedRef.current) {
+        if (Math.abs(rawDeltaX) < 4 && Math.abs(rawDeltaY) < 4) return;
+        dragActivatedRef.current = true;
+      }
       const gridSize = page.gridSize || 10;
 
       if (dragState.isVertex && dragState.initialConfig) {
@@ -902,6 +912,8 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       return;
     }
 
+    dragActivatedRef.current = false;
+    multiDragActivatedRef.current = false;
     setDragState(null);
     setMultiDragState(null);
     setResizeState(null);
@@ -962,6 +974,60 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
         return;
       }
 
+      const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+      if (isArrow) {
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+
+        if (hasMultiSelection) {
+          e.preventDefault();
+          for (const id of selectedWidgetIds) {
+            const w = page.widgets.find(ww => ww.id === id);
+            if (!w || w.locked) continue;
+            if (w.type === 'visu-line' || w.type === 'visu-arrow') {
+              const lc = w.config as { x1?: number; y1?: number; x2?: number; y2?: number };
+              onUpdateWidget(id, {
+                config: { ...w.config, x1: (lc.x1 ?? 0) + dx, y1: (lc.y1 ?? 0) + dy, x2: (lc.x2 ?? 0) + dx, y2: (lc.y2 ?? 0) + dy },
+                position: { x: w.position.x + dx, y: w.position.y + dy }
+              });
+            } else if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+              const pts = (w.config as { points?: { x: number; y: number }[] }).points || [];
+              onUpdateWidget(id, {
+                config: { ...w.config, points: pts.map(p => ({ x: p.x + dx, y: p.y + dy })) },
+                position: { x: w.position.x + dx, y: w.position.y + dy }
+              });
+            } else {
+              onUpdateWidget(id, { position: { x: Math.max(0, w.position.x + dx), y: Math.max(0, w.position.y + dy) } });
+            }
+          }
+          return;
+        }
+
+        if (selectedWidgetId) {
+          e.preventDefault();
+          const w = page.widgets.find(ww => ww.id === selectedWidgetId);
+          if (w && !w.locked) {
+            if (w.type === 'visu-line' || w.type === 'visu-arrow') {
+              const lc = w.config as { x1?: number; y1?: number; x2?: number; y2?: number };
+              onUpdateWidget(selectedWidgetId, {
+                config: { ...w.config, x1: (lc.x1 ?? 0) + dx, y1: (lc.y1 ?? 0) + dy, x2: (lc.x2 ?? 0) + dx, y2: (lc.y2 ?? 0) + dy },
+                position: { x: w.position.x + dx, y: w.position.y + dy }
+              });
+            } else if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+              const pts = (w.config as { points?: { x: number; y: number }[] }).points || [];
+              onUpdateWidget(selectedWidgetId, {
+                config: { ...w.config, points: pts.map(p => ({ x: p.x + dx, y: p.y + dy })) },
+                position: { x: w.position.x + dx, y: w.position.y + dy }
+              });
+            } else {
+              onUpdateWidget(selectedWidgetId, { position: { x: Math.max(0, w.position.x + dx), y: Math.max(0, w.position.y + dy) } });
+            }
+          }
+          return;
+        }
+      }
+
       if (!selectedWidgetId) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -977,7 +1043,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditMode, selectedWidgetId, selectedWidgetIds, drawingState, onDeleteWidget, onDeleteWidgets, onCopyWidget, onCopyWidgets, onDuplicateWidget, onPasteWidget, page.widgets, onSelectWidget, onSelectWidgets]);
+  }, [isEditMode, selectedWidgetId, selectedWidgetIds, drawingState, onDeleteWidget, onDeleteWidgets, onCopyWidget, onCopyWidgets, onDuplicateWidget, onPasteWidget, page.widgets, onSelectWidget, onSelectWidgets, onUpdateWidget]);
 
   const gridPattern = page.showGrid && page.gridSize ? (
     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.1 }}>
