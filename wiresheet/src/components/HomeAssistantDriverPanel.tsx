@@ -5,6 +5,7 @@ import { HaEntity, HaInstance } from '../types/flow';
 interface GaSlot {
   id: string;
   label: string;
+  value?: unknown;
 }
 
 interface GaControlPage {
@@ -355,6 +356,9 @@ const GaControlSection: React.FC<{
                                 >
                                   <div className="w-2 h-2 rounded-full border border-teal-500/60 bg-teal-900/30 shrink-0" />
                                   <span className="text-[10px] text-teal-300/90 flex-1 truncate">{slot.label}</span>
+                                  {slot.value !== undefined && (
+                                    <span className="font-mono text-[10px] text-cyan-400 shrink-0">{String(slot.value)}</span>
+                                  )}
                                   <span className="text-[9px] text-slate-600 font-mono">IN</span>
                                 </div>
                               ))}
@@ -380,6 +384,9 @@ const GaControlSection: React.FC<{
                                 >
                                   <div className="w-2 h-2 rounded-full border border-amber-500/60 bg-amber-900/30 shrink-0" />
                                   <span className="text-[10px] text-amber-300/90 flex-1 truncate">{slot.label}</span>
+                                  {slot.value !== undefined && (
+                                    <span className="font-mono text-[10px] text-cyan-400 shrink-0">{String(slot.value)}</span>
+                                  )}
                                   <span className="text-[9px] text-slate-600 font-mono">OUT</span>
                                 </div>
                               ))}

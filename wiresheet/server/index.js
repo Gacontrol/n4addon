@@ -101,6 +101,8 @@ let driverConfig = {
 const modbusLiveValues = new Map();
 const haLiveValues = new Map();
 const haLastWrittenValues = new Map();
+const remoteGaLiveValues = new Map();
+const remoteGaApiBaseCache = new Map();
 let driverPollingInterval = null;
 const DRIVER_POLL_INTERVAL = 2000;
 let isPollingRunning = false;
@@ -209,6 +211,34 @@ async function pollAllDrivers() {
       }
     } catch (err) {
       console.log(`HA extra instance poll error [${instance.name}]: ${err.message}`);
+    }
+  }
+
+  const hasRemoteGaBindings = (driverConfig.driverBindings || []).some(b => b.driverType === 'remote-ga');
+  if (hasRemoteGaBindings) {
+    const remoteGaInstances = new Map();
+    for (const binding of (driverConfig.driverBindings || []).filter(b => b.driverType === 'remote-ga' && b.instanceId)) {
+      if (!remoteGaInstances.has(binding.instanceId)) {
+        const inst = extraInstances.find(i => i.id === binding.instanceId);
+        if (inst) remoteGaInstances.set(binding.instanceId, inst);
+      }
+    }
+    for (const [instanceId, instance] of remoteGaInstances) {
+      try {
+        const apiBase = await resolveRemoteGaApiBase(instance);
+        if (!apiBase) continue;
+        const headers = { Authorization: `Bearer ${instance.token}` };
+        const liveRes = await fetch(`${apiBase}/api/live-values`, { headers, signal: AbortSignal.timeout(5000) });
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          const values = liveData.values || {};
+          for (const [nodeKey, val] of Object.entries(values)) {
+            remoteGaLiveValues.set(`${instanceId}:${nodeKey}`, val);
+          }
+        }
+      } catch (err) {
+        console.log(`Remote GA poll error [${instance.name}]: ${err.message}`);
+      }
     }
   }
 
@@ -351,6 +381,55 @@ function getHaBaseUrl() {
     return 'http://supervisor/core/api';
   }
   return null;
+}
+
+async function resolveRemoteGaApiBase(instance) {
+  const cached = remoteGaApiBaseCache.get(instance.id);
+  if (cached && cached.expiry > Date.now()) return cached.url;
+
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
+  let apiBase = null;
+
+  try {
+    const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    if (addonsRes.ok) {
+      const addonsData = await addonsRes.json();
+      const addons = addonsData.data?.addons || addonsData.addons || [];
+      const wsAddon = addons.find(a =>
+        (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+        (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+      );
+      if (wsAddon) apiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+    }
+  } catch {}
+
+  if (!apiBase) {
+    const commonSlugs = ['wiresheet', 'ga_control', 'ga-control', 'wiresheet_addon'];
+    for (const slug of commonSlugs) {
+      try {
+        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/pages`, { headers, signal: AbortSignal.timeout(3000) });
+        if (r.ok) { apiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+      } catch {}
+    }
+  }
+
+  if (!apiBase) {
+    const hostMatch = base.match(/^(https?:\/\/[^:/]+)/);
+    if (hostMatch) {
+      for (const port of [8100, 3000, 8080]) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/api/pages`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok) { apiBase = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (apiBase) {
+    remoteGaApiBaseCache.set(instance.id, { url: apiBase, expiry: Date.now() + 60000 });
+  }
+  return apiBase;
 }
 
 async function haGet(apiPath) {
@@ -802,16 +881,27 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
     const result = (Array.isArray(pages) ? pages : []).map(page => ({
       id: page.id,
       name: page.name || page.id,
-      nodes: (page.nodes || []).map(node => ({
-        id: node.id,
-        type: node.type,
-        label: node.data?.label || node.data?.name || node.id,
-        unit: node.data?.unit || '',
-        value: liveValues[node.id] !== undefined ? liveValues[node.id] : node.data?.value,
-        description: node.data?.description || '',
-        inputs: resolveSlots(node, 'inputs'),
-        outputs: resolveSlots(node, 'outputs')
-      }))
+      nodes: (page.nodes || []).map(node => {
+        const slots_in = resolveSlots(node, 'inputs');
+        const slots_out = resolveSlots(node, 'outputs');
+        return {
+          id: node.id,
+          type: node.type,
+          label: node.data?.label || node.data?.name || node.id,
+          unit: node.data?.unit || '',
+          value: liveValues[node.id] !== undefined ? liveValues[node.id] : node.data?.value,
+          description: node.data?.description || '',
+          inputs: slots_in.map(s => ({
+            ...s,
+            value: liveValues[`${node.id}:${s.id}`] !== undefined ? liveValues[`${node.id}:${s.id}`] : undefined
+          })),
+          outputs: slots_out.map(s => ({
+            ...s,
+            value: liveValues[`${node.id}:${s.id}`] !== undefined ? liveValues[`${node.id}:${s.id}`]
+              : (slots_out.length === 1 ? (liveValues[node.id] !== undefined ? liveValues[node.id] : undefined) : undefined)
+          }))
+        };
+      })
     }));
 
     res.json({ pages: result, wiresheetApiBase });
@@ -2516,6 +2606,19 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
           const numVal = parseFloat(rawState);
           bindingValues[bindingKey] = !isNaN(numVal) ? numVal : rawState;
         }
+      } else if (binding.driverType === 'remote-ga' && binding.instanceId) {
+        const remoteNodeBase = binding.datapointId
+          ? binding.datapointId.split(':')[0]
+          : (binding.nodeId || '');
+        const portSuffix = binding.slotId || (binding.datapointId && binding.datapointId.includes(':') ? binding.datapointId.split(':').slice(1).join(':') : null);
+        const portKey = portSuffix ? `${binding.instanceId}:${remoteNodeBase}:${portSuffix}` : null;
+        const nodeKey = `${binding.instanceId}:${remoteNodeBase}`;
+        let remoteVal = portKey ? remoteGaLiveValues.get(portKey) : undefined;
+        if (remoteVal === undefined) remoteVal = remoteGaLiveValues.get(nodeKey);
+        if (remoteVal !== undefined) {
+          const numVal = parseFloat(remoteVal);
+          bindingValues[bindingKey] = !isNaN(numVal) ? numVal : remoteVal;
+        }
       }
     } catch (err) {
       console.error(`Binding ${bindingKey} Read Fehler:`, err.message);
@@ -3942,6 +4045,27 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         await haPost(`/services/${domain}/${service}`, serviceData);
         haLastWrittenValues.set(bindingWriteKey, normalizedValue);
         console.log(`Output Binding HA ${domain}.${service} ${binding.haEntityId}: ${normalizedValue} (geaendert)`);
+      } else if (binding.driverType === 'remote-ga' && binding.instanceId && binding.pageId) {
+        const instance = (driverConfig.haInstances || []).find(i => i.id === binding.instanceId);
+        if (!instance) return;
+        const remoteWriteKey = `remote-ga:${binding.instanceId}:${binding.pageId}:${binding.datapointId}`;
+        const lastWritten = haLastWrittenValues.get(remoteWriteKey);
+        if (lastWritten !== undefined && String(lastWritten) === String(valueToWrite)) return;
+        const apiBase = await resolveRemoteGaApiBase(instance);
+        if (!apiBase) return;
+        const remoteNodeBase = binding.datapointId ? binding.datapointId.split(':')[0] : (binding.nodeId || '');
+        const headers = { Authorization: `Bearer ${instance.token}`, 'Content-Type': 'application/json' };
+        const manualOverrides = { [remoteNodeBase]: valueToWrite };
+        const r = await fetch(`${apiBase}/api/pages/${binding.pageId}/execute`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ manualOverrides }),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (r.ok) {
+          haLastWrittenValues.set(remoteWriteKey, valueToWrite);
+          console.log(`Output Binding remote-ga ${binding.instanceId}/${binding.pageId}/${remoteNodeBase}: ${valueToWrite}`);
+        }
       }
     } catch (err) {
       console.error(`Output Binding ${bindingKey} Write Fehler:`, err.message);
