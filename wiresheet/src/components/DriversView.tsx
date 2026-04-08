@@ -112,6 +112,13 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
   const [haInstanceSearchQuery, setHaInstanceSearchQuery] = useState<Record<string, string>>({});
   const [showTokens, setShowTokens] = useState<Set<string>>(new Set());
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveredHosts, setDiscoveredHosts] = useState<{ url: string; ip: string; name: string }[]>([]);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [authTarget, setAuthTarget] = useState<{ url: string; name: string } | null>(null);
+  const [authCredentials, setAuthCredentials] = useState({ username: '', password: '' });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -451,6 +458,54 @@ export const DriversView: React.FC<DriversViewProps> = ({
       setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: false }));
     }
   }, [instanceEntities]);
+
+  const handleDiscoverHa = useCallback(async () => {
+    setIsDiscovering(true);
+    setDiscoveredHosts([]);
+    setShowDiscovery(true);
+    try {
+      const resp = await fetch('/ha/discover');
+      const data = await resp.json();
+      setDiscoveredHosts(data.found || []);
+    } catch {
+      setDiscoveredHosts([]);
+    } finally {
+      setIsDiscovering(false);
+    }
+  }, []);
+
+  const handleAuthenticateInstance = useCallback(async () => {
+    if (!authTarget) return;
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const resp = await fetch('/ha/authenticate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: authTarget.url, username: authCredentials.username, password: authCredentials.password })
+      });
+      const data = await resp.json();
+      if (data.ok && data.token) {
+        const newInst: HaInstance = {
+          id: `ha-${Date.now()}`,
+          name: authTarget.name,
+          url: authTarget.url,
+          token: data.token,
+          enabled: true
+        };
+        onHaInstancesChange?.([...haInstances, newInst]);
+        setAuthTarget(null);
+        setAuthCredentials({ username: '', password: '' });
+        setDiscoveredHosts(prev => prev.filter(h => h.url !== authTarget.url));
+      } else {
+        setAuthError(data.msg || 'Anmeldung fehlgeschlagen');
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Netzwerkfehler');
+    } finally {
+      setAuthLoading(false);
+    }
+  }, [authTarget, authCredentials, haInstances, onHaInstancesChange]);
 
   const renderConfigDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint) => {
     const key = `${device.id}:${dp.id}`;
@@ -1162,13 +1217,24 @@ export const DriversView: React.FC<DriversViewProps> = ({
                   <span className="text-sm font-medium text-white">Weitere HA-Instanzen</span>
                   <span className="text-xs text-slate-500">({haInstances.length})</span>
                 </div>
-                <button
-                  onClick={() => setShowAddHaInstance(true)}
-                  className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
-                >
-                  <Plus className="w-3 h-3" />
-                  Hinzufuegen
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleDiscoverHa}
+                    disabled={isDiscovering}
+                    className="flex items-center gap-1 px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium disabled:opacity-50"
+                    title="Netzwerk nach HA-Instanzen durchsuchen"
+                  >
+                    {isDiscovering ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Suchen
+                  </button>
+                  <button
+                    onClick={() => setShowAddHaInstance(true)}
+                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Manuell
+                  </button>
+                </div>
               </div>
 
               {haInstances.length === 0 ? (
@@ -1282,6 +1348,133 @@ export const DriversView: React.FC<DriversViewProps> = ({
           </>
         )}
       </div>
+
+      {showDiscovery && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => !authTarget && setShowDiscovery(false)}>
+          <div className="bg-slate-800 rounded-xl border border-slate-600 w-[480px] max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <Wifi className="w-5 h-5 text-cyan-400" />
+                <div>
+                  <h3 className="text-base font-semibold text-white">HA-Instanzen im Netzwerk</h3>
+                  <p className="text-xs text-slate-400">Port 8123 wird im lokalen Netzwerk gesucht</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isDiscovering && <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />}
+                <button onClick={() => setShowDiscovery(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {isDiscovering && discoveredHosts.length === 0 && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-cyan-400 mx-auto mb-3" />
+                  <p className="text-sm text-slate-400">Suche nach Home Assistant Instanzen...</p>
+                  <p className="text-xs text-slate-500 mt-1">Dies kann bis zu 30 Sekunden dauern</p>
+                </div>
+              )}
+              {!isDiscovering && discoveredHosts.length === 0 && (
+                <div className="text-center py-8">
+                  <Wifi className="w-8 h-8 text-slate-600 mx-auto mb-3" />
+                  <p className="text-sm text-slate-400">Keine HA-Instanzen gefunden</p>
+                  <p className="text-xs text-slate-500 mt-1">Stelle sicher, dass HA auf Port 8123 erreichbar ist</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                {discoveredHosts.map(host => {
+                  const alreadyAdded = haInstances.some(i => i.url === host.url);
+                  return (
+                    <div key={host.url} className="flex items-center gap-3 p-3 bg-slate-900 rounded-lg border border-slate-700">
+                      <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{host.name}</div>
+                        <div className="text-xs text-slate-500">{host.url}</div>
+                      </div>
+                      {alreadyAdded ? (
+                        <span className="text-xs text-green-400 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Hinzugefuegt
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => { setAuthTarget(host); setAuthCredentials({ username: '', password: '' }); setAuthError(null); }}
+                          className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium whitespace-nowrap"
+                        >
+                          Anmelden
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {authTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
+          <div className="bg-slate-800 rounded-xl border border-slate-600 w-[400px] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-white">Anmelden bei HA</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{authTarget.name} — {authTarget.url}</p>
+              </div>
+              <button onClick={() => setAuthTarget(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Benutzername</label>
+                <input
+                  type="text"
+                  value={authCredentials.username}
+                  onChange={(e) => setAuthCredentials(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="admin"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
+                  autoComplete="username"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Passwort</label>
+                <input
+                  type="password"
+                  value={authCredentials.password}
+                  onChange={(e) => setAuthCredentials(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
+                  autoComplete="current-password"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
+                />
+              </div>
+              {authError && (
+                <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  {authError}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setAuthTarget(null)}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleAuthenticateInstance}
+                disabled={authLoading || !authCredentials.username || !authCredentials.password}
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium disabled:opacity-50"
+              >
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Anmelden & Hinzufuegen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddHaInstance && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddHaInstance(false)}>

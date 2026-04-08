@@ -654,6 +654,109 @@ app.post(['/ha/instances/test', '/api/ha/instances/test'], async (req, res) => {
   }
 });
 
+app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
+  const os = await import('os');
+  const found = [];
+
+  const getLocalSubnets = () => {
+    const subnets = new Set();
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const iface of (ifaces[name] || [])) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          const parts = iface.address.split('.');
+          subnets.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
+        }
+      }
+    }
+    return Array.from(subnets);
+  };
+
+  const tryHaHost = async (ip) => {
+    const url = `http://${ip}:8123`;
+    try {
+      const resp = await fetch(`${url}/api/`, { signal: AbortSignal.timeout(1200) });
+      if (resp.status === 401 || resp.ok) {
+        let name = ip;
+        try {
+          const infoResp = await fetch(`${url}/api/config`, { signal: AbortSignal.timeout(1500) });
+          if (infoResp.ok) {
+            const cfg = await infoResp.json();
+            name = cfg.location_name || ip;
+          }
+        } catch {}
+        return { url, ip, name };
+      }
+    } catch {}
+    return null;
+  };
+
+  try {
+    const subnets = getLocalSubnets();
+    const scanPromises = [];
+    for (const subnet of subnets) {
+      for (let i = 1; i <= 254; i++) {
+        scanPromises.push(tryHaHost(`${subnet}.${i}`));
+      }
+    }
+    const batchSize = 50;
+    for (let i = 0; i < scanPromises.length; i += batchSize) {
+      const results = await Promise.all(scanPromises.slice(i, i + batchSize));
+      results.forEach(r => { if (r) found.push(r); });
+    }
+  } catch (err) {
+    console.error('HA discover error:', err.message);
+  }
+
+  res.json({ found });
+});
+
+app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
+  const { url, username, password } = req.body;
+  if (!url || !username || !password) {
+    return res.status(400).json({ ok: false, msg: 'URL, Benutzername und Passwort erforderlich' });
+  }
+  const base = url.replace(/\/$/, '');
+  try {
+    const flow1 = await fetch(`${base}/auth/login_flow`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: base, handler: ['homeassistant', null], redirect_uri: `${base}/` }),
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!flow1.ok) return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen (${flow1.status})` });
+    const flow1Data = await flow1.json();
+    const flowId = flow1Data.flow_id;
+    if (!flowId) return res.json({ ok: false, msg: 'Kein Flow-ID erhalten' });
+
+    const flow2 = await fetch(`${base}/auth/login_flow/${flowId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      signal: AbortSignal.timeout(6000)
+    });
+    const flow2Data = await flow2.json();
+    if (!flow2Data.result) return res.json({ ok: false, msg: 'Anmeldedaten ungueltig' });
+
+    const tokenResp = await fetch(`${base}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: flow2Data.result,
+        client_id: base
+      }).toString(),
+      signal: AbortSignal.timeout(6000)
+    });
+    const tokenData = await tokenResp.json();
+    if (!tokenData.access_token) return res.json({ ok: false, msg: 'Token konnte nicht abgerufen werden' });
+
+    res.json({ ok: true, token: tokenData.access_token, msg: 'Anmeldung erfolgreich' });
+  } catch (err) {
+    res.json({ ok: false, msg: err.message });
+  }
+});
+
 app.get(['/driver-live-values', '/api/driver-live-values'], (req, res) => {
   res.json({
     modbus: Object.fromEntries(modbusLiveValues),

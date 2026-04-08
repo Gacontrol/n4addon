@@ -397,12 +397,17 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         }
       }
     };
-    const handleUp = () => setDraggingVertex(null);
+    document.body.style.cursor = 'crosshair';
+    const handleUp = () => {
+      setDraggingVertex(null);
+      document.body.style.cursor = '';
+    };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      document.body.style.cursor = '';
     };
   }, [draggingVertex, widget.config, onUpdateConfig, zoom]);
 
@@ -676,9 +681,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
             />
             {isEditMode && isSelected && (
               <>
-                <circle cx={x1} cy={y1} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'grab' }}
+                <circle cx={x1} cy={y1} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'crosshair' }}
                   onMouseDown={(e) => handleVertexMouseDown(e, 'line', 0, { x: x1abs, y: y1abs })} />
-                <circle cx={x2} cy={y2} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'grab' }}
+                <circle cx={x2} cy={y2} r={sw / 2} fill="#3b82f6" stroke="white" strokeWidth={1} style={{ cursor: 'crosshair' }}
                   onMouseDown={(e) => handleVertexMouseDown(e, 'line', 1, { x: x2abs, y: y2abs })} />
               </>
             )}
@@ -768,7 +773,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
               />
               {isEditMode && isSelected && freehandPts.map((pt, i) => (
                 <circle key={i} cx={pt.x} cy={pt.y} r={6} fill="#3b82f6" stroke="white" strokeWidth={2}
-                  style={{ cursor: 'grab' }}
+                  style={{ cursor: 'crosshair' }}
                   onMouseDown={(e) => handleVertexMouseDown(e, 'polygon', i, pt)} />
               ))}
             </svg>
@@ -909,7 +914,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
                 fill="#3b82f6"
                 stroke="white"
                 strokeWidth={2}
-                style={{ cursor: 'grab' }}
+                style={{ cursor: 'crosshair' }}
                 onMouseDown={(e) => handleVertexMouseDown(e, 'polyline', i, pt)}
               />
             ))}
@@ -1572,7 +1577,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
@@ -1599,7 +1604,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget ? 0 : 8,
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget ? 0 : 8,
+        overflow: is3DBuildingWidget ? 'hidden' : undefined,
         transition: isHighlighted ? 'box-shadow 0.3s ease-in-out, border 0.3s ease-in-out' : undefined
       } as React.CSSProperties}
       onMouseDown={onMouseDown}
