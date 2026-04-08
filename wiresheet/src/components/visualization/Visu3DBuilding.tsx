@@ -253,7 +253,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   if (loading) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center"
+        className="absolute inset-0 flex items-center justify-center"
         style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}
       >
         <div className="flex flex-col items-center gap-2">
@@ -267,7 +267,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   if (error || buildings.length === 0) {
     return (
       <div
-        className="w-full h-full flex items-center justify-center"
+        className="absolute inset-0 flex items-center justify-center"
         style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}
       >
         <div className="flex flex-col items-center gap-2 text-center px-4">
@@ -292,7 +292,7 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const canClickFloors = floorsClickable && !config.showAllFloors;
 
   return (
-    <div className="w-full h-full relative overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
+    <div className="absolute inset-0 overflow-hidden" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
         buildings={filteredBuildings}
         activeFloorId={displayedFloorId}

@@ -1549,7 +1549,7 @@ export function BuildingCanvas3D({
           powerPreference: 'high-performance',
         }}
         onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); onSelectFurniture?.(null); }}
-        style={{ background: bgTransparent ? 'transparent' : bgColor }}
+        style={{ background: bgTransparent ? 'transparent' : bgColor, position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
       >
         {!bgTransparent && <color attach="background" args={[bgColor]} />}
         {!bgTransparent && <fog attach="fog" args={[effectiveBgColor, 60, 200]} />}
