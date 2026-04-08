@@ -900,14 +900,30 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
 
     const privateRanges = [
       '192.168.0', '192.168.1', '192.168.2', '192.168.100', '192.168.178',
-      '10.0.0', '10.0.1', '10.1.1', '172.16.0', '172.16.1'
+      '10.0.0', '10.0.1', '10.1.1'
     ];
     for (const s of privateRanges) subnets.add(s);
 
-    return Array.from(subnets);
+    const filtered = new Set();
+    for (const subnet of subnets) {
+      const first = Number(subnet.split('.')[0]);
+      const second = Number(subnet.split('.')[1]);
+      if (first === 172 && second >= 16 && second <= 31) continue;
+      if (first === 10 && second === 0 && Number(subnet.split('.')[2]) === 2) continue;
+      filtered.add(subnet);
+    }
+    return Array.from(filtered);
+  };
+
+  const isInternalDockerIP = (ip) => {
+    const parts = ip.split('.').map(Number);
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 10 && parts[1] === 0 && parts[2] === 2) return true;
+    return false;
   };
 
   const tryHaHost = async (ip) => {
+    if (isInternalDockerIP(ip)) return null;
     const url = `http://${ip}:8123`;
     try {
       const ctrl = new AbortController();
@@ -1051,31 +1067,85 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
 });
 
 app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
-  const { url, username, password } = req.body;
-  if (!url || !username || !password) {
-    return res.status(400).json({ ok: false, msg: 'URL, Benutzername und Passwort erforderlich' });
+  const { url, username, password, token: directToken } = req.body;
+  if (!url) {
+    return res.status(400).json({ ok: false, msg: 'URL erforderlich' });
   }
   const base = url.replace(/\/$/, '');
+
+  if (directToken) {
+    try {
+      const testResp = await fetch(`${base}/api/`, {
+        headers: { Authorization: `Bearer ${directToken}` },
+        signal: AbortSignal.timeout(6000)
+      });
+      if (testResp.ok || testResp.status === 200) {
+        return res.json({ ok: true, token: directToken, msg: 'Token gueltig' });
+      }
+      return res.json({ ok: false, msg: `Token ungueltig (${testResp.status})` });
+    } catch (err) {
+      return res.json({ ok: false, msg: err.message });
+    }
+  }
+
+  if (!username || !password) {
+    return res.status(400).json({ ok: false, msg: 'Benutzername und Passwort oder Token erforderlich' });
+  }
+
+  const parsed = new URL(base);
+  const clientId = `${parsed.protocol}//${parsed.host}/`;
+  const redirectUri = `${parsed.protocol}//${parsed.host}/?auth_callback=1`;
+
   try {
-    const flow1 = await fetch(`${base}/auth/login_flow`, {
+    const flow1Resp = await fetch(`${base}/auth/login_flow`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: base, handler: ['homeassistant', null], redirect_uri: `${base}/` }),
-      signal: AbortSignal.timeout(6000)
+      body: JSON.stringify({
+        client_id: clientId,
+        handler: ['homeassistant', null],
+        redirect_uri: redirectUri
+      }),
+      signal: AbortSignal.timeout(8000)
     });
-    if (!flow1.ok) return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen (${flow1.status})` });
-    const flow1Data = await flow1.json();
+
+    const flow1Text = await flow1Resp.text();
+    let flow1Data;
+    try {
+      flow1Data = JSON.parse(flow1Text);
+    } catch {
+      console.error('HA auth flow1 non-JSON response:', flow1Text.slice(0, 200));
+      return res.json({ ok: false, msg: `Login-Flow Fehler: ungueltige Antwort vom HA-Server (${flow1Resp.status})` });
+    }
+
+    if (!flow1Resp.ok || flow1Data.errors) {
+      return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen: ${JSON.stringify(flow1Data.errors || flow1Data)}` });
+    }
+
     const flowId = flow1Data.flow_id;
     if (!flowId) return res.json({ ok: false, msg: 'Kein Flow-ID erhalten' });
 
-    const flow2 = await fetch(`${base}/auth/login_flow/${flowId}`, {
+    const flow2Resp = await fetch(`${base}/auth/login_flow/${flowId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
-      signal: AbortSignal.timeout(6000)
+      signal: AbortSignal.timeout(8000)
     });
-    const flow2Data = await flow2.json();
-    if (!flow2Data.result) return res.json({ ok: false, msg: 'Anmeldedaten ungueltig' });
+
+    const flow2Text = await flow2Resp.text();
+    let flow2Data;
+    try {
+      flow2Data = JSON.parse(flow2Text);
+    } catch {
+      console.error('HA auth flow2 non-JSON response:', flow2Text.slice(0, 200));
+      return res.json({ ok: false, msg: 'Anmelde-Antwort konnte nicht verarbeitet werden' });
+    }
+
+    if (flow2Data.errors || flow2Data.type === 'abort') {
+      return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
+    }
+    if (!flow2Data.result) {
+      return res.json({ ok: false, msg: `Anmeldung fehlgeschlagen: ${flow2Data.description || JSON.stringify(flow2Data)}` });
+    }
 
     const tokenResp = await fetch(`${base}/auth/token`, {
       method: 'POST',
@@ -1083,16 +1153,28 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: flow2Data.result,
-        client_id: base
+        client_id: clientId
       }).toString(),
-      signal: AbortSignal.timeout(6000)
+      signal: AbortSignal.timeout(8000)
     });
-    const tokenData = await tokenResp.json();
-    if (!tokenData.access_token) return res.json({ ok: false, msg: 'Token konnte nicht abgerufen werden' });
+
+    const tokenText = await tokenResp.text();
+    let tokenData;
+    try {
+      tokenData = JSON.parse(tokenText);
+    } catch {
+      console.error('HA auth token non-JSON response:', tokenText.slice(0, 200));
+      return res.json({ ok: false, msg: 'Token-Antwort konnte nicht verarbeitet werden' });
+    }
+
+    if (!tokenData.access_token) {
+      return res.json({ ok: false, msg: `Token-Abruf fehlgeschlagen: ${tokenData.error_description || tokenData.error || 'unbekannter Fehler'}` });
+    }
 
     res.json({ ok: true, token: tokenData.access_token, msg: 'Anmeldung erfolgreich' });
   } catch (err) {
-    res.json({ ok: false, msg: err.message });
+    console.error('HA auth error:', err);
+    res.json({ ok: false, msg: `Verbindungsfehler: ${err.message}` });
   }
 });
 

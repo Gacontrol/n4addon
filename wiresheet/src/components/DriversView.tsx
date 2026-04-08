@@ -121,6 +121,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [authTarget, setAuthTarget] = useState<{ url: string; name: string } | null>(null);
   const [authCredentials, setAuthCredentials] = useState({ username: '', password: '' });
+  const [authToken, setAuthToken] = useState('');
+  const [authMode, setAuthMode] = useState<'credentials' | 'token'>('credentials');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
@@ -520,10 +522,14 @@ export const DriversView: React.FC<DriversViewProps> = ({
     setAuthLoading(true);
     setAuthError(null);
     try {
+      const body = authMode === 'token'
+        ? { url: authTarget.url, token: authToken }
+        : { url: authTarget.url, username: authCredentials.username, password: authCredentials.password };
+
       const resp = await fetch('/ha/authenticate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: authTarget.url, username: authCredentials.username, password: authCredentials.password })
+        body: JSON.stringify(body)
       });
       const data = await resp.json();
       if (data.ok && data.token) {
@@ -537,6 +543,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
         onHaInstancesChange?.([...haInstances, newInst]);
         setAuthTarget(null);
         setAuthCredentials({ username: '', password: '' });
+        setAuthToken('');
         setDiscoveredHosts(prev => prev.filter(h => h.url !== authTarget.url));
       } else {
         setAuthError(data.msg || 'Anmeldung fehlgeschlagen');
@@ -546,7 +553,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
     } finally {
       setAuthLoading(false);
     }
-  }, [authTarget, authCredentials, haInstances, onHaInstancesChange]);
+  }, [authTarget, authMode, authToken, authCredentials, haInstances, onHaInstancesChange]);
 
   const renderConfigDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint) => {
     const key = `${device.id}:${dp.id}`;
@@ -1464,40 +1471,93 @@ export const DriversView: React.FC<DriversViewProps> = ({
 
       {authTarget && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]">
-          <div className="bg-slate-800 rounded-xl border border-slate-600 w-[400px] p-5">
+          <div className="bg-slate-800 rounded-xl border border-slate-600 w-[420px] p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-semibold text-white">Anmelden bei HA</h3>
                 <p className="text-xs text-slate-400 mt-0.5">{authTarget.name} — {authTarget.url}</p>
               </div>
-              <button onClick={() => setAuthTarget(null)} className="text-slate-400 hover:text-white">
+              <button onClick={() => { setAuthTarget(null); setAuthError(null); }} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Benutzername</label>
-                <input
-                  type="text"
-                  value={authCredentials.username}
-                  onChange={(e) => setAuthCredentials(prev => ({ ...prev, username: e.target.value }))}
-                  placeholder="admin"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                  autoComplete="username"
-                />
+                <label className="block text-xs text-slate-400 mb-2">Authentifizierung</label>
+                <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('credentials'); setAuthError(null); }}
+                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${authMode === 'credentials' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    Benutzername & Passwort
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('token'); setAuthError(null); }}
+                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${authMode === 'token' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    Long-Lived Token
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Passwort</label>
-                <input
-                  type="password"
-                  value={authCredentials.password}
-                  onChange={(e) => setAuthCredentials(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                  autoComplete="current-password"
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
-                />
-              </div>
+
+              {authMode === 'credentials' ? (
+                <>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Benutzername</label>
+                    <input
+                      type="text"
+                      value={authCredentials.username}
+                      onChange={(e) => setAuthCredentials(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="admin"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
+                      autoComplete="username"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Passwort</label>
+                    <input
+                      type="password"
+                      value={authCredentials.password}
+                      onChange={(e) => setAuthCredentials(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
+                      autoComplete="current-password"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
+                  <div className="relative">
+                    <input
+                      type={showTokens.has('auth-dialog') ? 'text' : 'password'}
+                      value={authToken}
+                      onChange={(e) => setAuthToken(e.target.value)}
+                      placeholder="eyJ..."
+                      className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTokens(prev => {
+                        const next = new Set(prev);
+                        if (next.has('auth-dialog')) next.delete('auth-dialog'); else next.add('auth-dialog');
+                        return next;
+                      })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showTokens.has('auth-dialog') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
+                </div>
+              )}
+
               {authError && (
                 <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded px-3 py-2">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
@@ -1507,14 +1567,14 @@ export const DriversView: React.FC<DriversViewProps> = ({
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => setAuthTarget(null)}
+                onClick={() => { setAuthTarget(null); setAuthError(null); }}
                 className="px-4 py-2 text-sm text-slate-400 hover:text-white"
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleAuthenticateInstance}
-                disabled={authLoading || !authCredentials.username || !authCredentials.password}
+                disabled={authLoading || (authMode === 'credentials' ? (!authCredentials.username || !authCredentials.password) : !authToken)}
                 className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium disabled:opacity-50"
               >
                 {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
