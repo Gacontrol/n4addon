@@ -1446,6 +1446,46 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   }
 });
 
+function buildProxyAssetUrl(assetUrl, proxyBase, token) {
+  return `${proxyBase}/api/remote-visu-asset?url=${encodeURIComponent(assetUrl)}&token=${encodeURIComponent(token)}`;
+}
+
+function rewriteHtmlUrls(html, origin, proxyBase, token) {
+  const absUrl = (rel) => {
+    try {
+      return new URL(rel, origin).href;
+    } catch {
+      return null;
+    }
+  };
+
+  const shouldProxy = (url) => {
+    if (!url) return false;
+    if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:') || url.startsWith('#')) return false;
+    try {
+      const u = new URL(url, origin);
+      return u.origin === new URL(origin).origin;
+    } catch {
+      return false;
+    }
+  };
+
+  const proxyUrl = (rel) => {
+    const abs = absUrl(rel);
+    if (!abs || !shouldProxy(abs)) return rel;
+    return buildProxyAssetUrl(abs, proxyBase, token);
+  };
+
+  return html
+    .replace(/(<script[^>]+\bsrc\s*=\s*)(["'])([^"']+)\2/gi, (m, pre, q, url) => `${pre}${q}${proxyUrl(url)}${q}`)
+    .replace(/(<link[^>]+\bhref\s*=\s*)(["'])([^"']+)\2/gi, (m, pre, q, url) => `${pre}${q}${proxyUrl(url)}${q}`)
+    .replace(/(<img[^>]+\bsrc\s*=\s*)(["'])([^"']+)\2/gi, (m, pre, q, url) => `${pre}${q}${proxyUrl(url)}${q}`)
+    .replace(/(url\s*\(\s*)(["']?)([^"')]+)\2(\s*\))/gi, (m, pre, q, url, post) => {
+      const proxied = proxyUrl(url.trim());
+      return `${pre}${q}${proxied}${q}${post}`;
+    });
+}
+
 app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   const { url: rawUrl, token } = req.query;
   if (!rawUrl || !token) {
@@ -1458,6 +1498,17 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   } catch {
     return res.status(400).json({ __proxyError: true, message: 'Ungültige URL' });
   }
+
+  const ingressHeader = req.headers['x-ingress-path'] || '';
+  let proxyBase = '';
+  if (ingressHeader) {
+    proxyBase = ingressHeader.replace(/\/$/, '');
+  } else {
+    const originalUrl = req.originalUrl || req.url || '';
+    const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+    if (pathMatch) proxyBase = pathMatch[1];
+  }
+
   try {
     const upstreamRes = await fetch(targetUrl, {
       headers: {
@@ -1482,7 +1533,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     if (!contentType.includes('text/html')) {
       const buf = await upstreamRes.arrayBuffer();
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, max-age=3600');
       return res.send(Buffer.from(buf));
     }
 
@@ -1515,10 +1566,35 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   } catch(e) {}
   window.__WIRESHEET_PROXY_TOKEN__ = WS_TOKEN;
   window.__WIRESHEET_PROXY_ORIGIN__ = WS_ORIGIN;
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    try {
+      var u = new URL(url, WS_ORIGIN);
+      if (u.origin === WS_ORIGIN) {
+        opts = opts || {};
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + WS_TOKEN });
+      }
+    } catch(e) {}
+    return _origFetch.call(this, url, opts);
+  };
+  var _origXHR = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url) {
+    this._wsUrl = url;
+    return _origXHR.apply(this, arguments);
+  };
+  var _origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function() {
+    try {
+      var u = new URL(this._wsUrl, WS_ORIGIN);
+      if (u.origin === WS_ORIGIN) this.setRequestHeader('Authorization', 'Bearer ' + WS_TOKEN);
+    } catch(e) {}
+    return _origSend.apply(this, arguments);
+  };
 })();
 </script>`;
 
-    let processed = body;
+    let processed = rewriteHtmlUrls(body, origin, proxyBase, token);
+
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
     } else if (processed.includes('<body')) {
@@ -1531,6 +1607,39 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   } catch (err) {
     console.error('[remote-visu-proxy] error:', err.message);
     res.status(502).json({ __proxyError: true, message: `Verbindungsfehler: ${err.message}` });
+  }
+});
+
+app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
+  const { url: rawUrl, token } = req.query;
+  if (!rawUrl || !token) return res.status(400).end();
+  let targetUrl;
+  try {
+    targetUrl = rawUrl;
+    new URL(targetUrl);
+  } catch {
+    return res.status(400).end();
+  }
+  try {
+    const upstreamRes = await fetch(targetUrl, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'WiresheetProxy/1.0'
+      },
+      signal: AbortSignal.timeout(15000),
+      redirect: 'follow'
+    });
+    if (!upstreamRes.ok) return res.status(upstreamRes.status).end();
+    const contentType = upstreamRes.headers.get('content-type') || 'application/octet-stream';
+    const buf = await upstreamRes.arrayBuffer();
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.send(Buffer.from(buf));
+  } catch (err) {
+    console.error('[remote-visu-asset] error:', err.message);
+    res.status(502).end();
   }
 });
 

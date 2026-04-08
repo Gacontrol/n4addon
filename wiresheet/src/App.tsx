@@ -1757,6 +1757,8 @@ function App() {
               instanceEntitiesLoading={instanceEntitiesLoading}
               instanceEntitiesError={instanceEntitiesError}
               onReloadInstanceEntities={() => loadInstanceEntities()}
+              instanceDriverPoints={instanceDriverPoints}
+              instanceGaPages={instanceGaPages}
             />
 
             <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} sm:flex w-52 sm:w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col absolute sm:relative z-30 top-0 bottom-0 left-0 h-full`}>
@@ -1908,6 +1910,8 @@ function App() {
               instanceEntitiesLoading={instanceEntitiesLoading}
               instanceEntitiesError={instanceEntitiesError}
               onReloadInstanceEntities={() => loadInstanceEntities()}
+              instanceDriverPoints={instanceDriverPoints}
+              instanceGaPages={instanceGaPages}
             />
 
             {selectedNodeData && (

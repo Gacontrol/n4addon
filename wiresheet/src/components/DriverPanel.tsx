@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer, AlertTriangle, RefreshCw, Loader2, WifiOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer, AlertTriangle, RefreshCw, Loader2, WifiOff, Layers, GitBranch } from 'lucide-react';
 import { ModbusDevice, DriverBinding, HaDevice, HaEntity, HaInstance } from '../types/flow';
+
+type InstanceDriverSheet = { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] };
+type InstanceModbusDevice = { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] };
+type InstanceDriverPoints = { sheets: InstanceDriverSheet[]; modbusDevices: InstanceModbusDevice[] };
+type GaPage = { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] };
 
 const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
 
@@ -55,6 +60,8 @@ interface DriverPanelProps {
   instanceEntitiesLoading?: Record<string, boolean>;
   instanceEntitiesError?: Record<string, string>;
   onReloadInstanceEntities?: () => void;
+  instanceDriverPoints?: Record<string, InstanceDriverPoints>;
+  instanceGaPages?: Record<string, GaPage[]>;
 }
 
 const STORAGE_KEY_PREFIX = 'wiresheet-driver-panel-';
@@ -76,7 +83,9 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   instanceDevices = {},
   instanceEntitiesLoading = {},
   instanceEntitiesError = {},
-  onReloadInstanceEntities
+  onReloadInstanceEntities,
+  instanceDriverPoints = {},
+  instanceGaPages = {},
 }) => {
   const storageKey = `${STORAGE_KEY_PREFIX}${side}`;
 
@@ -569,6 +578,15 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               const isLoading = instanceEntitiesLoading[instance.id];
               const error = instanceEntitiesError[instance.id];
               const sectionKey = `inst-${instance.id}`;
+              const driverPts = instanceDriverPoints[instance.id];
+              const gaPages = instanceGaPages[instance.id] || [];
+
+              const driverSheets = driverPts?.sheets || [];
+              const driverModbus = driverPts?.modbusDevices || [];
+              const hasDriverPoints = driverSheets.some(s => s.nodes.length > 0) || driverModbus.some(d => d.datapoints.length > 0);
+              const hasGaPages = gaPages.some(p => p.nodes.length > 0);
+
+              const totalCount = instDevs.length + (hasDriverPoints ? 1 : 0) + (hasGaPages ? 1 : 0);
 
               return (
                 <div key={instance.id} className="border-b border-slate-700">
@@ -588,7 +606,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         <WifiOff className="w-3 h-3 text-red-400 flex-shrink-0" />
                       ) : (
                         <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded flex-shrink-0">
-                          {instDevs.length}
+                          {totalCount}
                         </span>
                       )}
                       {expandedDriverTypes.has(sectionKey) ? (
@@ -614,78 +632,250 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                           <span className="text-[10px] text-red-300 truncate">{error}</span>
                         </div>
                       )}
-                      {isLoading && !error && (
-                        <div className="flex items-center gap-2 px-3 py-2">
-                          <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />
-                          <span className="text-[10px] text-slate-400">Laedt Entities...</span>
+
+                      {instDevs.length > 0 && (
+                        <div className="border-b border-slate-700/40">
+                          <button
+                            onClick={() => toggleDriverType(`${sectionKey}-entities`)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-700/30 transition-colors"
+                          >
+                            <Activity className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                            <span className="flex-1 text-[10px] font-medium text-slate-300 text-left">Entities</span>
+                            <span className="text-[9px] text-slate-500 bg-slate-700/60 px-1 py-0.5 rounded">{instDevs.length}</span>
+                            {expandedDriverTypes.has(`${sectionKey}-entities`) ? <ChevronUp className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+                          </button>
+                          {expandedDriverTypes.has(`${sectionKey}-entities`) && (
+                            <div>
+                              {isLoading && (
+                                <div className="flex items-center gap-2 px-4 py-2">
+                                  <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />
+                                  <span className="text-[10px] text-slate-400">Laedt...</span>
+                                </div>
+                              )}
+                              {instDevs.map(device => {
+                                const entities = getHaEntitiesForPanel(device);
+                                const isExpanded = expandedHaDevices.has(device.id);
+                                return (
+                                  <div key={`inst-${instance.id}-${device.id}`} className="border-b border-slate-700/20">
+                                    <button
+                                      onClick={() => toggleHaDevice(device.id)}
+                                      className="w-full flex items-center gap-2 px-5 py-1.5 hover:bg-slate-700/50 transition-colors"
+                                    >
+                                      <Circle className="w-2 h-2 flex-shrink-0 text-emerald-400 fill-emerald-400" />
+                                      <span className="flex-1 text-[10px] font-medium text-slate-200 truncate text-left">{device.name}</span>
+                                      {isExpanded ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+                                    </button>
+                                    {isExpanded && (
+                                      <div className="bg-slate-900/50">
+                                        {entities.map(entity => {
+                                          const binding = getBindingForHaEntity(entity.entity_id);
+                                          const isConnecting = !!connectingFrom;
+                                          const rawFriendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
+                                          const friendlyName = rawFriendlyName.startsWith(device.name + ' ')
+                                            ? rawFriendlyName.slice(device.name.length + 1).trim() || rawFriendlyName
+                                            : rawFriendlyName;
+                                          const unit = entity.attributes.unit_of_measurement as string || '';
+                                          const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
+                                          return (
+                                            <div
+                                              key={entity.entity_id}
+                                              className={`group flex items-center gap-2 px-6 py-1 cursor-pointer transition-colors ${
+                                                isConnecting ? 'hover:bg-blue-600/30 bg-blue-900/20' : 'hover:bg-slate-700/30'
+                                              } ${binding ? 'bg-cyan-900/20' : ''} ${isHaHighlighted ? 'ring-2 ring-cyan-400 bg-cyan-800/40 animate-pulse' : ''}`}
+                                              onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
+                                              draggable
+                                              onDragStart={(e) => {
+                                                e.dataTransfer.setData('application/json', JSON.stringify({
+                                                  type: 'driver-datapoint', driverType: 'homeassistant', device, entity, isOutput: isOutputPanel
+                                                }));
+                                              }}
+                                            >
+                                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${binding ? 'bg-cyan-400' : isConnecting ? 'bg-blue-400 animate-pulse' : 'bg-slate-500'}`} />
+                                              {getHaEntityIcon(entity.entity_id)}
+                                              <span className={`flex-1 text-[10px] truncate ${binding ? 'text-cyan-300' : 'text-slate-300'}`}>{friendlyName}</span>
+                                              {binding && <span className="text-[8px] text-cyan-500 bg-cyan-900/40 px-1 py-0.5 rounded">verb.</span>}
+                                              {unit && !binding && <span className="text-[9px] text-slate-500">{unit}</span>}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
-                      {!isLoading && !error && instDevs.length === 0 && (
+
+                      {hasDriverPoints && (
+                        <div className="border-b border-slate-700/40">
+                          <button
+                            onClick={() => toggleDriverType(`${sectionKey}-driver`)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-700/30 transition-colors"
+                          >
+                            <Layers className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                            <span className="flex-1 text-[10px] font-medium text-slate-300 text-left">Treiber</span>
+                            <span className="text-[9px] text-slate-500 bg-slate-700/60 px-1 py-0.5 rounded">
+                              {driverSheets.reduce((a, s) => a + s.nodes.length, 0) + driverModbus.reduce((a, d) => a + d.datapoints.length, 0)}
+                            </span>
+                            {expandedDriverTypes.has(`${sectionKey}-driver`) ? <ChevronUp className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+                          </button>
+                          {expandedDriverTypes.has(`${sectionKey}-driver`) && (
+                            <div>
+                              {driverModbus.map(dev => dev.datapoints.length > 0 && (
+                                <div key={dev.id} className="border-b border-slate-700/20">
+                                  <button
+                                    onClick={() => toggleHaDevice(`dp-modbus-${dev.id}`)}
+                                    className="w-full flex items-center gap-2 px-5 py-1.5 hover:bg-slate-700/50 transition-colors"
+                                  >
+                                    <Network className="w-3 h-3 text-orange-400 flex-shrink-0" />
+                                    <span className="flex-1 text-[10px] font-medium text-slate-200 truncate text-left">{dev.name}</span>
+                                    {expandedHaDevices.has(`dp-modbus-${dev.id}`) ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+                                  </button>
+                                  {expandedHaDevices.has(`dp-modbus-${dev.id}`) && (
+                                    <div className="bg-slate-900/50">
+                                      {dev.datapoints.map(dp => (
+                                        <div
+                                          key={dp.id}
+                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                          draggable
+                                          onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                              type: 'remote-driver-point',
+                                              instanceId: instance.id,
+                                              instanceName: instance.name,
+                                              driverType: 'modbus',
+                                              deviceId: dev.id,
+                                              deviceName: dev.name,
+                                              datapointId: dp.id,
+                                              datapointName: dp.name,
+                                              unit: dp.unit,
+                                              dataType: dp.type,
+                                            }));
+                                          }}
+                                        >
+                                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500/70 flex-shrink-0" />
+                                          <Cpu className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                          <span className="flex-1 text-[10px] text-slate-300 truncate">{dp.name}</span>
+                                          {dp.unit && <span className="text-[9px] text-slate-500">{dp.unit}</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {driverSheets.map(sheet => sheet.nodes.length > 0 && (
+                                <div key={sheet.id} className="border-b border-slate-700/20">
+                                  <button
+                                    onClick={() => toggleHaDevice(`dp-sheet-${sheet.id}`)}
+                                    className="w-full flex items-center gap-2 px-5 py-1.5 hover:bg-slate-700/50 transition-colors"
+                                  >
+                                    <Layers className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                                    <span className="flex-1 text-[10px] font-medium text-slate-200 truncate text-left">{sheet.name}</span>
+                                    {expandedHaDevices.has(`dp-sheet-${sheet.id}`) ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+                                  </button>
+                                  {expandedHaDevices.has(`dp-sheet-${sheet.id}`) && (
+                                    <div className="bg-slate-900/50">
+                                      {sheet.nodes.map(node => (
+                                        <div
+                                          key={node.id}
+                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                          draggable
+                                          onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                              type: 'remote-driver-point',
+                                              instanceId: instance.id,
+                                              instanceName: instance.name,
+                                              driverType: 'sheet',
+                                              sheetId: sheet.id,
+                                              sheetName: sheet.name,
+                                              nodeId: node.id,
+                                              nodeName: node.label,
+                                              unit: node.unit,
+                                              nodeType: node.type,
+                                            }));
+                                          }}
+                                        >
+                                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70 flex-shrink-0" />
+                                          <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                          <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label}</span>
+                                          {node.unit && <span className="text-[9px] text-slate-500">{node.unit}</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {hasGaPages && (
+                        <div className="border-b border-slate-700/40">
+                          <button
+                            onClick={() => toggleDriverType(`${sectionKey}-ga`)}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-700/30 transition-colors"
+                          >
+                            <GitBranch className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                            <span className="flex-1 text-[10px] font-medium text-slate-300 text-left">GA-Control</span>
+                            <span className="text-[9px] text-slate-500 bg-slate-700/60 px-1 py-0.5 rounded">
+                              {gaPages.reduce((a, p) => a + p.nodes.length, 0)}
+                            </span>
+                            {expandedDriverTypes.has(`${sectionKey}-ga`) ? <ChevronUp className="w-3 h-3 text-slate-500" /> : <ChevronDown className="w-3 h-3 text-slate-500" />}
+                          </button>
+                          {expandedDriverTypes.has(`${sectionKey}-ga`) && (
+                            <div>
+                              {gaPages.map(page => page.nodes.length > 0 && (
+                                <div key={page.id} className="border-b border-slate-700/20">
+                                  <button
+                                    onClick={() => toggleHaDevice(`ga-page-${page.id}`)}
+                                    className="w-full flex items-center gap-2 px-5 py-1.5 hover:bg-slate-700/50 transition-colors"
+                                  >
+                                    <GitBranch className="w-3 h-3 text-teal-400/70 flex-shrink-0" />
+                                    <span className="flex-1 text-[10px] font-medium text-slate-200 truncate text-left">{page.name}</span>
+                                    {expandedHaDevices.has(`ga-page-${page.id}`) ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+                                  </button>
+                                  {expandedHaDevices.has(`ga-page-${page.id}`) && (
+                                    <div className="bg-slate-900/50">
+                                      {page.nodes.map(node => (
+                                        <div
+                                          key={node.id}
+                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                          draggable
+                                          onDragStart={(e) => {
+                                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                              type: 'remote-ga-point',
+                                              instanceId: instance.id,
+                                              instanceName: instance.name,
+                                              pageId: page.id,
+                                              pageName: page.name,
+                                              nodeId: node.id,
+                                              nodeName: node.label,
+                                              unit: node.unit,
+                                              nodeType: node.type,
+                                            }));
+                                          }}
+                                        >
+                                          <div className="w-1.5 h-1.5 rounded-full bg-teal-500/70 flex-shrink-0" />
+                                          <Gauge className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                          <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label || node.id}</span>
+                                          {node.unit && <span className="text-[9px] text-slate-500">{node.unit}</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {!isLoading && !error && instDevs.length === 0 && !hasDriverPoints && !hasGaPages && (
                         <div className="px-3 py-2 text-[10px] text-slate-500">Keine Datenpunkte</div>
                       )}
-                      {instDevs.map(device => {
-                        const entities = getHaEntitiesForPanel(device);
-                        const isExpanded = expandedHaDevices.has(device.id);
-                        return (
-                          <div key={`inst-${instance.id}-${device.id}`} className="border-b border-slate-700/30">
-                            <button
-                              onClick={() => toggleHaDevice(device.id)}
-                              className="w-full flex items-center gap-2 px-4 py-1.5 hover:bg-slate-700/50 transition-colors"
-                            >
-                              <Circle className="w-2 h-2 flex-shrink-0 text-emerald-400 fill-emerald-400" />
-                              <span className="flex-1 text-[11px] font-medium text-slate-200 truncate text-left">
-                                {device.name}
-                              </span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3 h-3 text-slate-400" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3 text-slate-400" />
-                              )}
-                            </button>
-                            {isExpanded && (
-                              <div className="bg-slate-900/50">
-                                {entities.map(entity => {
-                                  const binding = getBindingForHaEntity(entity.entity_id);
-                                  const isConnecting = !!connectingFrom;
-                                  const rawFriendlyName = (entity.attributes.friendly_name as string) || entity.entity_id;
-                                  const friendlyName = rawFriendlyName.startsWith(device.name + ' ')
-                                    ? rawFriendlyName.slice(device.name.length + 1).trim() || rawFriendlyName
-                                    : rawFriendlyName;
-                                  const unit = entity.attributes.unit_of_measurement as string || '';
-                                  const isHaHighlighted = shouldHighlight && highlightedBinding?.haEntityId === entity.entity_id;
-                                  return (
-                                    <div
-                                      key={entity.entity_id}
-                                      className={`group flex items-center gap-2 px-5 py-1 cursor-pointer transition-colors ${
-                                        isConnecting ? 'hover:bg-blue-600/30 bg-blue-900/20' : 'hover:bg-slate-700/30'
-                                      } ${binding ? 'bg-cyan-900/20' : ''} ${isHaHighlighted ? 'ring-2 ring-cyan-400 bg-cyan-800/40 animate-pulse' : ''}`}
-                                      onClick={() => onHaEntityClick?.(device, entity, isOutputPanel)}
-                                      draggable
-                                      onDragStart={(e) => {
-                                        e.dataTransfer.setData('application/json', JSON.stringify({
-                                          type: 'driver-datapoint',
-                                          driverType: 'homeassistant',
-                                          device,
-                                          entity,
-                                          isOutput: isOutputPanel
-                                        }));
-                                      }}
-                                    >
-                                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${binding ? 'bg-cyan-400' : isConnecting ? 'bg-blue-400 animate-pulse' : 'bg-slate-500'}`} />
-                                      {getHaEntityIcon(entity.entity_id)}
-                                      <span className={`flex-1 text-[10px] truncate ${binding ? 'text-cyan-300' : 'text-slate-300'}`}>
-                                        {friendlyName}
-                                      </span>
-                                      {binding && <span className="text-[8px] text-cyan-500 bg-cyan-900/40 px-1 py-0.5 rounded">verb.</span>}
-                                      {unit && !binding && <span className="text-[9px] text-slate-500">{unit}</span>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
                     </div>
                   )}
                 </div>
