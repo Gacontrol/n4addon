@@ -2111,6 +2111,8 @@ function App() {
           haInstances={haInstances}
           onHaInstancesChange={handleHaInstancesChange}
           driverLiveValues={driverLiveValues}
+          instanceGaPages={instanceGaPages}
+          instanceDriverPoints={instanceDriverPoints}
         />
       ) : mainView === 'alarms' ? (
         <AlarmManagementView

@@ -78,6 +78,8 @@ interface HomeAssistantDriverPanelProps {
   onUpdate: (id: string, updates: Partial<HaInstance>) => void;
   onBack: () => void;
   apiBase: string;
+  preloadedGaPages?: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] }[];
+  preloadedDriverPoints?: { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] };
 }
 
 const WRITABLE_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
@@ -676,25 +678,59 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
   onUpdate,
   onBack,
   apiBase,
+  preloadedGaPages,
+  preloadedDriverPoints,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('entities');
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: instance.name, url: instance.url, token: instance.token });
   const [showToken, setShowToken] = useState(false);
   const emptyDriverPoints: DriverPointsData = { sheets: [], modbusDevices: [], haRemoteInstances: [] };
-  const [data, setData] = useState<InstanceData>({ entities: [], gaPages: [], visus: [], driverPoints: emptyDriverPoints });
+
+  const hasPreloadedGa = !!(preloadedGaPages && preloadedGaPages.length >= 0);
+  const hasPreloadedDp = !!(preloadedDriverPoints && (preloadedDriverPoints.sheets || preloadedDriverPoints.modbusDevices));
+
+  const [data, setData] = useState<InstanceData>(() => ({
+    entities: [],
+    gaPages: hasPreloadedGa ? (preloadedGaPages as InstanceData['gaPages']) : [],
+    visus: [],
+    driverPoints: hasPreloadedDp
+      ? { sheets: preloadedDriverPoints!.sheets || [], modbusDevices: preloadedDriverPoints!.modbusDevices || [], haRemoteInstances: [] }
+      : emptyDriverPoints
+  }));
   const [loadingEntities, setLoadingEntities] = useState(false);
   const [loadingGa, setLoadingGa] = useState(false);
   const [loadingVisus, setLoadingVisus] = useState(false);
   const [loadingDriverPoints, setLoadingDriverPoints] = useState(false);
   const [entityError, setEntityError] = useState<string | null>(null);
   const [entitiesLoaded, setEntitiesLoaded] = useState(false);
-  const [gaLoaded, setGaLoaded] = useState(false);
+  const [gaLoaded, setGaLoaded] = useState(hasPreloadedGa);
   const [visuLoaded, setVisuLoaded] = useState(false);
-  const [driverPointsLoaded, setDriverPointsLoaded] = useState(false);
+  const [driverPointsLoaded, setDriverPointsLoaded] = useState(hasPreloadedDp);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [entitySearch, setEntitySearch] = useState('');
+
+  useEffect(() => {
+    if (preloadedGaPages) {
+      setData(prev => ({ ...prev, gaPages: preloadedGaPages as InstanceData['gaPages'] }));
+      setGaLoaded(true);
+    }
+  }, [preloadedGaPages]);
+
+  useEffect(() => {
+    if (preloadedDriverPoints) {
+      setData(prev => ({
+        ...prev,
+        driverPoints: {
+          sheets: preloadedDriverPoints.sheets || [],
+          modbusDevices: preloadedDriverPoints.modbusDevices || [],
+          haRemoteInstances: []
+        }
+      }));
+      setDriverPointsLoaded(true);
+    }
+  }, [preloadedDriverPoints]);
 
   const loadEntities = useCallback(async () => {
     setLoadingEntities(true);

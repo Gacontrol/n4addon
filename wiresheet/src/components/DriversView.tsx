@@ -31,6 +31,8 @@ interface DriversViewProps {
   haInstances?: HaInstance[];
   onHaInstancesChange?: (instances: HaInstance[]) => void;
   driverLiveValues?: { modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> };
+  instanceGaPages?: Record<string, { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown }[] }[]>;
+  instanceDriverPoints?: Record<string, { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] }>;
 }
 
 const REGISTER_TYPES = ['holding', 'input', 'coil', 'discrete'] as const;
@@ -100,7 +102,9 @@ export const DriversView: React.FC<DriversViewProps> = ({
   onRefreshHaEntities,
   haInstances = [],
   onHaInstancesChange,
-  driverLiveValues = { modbus: {}, ha: {} }
+  driverLiveValues = { modbus: {}, ha: {} },
+  instanceGaPages = {},
+  instanceDriverPoints = {},
 }) => {
   const [selectedDriverType, setSelectedDriverType] = useState<DriverType | null>('modbus-tcp');
   const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
@@ -1346,6 +1350,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
               }}
               onBack={() => setSelectedDriverType('homeassistant')}
               apiBase={getApiBase()}
+              preloadedGaPages={instanceGaPages[selectedInstance.id]}
+              preloadedDriverPoints={instanceDriverPoints[selectedInstance.id]}
             />
           );
         })()}

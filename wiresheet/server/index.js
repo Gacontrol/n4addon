@@ -1307,7 +1307,11 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   try {
     const flow1Resp = await fetch(`${base}/auth/login_flow`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': clientId.replace(/\/$/, ''),
+        'Referer': clientId,
+      },
       body: JSON.stringify({
         client_id: clientId,
         handler: ['homeassistant', null],
@@ -1340,7 +1344,11 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
 
     const flow2Resp = await fetch(`${base}/auth/login_flow/${flowId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': clientId.replace(/\/$/, ''),
+        'Referer': clientId,
+      },
       body: JSON.stringify({ username, password }),
       signal: AbortSignal.timeout(10000)
     });
@@ -1348,9 +1356,11 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
     const { data: flow2Data, text: flow2Text } = await tryParseJson(flow2Resp);
 
     if (!flow2Data) {
-      console.error('HA auth flow2 non-JSON:', flow2Text.slice(0, 300));
-      return res.json({ ok: false, msg: 'Anmelde-Antwort konnte nicht verarbeitet werden' });
+      console.error('[HA auth] flow2 non-JSON response:', flow2Text.slice(0, 500));
+      return res.json({ ok: false, msg: `Anmelde-Antwort konnte nicht verarbeitet werden (HTTP ${flow2Resp.status})` });
     }
+
+    console.log('[HA auth] flow2 response type:', flow2Data.type, 'result:', flow2Data.result ? '[present]' : '[absent]', 'errors:', flow2Data.errors);
 
     if (flow2Data.type === 'abort') {
       const reason = flow2Data.reason || flow2Data.description || 'unbekannter Grund';
@@ -1358,16 +1368,27 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
     }
 
     if (flow2Data.errors && Object.keys(flow2Data.errors).length > 0) {
-      return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
+      const errDetail = Object.values(flow2Data.errors).join(', ');
+      return res.json({ ok: false, msg: `Benutzername oder Passwort falsch (${errDetail})` });
     }
 
-    if (!flow2Resp.ok && !flow2Data.result) {
-      return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
+    if (flow2Data.type === 'form') {
+      const stepId = flow2Data.step_id || '';
+      if (stepId === 'totp' || stepId === 'mfa' || (flow2Data.description_placeholders && flow2Data.description_placeholders.mfa_module)) {
+        return res.json({ ok: false, msg: 'Zwei-Faktor-Authentifizierung aktiv. Bitte Long-Lived Token verwenden.' });
+      }
+      return res.json({ ok: false, msg: `Benutzername oder Passwort falsch` });
     }
 
-    if (!flow2Data.result) {
-      const detail = flow2Data.description || flow2Data.message || JSON.stringify(flow2Data);
-      return res.json({ ok: false, msg: `Anmeldung fehlgeschlagen: ${detail}` });
+    if (!flow2Resp.ok) {
+      return res.json({ ok: false, msg: `Benutzername oder Passwort falsch (HTTP ${flow2Resp.status})` });
+    }
+
+    const authCode = flow2Data.result;
+    if (!authCode) {
+      console.error('[HA auth] flow2 no result in:', JSON.stringify(flow2Data).slice(0, 300));
+      const detail = flow2Data.description || flow2Data.message || `type=${flow2Data.type}`;
+      return res.json({ ok: false, msg: `Authentifizierung fehlgeschlagen: ${detail}` });
     }
 
     const tokenResp = await fetch(`${base}/auth/token`, {
@@ -1375,16 +1396,17 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        code: flow2Data.result,
+        code: authCode,
         client_id: clientId
       }).toString(),
       signal: AbortSignal.timeout(10000)
     });
 
-    const { data: tokenData } = await tryParseJson(tokenResp);
+    const { data: tokenData, text: tokenText } = await tryParseJson(tokenResp);
 
     if (!tokenData || !tokenData.access_token) {
       const detail = tokenData?.error_description || tokenData?.error || `HTTP ${tokenResp.status}`;
+      console.error('[HA auth] token exchange failed:', tokenText?.slice(0, 300));
       return res.json({ ok: false, msg: `Token-Abruf fehlgeschlagen: ${detail}` });
     }
 
