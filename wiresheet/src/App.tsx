@@ -167,6 +167,8 @@ function App() {
   const [haInstances, setHaInstances] = useState<HaInstance[]>([]);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
+  const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
+  const [instanceEntitiesError, setInstanceEntitiesError] = useState<Record<string, string>>({});
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -413,31 +415,46 @@ function App() {
     setHaDevices(devices);
   }, [haEntities, instanceEntities, haInstances]);
 
-  useEffect(() => {
-    const enabledInstances = haInstances.filter(i => i.enabled && i.url && i.token);
+  const loadInstanceEntities = useCallback(async (instances?: HaInstance[]) => {
+    const enabledInstances = (instances || haInstances).filter(i => i.enabled && i.url && i.token);
     if (enabledInstances.length === 0) {
       setInstanceEntities({});
+      setInstanceEntitiesLoading({});
+      setInstanceEntitiesError({});
       return;
     }
     const apiBase = getApiBase();
-    let cancelled = false;
-    const loadAll = async () => {
-      const results: Record<string, HaEntity[]> = {};
-      await Promise.all(enabledInstances.map(async (instance) => {
-        try {
-          const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/states`);
-          if (!resp.ok) return;
-          const data = await resp.json();
-          if (data.entities && !cancelled) {
-            results[instance.id] = data.entities as HaEntity[];
-          }
-        } catch {}
-      }));
-      if (!cancelled) setInstanceEntities(results);
-    };
-    loadAll();
-    return () => { cancelled = true; };
+    const loadingMap: Record<string, boolean> = {};
+    for (const inst of enabledInstances) loadingMap[inst.id] = true;
+    setInstanceEntitiesLoading(loadingMap);
+
+    await Promise.all(enabledInstances.map(async (instance) => {
+      try {
+        const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/states`);
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+          setInstanceEntitiesError(prev => ({ ...prev, [instance.id]: errData.error || `HTTP ${resp.status}` }));
+          setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: false }));
+          return;
+        }
+        const data = await resp.json();
+        if (data.entities) {
+          setInstanceEntities(prev => ({ ...prev, [instance.id]: data.entities as HaEntity[] }));
+          setInstanceEntitiesError(prev => { const n = { ...prev }; delete n[instance.id]; return n; });
+        } else {
+          setInstanceEntitiesError(prev => ({ ...prev, [instance.id]: data.error || 'Unbekannter Fehler' }));
+        }
+      } catch (err) {
+        setInstanceEntitiesError(prev => ({ ...prev, [instance.id]: err instanceof Error ? err.message : 'Netzwerkfehler' }));
+      } finally {
+        setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: false }));
+      }
+    }));
   }, [haInstances]);
+
+  useEffect(() => {
+    loadInstanceEntities(haInstances);
+  }, [haInstances]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedNodes.size === 1) {
@@ -1700,6 +1717,10 @@ function App() {
               modbusDriverEnabled={modbusDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
               highlightedBinding={highlightedBinding}
+              haInstances={haInstances}
+              instanceEntitiesLoading={instanceEntitiesLoading}
+              instanceEntitiesError={instanceEntitiesError}
+              onReloadInstanceEntities={() => loadInstanceEntities()}
             />
 
             <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} sm:flex w-52 sm:w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col absolute sm:relative z-30 top-0 bottom-0 left-0 h-full`}>
@@ -1846,6 +1867,10 @@ function App() {
               modbusDriverEnabled={modbusDriverEnabled}
               onHaEntityClick={handleHaEntityClick}
               highlightedBinding={highlightedBinding}
+              haInstances={haInstances}
+              instanceEntitiesLoading={instanceEntitiesLoading}
+              instanceEntitiesError={instanceEntitiesError}
+              onReloadInstanceEntities={() => loadInstanceEntities()}
             />
 
             {selectedNodeData && (

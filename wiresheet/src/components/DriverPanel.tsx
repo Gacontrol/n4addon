@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer, AlertTriangle } from 'lucide-react';
-import { ModbusDevice, DriverBinding, HaDevice, HaEntity } from '../types/flow';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Network, Cpu, Circle, Home, Lightbulb, Power, Gauge, Activity, Thermometer, AlertTriangle, RefreshCw, Loader2, WifiOff } from 'lucide-react';
+import { ModbusDevice, DriverBinding, HaDevice, HaEntity, HaInstance } from '../types/flow';
 
 const WRITABLE_HA_DOMAINS = ['switch', 'light', 'fan', 'cover', 'climate', 'input_boolean', 'input_number', 'input_select', 'automation', 'script', 'scene', 'lock', 'vacuum', 'media_player'];
 
+function getHaDomain(entityId: string): string {
+  const id = entityId.includes(':') ? entityId.split(':').slice(1).join(':') : entityId;
+  return id.split('.')[0];
+}
+
 function isWritableHaEntity(entity: HaEntity): boolean {
-  const domain = entity.entity_id.split('.')[0];
-  return WRITABLE_HA_DOMAINS.includes(domain);
+  return WRITABLE_HA_DOMAINS.includes(getHaDomain(entity.entity_id));
 }
 
 function getHaEntityIcon(entityId: string): React.ReactNode {
-  const domain = entityId.split('.')[0];
+  const domain = getHaDomain(entityId);
   const iconClass = "w-3 h-3";
   switch (domain) {
     case 'light': return <Lightbulb className={`${iconClass} text-yellow-400`} />;
@@ -46,6 +50,10 @@ interface DriverPanelProps {
   modbusDriverEnabled?: boolean;
   onHaEntityClick?: (device: HaDevice, entity: HaEntity, isOutput: boolean) => void;
   highlightedBinding?: DriverBinding | null;
+  haInstances?: HaInstance[];
+  instanceEntitiesLoading?: Record<string, boolean>;
+  instanceEntitiesError?: Record<string, string>;
+  onReloadInstanceEntities?: () => void;
 }
 
 const STORAGE_KEY_PREFIX = 'wiresheet-driver-panel-';
@@ -62,7 +70,11 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   haDriverEnabled = false,
   modbusDriverEnabled = true,
   onHaEntityClick,
-  highlightedBinding
+  highlightedBinding,
+  haInstances = [],
+  instanceEntitiesLoading = {},
+  instanceEntitiesError = {},
+  onReloadInstanceEntities
 }) => {
   const storageKey = `${STORAGE_KEY_PREFIX}${side}`;
 
@@ -247,7 +259,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   };
 
   const haDevicesWithEntities = haDevices.filter(d => getHaEntitiesForPanel(d).length > 0);
-  const hasHaEntities = (haDriverEnabled && haDevicesWithEntities.length > 0) || unavailableHaBindings.length > 0;
+  const hasExternalInstances = haInstances.filter(i => i.enabled && i.url && i.token).length > 0;
+  const hasHaEntities = (haDriverEnabled && haDevicesWithEntities.length > 0) || unavailableHaBindings.length > 0 || hasExternalInstances;
   const hasDatapoints = hasModbusDatapoints || hasHaEntities;
 
   const getBindingForDatapoint = (deviceId: string, datapointId: string) => {
@@ -473,23 +486,34 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
 
             {hasHaEntities && (
               <div className="border-b border-slate-700">
-                <button
-                  onClick={() => toggleDriverType('homeassistant')}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors bg-slate-900/30"
-                >
-                  <Home className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                  <span className="flex-1 text-xs font-semibold text-cyan-300 text-left">
-                    Home Assistant
-                  </span>
-                  <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
-                    {haDevicesWithEntities.length}
-                  </span>
-                  {expandedDriverTypes.has('homeassistant') ? (
-                    <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <div className="flex items-center">
+                  <button
+                    onClick={() => toggleDriverType('homeassistant')}
+                    className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50 transition-colors bg-slate-900/30"
+                  >
+                    <Home className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                    <span className="flex-1 text-xs font-semibold text-cyan-300 text-left">
+                      Home Assistant
+                    </span>
+                    <span className="text-[10px] text-slate-400 bg-slate-700 px-1.5 py-0.5 rounded">
+                      {haDevicesWithEntities.length}
+                    </span>
+                    {expandedDriverTypes.has('homeassistant') ? (
+                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                  </button>
+                  {onReloadInstanceEntities && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onReloadInstanceEntities(); }}
+                      className="px-2 py-2 text-slate-500 hover:text-cyan-400 transition-colors bg-slate-900/30 hover:bg-slate-700/50"
+                      title="Instanzen neu laden"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                   )}
-                </button>
+                </div>
 
                 {expandedDriverTypes.has('homeassistant') && (
                   <div className="bg-slate-900/20">
@@ -599,6 +623,39 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                         })}
                       </div>
                     )}
+
+                    {haInstances.filter(i => i.enabled && i.url && i.token).map(instance => {
+                      const isLoading = instanceEntitiesLoading[instance.id];
+                      const error = instanceEntitiesError[instance.id];
+                      const hasEntities = haDevicesWithEntities.some(d =>
+                        d.entities.some(e => e.entity_id.startsWith(`${instance.id}:`))
+                      );
+                      if (hasEntities && !error) return null;
+                      return (
+                        <div key={instance.id} className="flex items-center gap-2 px-3 py-1.5 border-t border-slate-700/40 bg-slate-900/40">
+                          {isLoading ? (
+                            <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />
+                          ) : error ? (
+                            <WifiOff className="w-3 h-3 text-red-400 flex-shrink-0" />
+                          ) : (
+                            <Loader2 className="w-3 h-3 text-slate-500 animate-spin flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[10px] text-slate-300 truncate block">{instance.name}</span>
+                            {error && <span className="text-[9px] text-red-400 truncate block">{error}</span>}
+                            {isLoading && <span className="text-[9px] text-slate-500">Laedt...</span>}
+                            {!isLoading && !error && <span className="text-[9px] text-slate-500">Verbinde...</span>}
+                          </div>
+                          <button
+                            onClick={() => onReloadInstanceEntities?.()}
+                            className="text-slate-500 hover:text-cyan-400 transition-colors flex-shrink-0"
+                            title="Neu laden"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
