@@ -616,20 +616,56 @@ app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/stat
   const { instanceId } = req.params;
   const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
   try {
-    const haRes = await fetch(`${instance.url}/api/states`, {
-      headers: { Authorization: `Bearer ${instance.token}` },
-      signal: AbortSignal.timeout(8000)
+    const statesRes = await fetch(`${base}/api/states`, { headers, signal: AbortSignal.timeout(10000) });
+    if (!statesRes.ok) return res.status(502).json({ error: 'HA request failed', status: statesRes.status });
+    const states = await statesRes.json();
+
+    let deviceMap = new Map();
+    let entityRegMap = new Map();
+    let configEntryMap = new Map();
+    try {
+      const [devRes, entRes, ceRes] = await Promise.all([
+        fetch(`${base}/api/config/device_registry`, { headers, signal: AbortSignal.timeout(6000) }),
+        fetch(`${base}/api/config/entity_registry`, { headers, signal: AbortSignal.timeout(6000) }),
+        fetch(`${base}/api/config/config_entries`, { headers, signal: AbortSignal.timeout(6000) })
+      ]);
+      if (devRes.ok) { const d = await devRes.json(); (d.devices||d||[]).forEach(x => deviceMap.set(x.id, x)); }
+      if (entRes.ok) { const d = await entRes.json(); (d.entities||d||[]).forEach(x => entityRegMap.set(x.entity_id, x)); }
+      if (ceRes.ok) { const d = await ceRes.json(); (d.config_entries||d||[]).forEach(x => configEntryMap.set(x.entry_id, x)); }
+    } catch {}
+
+    const entities = states.map(e => {
+      const regEntry = entityRegMap.get(e.entity_id);
+      let deviceInfo = regEntry?.device_id ? deviceMap.get(regEntry.device_id) : null;
+      let integrationTitle = null;
+      if (regEntry?.config_entry_id) {
+        const ce = configEntryMap.get(regEntry.config_entry_id);
+        if (ce) integrationTitle = ce.title || ce.domain || regEntry.platform;
+      }
+      if (!integrationTitle && deviceInfo?.config_entries?.length) {
+        const ce = configEntryMap.get(deviceInfo.config_entries[0]);
+        if (ce) integrationTitle = ce.title || ce.domain;
+      }
+      return {
+        entity_id: `${instanceId}:${e.entity_id}`,
+        _original_entity_id: e.entity_id,
+        state: e.state,
+        attributes: {
+          ...e.attributes,
+          _device_id: regEntry?.device_id ? `${instanceId}:${regEntry.device_id}` : null,
+          _device_name: deviceInfo?.name_by_user || deviceInfo?.name || null,
+          _integration: integrationTitle || regEntry?.platform || e.entity_id.split('.')[0],
+          _area_id: deviceInfo?.area_id || regEntry?.area_id || null,
+          _instance_id: instanceId,
+          _instance_name: instance.name
+        },
+        last_changed: e.last_changed,
+        last_updated: e.last_updated
+      };
     });
-    if (!haRes.ok) return res.status(502).json({ error: 'HA request failed', status: haRes.status });
-    const states = await haRes.json();
-    const entities = states.map(e => ({
-      entity_id: e.entity_id,
-      state: e.state,
-      attributes: e.attributes,
-      last_changed: e.last_changed,
-      last_updated: e.last_updated
-    }));
     res.json({ entities });
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -669,17 +705,19 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
         }
       }
     }
+    const commonSubnets = ['192.168.0', '192.168.1', '192.168.2', '10.0.0', '10.0.1', '172.16.0'];
+    for (const s of commonSubnets) subnets.add(s);
     return Array.from(subnets);
   };
 
   const tryHaHost = async (ip) => {
     const url = `http://${ip}:8123`;
     try {
-      const resp = await fetch(`${url}/api/`, { signal: AbortSignal.timeout(1200) });
+      const resp = await fetch(`${url}/api/`, { signal: AbortSignal.timeout(2000) });
       if (resp.status === 401 || resp.ok) {
         let name = ip;
         try {
-          const infoResp = await fetch(`${url}/api/config`, { signal: AbortSignal.timeout(1500) });
+          const infoResp = await fetch(`${url}/api/config`, { signal: AbortSignal.timeout(2000) });
           if (infoResp.ok) {
             const cfg = await infoResp.json();
             name = cfg.location_name || ip;
@@ -693,15 +731,17 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
 
   try {
     const subnets = getLocalSubnets();
-    const scanPromises = [];
+    const allIPs = [];
     for (const subnet of subnets) {
       for (let i = 1; i <= 254; i++) {
-        scanPromises.push(tryHaHost(`${subnet}.${i}`));
+        allIPs.push(`${subnet}.${i}`);
       }
     }
-    const batchSize = 50;
-    for (let i = 0; i < scanPromises.length; i += batchSize) {
-      const results = await Promise.all(scanPromises.slice(i, i + batchSize));
+    const uniqueIPs = [...new Set(allIPs)];
+    const batchSize = 80;
+    for (let i = 0; i < uniqueIPs.length; i += batchSize) {
+      const batch = uniqueIPs.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(ip => tryHaHost(ip)));
       results.forEach(r => { if (r) found.push(r); });
     }
   } catch (err) {

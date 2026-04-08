@@ -166,6 +166,7 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haInstances, setHaInstances] = useState<HaInstance[]>([]);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
+  const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -348,43 +349,32 @@ function App() {
   }, [selectedNodes]);
 
   useEffect(() => {
-    if (haEntities.length === 0) {
-      setHaDevices([]);
-      return;
-    }
-
     const extractDeviceName = (entity: HaEntity): string => {
-      if (entity.attributes.device_name) {
-        return entity.attributes.device_name as string;
-      }
-
+      const devName = entity.attributes._device_name as string | undefined;
+      if (devName) return devName;
+      if (entity.attributes.device_name) return entity.attributes.device_name as string;
       const friendlyName = entity.attributes.friendly_name as string;
       if (friendlyName) {
         const parts = friendlyName.split(' ');
-        if (parts.length >= 2) {
-          return parts[0];
-        }
+        if (parts.length >= 2) return parts[0];
         return friendlyName;
       }
-
       const entityName = entity.entity_id.split('.')[1] || '';
       const nameParts = entityName.split('_');
-      if (nameParts.length >= 2) {
-        return nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
-      }
+      if (nameParts.length >= 2) return nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
       return entityName.charAt(0).toUpperCase() + entityName.slice(1);
     };
 
     const deviceMap = new Map<string, HaDevice>();
+
     for (const entity of haEntities) {
-      const deviceId = (entity.attributes.device_id as string) || '';
+      const deviceId = (entity.attributes._device_id as string) || (entity.attributes.device_id as string) || '';
       const derivedDeviceName = extractDeviceName(entity);
       const effectiveDeviceId = deviceId || `derived_${derivedDeviceName.toLowerCase().replace(/\s+/g, '_')}`;
-
       if (!deviceMap.has(effectiveDeviceId)) {
         deviceMap.set(effectiveDeviceId, {
           id: effectiveDeviceId,
-          name: (entity.attributes.device_name as string) || derivedDeviceName,
+          name: (entity.attributes._device_name as string) || (entity.attributes.device_name as string) || derivedDeviceName,
           manufacturer: entity.attributes.manufacturer as string,
           model: entity.attributes.model as string,
           entities: []
@@ -393,10 +383,61 @@ function App() {
       deviceMap.get(effectiveDeviceId)!.entities.push(entity);
     }
 
+    for (const [instanceId, entities] of Object.entries(instanceEntities)) {
+      const instance = haInstances.find(i => i.id === instanceId);
+      const instanceLabel = instance ? instance.name : instanceId;
+      for (const entity of entities) {
+        const devId = entity.attributes._device_id as string | undefined;
+        const devName = entity.attributes._device_name as string | undefined;
+        const derivedDeviceName = extractDeviceName(entity);
+        const effectiveDeviceId = devId || `inst_${instanceId}_${derivedDeviceName.toLowerCase().replace(/\s+/g, '_')}`;
+        const effectiveDeviceName = devName ? `${instanceLabel} – ${devName}` : `${instanceLabel} – ${derivedDeviceName}`;
+        if (!deviceMap.has(effectiveDeviceId)) {
+          deviceMap.set(effectiveDeviceId, {
+            id: effectiveDeviceId,
+            name: effectiveDeviceName,
+            entities: []
+          });
+        }
+        deviceMap.get(effectiveDeviceId)!.entities.push(entity);
+      }
+    }
+
+    if (deviceMap.size === 0) {
+      setHaDevices([]);
+      return;
+    }
+
     const devices = Array.from(deviceMap.values());
     devices.sort((a, b) => a.name.localeCompare(b.name));
     setHaDevices(devices);
-  }, [haEntities]);
+  }, [haEntities, instanceEntities, haInstances]);
+
+  useEffect(() => {
+    const enabledInstances = haInstances.filter(i => i.enabled && i.url && i.token);
+    if (enabledInstances.length === 0) {
+      setInstanceEntities({});
+      return;
+    }
+    const apiBase = getApiBase();
+    let cancelled = false;
+    const loadAll = async () => {
+      const results: Record<string, HaEntity[]> = {};
+      await Promise.all(enabledInstances.map(async (instance) => {
+        try {
+          const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/states`);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          if (data.entities && !cancelled) {
+            results[instance.id] = data.entities as HaEntity[];
+          }
+        } catch {}
+      }));
+      if (!cancelled) setInstanceEntities(results);
+    };
+    loadAll();
+    return () => { cancelled = true; };
+  }, [haInstances]);
 
   useEffect(() => {
     if (selectedNodes.size === 1) {
