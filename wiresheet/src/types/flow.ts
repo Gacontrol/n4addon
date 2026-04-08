@@ -267,3 +267,11 @@ export interface HaDevice {
   area_id?: string;
   entities: HaEntity[];
 }
+
+export interface HaInstance {
+  id: string;
+  name: string;
+  url: string;
+  token: string;
+  enabled: boolean;
+}

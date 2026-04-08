@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus, Home, Lightbulb, Thermometer, Power, Gauge, Activity, AlertCircle, Loader2 } from 'lucide-react';
-import { ModbusDevice, ModbusDatapoint, HaEntity, HaDevice } from '../types/flow';
+import React, { useState, useCallback, useRef } from 'react';
+import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus, Home, Lightbulb, Thermometer, Power, Gauge, Activity, AlertCircle, Loader2, Wifi, Eye, EyeOff, Link } from 'lucide-react';
+import { ModbusDevice, ModbusDatapoint, HaEntity, HaDevice, HaInstance } from '../types/flow';
 import { modbusDeviceLibrary, ModbusDeviceTemplate } from '../data/modbusDeviceLibrary';
 
 type DriverType = 'modbus-tcp' | 'homeassistant';
@@ -27,6 +27,8 @@ interface DriversViewProps {
   haDriverEnabled: boolean;
   onHaDriverEnabledChange: (enabled: boolean) => void;
   onRefreshHaEntities: () => void;
+  haInstances?: HaInstance[];
+  onHaInstancesChange?: (instances: HaInstance[]) => void;
   driverLiveValues?: { modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> };
 }
 
@@ -95,11 +97,21 @@ export const DriversView: React.FC<DriversViewProps> = ({
   haDriverEnabled,
   onHaDriverEnabledChange,
   onRefreshHaEntities,
+  haInstances = [],
+  onHaInstancesChange,
   driverLiveValues = { modbus: {}, ha: {} }
 }) => {
   const [selectedDriverType, setSelectedDriverType] = useState<DriverType | null>('modbus-tcp');
   const [expandedHaDevices, setExpandedHaDevices] = useState<Set<string>>(new Set());
   const [haSearchQuery, setHaSearchQuery] = useState('');
+  const [showAddHaInstance, setShowAddHaInstance] = useState(false);
+  const [newHaInstance, setNewHaInstance] = useState<Partial<HaInstance>>({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
+  const [haInstanceTestResult, setHaInstanceTestResult] = useState<Record<string, { ok: boolean; msg: string; testing?: boolean }>>({});
+  const [expandedHaInstances, setExpandedHaInstances] = useState<Set<string>>(new Set());
+  const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
+  const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
+  const [haInstanceSearchQuery, setHaInstanceSearchQuery] = useState<Record<string, string>>({});
+  const [showTokens, setShowTokens] = useState<Set<string>>(new Set());
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -378,6 +390,67 @@ export const DriversView: React.FC<DriversViewProps> = ({
       setSavingConfig(prev => ({ ...prev, [key]: false }));
     }
   }, []);
+
+  const handleAddHaInstance = useCallback(() => {
+    if (!newHaInstance.name || !newHaInstance.url || !newHaInstance.token) return;
+    const instance: HaInstance = {
+      id: `ha-${Date.now()}`,
+      name: newHaInstance.name!,
+      url: newHaInstance.url!.replace(/\/$/, ''),
+      token: newHaInstance.token!,
+      enabled: true
+    };
+    onHaInstancesChange?.([...haInstances, instance]);
+    setNewHaInstance({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
+    setShowAddHaInstance(false);
+  }, [newHaInstance, haInstances, onHaInstancesChange]);
+
+  const handleDeleteHaInstance = useCallback((id: string) => {
+    onHaInstancesChange?.(haInstances.filter(i => i.id !== id));
+  }, [haInstances, onHaInstancesChange]);
+
+  const handleToggleHaInstance = useCallback((id: string) => {
+    onHaInstancesChange?.(haInstances.map(i => i.id === id ? { ...i, enabled: !i.enabled } : i));
+  }, [haInstances, onHaInstancesChange]);
+
+  const handleTestHaInstance = useCallback(async (instance: HaInstance) => {
+    setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: false, msg: '', testing: true } }));
+    try {
+      const resp = await fetch('/ha/instances/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: instance.url, token: instance.token })
+      });
+      const data = await resp.json();
+      setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: data.ok, msg: data.msg || (data.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'), testing: false } }));
+    } catch {
+      setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: false, msg: 'Netzwerkfehler', testing: false } }));
+    }
+  }, []);
+
+  const handleLoadInstanceEntities = useCallback(async (instance: HaInstance) => {
+    if (instanceEntities[instance.id]) {
+      setExpandedHaInstances(prev => {
+        const next = new Set(prev);
+        if (next.has(instance.id)) next.delete(instance.id); else next.add(instance.id);
+        return next;
+      });
+      return;
+    }
+    setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: true }));
+    setExpandedHaInstances(prev => new Set([...prev, instance.id]));
+    try {
+      const resp = await fetch(`/ha/instances/${instance.id}/states`);
+      const data = await resp.json();
+      if (data.entities) {
+        setInstanceEntities(prev => ({ ...prev, [instance.id]: data.entities }));
+      }
+    } catch {
+      setInstanceEntities(prev => ({ ...prev, [instance.id]: [] }));
+    } finally {
+      setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: false }));
+    }
+  }, [instanceEntities]);
 
   const renderConfigDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint) => {
     const key = `${device.id}:${dp.id}`;
@@ -1081,9 +1154,211 @@ export const DriversView: React.FC<DriversViewProps> = ({
                 </div>
               )}
             </div>
+
+            <div className="mt-4 border-t border-slate-700 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Wifi className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm font-medium text-white">Weitere HA-Instanzen</span>
+                  <span className="text-xs text-slate-500">({haInstances.length})</span>
+                </div>
+                <button
+                  onClick={() => setShowAddHaInstance(true)}
+                  className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
+                >
+                  <Plus className="w-3 h-3" />
+                  Hinzufuegen
+                </button>
+              </div>
+
+              {haInstances.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-xs border border-dashed border-slate-700 rounded-lg">
+                  <Wifi className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                  Keine weiteren HA-Instanzen konfiguriert
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {haInstances.map(instance => {
+                    const isExpanded = expandedHaInstances.has(instance.id);
+                    const testResult = haInstanceTestResult[instance.id];
+                    const entities = instanceEntities[instance.id] || [];
+                    const isLoadingEntities = instanceEntitiesLoading[instance.id];
+                    const searchQ = haInstanceSearchQuery[instance.id] || '';
+                    const filteredEntities = entities.filter(e =>
+                      !searchQ || e.entity_id.toLowerCase().includes(searchQ.toLowerCase()) ||
+                      (e.attributes.friendly_name as string || '').toLowerCase().includes(searchQ.toLowerCase())
+                    );
+
+                    return (
+                      <div key={instance.id} className="bg-slate-800 rounded-lg border border-slate-700">
+                        <div className="flex items-center gap-2 p-3">
+                          <button
+                            onClick={() => handleLoadInstanceEntities(instance)}
+                            className="text-slate-400"
+                          >
+                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${instance.enabled ? 'bg-cyan-500' : 'bg-slate-600'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{instance.name}</div>
+                            <div className="text-xs text-slate-500 truncate">{instance.url}</div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {testResult && !testResult.testing && (
+                              <span className={`text-xs ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                                {testResult.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleTestHaInstance(instance)}
+                              disabled={testResult?.testing}
+                              className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-cyan-400"
+                              title="Verbindung testen"
+                            >
+                              {testResult?.testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => handleToggleHaInstance(instance.id)}
+                              className="p-1 rounded hover:bg-slate-700"
+                              title={instance.enabled ? 'Deaktivieren' : 'Aktivieren'}
+                            >
+                              {instance.enabled
+                                ? <ToggleRight className="w-4 h-4 text-cyan-400" />
+                                : <ToggleLeft className="w-4 h-4 text-slate-500" />
+                              }
+                            </button>
+                            <button
+                              onClick={() => handleDeleteHaInstance(instance.id)}
+                              className="p-1 rounded hover:bg-slate-700 hover:text-red-400"
+                              title="Loeschen"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="border-t border-slate-700 p-3">
+                            {isLoadingEntities ? (
+                              <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Lade Entities...
+                              </div>
+                            ) : (
+                              <>
+                                <input
+                                  type="text"
+                                  value={searchQ}
+                                  onChange={(e) => setHaInstanceSearchQuery(prev => ({ ...prev, [instance.id]: e.target.value }))}
+                                  placeholder="Entities suchen..."
+                                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white placeholder-slate-500 mb-2"
+                                />
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                  {filteredEntities.length === 0 ? (
+                                    <div className="text-xs text-slate-500 text-center py-3">
+                                      {entities.length === 0 ? 'Keine Entities geladen' : 'Keine Treffer'}
+                                    </div>
+                                  ) : (
+                                    filteredEntities.slice(0, 100).map(entity => (
+                                      <HaEntityRow key={entity.entity_id} entity={entity} liveData={undefined} />
+                                    ))
+                                  )}
+                                </div>
+                                {entities.length > 0 && (
+                                  <div className="text-xs text-slate-600 mt-2 text-right">
+                                    {filteredEntities.length} / {entities.length} Entities
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
+
+      {showAddHaInstance && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddHaInstance(false)}>
+          <div className="bg-slate-800 rounded-xl border border-slate-600 w-[420px] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Wifi className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-lg font-semibold text-white">HA-Instanz hinzufuegen</h3>
+              </div>
+              <button onClick={() => setShowAddHaInstance(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={newHaInstance.name || ''}
+                  onChange={(e) => setNewHaInstance(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="z.B. Buero HA"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">URL</label>
+                <input
+                  type="text"
+                  value={newHaInstance.url || ''}
+                  onChange={(e) => setNewHaInstance(prev => ({ ...prev, url: e.target.value }))}
+                  placeholder="http://192.168.1.x:8123"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
+                <div className="relative">
+                  <input
+                    type={showTokens.has('new') ? 'text' : 'password'}
+                    value={newHaInstance.token || ''}
+                    onChange={(e) => setNewHaInstance(prev => ({ ...prev, token: e.target.value }))}
+                    placeholder="eyJ..."
+                    className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTokens(prev => {
+                      const next = new Set(prev);
+                      if (next.has('new')) next.delete('new'); else next.add('new');
+                      return next;
+                    })}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showTokens.has('new') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowAddHaInstance(false)}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleAddHaInstance}
+                disabled={!newHaInstance.name || !newHaInstance.url || !newHaInstance.token}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Hinzufuegen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddDevice && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddDevice(false)}>

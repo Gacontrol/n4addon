@@ -47,7 +47,8 @@ let driverConfig = {
   modbusDevices: [],
   modbusDriverEnabled: true,
   driverBindings: [],
-  haDriverEnabled: true
+  haDriverEnabled: true,
+  haInstances: []
 };
 const modbusLiveValues = new Map();
 const haLiveValues = new Map();
@@ -142,6 +143,27 @@ async function pollAllDrivers() {
     }
   }
 
+  const extraInstances = (driverConfig.haInstances || []).filter(i => i.enabled && i.url && i.token);
+  for (const instance of extraInstances) {
+    try {
+      const haRes = await fetch(`${instance.url}/api/states`, {
+        headers: { Authorization: `Bearer ${instance.token}` },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (haRes.ok) {
+        const states = await haRes.json();
+        for (const entity of states) {
+          haLiveValues.set(`${instance.id}:${entity.entity_id}`, {
+            state: entity.state,
+            attributes: entity.attributes
+          });
+        }
+      }
+    } catch (err) {
+      console.log(`HA extra instance poll error [${instance.name}]: ${err.message}`);
+    }
+  }
+
   broadcastSSE('driver-values', {
     modbus: Object.fromEntries(modbusLiveValues),
     ha: Object.fromEntries(haLiveValues)
@@ -189,7 +211,8 @@ async function loadDriverConfig() {
       modbusDevices: cfg.modbusDevices || [],
       modbusDriverEnabled: cfg.modbusDriverEnabled !== false,
       driverBindings: cfg.driverBindings || [],
-      haDriverEnabled: cfg.haDriverEnabled !== false
+      haDriverEnabled: cfg.haDriverEnabled !== false,
+      haInstances: cfg.haInstances || []
     };
     console.log(`Treiber-Konfiguration geladen: ${driverConfig.modbusDevices.length} Modbus-Geraete, ${driverConfig.driverBindings.length} Bindings`);
     startDriverPolling();
@@ -577,7 +600,8 @@ app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
       modbusDevices: cfg.modbusDevices || [],
       modbusDriverEnabled: cfg.modbusDriverEnabled !== false,
       driverBindings: cfg.driverBindings || [],
-      haDriverEnabled: cfg.haDriverEnabled !== false
+      haDriverEnabled: cfg.haDriverEnabled !== false,
+      haInstances: cfg.haInstances || []
     };
     await saveDriverConfig();
     startDriverPolling();
@@ -585,6 +609,48 @@ app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
   } catch (err) {
     console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/states'], async (req, res) => {
+  const { instanceId } = req.params;
+  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  try {
+    const haRes = await fetch(`${instance.url}/api/states`, {
+      headers: { Authorization: `Bearer ${instance.token}` },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!haRes.ok) return res.status(502).json({ error: 'HA request failed', status: haRes.status });
+    const states = await haRes.json();
+    const entities = states.map(e => ({
+      entity_id: e.entity_id,
+      state: e.state,
+      attributes: e.attributes,
+      last_changed: e.last_changed,
+      last_updated: e.last_updated
+    }));
+    res.json({ entities });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.post(['/ha/instances/test', '/api/ha/instances/test'], async (req, res) => {
+  const { url, token } = req.body;
+  if (!url || !token) return res.status(400).json({ ok: false, msg: 'URL und Token erforderlich' });
+  try {
+    const haRes = await fetch(`${url.replace(/\/$/, '')}/api/`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (haRes.ok) {
+      res.json({ ok: true, msg: 'Verbindung erfolgreich' });
+    } else {
+      res.json({ ok: false, msg: `HTTP ${haRes.status}` });
+    }
+  } catch (err) {
+    res.json({ ok: false, msg: err.message });
   }
 });
 

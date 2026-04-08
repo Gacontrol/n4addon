@@ -15,7 +15,7 @@ import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
 import { useAlarmManagement } from './hooks/useAlarmManagement';
-import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus } from './types/flow';
+import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus, HaInstance } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage, parseDpKey } from './types/visualization';
 import { BooleanAlarmConfig, NumericAlarmConfig, EnumAlarmConfig, AggregateAlarmConfig, ValveAlarmConfig, SensorAlarmConfig } from './types/alarm';
@@ -164,6 +164,7 @@ function App() {
   const [selectedModbusDatapointPath, setSelectedModbusDatapointPath] = useState<{ deviceId: string; datapointId: string } | null>(null);
   const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
+  const [haInstances, setHaInstances] = useState<HaInstance[]>([]);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -227,6 +228,7 @@ function App() {
           );
           setDriverBindings(normalizedBindings);
           setHaDriverEnabled(cfg.haDriverEnabled !== false);
+          setHaInstances(cfg.haInstances || []);
           console.log('Treiber-Konfiguration geladen');
         }
       } catch (err) {
@@ -237,7 +239,7 @@ function App() {
     loadDriverConfig();
   }, [getApiBase]);
 
-  const saveDriverConfig = useCallback(async (devices: ModbusDevice[], enabled: boolean, bindings: DriverBinding[], haEnabled: boolean) => {
+  const saveDriverConfig = useCallback(async (devices: ModbusDevice[], enabled: boolean, bindings: DriverBinding[], haEnabled: boolean, instances?: HaInstance[]) => {
     if (!driverConfigLoaded) return;
     try {
       const apiBase = getApiBase();
@@ -248,13 +250,19 @@ function App() {
           modbusDevices: devices,
           modbusDriverEnabled: enabled,
           driverBindings: bindings,
-          haDriverEnabled: haEnabled
+          haDriverEnabled: haEnabled,
+          haInstances: instances
         })
       });
     } catch (err) {
       console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
     }
   }, [getApiBase, driverConfigLoaded]);
+
+  const handleHaInstancesChange = useCallback((instances: HaInstance[]) => {
+    setHaInstances(instances);
+    saveDriverConfig(modbusDevicesState, modbusDriverEnabledState, driverBindings, haDriverEnabled, instances);
+  }, [saveDriverConfig, modbusDevicesState, modbusDriverEnabledState, driverBindings, haDriverEnabled]);
 
   const setModbusDevices = useCallback((devices: ModbusDevice[]) => {
     setModbusDevicesState(devices);
@@ -1993,6 +2001,8 @@ function App() {
           haDriverEnabled={haDriverEnabled}
           onHaDriverEnabledChange={setHaDriverEnabled}
           onRefreshHaEntities={loadHaEntities}
+          haInstances={haInstances}
+          onHaInstancesChange={handleHaInstancesChange}
           driverLiveValues={driverLiveValues}
         />
       ) : mainView === 'alarms' ? (
