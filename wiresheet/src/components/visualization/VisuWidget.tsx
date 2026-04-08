@@ -1578,9 +1578,9 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           ? '3px solid #ec4899'
           : (showSelectionBorder
             ? '2px solid #3b82f6'
-            : (isMultiSelected && isEditMode ? '2px solid #3b82f6' : 'none')),
-        outline: isMultiSelected && isEditMode && !showSelectionBorder ? '2px solid #3b82f6' : undefined,
-        outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder ? 2 : undefined,
+            : (isMultiSelected && isEditMode && !isVertexWidget ? '2px solid #3b82f6' : 'none')),
+        outline: isMultiSelected && isEditMode && !showSelectionBorder && !isVertexWidget ? '2px solid #3b82f6' : undefined,
+        outlineOffset: isMultiSelected && isEditMode && !showSelectionBorder && !isVertexWidget ? 2 : undefined,
         boxShadow: isHighlighted
           ? highlightStyle.boxShadow
           : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),

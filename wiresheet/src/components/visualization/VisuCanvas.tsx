@@ -131,6 +131,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     startX: number;
     startY: number;
     initialPositions: Record<string, { x: number; y: number }>;
+    initialConfigs: Record<string, Record<string, unknown>>;
   } | null>(null);
 
   const [resizeState, setResizeState] = useState<{
@@ -635,15 +636,22 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
 
       if (isInSelection && selectedWidgetIds.length > 1) {
         const initialPositions: Record<string, { x: number; y: number }> = {};
+        const initialConfigs: Record<string, Record<string, unknown>> = {};
         for (const id of selectedWidgetIds) {
           const w = page.widgets.find(ww => ww.id === id);
-          if (w) initialPositions[id] = { x: w.position.x, y: w.position.y };
+          if (w) {
+            initialPositions[id] = { x: w.position.x, y: w.position.y };
+            if (['visu-line', 'visu-polyline', 'visu-polygon'].includes(w.type)) {
+              initialConfigs[id] = JSON.parse(JSON.stringify(w.config));
+            }
+          }
         }
         setMultiDragState({
           widgetIds: selectedWidgetIds,
           startX: e.clientX,
           startY: e.clientY,
-          initialPositions
+          initialPositions,
+          initialConfigs
         });
       } else {
         const isVertex = ['visu-line', 'visu-polyline', 'visu-polygon'].includes(widget.type);
@@ -688,26 +696,44 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       if (onUpdateWidgets) {
         const updates = multiDragState.widgetIds.map(id => {
           const initial = multiDragState.initialPositions[id];
-          return {
-            widgetId: id,
-            updates: {
-              position: {
-                x: Math.max(0, initial.x + dx),
-                y: Math.max(0, initial.y + dy)
-              }
+          const cfg = multiDragState.initialConfigs[id];
+          const newPos = { x: Math.max(0, initial.x + dx), y: Math.max(0, initial.y + dy) };
+          const w = page.widgets.find(ww => ww.id === id);
+          if (cfg && w) {
+            if (w.type === 'visu-line' || w.type === 'visu-arrow') {
+              const lc = cfg as { x1?: number; y1?: number; x2?: number; y2?: number };
+              const nx1 = (lc.x1 ?? 0) + dx, ny1 = (lc.y1 ?? 0) + dy;
+              const nx2 = (lc.x2 ?? 0) + dx, ny2 = (lc.y2 ?? 0) + dy;
+              return { widgetId: id, updates: { config: { ...cfg, x1: nx1, y1: ny1, x2: nx2, y2: ny2 } as VisuWidget['config'], position: newPos } };
+            } else if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+              const pts = (cfg.points as { x: number; y: number }[]) || [];
+              return { widgetId: id, updates: { config: { ...cfg, points: pts.map(p => ({ x: p.x + dx, y: p.y + dy })) } as VisuWidget['config'], position: newPos } };
             }
-          };
+          }
+          return { widgetId: id, updates: { position: newPos } };
         });
         onUpdateWidgets(updates);
       } else {
         for (const id of multiDragState.widgetIds) {
           const initial = multiDragState.initialPositions[id];
-          onUpdateWidget(id, {
-            position: {
-              x: Math.max(0, initial.x + dx),
-              y: Math.max(0, initial.y + dy)
+          const cfg = multiDragState.initialConfigs[id];
+          const newPos = { x: Math.max(0, initial.x + dx), y: Math.max(0, initial.y + dy) };
+          const w = page.widgets.find(ww => ww.id === id);
+          if (cfg && w) {
+            if (w.type === 'visu-line' || w.type === 'visu-arrow') {
+              const lc = cfg as { x1?: number; y1?: number; x2?: number; y2?: number };
+              const nx1 = (lc.x1 ?? 0) + dx, ny1 = (lc.y1 ?? 0) + dy;
+              const nx2 = (lc.x2 ?? 0) + dx, ny2 = (lc.y2 ?? 0) + dy;
+              onUpdateWidget(id, { config: { ...cfg, x1: nx1, y1: ny1, x2: nx2, y2: ny2 } as VisuWidget['config'], position: newPos });
+            } else if (w.type === 'visu-polyline' || w.type === 'visu-polygon') {
+              const pts = (cfg.points as { x: number; y: number }[]) || [];
+              onUpdateWidget(id, { config: { ...cfg, points: pts.map(p => ({ x: p.x + dx, y: p.y + dy })) } as VisuWidget['config'], position: newPos });
+            } else {
+              onUpdateWidget(id, { position: newPos });
             }
-          });
+          } else {
+            onUpdateWidget(id, { position: newPos });
+          }
         }
       }
     }
