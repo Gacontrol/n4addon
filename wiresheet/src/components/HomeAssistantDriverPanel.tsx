@@ -843,17 +843,17 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     }
   }, [instance.id, apiBase]);
 
-  const loadGaControl = useCallback(async () => {
-    setLoadingGa(true);
+  const loadGaControl = useCallback(async (silent = false) => {
+    if (!silent) setLoadingGa(true);
     try {
       const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/ga-control`);
       const d = await resp.json();
       setData(prev => ({ ...prev, gaPages: d.pages || [], gaError: d.error }));
       setGaLoaded(true);
     } catch (e) {
-      setData(prev => ({ ...prev, gaPages: [], gaError: e instanceof Error ? e.message : 'Fehler' }));
+      if (!silent) setData(prev => ({ ...prev, gaPages: [], gaError: e instanceof Error ? e.message : 'Fehler' }));
     } finally {
-      setLoadingGa(false);
+      if (!silent) setLoadingGa(false);
     }
   }, [instance.id, apiBase]);
 
@@ -901,6 +901,14 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     if (activeTab === 'visus' && !visuLoaded) loadVisus();
     if (activeTab === 'driver-points' && !driverPointsLoaded) loadDriverPoints();
   }, [activeTab, entitiesLoaded, gaLoaded, visuLoaded, driverPointsLoaded, loadEntities, loadGaControl, loadVisus, loadDriverPoints]);
+
+  useEffect(() => {
+    if (activeTab !== 'ga-control') return;
+    const interval = setInterval(() => {
+      loadGaControl(true);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeTab, loadGaControl]);
 
   const handleTest = async () => {
     setTesting(true);

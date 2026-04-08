@@ -257,13 +257,13 @@ function App() {
           modbusDriverEnabled: enabled,
           driverBindings: bindings,
           haDriverEnabled: haEnabled,
-          haInstances: instances
+          haInstances: instances ?? haInstances
         })
       });
     } catch (err) {
       console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
     }
-  }, [getApiBase, driverConfigLoaded]);
+  }, [getApiBase, driverConfigLoaded, haInstances]);
 
   const handleHaInstancesChange = useCallback((instances: HaInstance[]) => {
     setHaInstances(instances);

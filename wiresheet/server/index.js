@@ -787,10 +787,17 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
   }
 
   try {
-    const pagesRes = await fetch(`${wiresheetApiBase}/api/pages`, { headers, signal: AbortSignal.timeout(8000) });
+    const [pagesRes, liveValuesRes] = await Promise.all([
+      fetch(`${wiresheetApiBase}/api/pages`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${wiresheetApiBase}/api/live-values`, { headers, signal: AbortSignal.timeout(5000) }).catch(() => null)
+    ]);
     if (!pagesRes.ok) return res.json({ pages: [], error: `Seiten konnten nicht geladen werden (${pagesRes.status})`, wiresheetApiBase });
 
     const pages = await pagesRes.json();
+    let liveValues = {};
+    if (liveValuesRes && liveValuesRes.ok) {
+      try { const lv = await liveValuesRes.json(); liveValues = lv.values || {}; } catch {}
+    }
 
     const result = (Array.isArray(pages) ? pages : []).map(page => ({
       id: page.id,
@@ -800,7 +807,7 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
         type: node.type,
         label: node.data?.label || node.data?.name || node.id,
         unit: node.data?.unit || '',
-        value: node.data?.value,
+        value: liveValues[node.id] !== undefined ? liveValues[node.id] : node.data?.value,
         description: node.data?.description || '',
         inputs: resolveSlots(node, 'inputs'),
         outputs: resolveSlots(node, 'outputs')
