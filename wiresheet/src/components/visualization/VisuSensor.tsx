@@ -257,6 +257,11 @@ export const VisuSensor: React.FC<VisuSensorProps> = ({
             ALARM
           </div>
         )}
+        {isHandMode && (
+          <div className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10 bg-amber-500 text-white">
+            HAND
+          </div>
+        )}
         {(labelPos === 'top' || labelPos === 'left') && labelEl}
         {symbolEl}
         {(labelPos === 'bottom' || labelPos === 'right') && labelEl}

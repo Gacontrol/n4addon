@@ -278,7 +278,7 @@ export const VisuPump: React.FC<VisuPumpProps> = ({
       >
         {isNotAuto && (
           <div
-            className="absolute top-0.5 left-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10"
+            className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded text-[9px] font-bold z-10"
             style={{
               backgroundColor: hoaMode === 0 ? '#64748b' : '#f59e0b',
               color: 'white'
