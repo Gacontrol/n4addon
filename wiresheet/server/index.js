@@ -828,6 +828,122 @@ app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus
   }
 });
 
+app.get(['/ha/instances/:instanceId/driver-points', '/api/ha/instances/:instanceId/driver-points'], async (req, res) => {
+  const { instanceId } = req.params;
+  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
+
+  let wiresheetApiBase = null;
+
+  try {
+    const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    if (addonsRes.ok) {
+      const addonsData = await addonsRes.json();
+      const addons = addonsData.data?.addons || addonsData.addons || [];
+      const wsAddon = addons.find(a =>
+        (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+        (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+      );
+      if (wsAddon) wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+    }
+  } catch {}
+
+  if (!wiresheetApiBase) {
+    const commonSlugs = ['wiresheet', 'ga_control', 'ga-control', 'wiresheet_addon'];
+    for (const slug of commonSlugs) {
+      try {
+        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/pages`, { headers, signal: AbortSignal.timeout(3000) });
+        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+      } catch {}
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    const hostMatch = base.match(/^(https?:\/\/[^:\/]+)/);
+    if (hostMatch) {
+      for (const port of [8100, 3000, 8080]) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/api/pages`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok) { wiresheetApiBase = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    return res.json({ sheets: [], error: 'Wiresheet Addon nicht gefunden' });
+  }
+
+  try {
+    const [pagesRes, drvRes] = await Promise.all([
+      fetch(`${wiresheetApiBase}/api/pages`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${wiresheetApiBase}/api/driver-config`, { headers, signal: AbortSignal.timeout(8000) })
+    ]);
+
+    const sheets = [];
+
+    if (pagesRes.ok) {
+      const pages = await pagesRes.json();
+      for (const page of (Array.isArray(pages) ? pages : [])) {
+        const nodes = (page.nodes || []).filter(n =>
+          n.type && (
+            n.type.includes('ha-input') || n.type.includes('ha-output') ||
+            n.type.includes('modbus') || n.type.includes('sensor') ||
+            n.type.includes('input') || n.type.includes('output')
+          )
+        );
+        if (nodes.length > 0) {
+          sheets.push({
+            id: page.id,
+            name: page.name || page.id,
+            nodes: nodes.map(n => ({
+              id: n.id,
+              type: n.type,
+              label: n.data?.label || n.id,
+              unit: n.data?.config?.unit || '',
+              entityId: n.data?.entityId || '',
+              dpType: n.data?.dpType || 'unknown'
+            }))
+          });
+        }
+      }
+    }
+
+    let driverPoints = { modbusDevices: [], haInstances: [] };
+    if (drvRes.ok) {
+      try { driverPoints = await drvRes.json(); } catch {}
+    }
+
+    res.json({
+      sheets,
+      modbusDevices: (driverPoints.modbusDevices || []).map(d => ({
+        id: d.id,
+        name: d.name || d.id,
+        type: d.type || 'modbus',
+        datapoints: (d.datapoints || []).map(dp => ({
+          id: dp.id,
+          name: dp.name || dp.id,
+          unit: dp.unit || '',
+          type: dp.type || 'holding',
+          register: dp.register,
+          description: dp.description || ''
+        }))
+      })),
+      haRemoteInstances: (driverPoints.haInstances || []).map(i => ({
+        id: i.id,
+        name: i.name,
+        url: i.url
+      })),
+      wiresheetApiBase
+    });
+  } catch (err) {
+    console.error('[driver-points]', err.message);
+    res.json({ sheets: [], modbusDevices: [], haRemoteInstances: [], error: err.message });
+  }
+});
+
 app.post(['/ha/instances/test', '/api/ha/instances/test'], async (req, res) => {
   const { url, token } = req.body;
   if (!url || !token) return res.status(400).json({ ok: false, msg: 'URL und Token erforderlich' });
@@ -1092,9 +1208,20 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
     return res.status(400).json({ ok: false, msg: 'Benutzername und Passwort oder Token erforderlich' });
   }
 
-  const parsed = new URL(base);
+  let parsed;
+  try {
+    parsed = new URL(base);
+  } catch {
+    return res.json({ ok: false, msg: 'Ungueltige URL' });
+  }
   const clientId = `${parsed.protocol}//${parsed.host}/`;
   const redirectUri = `${parsed.protocol}//${parsed.host}/?auth_callback=1`;
+
+  const tryParseJson = async (resp) => {
+    const text = await resp.text();
+    try { return { data: JSON.parse(text), text }; }
+    catch { return { data: null, text }; }
+  };
 
   try {
     const flow1Resp = await fetch(`${base}/auth/login_flow`, {
@@ -1105,46 +1232,61 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
         handler: ['homeassistant', null],
         redirect_uri: redirectUri
       }),
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(10000)
     });
 
-    const flow1Text = await flow1Resp.text();
-    let flow1Data;
-    try {
-      flow1Data = JSON.parse(flow1Text);
-    } catch {
-      console.error('HA auth flow1 non-JSON response:', flow1Text.slice(0, 200));
-      return res.json({ ok: false, msg: `Login-Flow Fehler: ungueltige Antwort vom HA-Server (${flow1Resp.status})` });
+    const { data: flow1Data, text: flow1Text } = await tryParseJson(flow1Resp);
+
+    if (!flow1Data) {
+      console.error('HA auth flow1 non-JSON:', flow1Text.slice(0, 300));
+      return res.json({ ok: false, msg: `HA Antwort konnte nicht verarbeitet werden (HTTP ${flow1Resp.status})` });
     }
 
-    if (!flow1Resp.ok || flow1Data.errors) {
-      return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen: ${JSON.stringify(flow1Data.errors || flow1Data)}` });
+    if (!flow1Resp.ok) {
+      const detail = flow1Data.message || flow1Data.error || flow1Data.description || JSON.stringify(flow1Data);
+      return res.json({ ok: false, msg: `Login-Flow fehlgeschlagen (${flow1Resp.status}): ${detail}` });
+    }
+
+    if (flow1Data.errors && Object.keys(flow1Data.errors).length > 0) {
+      return res.json({ ok: false, msg: `Login-Flow Fehler: ${JSON.stringify(flow1Data.errors)}` });
     }
 
     const flowId = flow1Data.flow_id;
-    if (!flowId) return res.json({ ok: false, msg: 'Kein Flow-ID erhalten' });
+    if (!flowId) {
+      console.error('HA auth flow1 no flow_id:', flow1Data);
+      return res.json({ ok: false, msg: `Kein Flow-ID erhalten. HA-Antwort: ${JSON.stringify(flow1Data).slice(0, 200)}` });
+    }
 
     const flow2Resp = await fetch(`${base}/auth/login_flow/${flowId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(10000)
     });
 
-    const flow2Text = await flow2Resp.text();
-    let flow2Data;
-    try {
-      flow2Data = JSON.parse(flow2Text);
-    } catch {
-      console.error('HA auth flow2 non-JSON response:', flow2Text.slice(0, 200));
+    const { data: flow2Data, text: flow2Text } = await tryParseJson(flow2Resp);
+
+    if (!flow2Data) {
+      console.error('HA auth flow2 non-JSON:', flow2Text.slice(0, 300));
       return res.json({ ok: false, msg: 'Anmelde-Antwort konnte nicht verarbeitet werden' });
     }
 
-    if (flow2Data.errors || flow2Data.type === 'abort') {
+    if (flow2Data.type === 'abort') {
+      const reason = flow2Data.reason || flow2Data.description || 'unbekannter Grund';
+      return res.json({ ok: false, msg: `Anmeldung abgebrochen: ${reason}` });
+    }
+
+    if (flow2Data.errors && Object.keys(flow2Data.errors).length > 0) {
       return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
     }
+
+    if (!flow2Resp.ok && !flow2Data.result) {
+      return res.json({ ok: false, msg: 'Benutzername oder Passwort falsch' });
+    }
+
     if (!flow2Data.result) {
-      return res.json({ ok: false, msg: `Anmeldung fehlgeschlagen: ${flow2Data.description || JSON.stringify(flow2Data)}` });
+      const detail = flow2Data.description || flow2Data.message || JSON.stringify(flow2Data);
+      return res.json({ ok: false, msg: `Anmeldung fehlgeschlagen: ${detail}` });
     }
 
     const tokenResp = await fetch(`${base}/auth/token`, {
@@ -1155,20 +1297,14 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
         code: flow2Data.result,
         client_id: clientId
       }).toString(),
-      signal: AbortSignal.timeout(8000)
+      signal: AbortSignal.timeout(10000)
     });
 
-    const tokenText = await tokenResp.text();
-    let tokenData;
-    try {
-      tokenData = JSON.parse(tokenText);
-    } catch {
-      console.error('HA auth token non-JSON response:', tokenText.slice(0, 200));
-      return res.json({ ok: false, msg: 'Token-Antwort konnte nicht verarbeitet werden' });
-    }
+    const { data: tokenData } = await tryParseJson(tokenResp);
 
-    if (!tokenData.access_token) {
-      return res.json({ ok: false, msg: `Token-Abruf fehlgeschlagen: ${tokenData.error_description || tokenData.error || 'unbekannter Fehler'}` });
+    if (!tokenData || !tokenData.access_token) {
+      const detail = tokenData?.error_description || tokenData?.error || `HTTP ${tokenResp.status}`;
+      return res.json({ ok: false, msg: `Token-Abruf fehlgeschlagen: ${detail}` });
     }
 
     res.json({ ok: true, token: tokenData.access_token, msg: 'Anmeldung erfolgreich' });

@@ -22,10 +22,49 @@ interface VisuPage {
   backgroundColor?: string;
 }
 
+interface DriverPointNode {
+  id: string;
+  type: string;
+  label: string;
+  unit: string;
+  entityId: string;
+  dpType: string;
+}
+
+interface DriverSheet {
+  id: string;
+  name: string;
+  nodes: DriverPointNode[];
+}
+
+interface DriverModbusDatapoint {
+  id: string;
+  name: string;
+  unit: string;
+  type: string;
+  register?: number;
+  description: string;
+}
+
+interface DriverModbusDevice {
+  id: string;
+  name: string;
+  type: string;
+  datapoints: DriverModbusDatapoint[];
+}
+
+interface DriverPointsData {
+  sheets: DriverSheet[];
+  modbusDevices: DriverModbusDevice[];
+  haRemoteInstances: { id: string; name: string; url: string }[];
+  error?: string;
+}
+
 interface InstanceData {
   entities: HaEntity[];
   gaPages: GaControlPage[];
   visus: VisuPage[];
+  driverPoints: DriverPointsData;
   gaError?: string;
   visuError?: string;
   connectionStatus?: 'online' | 'offline' | 'unknown';
@@ -355,6 +394,175 @@ const VisusSection: React.FC<{
   );
 };
 
+const DriverPointsSection: React.FC<{
+  data: DriverPointsData;
+  loading: boolean;
+  onRefresh: () => void;
+}> = ({ data, loading, onRefresh }) => {
+  const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
+  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
+
+  const toggleSheet = (id: string) => setExpandedSheets(prev => {
+    const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
+  const toggleDevice = (id: string) => setExpandedDevices(prev => {
+    const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
+  });
+
+  const totalNodes = data.sheets.reduce((s, sh) => s + sh.nodes.length, 0);
+  const totalDps = data.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
+
+  function getDriverNodeIcon(type: string) {
+    if (type.includes('ha-input')) return <Activity className="w-3 h-3 text-cyan-400" />;
+    if (type.includes('ha-output')) return <Zap className="w-3 h-3 text-amber-400" />;
+    if (type.includes('modbus')) return <Server className="w-3 h-3 text-emerald-400" />;
+    return <Circle className="w-3 h-3 text-slate-500" />;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Server className="w-4 h-4 text-emerald-400" />
+          <span className="text-sm font-semibold text-white">Treiberpunkte</span>
+          {(totalNodes + totalDps) > 0 && (
+            <span className="text-xs text-slate-500">{totalNodes + totalDps} Punkte</span>
+          )}
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors disabled:opacity-40"
+          title="Treiberpunkte neu laden"
+        >
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+
+      {data.error && (
+        <div className="flex items-start gap-2 p-2.5 bg-slate-800/60 border border-slate-700/40 rounded-lg mb-3">
+          <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs text-slate-400">Treiberpunkte nicht verfuegbar</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">{data.error}</p>
+          </div>
+        </div>
+      )}
+
+      {loading && data.sheets.length === 0 && data.modbusDevices.length === 0 && (
+        <div className="flex items-center gap-2 py-6 justify-center">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+          <span className="text-xs text-slate-400">Lade Treiberpunkte...</span>
+        </div>
+      )}
+
+      {!loading && !data.error && data.sheets.length === 0 && data.modbusDevices.length === 0 && (
+        <div className="text-center py-6">
+          <Server className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+          <p className="text-xs text-slate-500">Keine Treiberpunkte gefunden</p>
+          <button onClick={onRefresh} className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 underline">
+            Erneut versuchen
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        {data.sheets.length > 0 && (
+          <div className="mb-2">
+            <div className="flex items-center gap-1.5 px-1 mb-1.5">
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-xs font-semibold text-slate-300">Logikseiten ({data.sheets.length})</span>
+            </div>
+            {data.sheets.map(sheet => {
+              const isExp = expandedSheets.has(sheet.id);
+              return (
+                <div key={sheet.id} className="border border-slate-700/50 rounded-lg overflow-hidden mb-1">
+                  <button
+                    onClick={() => toggleSheet(sheet.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800 transition-colors text-left"
+                  >
+                    {isExp ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                    <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-white text-sm font-medium flex-1 truncate">{sheet.name}</span>
+                    <span className="text-slate-500 text-xs">{sheet.nodes.length} Punkte</span>
+                  </button>
+                  {isExp && (
+                    <div className="p-2 space-y-1 bg-slate-900/30">
+                      {sheet.nodes.map(node => (
+                        <div key={node.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-slate-900/60 border border-slate-700/40">
+                          {getDriverNodeIcon(node.type)}
+                          <span className="text-white text-xs flex-1 truncate" title={node.label}>{node.label}</span>
+                          {node.unit && <span className="text-slate-600 text-[10px] shrink-0">{node.unit}</span>}
+                          {node.entityId && <span className="text-cyan-700 text-[9px] font-mono truncate max-w-[120px]">{node.entityId}</span>}
+                          <span className="text-slate-700 text-[9px] font-mono">{node.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {data.modbusDevices.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 px-1 mb-1.5">
+              <Server className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-xs font-semibold text-slate-300">Modbus-Geraete ({data.modbusDevices.length})</span>
+            </div>
+            {data.modbusDevices.map(device => {
+              const isExp = expandedDevices.has(device.id);
+              return (
+                <div key={device.id} className="border border-slate-700/50 rounded-lg overflow-hidden mb-1">
+                  <button
+                    onClick={() => toggleDevice(device.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800 transition-colors text-left"
+                  >
+                    {isExp ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                    <Server className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-white text-sm font-medium flex-1 truncate">{device.name}</span>
+                    <span className="text-slate-500 text-xs">{device.datapoints.length} Datenpunkte</span>
+                  </button>
+                  {isExp && (
+                    <div className="p-2 space-y-1 bg-slate-900/30">
+                      {device.datapoints.map(dp => (
+                        <div key={dp.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-slate-900/60 border border-slate-700/40">
+                          <Gauge className="w-3 h-3 text-emerald-400" />
+                          <span className="text-white text-xs flex-1 truncate" title={dp.description || dp.name}>{dp.name}</span>
+                          {dp.unit && <span className="text-slate-600 text-[10px] shrink-0">{dp.unit}</span>}
+                          {dp.register !== undefined && <span className="text-slate-600 text-[9px] font-mono">Reg {dp.register}</span>}
+                          <span className="text-slate-700 text-[9px] font-mono">{dp.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {data.haRemoteInstances.length > 0 && (
+          <div>
+            <div className="flex items-center gap-1.5 px-1 mb-1.5 mt-2">
+              <Wifi className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-xs font-semibold text-slate-300">Verbundene HA-Instanzen ({data.haRemoteInstances.length})</span>
+            </div>
+            {data.haRemoteInstances.map(inst => (
+              <div key={inst.id} className="flex items-center gap-2 px-3 py-2 rounded border border-slate-700/40 bg-slate-800/50 mb-1">
+                <Wifi className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="text-white text-xs flex-1 truncate">{inst.name}</span>
+                <span className="text-slate-500 text-[10px] font-mono truncate max-w-[140px]">{inst.url}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const EntitiesSection: React.FC<{
   entities: HaEntity[];
   liveValues?: Record<string, { state: string; attributes: Record<string, unknown> }>;
@@ -458,7 +666,7 @@ const EntitiesSection: React.FC<{
   );
 };
 
-type TabType = 'entities' | 'ga-control' | 'visus';
+type TabType = 'entities' | 'ga-control' | 'driver-points' | 'visus';
 
 export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> = ({
   instance,
@@ -473,14 +681,17 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: instance.name, url: instance.url, token: instance.token });
   const [showToken, setShowToken] = useState(false);
-  const [data, setData] = useState<InstanceData>({ entities: [], gaPages: [], visus: [] });
+  const emptyDriverPoints: DriverPointsData = { sheets: [], modbusDevices: [], haRemoteInstances: [] };
+  const [data, setData] = useState<InstanceData>({ entities: [], gaPages: [], visus: [], driverPoints: emptyDriverPoints });
   const [loadingEntities, setLoadingEntities] = useState(false);
   const [loadingGa, setLoadingGa] = useState(false);
   const [loadingVisus, setLoadingVisus] = useState(false);
+  const [loadingDriverPoints, setLoadingDriverPoints] = useState(false);
   const [entityError, setEntityError] = useState<string | null>(null);
   const [entitiesLoaded, setEntitiesLoaded] = useState(false);
   const [gaLoaded, setGaLoaded] = useState(false);
   const [visuLoaded, setVisuLoaded] = useState(false);
+  const [driverPointsLoaded, setDriverPointsLoaded] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [entitySearch, setEntitySearch] = useState('');
@@ -532,11 +743,34 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     }
   }, [instance.id, apiBase]);
 
+  const loadDriverPoints = useCallback(async () => {
+    setLoadingDriverPoints(true);
+    try {
+      const resp = await fetch(`${apiBase}/ha/instances/${instance.id}/driver-points`);
+      const d = await resp.json();
+      setData(prev => ({
+        ...prev,
+        driverPoints: {
+          sheets: d.sheets || [],
+          modbusDevices: d.modbusDevices || [],
+          haRemoteInstances: d.haRemoteInstances || [],
+          error: d.error
+        }
+      }));
+      setDriverPointsLoaded(true);
+    } catch (e) {
+      setData(prev => ({ ...prev, driverPoints: { sheets: [], modbusDevices: [], haRemoteInstances: [], error: e instanceof Error ? e.message : 'Fehler' } }));
+    } finally {
+      setLoadingDriverPoints(false);
+    }
+  }, [instance.id, apiBase]);
+
   useEffect(() => {
     if (activeTab === 'entities' && !entitiesLoaded) loadEntities();
     if (activeTab === 'ga-control' && !gaLoaded) loadGaControl();
     if (activeTab === 'visus' && !visuLoaded) loadVisus();
-  }, [activeTab, entitiesLoaded, gaLoaded, visuLoaded, loadEntities, loadGaControl, loadVisus]);
+    if (activeTab === 'driver-points' && !driverPointsLoaded) loadDriverPoints();
+  }, [activeTab, entitiesLoaded, gaLoaded, visuLoaded, driverPointsLoaded, loadEntities, loadGaControl, loadVisus, loadDriverPoints]);
 
   const handleTest = async () => {
     setTesting(true);
@@ -563,12 +797,17 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     setEntitiesLoaded(false);
     setGaLoaded(false);
     setVisuLoaded(false);
-    setData({ entities: [], gaPages: [], visus: [] });
+    setDriverPointsLoaded(false);
+    setData({ entities: [], gaPages: [], visus: [], driverPoints: { sheets: [], modbusDevices: [], haRemoteInstances: [] } });
   };
+
+  const driverPointsTotal = data.driverPoints.sheets.reduce((s, sh) => s + sh.nodes.length, 0) +
+    data.driverPoints.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'entities', label: 'Entities', icon: <Home className="w-3.5 h-3.5" />, count: data.entities.length || undefined },
     { id: 'ga-control', label: 'GA-Control', icon: <Database className="w-3.5 h-3.5" />, count: data.gaPages.length || undefined },
+    { id: 'driver-points', label: 'Treiberpunkte', icon: <Server className="w-3.5 h-3.5" />, count: driverPointsTotal || undefined },
     { id: 'visus', label: 'Visus', icon: <Monitor className="w-3.5 h-3.5" />, count: data.visus.length || undefined },
   ];
 
@@ -740,6 +979,13 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
             error={data.gaError}
             loading={loadingGa}
             onRefresh={loadGaControl}
+          />
+        )}
+        {activeTab === 'driver-points' && (
+          <DriverPointsSection
+            data={data.driverPoints}
+            loading={loadingDriverPoints}
+            onRefresh={loadDriverPoints}
           />
         )}
         {activeTab === 'visus' && (

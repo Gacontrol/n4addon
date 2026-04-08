@@ -16,6 +16,42 @@ interface HAEntity {
   attributes: Record<string, unknown>;
 }
 
+interface InstanceInfo {
+  id: string;
+  name: string;
+}
+
+interface GaNode {
+  id: string;
+  type: string;
+  label: string;
+  unit: string;
+  value?: unknown;
+}
+
+interface GaPage {
+  id: string;
+  name: string;
+  nodes: GaNode[];
+}
+
+interface DriverSheet {
+  id: string;
+  name: string;
+  nodes: { id: string; type: string; label: string; unit: string; entityId: string }[];
+}
+
+interface DriverModbusDevice {
+  id: string;
+  name: string;
+  datapoints: { id: string; name: string; unit: string; type: string; register?: number }[];
+}
+
+interface InstanceDriverPoints {
+  sheets: DriverSheet[];
+  modbusDevices: DriverModbusDevice[];
+}
+
 interface PropertiesPanelProps {
   node: FlowNode;
   onClose: () => void;
@@ -25,6 +61,9 @@ interface PropertiesPanelProps {
   haLoading: boolean;
   haError?: string | null;
   onReloadEntities: () => void;
+  haInstances?: InstanceInfo[];
+  instanceGaPages?: Record<string, GaPage[]>;
+  instanceDriverPoints?: Record<string, InstanceDriverPoints>;
   liveValues: Record<string, unknown>;
   modbusDevices?: ModbusDevice[];
   modbusDriverEnabled?: boolean;
@@ -54,6 +93,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   haLoading,
   haError,
   onReloadEntities,
+  haInstances = [],
+  instanceGaPages = {},
+  instanceDriverPoints = {},
   liveValues,
   modbusDevices = [],
   modbusDriverEnabled = true,
@@ -437,6 +479,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               selectedEntityId={node.data.entityId}
               onSelect={handleEntitySelect}
               onReload={onReloadEntities}
+              instances={haInstances}
+              instanceGaPages={instanceGaPages}
+              instanceDriverPoints={instanceDriverPoints}
             />
           </div>
         )}

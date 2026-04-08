@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Search, RefreshCw, Check, Layers, Cpu, Tag } from 'lucide-react';
+import { ChevronRight, ChevronDown, Search, RefreshCw, Check, Layers, Cpu, Tag, Database, Server, Gauge } from 'lucide-react';
 
 interface HAEntity {
   entity_id: string;
@@ -19,6 +19,58 @@ interface Device {
   entities: HAEntity[];
 }
 
+interface GaNode {
+  id: string;
+  type: string;
+  label: string;
+  unit: string;
+  value?: unknown;
+}
+
+interface GaPage {
+  id: string;
+  name: string;
+  nodes: GaNode[];
+}
+
+interface DriverNode {
+  id: string;
+  type: string;
+  label: string;
+  unit: string;
+  entityId: string;
+}
+
+interface DriverSheet {
+  id: string;
+  name: string;
+  nodes: DriverNode[];
+}
+
+interface DriverModbusDatapoint {
+  id: string;
+  name: string;
+  unit: string;
+  type: string;
+  register?: number;
+}
+
+interface DriverModbusDevice {
+  id: string;
+  name: string;
+  datapoints: DriverModbusDatapoint[];
+}
+
+interface InstanceDriverPoints {
+  sheets: DriverSheet[];
+  modbusDevices: DriverModbusDevice[];
+}
+
+interface InstanceInfo {
+  id: string;
+  name: string;
+}
+
 interface EntityBrowserProps {
   haEntities: HAEntity[];
   haLoading: boolean;
@@ -26,6 +78,9 @@ interface EntityBrowserProps {
   selectedEntityId?: string;
   onSelect: (entity: HAEntity) => void;
   onReload: () => void;
+  instances?: InstanceInfo[];
+  instanceGaPages?: Record<string, GaPage[]>;
+  instanceDriverPoints?: Record<string, InstanceDriverPoints>;
 }
 
 function buildHierarchy(entities: HAEntity[]): Integration[] {
@@ -83,13 +138,260 @@ function buildHierarchy(entities: HAEntity[]): Integration[] {
   return integrations;
 }
 
+const GaControlRubric: React.FC<{
+  instanceName: string;
+  instanceId: string;
+  pages: GaPage[];
+  searchQuery: string;
+}> = ({ instanceName, instanceId, pages, searchQuery }) => {
+  const [open, setOpen] = useState(false);
+  const [openPages, setOpenPages] = useState<Set<string>>(new Set());
+
+  const togglePage = (id: string) => setOpenPages(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  const isSearching = searchQuery.trim().length > 0;
+  const q = searchQuery.toLowerCase();
+
+  const filteredPages = useMemo(() => {
+    if (!isSearching) return pages;
+    return pages
+      .map(p => ({
+        ...p,
+        nodes: p.nodes.filter(n =>
+          n.label.toLowerCase().includes(q) ||
+          n.id.toLowerCase().includes(q)
+        )
+      }))
+      .filter(p => p.nodes.length > 0 || p.name.toLowerCase().includes(q));
+  }, [pages, q, isSearching]);
+
+  if (filteredPages.length === 0 && !isSearching) return null;
+
+  const totalNodes = pages.reduce((s, p) => s + p.nodes.length, 0);
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-1.5 px-1.5 py-1 hover:bg-slate-700/50 rounded text-left transition-colors"
+      >
+        {open || isSearching
+          ? <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          : <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
+        }
+        <Database className="w-3 h-3 text-amber-400 flex-shrink-0" />
+        <span className="text-xs font-semibold text-slate-300 truncate">GA-Control</span>
+        <span className="text-[9px] px-1 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800/40 flex-shrink-0 ml-1">
+          {instanceName}
+        </span>
+        <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{totalNodes}</span>
+      </button>
+
+      {(open || isSearching) && (
+        <div className="ml-3 space-y-0.5">
+          {filteredPages.map(page => (
+            <div key={`${instanceId}-ga-${page.id}`}>
+              <button
+                onClick={() => togglePage(page.id)}
+                className="w-full flex items-center gap-1.5 px-1.5 py-0.5 hover:bg-slate-700/50 rounded text-left transition-colors"
+              >
+                {openPages.has(page.id) || isSearching
+                  ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                  : <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                }
+                <Layers className="w-3 h-3 text-amber-400/70 flex-shrink-0" />
+                <span className="text-xs text-slate-400 truncate">{page.name}</span>
+                <span className="text-xs text-slate-600 ml-auto flex-shrink-0">{page.nodes.length}</span>
+              </button>
+
+              {(openPages.has(page.id) || isSearching) && (
+                <div className="ml-4 space-y-0.5">
+                  {page.nodes.map(node => (
+                    <div
+                      key={node.id}
+                      className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-slate-800/40"
+                    >
+                      <Tag className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-slate-300 truncate">{node.label}</p>
+                        <p className="text-[9px] font-mono text-slate-600 truncate">{node.type}</p>
+                      </div>
+                      {node.unit && <span className="text-[10px] text-slate-600 flex-shrink-0">{node.unit}</span>}
+                      {node.value !== undefined && (
+                        <span className="text-[10px] font-mono text-cyan-400 flex-shrink-0">{String(node.value)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DriverPointsRubric: React.FC<{
+  instanceName: string;
+  instanceId: string;
+  data: InstanceDriverPoints;
+  searchQuery: string;
+}> = ({ instanceName, instanceId, data, searchQuery }) => {
+  const [open, setOpen] = useState(false);
+  const [openSheets, setOpenSheets] = useState<Set<string>>(new Set());
+  const [openDevices, setOpenDevices] = useState<Set<string>>(new Set());
+
+  const toggleSheet = (id: string) => setOpenSheets(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleDevice = (id: string) => setOpenDevices(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  const isSearching = searchQuery.trim().length > 0;
+  const q = searchQuery.toLowerCase();
+
+  const filteredSheets = useMemo(() => {
+    if (!isSearching) return data.sheets;
+    return data.sheets
+      .map(s => ({
+        ...s,
+        nodes: s.nodes.filter(n =>
+          n.label.toLowerCase().includes(q) ||
+          n.entityId?.toLowerCase().includes(q)
+        )
+      }))
+      .filter(s => s.nodes.length > 0 || s.name.toLowerCase().includes(q));
+  }, [data.sheets, q, isSearching]);
+
+  const filteredDevices = useMemo(() => {
+    if (!isSearching) return data.modbusDevices;
+    return data.modbusDevices
+      .map(d => ({
+        ...d,
+        datapoints: d.datapoints.filter(dp =>
+          dp.name.toLowerCase().includes(q)
+        )
+      }))
+      .filter(d => d.datapoints.length > 0 || d.name.toLowerCase().includes(q));
+  }, [data.modbusDevices, q, isSearching]);
+
+  const totalPoints = data.sheets.reduce((s, sh) => s + sh.nodes.length, 0) +
+    data.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
+
+  if (totalPoints === 0 && !isSearching) return null;
+
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-1.5 px-1.5 py-1 hover:bg-slate-700/50 rounded text-left transition-colors"
+      >
+        {open || isSearching
+          ? <ChevronDown className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          : <ChevronRight className="w-3 h-3 text-slate-400 flex-shrink-0" />
+        }
+        <Server className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+        <span className="text-xs font-semibold text-slate-300 truncate">Treiberpunkte</span>
+        <span className="text-[9px] px-1 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800/40 flex-shrink-0 ml-1">
+          {instanceName}
+        </span>
+        <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{totalPoints}</span>
+      </button>
+
+      {(open || isSearching) && (
+        <div className="ml-3 space-y-0.5">
+          {filteredSheets.map(sheet => (
+            <div key={`${instanceId}-dp-sheet-${sheet.id}`}>
+              <button
+                onClick={() => toggleSheet(sheet.id)}
+                className="w-full flex items-center gap-1.5 px-1.5 py-0.5 hover:bg-slate-700/50 rounded text-left transition-colors"
+              >
+                {openSheets.has(sheet.id) || isSearching
+                  ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                  : <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                }
+                <Layers className="w-3 h-3 text-cyan-400/70 flex-shrink-0" />
+                <span className="text-xs text-slate-400 truncate">{sheet.name}</span>
+                <span className="text-xs text-slate-600 ml-auto flex-shrink-0">{sheet.nodes.length}</span>
+              </button>
+
+              {(openSheets.has(sheet.id) || isSearching) && (
+                <div className="ml-4 space-y-0.5">
+                  {sheet.nodes.map(node => (
+                    <div
+                      key={node.id}
+                      className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-slate-800/40"
+                    >
+                      <Tag className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-slate-300 truncate">{node.label}</p>
+                        {node.entityId && (
+                          <p className="text-[9px] font-mono text-slate-600 truncate">{node.entityId}</p>
+                        )}
+                      </div>
+                      {node.unit && <span className="text-[10px] text-slate-600 flex-shrink-0">{node.unit}</span>}
+                      <span className="text-[9px] font-mono text-slate-700 flex-shrink-0">{node.type}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+
+          {filteredDevices.map(device => (
+            <div key={`${instanceId}-dp-dev-${device.id}`}>
+              <button
+                onClick={() => toggleDevice(device.id)}
+                className="w-full flex items-center gap-1.5 px-1.5 py-0.5 hover:bg-slate-700/50 rounded text-left transition-colors"
+              >
+                {openDevices.has(device.id) || isSearching
+                  ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                  : <ChevronRight className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                }
+                <Server className="w-3 h-3 text-emerald-400/70 flex-shrink-0" />
+                <span className="text-xs text-slate-400 truncate">{device.name}</span>
+                <span className="text-xs text-slate-600 ml-auto flex-shrink-0">{device.datapoints.length}</span>
+              </button>
+
+              {(openDevices.has(device.id) || isSearching) && (
+                <div className="ml-4 space-y-0.5">
+                  {device.datapoints.map(dp => (
+                    <div
+                      key={dp.id}
+                      className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-slate-800/40"
+                    >
+                      <Gauge className="w-2.5 h-2.5 text-emerald-400/60 flex-shrink-0" />
+                      <span className="text-[10px] text-slate-300 flex-1 truncate">{dp.name}</span>
+                      {dp.unit && <span className="text-[10px] text-slate-600 flex-shrink-0">{dp.unit}</span>}
+                      {dp.register !== undefined && (
+                        <span className="text-[9px] font-mono text-slate-700 flex-shrink-0">R{dp.register}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const EntityBrowser: React.FC<EntityBrowserProps> = ({
   haEntities,
   haLoading,
   haError,
   selectedEntityId,
   onSelect,
-  onReload
+  onReload,
+  instances = [],
+  instanceGaPages = {},
+  instanceDriverPoints = {},
 }) => {
   const [search, setSearch] = useState('');
   const [openIntegrations, setOpenIntegrations] = useState<Set<string>>(new Set());
@@ -134,6 +436,15 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
   }, [hierarchy, search]);
 
   const isSearching = search.trim().length > 0;
+
+  const instancesWithExtras = useMemo(() =>
+    instances.filter(inst =>
+      (instanceGaPages[inst.id] && instanceGaPages[inst.id].length > 0) ||
+      (instanceDriverPoints[inst.id] &&
+        (instanceDriverPoints[inst.id].sheets.length > 0 || instanceDriverPoints[inst.id].modbusDevices.length > 0))
+    ),
+    [instances, instanceGaPages, instanceDriverPoints]
+  );
 
   return (
     <div className="flex flex-col min-h-0">
@@ -259,6 +570,30 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        ))}
+
+        {instancesWithExtras.map(inst => (
+          <div key={`ext-${inst.id}`}>
+            {instanceGaPages[inst.id] && instanceGaPages[inst.id].length > 0 && (
+              <GaControlRubric
+                instanceName={inst.name}
+                instanceId={inst.id}
+                pages={instanceGaPages[inst.id]}
+                searchQuery={search}
+              />
+            )}
+            {instanceDriverPoints[inst.id] && (
+              instanceDriverPoints[inst.id].sheets.length > 0 ||
+              instanceDriverPoints[inst.id].modbusDevices.length > 0
+            ) && (
+              <DriverPointsRubric
+                instanceName={inst.name}
+                instanceId={inst.id}
+                data={instanceDriverPoints[inst.id]}
+                searchQuery={search}
+              />
             )}
           </div>
         ))}

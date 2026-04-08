@@ -170,6 +170,8 @@ function App() {
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
   const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
   const [instanceEntitiesError, setInstanceEntitiesError] = useState<Record<string, string>>({});
+  const [instanceGaPages, setInstanceGaPages] = useState<Record<string, {id: string; name: string; nodes: {id: string; type: string; label: string; unit: string; value?: unknown}[]}[]>>({});
+  const [instanceDriverPoints, setInstanceDriverPoints] = useState<Record<string, {sheets: {id: string; name: string; nodes: {id: string; type: string; label: string; unit: string; entityId: string}[]}[]; modbusDevices: {id: string; name: string; datapoints: {id: string; name: string; unit: string; type: string; register?: number}[]}[]}>>({});
   const [highlightedBinding, setHighlightedBinding] = useState<DriverBinding | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const errorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -455,6 +457,38 @@ function App() {
 
   useEffect(() => {
     loadInstanceEntities(haInstances);
+  }, [haInstances]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadInstanceExtras = useCallback(async (instances?: HaInstance[]) => {
+    const enabledInstances = (instances || haInstances).filter(i => i.enabled && i.url && i.token);
+    if (enabledInstances.length === 0) return;
+    const apiBase = getApiBase();
+    await Promise.all(enabledInstances.map(async (instance) => {
+      try {
+        const [gaResp, dpResp] = await Promise.all([
+          fetch(`${apiBase}/ha/instances/${instance.id}/ga-control`),
+          fetch(`${apiBase}/ha/instances/${instance.id}/driver-points`),
+        ]);
+        const [gaData, dpData] = await Promise.all([gaResp.json().catch(() => ({})), dpResp.json().catch(() => ({}))]);
+        if (gaData.pages) {
+          setInstanceGaPages(prev => ({ ...prev, [instance.id]: gaData.pages }));
+        }
+        if (dpData.sheets || dpData.modbusDevices) {
+          setInstanceDriverPoints(prev => ({
+            ...prev,
+            [instance.id]: {
+              sheets: dpData.sheets || [],
+              modbusDevices: dpData.modbusDevices || [],
+            }
+          }));
+        }
+      } catch {
+      }
+    }));
+  }, [haInstances, getApiBase]);
+
+  useEffect(() => {
+    loadInstanceExtras(haInstances);
   }, [haInstances]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -1886,6 +1920,9 @@ function App() {
                 haLoading={haLoading}
                 haError={haError}
                 onReloadEntities={loadHaEntities}
+                haInstances={haInstances}
+                instanceGaPages={instanceGaPages}
+                instanceDriverPoints={instanceDriverPoints}
                 liveValues={liveValues}
                 modbusDevices={modbusDevices}
                 modbusDriverEnabled={modbusDriverEnabled}
