@@ -1854,6 +1854,7 @@ function App() {
                 onClose={() => clearSelection()}
                 onUpdateNode={updateNodeData}
                 haEntities={haEntities}
+                haInstanceEntities={Object.values(instanceEntities).flat()}
                 haLoading={haLoading}
                 haError={haError}
                 onReloadEntities={loadHaEntities}

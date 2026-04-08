@@ -21,6 +21,7 @@ interface PropertiesPanelProps {
   onClose: () => void;
   onUpdateNode: (nodeId: string, updates: Partial<FlowNode['data']>) => void;
   haEntities: HAEntity[];
+  haInstanceEntities?: HAEntity[];
   haLoading: boolean;
   haError?: string | null;
   onReloadEntities: () => void;
@@ -49,6 +50,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onClose,
   onUpdateNode,
   haEntities,
+  haInstanceEntities = [],
   haLoading,
   haError,
   onReloadEntities,
@@ -429,7 +431,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             )}
             <EntityBrowser
-              haEntities={haEntities}
+              haEntities={[...haEntities, ...haInstanceEntities]}
               haLoading={haLoading}
               haError={haError}
               selectedEntityId={node.data.entityId}

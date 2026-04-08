@@ -221,6 +221,7 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
                       <div className="ml-4">
                         {device.entities.map(entity => {
                           const friendlyName = String(entity.attributes.friendly_name || '');
+                          const instanceName = entity.attributes._instance_name as string | undefined;
                           const isSelected = entity.entity_id === selectedEntityId;
                           return (
                             <button
@@ -235,9 +236,16 @@ export const EntityBrowser: React.FC<EntityBrowserProps> = ({
                               <Tag className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />
                               <div className="flex-1 min-w-0">
                                 <p className="text-[10px] font-mono text-slate-300 truncate">{entity.entity_id}</p>
-                                {friendlyName && (
-                                  <p className="text-[10px] text-slate-500 truncate">{friendlyName}</p>
-                                )}
+                                <div className="flex items-center gap-1.5">
+                                  {friendlyName && (
+                                    <p className="text-[10px] text-slate-500 truncate">{friendlyName}</p>
+                                  )}
+                                  {instanceName && (
+                                    <span className="text-[9px] px-1 py-0 rounded bg-cyan-900/50 text-cyan-400 border border-cyan-800/40 flex-shrink-0">
+                                      {instanceName}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <span className="text-[10px] text-slate-400 font-mono flex-shrink-0 max-w-14 truncate">
                                 {entity.state}

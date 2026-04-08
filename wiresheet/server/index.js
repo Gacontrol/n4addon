@@ -848,10 +848,10 @@ app.post(['/ha/instances/test', '/api/ha/instances/test'], async (req, res) => {
 
 app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
   const os = await import('os');
-  const found = [];
 
-  const getLocalSubnets = () => {
+  const getLocalSubnets = async () => {
     const subnets = new Set();
+
     const ifaces = os.networkInterfaces();
     for (const name of Object.keys(ifaces)) {
       for (const iface of (ifaces[name] || [])) {
@@ -861,15 +861,63 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
         }
       }
     }
-    const commonSubnets = ['192.168.0', '192.168.1', '192.168.2', '10.0.0', '10.0.1', '172.16.0'];
-    for (const s of commonSubnets) subnets.add(s);
+
+    const supervisorToken = process.env.SUPERVISOR_TOKEN || process.env.HASSIO_TOKEN;
+    if (supervisorToken) {
+      try {
+        const netRes = await fetch('http://supervisor/network/info', {
+          headers: { Authorization: `Bearer ${supervisorToken}` },
+          signal: AbortSignal.timeout(3000)
+        });
+        if (netRes.ok) {
+          const netData = await netRes.json();
+          const interfaces = netData?.data?.interfaces || [];
+          for (const iface of interfaces) {
+            const ipv4 = iface.ipv4 || iface.ipv4setting;
+            const addrs = ipv4?.address || [];
+            for (const addr of addrs) {
+              const ip = addr.split('/')[0];
+              const parts = ip.split('.');
+              if (parts.length === 4 && parts[0] !== '172') {
+                subnets.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
+              }
+            }
+          }
+        }
+      } catch {}
+      try {
+        const hostRes = await fetch('http://supervisor/host/info', {
+          headers: { Authorization: `Bearer ${process.env.SUPERVISOR_TOKEN || process.env.HASSIO_TOKEN}` },
+          signal: AbortSignal.timeout(3000)
+        });
+        if (hostRes.ok) {
+          const hostData = await hostRes.json();
+          const features = hostData?.data?.features || [];
+          console.log('HA discover: supervisor host features:', features);
+        }
+      } catch {}
+    }
+
+    const privateRanges = [
+      '192.168.0', '192.168.1', '192.168.2', '192.168.100', '192.168.178',
+      '10.0.0', '10.0.1', '10.1.1', '172.16.0', '172.16.1'
+    ];
+    for (const s of privateRanges) subnets.add(s);
+
     return Array.from(subnets);
   };
 
   const tryHaHost = async (ip) => {
     const url = `http://${ip}:8123`;
     try {
-      const resp = await fetch(`${url}/api/`, { signal: AbortSignal.timeout(2000) });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 1200);
+      let resp;
+      try {
+        resp = await fetch(`${url}/api/`, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (resp.status === 401 || resp.ok) {
         let name = ip;
         try {
@@ -885,8 +933,92 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
     return null;
   };
 
+  const trySpecialHostnames = async () => {
+    const specials = [
+      'homeassistant.local', 'hassio.local', 'homeassistant', 'hassio',
+      'ha.local', '192.168.1.1', '192.168.178.1'
+    ];
+    const results = [];
+    await Promise.all(specials.map(async (host) => {
+      const r = await tryHaHost(host);
+      if (r) results.push(r);
+    }));
+    return results;
+  };
+
+  const useStreaming = req.headers.accept && req.headers.accept.includes('text/event-stream');
+
+  if (useStreaming) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendFound = (host) => {
+      res.write(`data: ${JSON.stringify({ type: 'found', host })}\n\n`);
+    };
+    const sendDone = (total) => {
+      res.write(`data: ${JSON.stringify({ type: 'done', total })}\n\n`);
+      res.end();
+    };
+    const sendProgress = (scanned, total) => {
+      res.write(`data: ${JSON.stringify({ type: 'progress', scanned, total })}\n\n`);
+    };
+
+    try {
+      const specialResults = await trySpecialHostnames();
+      specialResults.forEach(r => sendFound(r));
+
+      const subnets = await getLocalSubnets();
+      const allIPs = [];
+      for (const subnet of subnets) {
+        for (let i = 1; i <= 254; i++) {
+          allIPs.push(`${subnet}.${i}`);
+        }
+      }
+      const uniqueIPs = [...new Set(allIPs)];
+      const total = uniqueIPs.length;
+      let scanned = 0;
+      const foundSet = new Set(specialResults.map(r => r.url));
+
+      const CONCURRENCY = 200;
+      let idx = 0;
+
+      const worker = async () => {
+        while (idx < uniqueIPs.length) {
+          const ip = uniqueIPs[idx++];
+          const r = await tryHaHost(ip);
+          scanned++;
+          if (r && !foundSet.has(r.url)) {
+            foundSet.add(r.url);
+            sendFound(r);
+          }
+          if (scanned % 50 === 0) {
+            sendProgress(scanned, total);
+          }
+        }
+      };
+
+      const workers = [];
+      for (let w = 0; w < CONCURRENCY; w++) workers.push(worker());
+      await Promise.all(workers);
+
+      sendDone(foundSet.size);
+    } catch (err) {
+      console.error('HA discover stream error:', err.message);
+      res.write(`data: ${JSON.stringify({ type: 'error', msg: err.message })}\n\n`);
+      res.end();
+    }
+    return;
+  }
+
+  const found = [];
   try {
-    const subnets = getLocalSubnets();
+    const specialResults = await trySpecialHostnames();
+    found.push(...specialResults);
+    const foundSet = new Set(found.map(r => r.url));
+
+    const subnets = await getLocalSubnets();
     const allIPs = [];
     for (const subnet of subnets) {
       for (let i = 1; i <= 254; i++) {
@@ -894,12 +1026,23 @@ app.get(['/ha/discover', '/api/ha/discover'], async (req, res) => {
       }
     }
     const uniqueIPs = [...new Set(allIPs)];
-    const batchSize = 80;
-    for (let i = 0; i < uniqueIPs.length; i += batchSize) {
-      const batch = uniqueIPs.slice(i, i + batchSize);
-      const results = await Promise.all(batch.map(ip => tryHaHost(ip)));
-      results.forEach(r => { if (r) found.push(r); });
-    }
+    let idx = 0;
+    const CONCURRENCY = 200;
+
+    const worker = async () => {
+      while (idx < uniqueIPs.length) {
+        const ip = uniqueIPs[idx++];
+        const r = await tryHaHost(ip);
+        if (r && !foundSet.has(r.url)) {
+          foundSet.add(r.url);
+          found.push(r);
+        }
+      }
+    };
+
+    const workers = [];
+    for (let w = 0; w < CONCURRENCY; w++) workers.push(worker());
+    await Promise.all(workers);
   } catch (err) {
     console.error('HA discover error:', err.message);
   }
