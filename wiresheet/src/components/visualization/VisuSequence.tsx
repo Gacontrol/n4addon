@@ -177,7 +177,6 @@ export const VisuSequence: React.FC<VisuSequenceProps> = ({
   const [showParams, setShowParams] = useState(false);
   const [localParams, setLocalParams] = useState<SequenceParams>({});
   const containerRef = useRef<HTMLDivElement>(null);
-  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
 
   const seqCount = Math.max(1, Math.min(6, params?.seqCount ?? 3));
   const inputVal = value?.input ?? 0;
@@ -192,22 +191,12 @@ export const VisuSequence: React.FC<VisuSequenceProps> = ({
 
   const handleOpen = useCallback(() => {
     if (isEditMode) return;
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const popupW = 560;
-      const popupH = 520;
-      let left = rect.left + rect.width / 2 - popupW / 2;
-      let top = rect.top + rect.height / 2 - popupH / 2;
-      left = Math.max(8, Math.min(window.innerWidth - popupW - 8, left));
-      top = Math.max(8, Math.min(window.innerHeight - popupH - 8, top));
-      setPopupPos({ top, left });
-    }
     setShowPopup(true);
   }, [isEditMode]);
 
   const handleParamChange = useCallback((key: string, val: unknown) => {
     setLocalParams(prev => ({ ...prev, [key]: val }));
-    onValueChange?.({ [key]: val });
+    onValueChange?.({ sequenceControl: { [`param_${key}`]: val } });
   }, [onValueChange]);
 
   const activeColor = config.activeColor ?? '#0d9488';
@@ -272,13 +261,11 @@ export const VisuSequence: React.FC<VisuSequenceProps> = ({
             background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
-          onMouseDown={e => e.target === e.currentTarget && setShowPopup(false)}
+          onMouseDown={e => { if (e.target === e.currentTarget) { e.stopPropagation(); setShowPopup(false); } }}
         >
           <div
             style={{
-              position: 'absolute',
-              top: popupPos.top,
-              left: popupPos.left,
+              position: 'relative',
               width: 560,
               maxHeight: '90vh',
               overflowY: 'auto',
@@ -289,6 +276,7 @@ export const VisuSequence: React.FC<VisuSequenceProps> = ({
               display: 'flex',
               flexDirection: 'column'
             }}
+            onMouseDown={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -310,7 +298,7 @@ export const VisuSequence: React.FC<VisuSequenceProps> = ({
                   <Settings style={{ width: 14, height: 14, color: showParams ? activeColor : '#94a3b8' }} />
                 </button>
                 <button
-                  onClick={() => setShowPopup(false)}
+                  onClick={(e) => { e.stopPropagation(); setShowPopup(false); }}
                   style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   <X style={{ width: 14, height: 14, color: '#94a3b8' }} />

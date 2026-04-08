@@ -33,25 +33,25 @@ export const VisuDisplay: React.FC<VisuDisplayProps> = ({
   const fontSize = style.fontSize || config.fontSize || 24;
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="w-full h-full flex flex-col">
       {style.showLabel && style.labelPosition === 'top' && (
-        <span className="text-xs truncate" style={{ color: textColor, opacity: 0.7 }}>{label}</span>
+        <span className="text-xs truncate px-1" style={{ color: textColor, opacity: 0.7, flexShrink: 0 }}>{label}</span>
       )}
       <div
-        className="px-4 py-3 rounded-lg font-mono text-center"
-        style={{ backgroundColor: bgColor, border: bgColor === 'transparent' ? 'none' : undefined }}
+        className="flex-1 flex items-center justify-center font-mono"
+        style={{ backgroundColor: bgColor, borderRadius: bgColor !== 'transparent' ? 6 : 0, overflow: 'hidden' }}
       >
-        <span style={{ color: textColor, fontSize }}>
+        <span style={{ color: textColor, fontSize, whiteSpace: 'nowrap' }}>
           {formatValue()}
         </span>
         {config.unit && (
-          <span className="text-slate-400 ml-2" style={{ fontSize: fontSize * 0.6 }}>
+          <span className="text-slate-400 ml-2" style={{ fontSize: fontSize * 0.6, flexShrink: 0 }}>
             {config.unit}
           </span>
         )}
       </div>
       {style.showLabel && style.labelPosition === 'bottom' && (
-        <span className="text-xs truncate" style={{ color: textColor, opacity: 0.7 }}>{label}</span>
+        <span className="text-xs truncate px-1" style={{ color: textColor, opacity: 0.7, flexShrink: 0 }}>{label}</span>
       )}
     </div>
   );

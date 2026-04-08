@@ -22,7 +22,7 @@ function getVisuUrl(): string {
   if (appMatch) return `${window.location.origin}${appMatch[1]}/visu`;
   const protocol = window.location.protocol;
   const hostname = window.location.hostname;
-  return `${protocol}//${hostname}:8098`;
+  return `${protocol}//${hostname}:8101`;
 }
 
 interface VisualizationViewProps {

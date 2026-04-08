@@ -3273,6 +3273,13 @@ function expandCompositeControl(nodeId, ctrl, rawValue, resolvedNodeType) {
     }
     return writes;
   }
+  const seqCtrl = rawValue.sequenceControl;
+  if (seqCtrl) {
+    for (const key of Object.keys(seqCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: seqCtrl[key] });
+    }
+    return writes;
+  }
   return writes;
 }
 
@@ -3291,7 +3298,8 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     let writes = [];
     if (rawValue && typeof rawValue === 'object' && (
       rawValue.pumpControl || rawValue.aggregateControl || rawValue.valveControl ||
-      rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl
+      rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl ||
+      rawValue.sequenceControl
     )) {
       let resolvedNodeType = null;
       if (srcNodeId && (rawValue.pumpControl || rawValue.aggregateControl)) {
