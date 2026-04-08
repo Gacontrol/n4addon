@@ -412,7 +412,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
       setManualAuthLoading(true);
       setManualAuthError(null);
       try {
-        const resp = await fetch('/ha/authenticate', {
+        const resp = await fetch(`${getApiBase()}/ha/authenticate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: newHaInstance.url, username: manualCredentials.username, password: manualCredentials.password })
@@ -466,7 +466,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const handleLoadInstanceEntities = useCallback(async (instance: HaInstance) => {
     setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: true }));
     try {
-      const resp = await fetch(`/ha/instances/${instance.id}/states`);
+      const resp = await fetch(`${getApiBase()}/ha/instances/${instance.id}/states`);
       const data = await resp.json();
       if (data.entities) {
         setInstanceEntities(prev => ({ ...prev, [instance.id]: data.entities }));
@@ -526,7 +526,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
         ? { url: authTarget.url, token: authToken }
         : { url: authTarget.url, username: authCredentials.username, password: authCredentials.password };
 
-      const resp = await fetch('/ha/authenticate', {
+      const resp = await fetch(`${getApiBase()}/ha/authenticate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
