@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CreditCard as Edit3, Eye, Grid2x2 as Grid, Plus, Trash2, Settings, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, FolderOpen, ExternalLink, AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter } from 'lucide-react';
-import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig } from '../../types/visualization';
+import { VisuPage, VisuWidget, WidgetTemplate, PolylineConfig, LineConfig, PolygonConfig } from '../../types/visualization';
 import { FlowNode } from '../../types/flow';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../../types/alarm';
 import { VisuCanvas } from './VisuCanvas';
@@ -265,21 +265,44 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     setSelectedWidgetId(newId);
   }, [activePage, onUpdateVisuPage]);
 
+  const offsetWidgetConfig = (src: VisuWidget, dx: number, dy: number): VisuWidget['config'] => {
+    if (src.type === 'visu-line' || src.type === 'visu-arrow') {
+      const lc = src.config as LineConfig;
+      return { ...lc, x1: (lc.x1 ?? 0) + dx, y1: (lc.y1 ?? 0) + dy, x2: (lc.x2 ?? 0) + dx, y2: (lc.y2 ?? 0) + dy };
+    }
+    if (src.type === 'visu-polyline') {
+      const pc = src.config as PolylineConfig;
+      return { ...pc, points: pc.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+    }
+    if (src.type === 'visu-polygon') {
+      const pg = src.config as PolygonConfig;
+      const pts = pg.points || [];
+      return { ...pg, points: pts.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+    }
+    return { ...src.config };
+  };
+
   const handlePasteWidget = useCallback(() => {
     const freshMulti = readMultiClipboard();
     const freshSingle = readClipboard();
+    const dx = 20, dy = 20;
     if (freshMulti !== null && freshMulti.length > 0) {
       const now = Date.now();
       const newWidgets = freshMulti.map((src, i) => ({
         ...src,
         id: `widget-${now + i}-${Math.random().toString(36).substr(2, 9)}`,
-        position: { x: src.position.x + 20, y: src.position.y + 20 },
-        config: src.type === 'visu-polyline'
-          ? { ...(src.config as PolylineConfig), points: (src.config as PolylineConfig).points.map(p => ({ ...p })) }
-          : { ...src.config },
+        position: { x: src.position.x + dx, y: src.position.y + dy },
+        config: offsetWidgetConfig(src, dx, dy),
         zIndex: activePage.widgets.length + 1 + i
       }));
-      setMultiClipboard(freshMulti);
+      const updatedClipboard = freshMulti.map((src) => ({
+        ...src,
+        position: { x: src.position.x + dx, y: src.position.y + dy },
+        config: offsetWidgetConfig(src, dx, dy)
+      }));
+      setMultiClipboard(updatedClipboard);
+      localStorage.setItem(MULTI_CLIPBOARD_KEY, JSON.stringify(updatedClipboard));
+      localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(updatedClipboard[0]));
       onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, ...newWidgets] });
       setSelectedWidgetIds(newWidgets.map(w => w.id));
       setSelectedWidgetId(newWidgets[newWidgets.length - 1].id);
@@ -287,17 +310,17 @@ export const VisualizationView: React.FC<VisualizationViewProps> = ({
     }
     const pasteSource = freshSingle;
     if (!pasteSource) return;
-    setClipboard(pasteSource);
     const newId = `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newWidget: VisuWidget = {
       ...pasteSource,
       id: newId,
-      position: { x: pasteSource.position.x + 20, y: pasteSource.position.y + 20 },
-      config: pasteSource.type === 'visu-polyline'
-        ? { ...(pasteSource.config as PolylineConfig), points: (pasteSource.config as PolylineConfig).points.map(p => ({ ...p })) }
-        : { ...pasteSource.config },
+      position: { x: pasteSource.position.x + dx, y: pasteSource.position.y + dy },
+      config: offsetWidgetConfig(pasteSource, dx, dy),
       zIndex: activePage.widgets.length + 1
     };
+    const updatedSource = { ...pasteSource, position: newWidget.position, config: newWidget.config };
+    setClipboard(updatedSource);
+    localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(updatedSource));
     onUpdateVisuPage(activePage.id, { widgets: [...activePage.widgets, newWidget] });
     setSelectedWidgetId(newId);
   }, [clipboard, multiClipboard, activePage, onUpdateVisuPage]);

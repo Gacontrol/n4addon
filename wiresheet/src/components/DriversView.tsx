@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus, Home, Lightbulb, Thermometer, Power, Gauge, Activity, AlertCircle, Loader2, Wifi, Eye, EyeOff, Link } from 'lucide-react';
+import { Plus, Trash2, Settings, ChevronRight, ChevronDown, Server, Database, ToggleLeft, ToggleRight, Copy, X, Check, Network, RefreshCw, CreditCard as Edit2, Save, Download, Upload, BookmarkPlus, Home, Lightbulb, Thermometer, Power, Gauge, Activity, AlertCircle, Loader2, Wifi, Eye, EyeOff } from 'lucide-react';
 import { ModbusDevice, ModbusDatapoint, HaEntity, HaDevice, HaInstance } from '../types/flow';
 import { modbusDeviceLibrary, ModbusDeviceTemplate } from '../data/modbusDeviceLibrary';
 
-type DriverType = 'modbus-tcp' | 'homeassistant';
+type DriverType = 'modbus-tcp' | 'homeassistant' | string;
 
 interface CustomLibraryDevice {
   id: string;
@@ -106,8 +106,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [haSearchQuery, setHaSearchQuery] = useState('');
   const [showAddHaInstance, setShowAddHaInstance] = useState(false);
   const [newHaInstance, setNewHaInstance] = useState<Partial<HaInstance>>({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
-  const [haInstanceTestResult, setHaInstanceTestResult] = useState<Record<string, { ok: boolean; msg: string; testing?: boolean }>>({});
-  const [expandedHaInstances, setExpandedHaInstances] = useState<Set<string>>(new Set());
+  const [haInstanceTestResult] = useState<Record<string, { ok: boolean; msg: string; testing?: boolean }>>({});
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
   const [instanceEntitiesLoading, setInstanceEntitiesLoading] = useState<Record<string, boolean>>({});
   const [haInstanceSearchQuery, setHaInstanceSearchQuery] = useState<Record<string, string>>({});
@@ -420,32 +419,8 @@ export const DriversView: React.FC<DriversViewProps> = ({
     onHaInstancesChange?.(haInstances.map(i => i.id === id ? { ...i, enabled: !i.enabled } : i));
   }, [haInstances, onHaInstancesChange]);
 
-  const handleTestHaInstance = useCallback(async (instance: HaInstance) => {
-    setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: false, msg: '', testing: true } }));
-    try {
-      const resp = await fetch('/ha/instances/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: instance.url, token: instance.token })
-      });
-      const data = await resp.json();
-      setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: data.ok, msg: data.msg || (data.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'), testing: false } }));
-    } catch {
-      setHaInstanceTestResult(prev => ({ ...prev, [instance.id]: { ok: false, msg: 'Netzwerkfehler', testing: false } }));
-    }
-  }, []);
-
   const handleLoadInstanceEntities = useCallback(async (instance: HaInstance) => {
-    if (instanceEntities[instance.id]) {
-      setExpandedHaInstances(prev => {
-        const next = new Set(prev);
-        if (next.has(instance.id)) next.delete(instance.id); else next.add(instance.id);
-        return next;
-      });
-      return;
-    }
     setInstanceEntitiesLoading(prev => ({ ...prev, [instance.id]: true }));
-    setExpandedHaInstances(prev => new Set([...prev, instance.id]));
     try {
       const resp = await fetch(`/ha/instances/${instance.id}/states`);
       const data = await resp.json();
@@ -728,7 +703,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
           <h2 className="text-sm font-semibold text-white mb-2">Treiber</h2>
           <p className="text-xs text-slate-500">Externe Schnittstellen konfigurieren</p>
         </div>
-        <div className="flex-1 p-3 space-y-2">
+        <div className="flex-1 overflow-auto p-3 space-y-1">
           <button
             onClick={() => setSelectedDriverType('modbus-tcp')}
             className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
@@ -745,22 +720,70 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </div>
             </div>
           </button>
-          <button
-            onClick={() => setSelectedDriverType('homeassistant')}
-            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
-              selectedDriverType === 'homeassistant'
-                ? 'bg-cyan-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Home className="w-5 h-5" />
-            <div className="text-left">
-              <div className="font-medium text-sm">Home Assistant</div>
-              <div className={`text-xs ${selectedDriverType === 'homeassistant' ? 'text-cyan-200' : 'text-slate-500'}`}>
-                {haDevices.length} Geraete, {haEntities.length} Entities
+
+          <div className="pt-1">
+            <div className="px-1 pb-1 flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Home Assistant</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleDiscoverHa}
+                  disabled={isDiscovering}
+                  className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-cyan-400 disabled:opacity-40"
+                  title="Netzwerk nach HA-Instanzen durchsuchen"
+                >
+                  {isDiscovering ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wifi className="w-3 h-3" />}
+                </button>
+                <button
+                  onClick={() => setShowAddHaInstance(true)}
+                  className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-cyan-400"
+                  title="HA-Instanz manuell hinzufuegen"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
               </div>
             </div>
-          </button>
+            <button
+              onClick={() => setSelectedDriverType('homeassistant')}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                selectedDriverType === 'homeassistant'
+                  ? 'bg-cyan-700 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <Home className="w-4 h-4" />
+              <div className="text-left">
+                <div className="font-medium text-sm">Lokal (Supervisor)</div>
+                <div className={`text-xs ${selectedDriverType === 'homeassistant' ? 'text-cyan-200' : 'text-slate-500'}`}>
+                  {haDevices.length} Geraete
+                </div>
+              </div>
+            </button>
+            {haInstances.map(instance => (
+              <button
+                key={instance.id}
+                onClick={() => {
+                  setSelectedDriverType(instance.id);
+                  handleLoadInstanceEntities(instance);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors mt-0.5 ${
+                  selectedDriverType === instance.id
+                    ? 'bg-cyan-700 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <div className="flex-shrink-0 relative">
+                  <Wifi className="w-4 h-4" />
+                  <div className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${instance.enabled ? 'bg-green-500' : 'bg-slate-500'}`} />
+                </div>
+                <div className="text-left min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate">{instance.name}</div>
+                  <div className={`text-xs truncate ${selectedDriverType === instance.id ? 'text-cyan-200' : 'text-slate-500'}`}>
+                    {instance.url.replace(/^https?:\/\//, '')}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1210,143 +1233,108 @@ export const DriversView: React.FC<DriversViewProps> = ({
               )}
             </div>
 
-            <div className="mt-4 border-t border-slate-700 pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Wifi className="w-4 h-4 text-cyan-400" />
-                  <span className="text-sm font-medium text-white">Weitere HA-Instanzen</span>
-                  <span className="text-xs text-slate-500">({haInstances.length})</span>
+          </>
+        )}
+
+        {(() => {
+          const selectedInstance = haInstances.find(i => i.id === selectedDriverType);
+          if (!selectedInstance) return null;
+          const entities = instanceEntities[selectedInstance.id] || [];
+          const isLoadingEntities = instanceEntitiesLoading[selectedInstance.id];
+          const searchQ = haInstanceSearchQuery[selectedInstance.id] || '';
+          const filteredEntities = entities.filter(e =>
+            !searchQ || e.entity_id.toLowerCase().includes(searchQ.toLowerCase()) ||
+            (e.attributes.friendly_name as string || '').toLowerCase().includes(searchQ.toLowerCase())
+          );
+          const testResult = haInstanceTestResult[selectedInstance.id];
+          return (
+            <>
+              <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-slate-800">
+                <div className="flex items-center gap-3">
+                  <Wifi className="w-5 h-5 text-cyan-400" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">{selectedInstance.name}</h2>
+                    <p className="text-xs text-slate-500">{selectedInstance.url}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {testResult && !testResult.testing && (
+                    <span className={`text-xs flex items-center gap-1 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                      {testResult.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                      {testResult.msg}
+                    </span>
+                  )}
                   <button
-                    onClick={handleDiscoverHa}
-                    disabled={isDiscovering}
-                    className="flex items-center gap-1 px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs font-medium disabled:opacity-50"
-                    title="Netzwerk nach HA-Instanzen durchsuchen"
+                    onClick={() => handleLoadInstanceEntities(selectedInstance)}
+                    disabled={isLoadingEntities}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    {isDiscovering ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                    Suchen
+                    {isLoadingEntities ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Aktualisieren
                   </button>
                   <button
-                    onClick={() => setShowAddHaInstance(true)}
-                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
+                    onClick={() => handleToggleHaInstance(selectedInstance.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      selectedInstance.enabled ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'
+                    }`}
                   >
-                    <Plus className="w-3 h-3" />
-                    Manuell
+                    {selectedInstance.enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    {selectedInstance.enabled ? 'Aktiv' : 'Deaktiviert'}
+                  </button>
+                  <button
+                    onClick={() => { handleDeleteHaInstance(selectedInstance.id); setSelectedDriverType('homeassistant'); }}
+                    className="p-2 rounded-lg bg-slate-700 hover:bg-red-900/50 text-slate-400 hover:text-red-400 transition-colors"
+                    title="Instanz loeschen"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {haInstances.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-xs border border-dashed border-slate-700 rounded-lg">
-                  <Wifi className="w-6 h-6 mx-auto mb-2 opacity-30" />
-                  Keine weiteren HA-Instanzen konfiguriert
+              <div className="flex-1 overflow-auto p-4">
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={searchQ}
+                    onChange={(e) => setHaInstanceSearchQuery(prev => ({ ...prev, [selectedInstance.id]: e.target.value }))}
+                    placeholder="Entities suchen..."
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {haInstances.map(instance => {
-                    const isExpanded = expandedHaInstances.has(instance.id);
-                    const testResult = haInstanceTestResult[instance.id];
-                    const entities = instanceEntities[instance.id] || [];
-                    const isLoadingEntities = instanceEntitiesLoading[instance.id];
-                    const searchQ = haInstanceSearchQuery[instance.id] || '';
-                    const filteredEntities = entities.filter(e =>
-                      !searchQ || e.entity_id.toLowerCase().includes(searchQ.toLowerCase()) ||
-                      (e.attributes.friendly_name as string || '').toLowerCase().includes(searchQ.toLowerCase())
-                    );
 
-                    return (
-                      <div key={instance.id} className="bg-slate-800 rounded-lg border border-slate-700">
-                        <div className="flex items-center gap-2 p-3">
-                          <button
-                            onClick={() => handleLoadInstanceEntities(instance)}
-                            className="text-slate-400"
-                          >
-                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                          </button>
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${instance.enabled ? 'bg-cyan-500' : 'bg-slate-600'}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">{instance.name}</div>
-                            <div className="text-xs text-slate-500 truncate">{instance.url}</div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {testResult && !testResult.testing && (
-                              <span className={`text-xs ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-                                {testResult.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                              </span>
-                            )}
-                            <button
-                              onClick={() => handleTestHaInstance(instance)}
-                              disabled={testResult?.testing}
-                              className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-cyan-400"
-                              title="Verbindung testen"
-                            >
-                              {testResult?.testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Link className="w-3.5 h-3.5" />}
-                            </button>
-                            <button
-                              onClick={() => handleToggleHaInstance(instance.id)}
-                              className="p-1 rounded hover:bg-slate-700"
-                              title={instance.enabled ? 'Deaktivieren' : 'Aktivieren'}
-                            >
-                              {instance.enabled
-                                ? <ToggleRight className="w-4 h-4 text-cyan-400" />
-                                : <ToggleLeft className="w-4 h-4 text-slate-500" />
-                              }
-                            </button>
-                            <button
-                              onClick={() => handleDeleteHaInstance(instance.id)}
-                              className="p-1 rounded hover:bg-slate-700 hover:text-red-400"
-                              title="Loeschen"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="border-t border-slate-700 p-3">
-                            {isLoadingEntities ? (
-                              <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Lade Entities...
-                              </div>
-                            ) : (
-                              <>
-                                <input
-                                  type="text"
-                                  value={searchQ}
-                                  onChange={(e) => setHaInstanceSearchQuery(prev => ({ ...prev, [instance.id]: e.target.value }))}
-                                  placeholder="Entities suchen..."
-                                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white placeholder-slate-500 mb-2"
-                                />
-                                <div className="space-y-1 max-h-48 overflow-y-auto">
-                                  {filteredEntities.length === 0 ? (
-                                    <div className="text-xs text-slate-500 text-center py-3">
-                                      {entities.length === 0 ? 'Keine Entities geladen' : 'Keine Treffer'}
-                                    </div>
-                                  ) : (
-                                    filteredEntities.slice(0, 100).map(entity => (
-                                      <HaEntityRow key={entity.entity_id} entity={entity} liveData={undefined} />
-                                    ))
-                                  )}
-                                </div>
-                                {entities.length > 0 && (
-                                  <div className="text-xs text-slate-600 mt-2 text-right">
-                                    {filteredEntities.length} / {entities.length} Entities
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </>
-        )}
+                {isLoadingEntities && entities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-8 h-8 text-cyan-400 mx-auto mb-3 animate-spin" />
+                    <p className="text-slate-500 text-sm">Lade Entities...</p>
+                  </div>
+                ) : entities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Wifi className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                    <p className="text-slate-400 text-sm mb-2">Keine Entities geladen</p>
+                    <p className="text-slate-600 text-xs mb-4">Verbindung herstellen und Entities laden</p>
+                    <button
+                      onClick={() => handleLoadInstanceEntities(selectedInstance)}
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-medium"
+                    >
+                      Entities laden
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      {filteredEntities.slice(0, 200).map(entity => (
+                        <HaEntityRow key={entity.entity_id} entity={entity} liveData={undefined} />
+                      ))}
+                    </div>
+                    <div className="text-xs text-slate-600 mt-3 text-right">
+                      {filteredEntities.length} / {entities.length} Entities
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {showDiscovery && (
