@@ -326,6 +326,62 @@ function stopDriverPolling() {
   }
 }
 
+const haWsConnections = new Map();
+
+async function connectHaWebSocket(instance) {
+  const existing = haWsConnections.get(instance.id);
+  if (existing && existing.readyState < 2) return;
+  if (existing) { try { existing.terminate(); } catch {} }
+  const wsUrl = instance.url.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://').replace(/\/$/, '') + '/api/websocket';
+  let ws;
+  try {
+    const WebSocket = (await import('ws')).default;
+    ws = new WebSocket(wsUrl, { headers: { 'Authorization': `Bearer ${instance.token}` } });
+  } catch { return; }
+  haWsConnections.set(instance.id, ws);
+  let subId = 1;
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'auth_required') {
+        ws.send(JSON.stringify({ type: 'auth', access_token: instance.token }));
+        return;
+      }
+      if (msg.type === 'auth_ok') {
+        ws.send(JSON.stringify({ id: subId, type: 'subscribe_events', event_type: 'state_changed' }));
+        return;
+      }
+      if (msg.type === 'auth_invalid') { ws.close(); return; }
+      if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
+        const entityId = msg.event.data?.entity_id;
+        const newState = msg.event.data?.new_state;
+        if (entityId && newState) {
+          const key = `${instance.id}:${entityId}`;
+          haLiveValues.set(key, { state: newState.state, attributes: newState.attributes || {} });
+          broadcastSSE('driver-values', { ha: { [key]: { state: newState.state, attributes: newState.attributes || {} } }, full: false });
+        }
+      }
+    } catch {}
+  });
+  ws.on('close', () => {
+    haWsConnections.delete(instance.id);
+    const still = (driverConfig.haInstances || []).find(i => i.id === instance.id && i.enabled);
+    if (still) setTimeout(() => connectHaWebSocket(instance), 5000);
+  });
+  ws.on('error', () => {});
+}
+
+function refreshHaWebSockets() {
+  const instances = (driverConfig.haInstances || []).filter(i => i.enabled && i.url && i.token);
+  const activeIds = new Set(instances.map(i => i.id));
+  for (const [id, ws] of haWsConnections) {
+    if (!activeIds.has(id)) { try { ws.terminate(); } catch {} haWsConnections.delete(id); }
+  }
+  for (const instance of instances) {
+    if (!haWsConnections.has(instance.id)) connectHaWebSocket(instance);
+  }
+}
+
 async function loadPersistentDpValues() {
   await dpStore.load(dpValuesFile, fs);
 }
@@ -347,6 +403,7 @@ async function loadDriverConfig() {
     };
     console.log(`Treiber-Konfiguration geladen: ${driverConfig.modbusDevices.length} Modbus-Geraete, ${driverConfig.driverBindings.length} Bindings`);
     startDriverPolling();
+    refreshHaWebSockets();
   } catch (err) {
     if (err.code !== 'ENOENT') {
       console.error('Fehler beim Laden der Treiber-Konfiguration:', err.message);
@@ -789,6 +846,7 @@ app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
     };
     await saveDriverConfig();
     startDriverPolling();
+    refreshHaWebSockets();
     res.json({ success: true });
   } catch (err) {
     console.error('Fehler beim Speichern der Treiber-Konfiguration:', err);
@@ -1731,7 +1789,7 @@ function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
 }
 
 app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
-  const { url: rawUrl, token } = req.query;
+  const { url: rawUrl, token, instanceId } = req.query;
   if (!rawUrl || !token) {
     return res.status(400).json({ __proxyError: true, message: 'Fehlende Parameter (url oder token)' });
   }
@@ -1792,11 +1850,18 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     const origin = `${baseUrl.protocol}//${baseUrl.host}`;
     const targetBase = targetUrl.split('?')[0].replace(/[^/]*$/, '');
 
+    const remoteApiProxyBase = instanceId ? `${proxyBase}/api/remote-api-proxy/${instanceId}/api` : null;
+
     const injectScript = `
 <script>
 (function() {
   var WS_TOKEN = ${JSON.stringify(token)};
   var WS_ORIGIN = ${JSON.stringify(origin)};
+  var WS_REMOTE_API_BASE = ${JSON.stringify(remoteApiProxyBase)};
+  if (WS_REMOTE_API_BASE) {
+    window.__WS_REMOTE_API_BASE__ = WS_REMOTE_API_BASE;
+    window.__WS_REMOTE_WS_BASE__ = null;
+  }
   try {
     localStorage.setItem('hassTokens', JSON.stringify({
       access_token: WS_TOKEN,
@@ -1917,6 +1982,64 @@ app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
   } catch (err) {
     console.error('[remote-visu-asset] error:', err.message);
     res.status(502).end();
+  }
+});
+
+app.all(['/remote-api-proxy/:instanceId/*', '/api/remote-api-proxy/:instanceId/*'], async (req, res) => {
+  const { instanceId } = req.params;
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+
+  const suffix = req.params[0] ? '/' + req.params[0] : '';
+  const qs = Object.keys(req.query).length > 0 ? '?' + new URLSearchParams(req.query).toString() : '';
+  const wiresheetApiBase = await (async () => {
+    try {
+      const base = instance.url.replace(/\/$/, '');
+      const headers = { Authorization: `Bearer ${instance.token}` };
+      const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(5000) });
+      if (addonsRes.ok) {
+        const addonsData = await addonsRes.json();
+        const addons = addonsData.data?.addons || addonsData.addons || [];
+        const wsAddon = addons.find(a =>
+          (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+          (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+        );
+        if (wsAddon) return `${base}/api/hassio_ingress/${wsAddon.slug}`;
+      }
+    } catch {}
+    for (const slug of ['wiresheet', 'ga_control', 'ga-control']) {
+      try {
+        const r = await fetch(`${instance.url.replace(/\/$/, '')}/api/hassio_ingress/${slug}/api/pages`, { headers: { Authorization: `Bearer ${instance.token}` }, signal: AbortSignal.timeout(3000) });
+        if (r.ok) return `${instance.url.replace(/\/$/, '')}/api/hassio_ingress/${slug}`;
+      } catch {}
+    }
+    return null;
+  })();
+
+  if (!wiresheetApiBase) return res.status(502).json({ error: 'Remote wiresheet not reachable' });
+
+  const targetUrl = `${wiresheetApiBase}${suffix}${qs}`;
+  try {
+    const upstreamRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: { Authorization: `Bearer ${instance.token}`, 'Content-Type': req.headers['content-type'] || 'application/json' },
+      body: ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.stringify(req.body) : undefined,
+      signal: AbortSignal.timeout(10000),
+      redirect: 'follow'
+    });
+    const contentType = upstreamRes.headers.get('content-type') || 'application/json';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const buf = await upstreamRes.arrayBuffer();
+    res.status(upstreamRes.status).send(Buffer.from(buf));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
   }
 });
 

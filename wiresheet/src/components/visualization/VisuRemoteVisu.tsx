@@ -43,7 +43,7 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
 
   const apiBase = getApiBase();
   const proxyUrl = (hasConfig && visuUrl)
-    ? `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&_rk=${reloadKey}`
+    ? `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&instanceId=${encodeURIComponent(config.instanceId || '')}&_rk=${reloadKey}`
     : null;
 
   const scale = config.scale ?? 1;

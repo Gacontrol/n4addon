@@ -112,8 +112,6 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [showAddHaInstance, setShowAddHaInstance] = useState(false);
   const [newHaInstance, setNewHaInstance] = useState<Partial<HaInstance>>({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
   const [haInstanceTestResult] = useState<Record<string, { ok: boolean; msg: string; testing?: boolean }>>({});
-  const [manualAuthMode, setManualAuthMode] = useState<'token' | 'credentials'>('token');
-  const [manualCredentials, setManualCredentials] = useState({ username: '', password: '' });
   const [manualAuthLoading, setManualAuthLoading] = useState(false);
   const [manualAuthError, setManualAuthError] = useState<string | null>(null);
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
@@ -125,9 +123,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   const [discoveredHosts, setDiscoveredHosts] = useState<{ url: string; ip: string; name: string }[]>([]);
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [authTarget, setAuthTarget] = useState<{ url: string; name: string } | null>(null);
-  const [authCredentials, setAuthCredentials] = useState({ username: '', password: '' });
   const [authToken, setAuthToken] = useState('');
-  const [authMode, setAuthMode] = useState<'credentials' | 'token'>('credentials');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
@@ -410,44 +406,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   }, []);
 
   const handleAddHaInstance = useCallback(async () => {
-    if (!newHaInstance.name || !newHaInstance.url) return;
-
-    if (manualAuthMode === 'credentials') {
-      if (!manualCredentials.username || !manualCredentials.password) return;
-      setManualAuthLoading(true);
-      setManualAuthError(null);
-      try {
-        const resp = await fetch(`${getApiBase()}/ha/authenticate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: newHaInstance.url, username: manualCredentials.username, password: manualCredentials.password })
-        });
-        const data = await resp.json();
-        if (data.ok && data.token) {
-          const instance: HaInstance = {
-            id: `ha-${Date.now()}`,
-            name: newHaInstance.name!,
-            url: newHaInstance.url!.replace(/\/$/, ''),
-            token: data.token,
-            enabled: true
-          };
-          onHaInstancesChange?.([...haInstances, instance]);
-          setNewHaInstance({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
-          setManualCredentials({ username: '', password: '' });
-          setManualAuthError(null);
-          setShowAddHaInstance(false);
-        } else {
-          setManualAuthError(data.msg || 'Anmeldung fehlgeschlagen');
-        }
-      } catch (err) {
-        setManualAuthError(err instanceof Error ? err.message : 'Netzwerkfehler');
-      } finally {
-        setManualAuthLoading(false);
-      }
-      return;
-    }
-
-    if (!newHaInstance.token) return;
+    if (!newHaInstance.name || !newHaInstance.url || !newHaInstance.token) return;
     const instance: HaInstance = {
       id: `ha-${Date.now()}`,
       name: newHaInstance.name!,
@@ -457,8 +416,9 @@ export const DriversView: React.FC<DriversViewProps> = ({
     };
     onHaInstancesChange?.([...haInstances, instance]);
     setNewHaInstance({ name: '', url: 'http://192.168.1.x:8123', token: '', enabled: true });
+    setManualAuthError(null);
     setShowAddHaInstance(false);
-  }, [newHaInstance, manualAuthMode, manualCredentials, haInstances, onHaInstancesChange]);
+  }, [newHaInstance, haInstances, onHaInstancesChange]);
 
   const handleDeleteHaInstance = useCallback((id: string) => {
     onHaInstancesChange?.(haInstances.filter(i => i.id !== id));
@@ -522,18 +482,14 @@ export const DriversView: React.FC<DriversViewProps> = ({
   }, []);
 
   const handleAuthenticateInstance = useCallback(async () => {
-    if (!authTarget) return;
+    if (!authTarget || !authToken) return;
     setAuthLoading(true);
     setAuthError(null);
     try {
-      const body = authMode === 'token'
-        ? { url: authTarget.url, token: authToken }
-        : { url: authTarget.url, username: authCredentials.username, password: authCredentials.password };
-
       const resp = await fetch(`${getApiBase()}/ha/authenticate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ url: authTarget.url, token: authToken })
       });
       const data = await resp.json();
       if (data.ok && data.token) {
@@ -546,7 +502,6 @@ export const DriversView: React.FC<DriversViewProps> = ({
         };
         onHaInstancesChange?.([...haInstances, newInst]);
         setAuthTarget(null);
-        setAuthCredentials({ username: '', password: '' });
         setAuthToken('');
         setDiscoveredHosts(prev => prev.filter(h => h.url !== authTarget.url));
       } else {
@@ -557,7 +512,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
     } finally {
       setAuthLoading(false);
     }
-  }, [authTarget, authMode, authToken, authCredentials, haInstances, onHaInstancesChange]);
+  }, [authTarget, authToken, haInstances, onHaInstancesChange]);
 
   const renderConfigDatapointRow = (device: ModbusDevice, dp: ModbusDatapoint) => {
     const key = `${device.id}:${dp.id}`;
@@ -1491,80 +1446,31 @@ export const DriversView: React.FC<DriversViewProps> = ({
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-2">Authentifizierung</label>
-                <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
+                <div className="relative">
+                  <input
+                    type={showTokens.has('auth-dialog') ? 'text' : 'password'}
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    placeholder="eyJ..."
+                    className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
+                  />
                   <button
                     type="button"
-                    onClick={() => { setAuthMode('credentials'); setAuthError(null); }}
-                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${authMode === 'credentials' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                    onClick={() => setShowTokens(prev => {
+                      const next = new Set(prev);
+                      if (next.has('auth-dialog')) next.delete('auth-dialog'); else next.add('auth-dialog');
+                      return next;
+                    })}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                   >
-                    Benutzername & Passwort
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAuthMode('token'); setAuthError(null); }}
-                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${authMode === 'token' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-                  >
-                    Long-Lived Token
+                    {showTokens.has('auth-dialog') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
               </div>
-
-              {authMode === 'credentials' ? (
-                <>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Benutzername</label>
-                    <input
-                      type="text"
-                      value={authCredentials.username}
-                      onChange={(e) => setAuthCredentials(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="admin"
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                      autoComplete="username"
-                      autoFocus
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Passwort</label>
-                    <input
-                      type="password"
-                      value={authCredentials.password}
-                      onChange={(e) => setAuthCredentials(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                      autoComplete="current-password"
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
-                  <div className="relative">
-                    <input
-                      type={showTokens.has('auth-dialog') ? 'text' : 'password'}
-                      value={authToken}
-                      onChange={(e) => setAuthToken(e.target.value)}
-                      placeholder="eyJ..."
-                      className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAuthenticateInstance(); }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowTokens(prev => {
-                        const next = new Set(prev);
-                        if (next.has('auth-dialog')) next.delete('auth-dialog'); else next.add('auth-dialog');
-                        return next;
-                      })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      {showTokens.has('auth-dialog') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
-                </div>
-              )}
 
               {authError && (
                 <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded px-3 py-2">
@@ -1582,7 +1488,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </button>
               <button
                 onClick={handleAuthenticateInstance}
-                disabled={authLoading || (authMode === 'credentials' ? (!authCredentials.username || !authCredentials.password) : !authToken)}
+                disabled={authLoading || !authToken}
                 className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium disabled:opacity-50"
               >
                 {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -1628,77 +1534,30 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs text-slate-400 mb-2">Authentifizierung</label>
-                <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
+                <div className="relative">
+                  <input
+                    type={showTokens.has('new') ? 'text' : 'password'}
+                    value={newHaInstance.token || ''}
+                    onChange={(e) => setNewHaInstance(prev => ({ ...prev, token: e.target.value }))}
+                    placeholder="eyJ..."
+                    className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddHaInstance(); }}
+                  />
                   <button
                     type="button"
-                    onClick={() => { setManualAuthMode('credentials'); setManualAuthError(null); }}
-                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${manualAuthMode === 'credentials' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                    onClick={() => setShowTokens(prev => {
+                      const next = new Set(prev);
+                      if (next.has('new')) next.delete('new'); else next.add('new');
+                      return next;
+                    })}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                   >
-                    Benutzername & Passwort
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setManualAuthMode('token'); setManualAuthError(null); }}
-                    className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${manualAuthMode === 'token' ? 'bg-cyan-700 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-                  >
-                    Long-Lived Token
+                    {showTokens.has('new') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
               </div>
-
-              {manualAuthMode === 'credentials' ? (
-                <>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Benutzername</label>
-                    <input
-                      type="text"
-                      value={manualCredentials.username}
-                      onChange={(e) => setManualCredentials(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="admin"
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                      autoComplete="username"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">Passwort</label>
-                    <input
-                      type="password"
-                      value={manualCredentials.password}
-                      onChange={(e) => setManualCredentials(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500"
-                      autoComplete="current-password"
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddHaInstance(); }}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">Long-Lived Access Token</label>
-                  <div className="relative">
-                    <input
-                      type={showTokens.has('new') ? 'text' : 'password'}
-                      value={newHaInstance.token || ''}
-                      onChange={(e) => setNewHaInstance(prev => ({ ...prev, token: e.target.value }))}
-                      placeholder="eyJ..."
-                      className="w-full px-3 py-2 pr-10 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowTokens(prev => {
-                        const next = new Set(prev);
-                        if (next.has('new')) next.delete('new'); else next.add('new');
-                        return next;
-                      })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      {showTokens.has('new') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Token aus HA Profil &gt; Sicherheit &gt; Long-Lived Access Tokens</p>
-                </div>
-              )}
 
               {manualAuthError && (
                 <div className="flex items-center gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded px-3 py-2">
@@ -1716,16 +1575,11 @@ export const DriversView: React.FC<DriversViewProps> = ({
               </button>
               <button
                 onClick={handleAddHaInstance}
-                disabled={
-                  manualAuthLoading ||
-                  !newHaInstance.name ||
-                  !newHaInstance.url ||
-                  (manualAuthMode === 'token' ? !newHaInstance.token : (!manualCredentials.username || !manualCredentials.password))
-                }
+                disabled={manualAuthLoading || !newHaInstance.name || !newHaInstance.url || !newHaInstance.token}
                 className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {manualAuthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {manualAuthMode === 'credentials' ? 'Anmelden & Hinzufuegen' : 'Hinzufuegen'}
+                Hinzufuegen
               </button>
             </div>
           </div>

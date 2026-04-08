@@ -490,25 +490,13 @@ const DriverPointsSection: React.FC<{
   loading: boolean;
   onRefresh: () => void;
 }> = ({ data, loading, onRefresh }) => {
-  const [expandedSheets, setExpandedSheets] = useState<Set<string>>(new Set());
   const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
 
-  const toggleSheet = (id: string) => setExpandedSheets(prev => {
-    const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
-  });
   const toggleDevice = (id: string) => setExpandedDevices(prev => {
     const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
   });
 
-  const totalNodes = data.sheets.reduce((s, sh) => s + sh.nodes.length, 0);
   const totalDps = data.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
-
-  function getDriverNodeIcon(type: string) {
-    if (type.includes('ha-input')) return <Activity className="w-3 h-3 text-cyan-400" />;
-    if (type.includes('ha-output')) return <Zap className="w-3 h-3 text-amber-400" />;
-    if (type.includes('modbus')) return <Server className="w-3 h-3 text-emerald-400" />;
-    return <Circle className="w-3 h-3 text-slate-500" />;
-  }
 
   return (
     <div>
@@ -516,8 +504,8 @@ const DriverPointsSection: React.FC<{
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-emerald-400" />
           <span className="text-sm font-semibold text-white">Treiberpunkte</span>
-          {(totalNodes + totalDps) > 0 && (
-            <span className="text-xs text-slate-500">{totalNodes + totalDps} Punkte</span>
+          {totalDps > 0 && (
+            <span className="text-xs text-slate-500">{totalDps} Punkte</span>
           )}
         </div>
         <button
@@ -540,14 +528,14 @@ const DriverPointsSection: React.FC<{
         </div>
       )}
 
-      {loading && data.sheets.length === 0 && data.modbusDevices.length === 0 && (
+      {loading && data.modbusDevices.length === 0 && (
         <div className="flex items-center gap-2 py-6 justify-center">
           <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
           <span className="text-xs text-slate-400">Lade Treiberpunkte...</span>
         </div>
       )}
 
-      {!loading && !data.error && data.sheets.length === 0 && data.modbusDevices.length === 0 && (
+      {!loading && !data.error && data.modbusDevices.length === 0 && (
         <div className="text-center py-6">
           <Server className="w-8 h-8 text-slate-700 mx-auto mb-2" />
           <p className="text-xs text-slate-500">Keine Treiberpunkte gefunden</p>
@@ -558,44 +546,6 @@ const DriverPointsSection: React.FC<{
       )}
 
       <div className="space-y-1.5">
-        {data.sheets.length > 0 && (
-          <div className="mb-2">
-            <div className="flex items-center gap-1.5 px-1 mb-1.5">
-              <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-xs font-semibold text-slate-300">Logikseiten ({data.sheets.length})</span>
-            </div>
-            {data.sheets.map(sheet => {
-              const isExp = expandedSheets.has(sheet.id);
-              return (
-                <div key={sheet.id} className="border border-slate-700/50 rounded-lg overflow-hidden mb-1">
-                  <button
-                    onClick={() => toggleSheet(sheet.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/70 hover:bg-slate-800 transition-colors text-left"
-                  >
-                    {isExp ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
-                    <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="text-white text-sm font-medium flex-1 truncate">{sheet.name}</span>
-                    <span className="text-slate-500 text-xs">{sheet.nodes.length} Punkte</span>
-                  </button>
-                  {isExp && (
-                    <div className="p-2 space-y-1 bg-slate-900/30">
-                      {sheet.nodes.map(node => (
-                        <div key={node.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-slate-900/60 border border-slate-700/40">
-                          {getDriverNodeIcon(node.type)}
-                          <span className="text-white text-xs flex-1 truncate" title={node.label}>{node.label}</span>
-                          {node.unit && <span className="text-slate-600 text-[10px] shrink-0">{node.unit}</span>}
-                          {node.entityId && <span className="text-cyan-700 text-[9px] font-mono truncate max-w-[120px]">{node.entityId}</span>}
-                          <span className="text-slate-700 text-[9px] font-mono">{node.type}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
         {data.modbusDevices.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 px-1 mb-1.5">

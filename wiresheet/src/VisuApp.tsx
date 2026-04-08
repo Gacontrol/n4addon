@@ -111,11 +111,15 @@ function getIngressPrefix(): string {
 }
 
 function getApiBase(): string {
+  const override = (window as Record<string, unknown>).__WS_REMOTE_API_BASE__ as string | undefined;
+  if (override) return override;
   const prefix = getIngressPrefix();
   return prefix ? `${prefix}/api` : '/api';
 }
 
 function getWsBase(): string {
+  const wsOverride = (window as Record<string, unknown>).__WS_REMOTE_WS_BASE__ as string | undefined;
+  if (wsOverride) return wsOverride;
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   const prefix = getIngressPrefix();
