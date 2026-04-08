@@ -63,6 +63,7 @@ interface DriverPanelProps {
   onReloadInstanceEntities?: () => void;
   instanceDriverPoints?: Record<string, InstanceDriverPoints>;
   instanceGaPages?: Record<string, GaPage[]>;
+  onGaNodeClick?: (params: { instanceId: string; instanceName: string; pageId: string; pageName: string; nodeId: string; nodeName: string; slotId?: string; slotLabel?: string; slotDirection?: 'input' | 'output'; unit: string; nodeType: string }) => void;
 }
 
 const STORAGE_KEY_PREFIX = 'wiresheet-driver-panel-';
@@ -87,6 +88,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   onReloadInstanceEntities,
   instanceDriverPoints = {},
   instanceGaPages = {},
+  onGaNodeClick,
 }) => {
   const storageKey = `${STORAGE_KEY_PREFIX}${side}`;
 
@@ -235,6 +237,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
         }
 
         return { binding, haDevice: device, haEntity: entity, isAvailable, errorReason };
+      } else if (binding.driverType === 'remote-ga') {
+        return { binding, isAvailable: true };
       }
       return { binding, isAvailable: false, errorReason: 'Unbekannter Treiber' };
     });
@@ -575,6 +579,8 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
             )}
 
             {enabledInstances.map(instance => {
+              if (isOutputPanel) return null;
+
               const instDevs = (instanceDevices[instance.id] || []).filter(d => getHaEntitiesForPanel(d).length > 0);
               const isLoading = instanceEntitiesLoading[instance.id];
               const error = instanceEntitiesError[instance.id];
@@ -844,58 +850,59 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                         const nodeKey = `ga-node-${instance.id}-${page.id}-${node.id}`;
                                         const hasSlots = (node.inputs && node.inputs.length > 0) || (node.outputs && node.outputs.length > 0);
                                         const nodeExpanded = expandedHaDevices.has(nodeKey);
+                                        const isConnecting = !!connectingFrom;
+                                        const gaParams = { instanceId: instance.id, instanceName: instance.name, pageId: page.id, pageName: page.name, nodeId: node.id, nodeName: node.label, unit: node.unit, nodeType: node.type };
                                         return (
                                           <div key={node.id}>
                                             <div
-                                              className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                              className={`flex items-center gap-2 px-6 py-1 cursor-pointer transition-colors ${isConnecting ? 'hover:bg-teal-700/30 bg-teal-900/10' : 'hover:bg-slate-700/30'}`}
                                               draggable
                                               onDragStart={(e) => {
                                                 e.dataTransfer.setData('application/json', JSON.stringify({
                                                   type: 'remote-ga-point',
-                                                  instanceId: instance.id,
-                                                  instanceName: instance.name,
-                                                  pageId: page.id,
-                                                  pageName: page.name,
-                                                  nodeId: node.id,
-                                                  nodeName: node.label,
-                                                  unit: node.unit,
-                                                  nodeType: node.type,
+                                                  ...gaParams,
                                                 }));
                                               }}
-                                              onClick={() => hasSlots && toggleHaDevice(nodeKey)}
+                                              onClick={() => {
+                                                if (isConnecting && onGaNodeClick) {
+                                                  onGaNodeClick(gaParams);
+                                                } else if (hasSlots) {
+                                                  toggleHaDevice(nodeKey);
+                                                }
+                                              }}
                                             >
-                                              <div className="w-1.5 h-1.5 rounded-full bg-teal-500/70 flex-shrink-0" />
+                                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnecting ? 'bg-teal-400' : 'bg-teal-500/70'}`} />
                                               <Gauge className="w-3 h-3 text-slate-400 flex-shrink-0" />
                                               <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label || node.id}</span>
                                               {node.unit && <span className="text-[9px] text-slate-500 mr-1">{node.unit}</span>}
-                                              {hasSlots && (nodeExpanded ? <ChevronUp className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />)}
+                                              {isConnecting && <span className="text-[8px] text-teal-400 flex-shrink-0">verb.</span>}
+                                              {!isConnecting && hasSlots && (nodeExpanded ? <ChevronUp className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />)}
                                             </div>
                                             {hasSlots && nodeExpanded && (
                                               <div className="bg-slate-950/60 border-l border-teal-900/40 ml-7">
                                                 {(node.inputs || []).map(slot => (
                                                   <div
                                                     key={`in-${slot.id}`}
-                                                    className="flex items-center gap-2 px-3 py-0.5 hover:bg-slate-700/20 cursor-grab transition-colors"
+                                                    className={`flex items-center gap-2 px-3 py-0.5 transition-colors ${isConnecting ? 'hover:bg-teal-700/30 bg-teal-900/10 cursor-pointer' : 'hover:bg-slate-700/20 cursor-grab'}`}
                                                     draggable
                                                     onDragStart={(e) => {
                                                       e.stopPropagation();
                                                       e.dataTransfer.setData('application/json', JSON.stringify({
                                                         type: 'remote-ga-slot',
                                                         slotDirection: 'input',
-                                                        instanceId: instance.id,
-                                                        instanceName: instance.name,
-                                                        pageId: page.id,
-                                                        pageName: page.name,
-                                                        nodeId: node.id,
-                                                        nodeName: node.label,
+                                                        ...gaParams,
                                                         slotId: slot.id,
                                                         slotLabel: slot.label,
-                                                        unit: node.unit,
-                                                        nodeType: node.type,
                                                       }));
                                                     }}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (isConnecting && onGaNodeClick) {
+                                                        onGaNodeClick({ ...gaParams, slotId: slot.id, slotLabel: slot.label, slotDirection: 'input' });
+                                                      }
+                                                    }}
                                                   >
-                                                    <div className="w-2 h-2 rounded-full border border-teal-500/60 bg-teal-900/30 flex-shrink-0" />
+                                                    <div className={`w-2 h-2 rounded-full border flex-shrink-0 ${isConnecting ? 'border-teal-400 bg-teal-700/40' : 'border-teal-500/60 bg-teal-900/30'}`} />
                                                     <span className="text-[9px] text-teal-300/80 truncate">{slot.label}</span>
                                                     <span className="text-[8px] text-slate-600 ml-auto">IN</span>
                                                   </div>
@@ -903,27 +910,26 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                                 {(node.outputs || []).map(slot => (
                                                   <div
                                                     key={`out-${slot.id}`}
-                                                    className="flex items-center gap-2 px-3 py-0.5 hover:bg-slate-700/20 cursor-grab transition-colors"
+                                                    className={`flex items-center gap-2 px-3 py-0.5 transition-colors ${isConnecting ? 'hover:bg-amber-700/30 bg-amber-900/10 cursor-pointer' : 'hover:bg-slate-700/20 cursor-grab'}`}
                                                     draggable
                                                     onDragStart={(e) => {
                                                       e.stopPropagation();
                                                       e.dataTransfer.setData('application/json', JSON.stringify({
                                                         type: 'remote-ga-slot',
                                                         slotDirection: 'output',
-                                                        instanceId: instance.id,
-                                                        instanceName: instance.name,
-                                                        pageId: page.id,
-                                                        pageName: page.name,
-                                                        nodeId: node.id,
-                                                        nodeName: node.label,
+                                                        ...gaParams,
                                                         slotId: slot.id,
                                                         slotLabel: slot.label,
-                                                        unit: node.unit,
-                                                        nodeType: node.type,
                                                       }));
                                                     }}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (isConnecting && onGaNodeClick) {
+                                                        onGaNodeClick({ ...gaParams, slotId: slot.id, slotLabel: slot.label, slotDirection: 'output' });
+                                                      }
+                                                    }}
                                                   >
-                                                    <div className="w-2 h-2 rounded-full border border-amber-500/60 bg-amber-900/30 flex-shrink-0" />
+                                                    <div className={`w-2 h-2 rounded-full border flex-shrink-0 ${isConnecting ? 'border-amber-400 bg-amber-700/40' : 'border-amber-500/60 bg-amber-900/30'}`} />
                                                     <span className="text-[9px] text-amber-300/80 truncate">{slot.label}</span>
                                                     <span className="text-[8px] text-slate-600 ml-auto">OUT</span>
                                                   </div>
@@ -979,7 +985,39 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
               </div>
             )}
 
-            {!hasModbusDatapoints && !hasHaEntities && (
+            {(() => {
+              const remoteGaBindings = driverBindings.filter(b => b.driverType === 'remote-ga');
+              if (remoteGaBindings.length === 0) return null;
+              return (
+                <div className="border-b border-teal-900/40 bg-teal-950/10">
+                  <div className="flex items-center gap-2 px-4 py-1.5 bg-teal-950/30">
+                    <GitBranch className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                    <span className="text-[10px] font-medium text-teal-300">Externe GA-Verbindungen</span>
+                    <span className="text-[8px] text-teal-600 ml-1 bg-teal-900/40 px-1 rounded">nur lesen</span>
+                  </div>
+                  {remoteGaBindings.map(binding => {
+                    const isHighlighted = shouldHighlight && highlightedBinding?.id === binding.id;
+                    return (
+                      <div
+                        key={binding.id}
+                        className={`flex items-center gap-2 px-5 py-1.5 bg-teal-950/20 border-b border-teal-900/20 ${isHighlighted ? 'ring-2 ring-teal-400 animate-pulse' : ''}`}
+                      >
+                        <div className="w-2 h-2 rounded-full flex-shrink-0 bg-teal-500/80" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[10px] text-teal-200 truncate block">
+                            {binding.datapointName}
+                          </span>
+                          <span className="text-[9px] text-teal-600/80 truncate block">{binding.deviceName}</span>
+                        </div>
+                        <span className="text-[8px] text-teal-500 bg-teal-900/40 px-1 py-0.5 rounded flex-shrink-0">verb.</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {!hasModbusDatapoints && !hasHaEntities && driverBindings.filter(b => b.driverType === 'remote-ga').length === 0 && (
               <div className="px-3 py-4 text-center text-xs text-slate-500">
                 Keine Treiber aktiv
               </div>

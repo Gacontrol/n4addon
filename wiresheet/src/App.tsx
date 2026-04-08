@@ -943,6 +943,53 @@ function App() {
     }
   }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
 
+  const handleGaNodeClick = useCallback((params: {
+    instanceId: string; instanceName: string;
+    pageId: string; pageName: string;
+    nodeId: string; nodeName: string;
+    slotId?: string; slotLabel?: string; slotDirection?: 'input' | 'output';
+    unit: string; nodeType: string;
+  }) => {
+    if (!connectingFrom) return;
+    const hasWireConnection = connections.some(
+      c => c.target === connectingFrom.nodeId && c.targetPort === connectingFrom.portId
+    );
+    if (hasWireConnection) {
+      showErrorToast('Verbindung nicht möglich: Eingang bereits verbunden');
+      cancelConnection();
+      return;
+    }
+    const slotLabel = params.slotLabel || params.slotDirection === 'output' ? `${params.nodeName}.out` : params.nodeName;
+    const newBinding: DriverBinding = {
+      id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      nodeId: connectingFrom.nodeId,
+      portId: connectingFrom.portId,
+      driverType: 'remote-ga',
+      deviceId: `${params.instanceId}:${params.pageId}:${params.nodeId}`,
+      deviceName: `${params.instanceName} / ${params.pageName}`,
+      datapointId: params.slotId ? `${params.nodeId}:${params.slotId}` : params.nodeId,
+      datapointName: params.slotLabel || params.nodeName,
+      direction: 'input',
+      instanceId: params.instanceId,
+      instanceName: params.instanceName,
+      pageId: params.pageId,
+      pageName: params.pageName,
+      slotId: params.slotId,
+      slotDirection: params.slotDirection,
+      readOnly: true,
+    };
+    void slotLabel;
+    updateDriverBindings(prev => {
+      const filtered = prev.filter(
+        b => !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
+      );
+      return [...filtered, newBinding];
+    });
+    clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+    removeConnectionsToInputPort(connectingFrom.nodeId, connectingFrom.portId);
+    cancelConnection();
+  }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
+
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
     datapoint: ModbusDevice['datapoints'][0],
@@ -1759,6 +1806,7 @@ function App() {
               onReloadInstanceEntities={() => loadInstanceEntities()}
               instanceDriverPoints={instanceDriverPoints}
               instanceGaPages={instanceGaPages}
+              onGaNodeClick={handleGaNodeClick}
             />
 
             <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} sm:flex w-52 sm:w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col absolute sm:relative z-30 top-0 bottom-0 left-0 h-full`}>
