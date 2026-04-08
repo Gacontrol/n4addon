@@ -105,7 +105,10 @@ const remoteGaLiveValues = new Map();
 const remoteGaApiBaseCache = new Map();
 let driverPollingInterval = null;
 const DRIVER_POLL_INTERVAL = 2000;
+const DRIVER_FULL_POLL_INTERVAL = 20000;
 let isPollingRunning = false;
+let lastFullPollTime = 0;
+const lastSentDriverValues = { modbus: {}, ha: {} };
 const modbusDeviceOnlineStatus = new Map();
 
 async function pingModbusDevice(device) {
@@ -214,21 +217,28 @@ async function pollAllDrivers() {
     }
   }
 
-  const hasRemoteGaBindings = (driverConfig.driverBindings || []).some(b => b.driverType === 'remote-ga');
-  if (hasRemoteGaBindings) {
-    const remoteGaInstances = new Map();
-    for (const binding of (driverConfig.driverBindings || []).filter(b => b.driverType === 'remote-ga' && b.instanceId)) {
-      if (!remoteGaInstances.has(binding.instanceId)) {
+  const hasRemoteBindings = (driverConfig.driverBindings || []).some(b =>
+    b.driverType === 'remote-ga' || b.driverType === 'remote-modbus' || b.driverType === 'remote-ha-sheet'
+  );
+  if (hasRemoteBindings) {
+    const remoteInstances = new Map();
+    for (const binding of (driverConfig.driverBindings || []).filter(b =>
+      (b.driverType === 'remote-ga' || b.driverType === 'remote-modbus' || b.driverType === 'remote-ha-sheet') && b.instanceId
+    )) {
+      if (!remoteInstances.has(binding.instanceId)) {
         const inst = extraInstances.find(i => i.id === binding.instanceId);
-        if (inst) remoteGaInstances.set(binding.instanceId, inst);
+        if (inst) remoteInstances.set(binding.instanceId, inst);
       }
     }
-    for (const [instanceId, instance] of remoteGaInstances) {
+    for (const [instanceId, instance] of remoteInstances) {
       try {
         const apiBase = await resolveRemoteGaApiBase(instance);
         if (!apiBase) continue;
         const headers = { Authorization: `Bearer ${instance.token}` };
-        const liveRes = await fetch(`${apiBase}/api/live-values`, { headers, signal: AbortSignal.timeout(5000) });
+        const [liveRes, drvLiveRes] = await Promise.all([
+          fetch(`${apiBase}/api/live-values`, { headers, signal: AbortSignal.timeout(5000) }),
+          fetch(`${apiBase}/api/driver-live-values`, { headers, signal: AbortSignal.timeout(5000) }).catch(() => null)
+        ]);
         if (liveRes.ok) {
           const liveData = await liveRes.json();
           const values = liveData.values || {};
@@ -236,16 +246,59 @@ async function pollAllDrivers() {
             remoteGaLiveValues.set(`${instanceId}:${nodeKey}`, val);
           }
         }
+        if (drvLiveRes && drvLiveRes.ok) {
+          const drvData = await drvLiveRes.json();
+          const modbusVals = drvData.modbus || {};
+          for (const [dpKey, val] of Object.entries(modbusVals)) {
+            remoteGaLiveValues.set(`${instanceId}:modbus:${dpKey}`, val);
+          }
+          const haVals = drvData.ha || {};
+          for (const [entityId, haState] of Object.entries(haVals)) {
+            remoteGaLiveValues.set(`${instanceId}:ha:${entityId}`, haState);
+          }
+        }
       } catch (err) {
-        console.log(`Remote GA poll error [${instance.name}]: ${err.message}`);
+        console.log(`Remote poll error [${instance.name}]: ${err.message}`);
       }
     }
   }
 
-  broadcastSSE('driver-values', {
-    modbus: Object.fromEntries(modbusLiveValues),
-    ha: Object.fromEntries(haLiveValues)
-  });
+  const now = Date.now();
+  const forceFull = (now - lastFullPollTime) >= DRIVER_FULL_POLL_INTERVAL;
+
+  const currentModbus = Object.fromEntries(modbusLiveValues);
+  const currentHa = Object.fromEntries(haLiveValues);
+
+  if (forceFull) {
+    lastFullPollTime = now;
+    lastSentDriverValues.modbus = { ...currentModbus };
+    lastSentDriverValues.ha = { ...currentHa };
+    broadcastSSE('driver-values', { modbus: currentModbus, ha: currentHa, full: true });
+  } else {
+    const deltaModbus = {};
+    const deltaHa = {};
+    let hasDelta = false;
+    for (const [k, v] of Object.entries(currentModbus)) {
+      if (String(lastSentDriverValues.modbus[k]) !== String(v)) {
+        deltaModbus[k] = v;
+        lastSentDriverValues.modbus[k] = v;
+        hasDelta = true;
+      }
+    }
+    for (const [k, v] of Object.entries(currentHa)) {
+      const prev = lastSentDriverValues.ha[k];
+      const prevState = prev && typeof prev === 'object' ? prev.state : prev;
+      const newState = v && typeof v === 'object' ? v.state : v;
+      if (String(prevState) !== String(newState)) {
+        deltaHa[k] = v;
+        lastSentDriverValues.ha[k] = v;
+        hasDelta = true;
+      }
+    }
+    if (hasDelta) {
+      broadcastSSE('driver-values', { modbus: deltaModbus, ha: deltaHa, full: false });
+    }
+  }
   broadcastSSE('modbus-device-status', Object.fromEntries(modbusDeviceOnlineStatus));
   } catch (err) {
     console.error('pollAllDrivers error:', err.message);
@@ -1115,11 +1168,18 @@ app.get(['/ha/instances/:instanceId/driver-points', '/api/ha/instances/:instance
     if (pagesRes.ok) {
       const pages = await pagesRes.json();
       for (const page of (Array.isArray(pages) ? pages : [])) {
+        const DRIVER_NODE_TYPES = new Set([
+          'ha-input', 'ha-output',
+          'modbus-device-input', 'modbus-device-output',
+          'modbus-coil-input', 'modbus-coil-output',
+          'sensor-control', 'dp-boolean', 'dp-numeric', 'dp-enum',
+          'const-value', 'time-program', 'python-script'
+        ]);
         const nodes = (page.nodes || []).filter(n =>
           n.type && (
-            n.type.includes('ha-input') || n.type.includes('ha-output') ||
-            n.type.includes('modbus') || n.type.includes('sensor') ||
-            n.type.includes('input') || n.type.includes('output')
+            DRIVER_NODE_TYPES.has(n.type) ||
+            n.type.startsWith('ha-') ||
+            n.type.startsWith('modbus-')
           )
         );
         if (nodes.length > 0) {
@@ -2651,6 +2711,32 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         if (remoteVal !== undefined) {
           const numVal = parseFloat(remoteVal);
           bindingValues[bindingKey] = !isNaN(numVal) ? numVal : remoteVal;
+        }
+      } else if (binding.driverType === 'remote-modbus' && binding.instanceId) {
+        const remoteDeviceId = binding.remoteDeviceId || binding.datapointId;
+        const remoteDatapointId = binding.remoteDatapointId;
+        const cacheKey = `${binding.instanceId}:modbus:${remoteDeviceId}:${remoteDatapointId}`;
+        const val = remoteGaLiveValues.get(cacheKey);
+        if (val !== undefined) {
+          const numVal = parseFloat(val);
+          bindingValues[bindingKey] = !isNaN(numVal) ? numVal : val;
+        }
+      } else if (binding.driverType === 'remote-ha-sheet' && binding.instanceId) {
+        const remoteNodeId = binding.remoteNodeId || binding.datapointId;
+        const remoteEntityId = binding.remoteEntityId;
+        if (remoteEntityId) {
+          const haState = remoteGaLiveValues.get(`${binding.instanceId}:ha:${remoteEntityId}`);
+          if (haState && typeof haState === 'object' && 'state' in haState) {
+            const rawState = haState.state;
+            const numVal = parseFloat(rawState);
+            bindingValues[bindingKey] = !isNaN(numVal) ? numVal : rawState;
+          }
+        } else if (remoteNodeId) {
+          const val = remoteGaLiveValues.get(`${binding.instanceId}:${remoteNodeId}`);
+          if (val !== undefined) {
+            const numVal = parseFloat(val);
+            bindingValues[bindingKey] = !isNaN(numVal) ? numVal : val;
+          }
         }
       }
     } catch (err) {

@@ -235,7 +235,7 @@ export interface DriverBinding {
   id: string;
   nodeId: string;
   portId: string;
-  driverType: 'modbus' | 'homeassistant' | 'remote-ga';
+  driverType: 'modbus' | 'homeassistant' | 'remote-ga' | 'remote-modbus' | 'remote-ha-sheet';
   deviceId: string;
   deviceName: string;
   datapointId: string;
@@ -250,6 +250,12 @@ export interface DriverBinding {
   slotId?: string;
   slotDirection?: 'input' | 'output';
   readOnly?: boolean;
+  remoteDeviceId?: string;
+  remoteDatapointId?: string;
+  remoteSheetId?: string;
+  remoteNodeId?: string;
+  remoteEntityId?: string;
+  remoteNodeType?: string;
 }
 
 export interface BindingStatus {

@@ -270,7 +270,14 @@ export const useWiresheetPages = () => {
               })));
             }
           } else if (event === 'driver-values') {
-            setDriverLiveValues(data);
+            if (data.full) {
+              setDriverLiveValues(data);
+            } else {
+              setDriverLiveValues(prev => ({
+                modbus: Object.keys(data.modbus || {}).length ? { ...prev.modbus, ...data.modbus } : prev.modbus,
+                ha: Object.keys(data.ha || {}).length ? { ...prev.ha, ...data.ha } : prev.ha,
+              }));
+            }
           } else if (event === 'modbus-device-status') {
             setModbusDeviceStatusSSE(data);
           }

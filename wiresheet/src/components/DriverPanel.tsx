@@ -64,6 +64,7 @@ interface DriverPanelProps {
   instanceDriverPoints?: Record<string, InstanceDriverPoints>;
   instanceGaPages?: Record<string, GaPage[]>;
   onGaNodeClick?: (params: { instanceId: string; instanceName: string; pageId: string; pageName: string; nodeId: string; nodeName: string; slotId?: string; slotLabel?: string; slotDirection?: 'input' | 'output'; unit: string; nodeType: string }) => void;
+  onRemoteDriverPointClick?: (params: { instanceId: string; instanceName: string; driverType: string; deviceId?: string; deviceName?: string; datapointId?: string; datapointName?: string; sheetId?: string; sheetName?: string; nodeId?: string; nodeName?: string; unit?: string; nodeType?: string; entityId?: string }) => void;
 }
 
 const STORAGE_KEY_PREFIX = 'wiresheet-driver-panel-';
@@ -89,6 +90,7 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
   instanceDriverPoints = {},
   instanceGaPages = {},
   onGaNodeClick,
+  onRemoteDriverPointClick,
 }) => {
   const storageKey = `${STORAGE_KEY_PREFIX}${side}`;
 
@@ -742,10 +744,12 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                   </button>
                                   {expandedHaDevices.has(`dp-modbus-${dev.id}`) && (
                                     <div className="bg-slate-900/50">
-                                      {dev.datapoints.map(dp => (
+                                      {dev.datapoints.map(dp => {
+                                        const dpIsConnecting = !!connectingFrom;
+                                        return (
                                         <div
                                           key={dp.id}
-                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                          className={`flex items-center gap-2 px-6 py-1 cursor-pointer transition-colors ${dpIsConnecting ? 'hover:bg-orange-700/30 bg-orange-900/10' : 'hover:bg-slate-700/30'}`}
                                           draggable
                                           onDragStart={(e) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify({
@@ -761,13 +765,20 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                               dataType: dp.type,
                                             }));
                                           }}
+                                          onClick={() => {
+                                            if (dpIsConnecting && onRemoteDriverPointClick) {
+                                              onRemoteDriverPointClick({ instanceId: instance.id, instanceName: instance.name, driverType: 'modbus', deviceId: dev.id, deviceName: dev.name, datapointId: dp.id, datapointName: dp.name, unit: dp.unit });
+                                            }
+                                          }}
                                         >
                                           <div className="w-1.5 h-1.5 rounded-full bg-amber-500/70 flex-shrink-0" />
                                           <Cpu className="w-3 h-3 text-slate-400 flex-shrink-0" />
                                           <span className="flex-1 text-[10px] text-slate-300 truncate">{dp.name}</span>
                                           {dp.unit && <span className="text-[9px] text-slate-500">{dp.unit}</span>}
+                                          {dpIsConnecting && <span className="text-[8px] text-orange-400 flex-shrink-0">verb.</span>}
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>
@@ -784,10 +795,12 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                   </button>
                                   {expandedHaDevices.has(`dp-sheet-${sheet.id}`) && (
                                     <div className="bg-slate-900/50">
-                                      {sheet.nodes.map(node => (
+                                      {sheet.nodes.map(node => {
+                                        const shNodeConnecting = !!connectingFrom;
+                                        return (
                                         <div
                                           key={node.id}
-                                          className="flex items-center gap-2 px-6 py-1 hover:bg-slate-700/30 cursor-pointer transition-colors"
+                                          className={`flex items-center gap-2 px-6 py-1 cursor-pointer transition-colors ${shNodeConnecting ? 'hover:bg-blue-700/30 bg-blue-900/10' : 'hover:bg-slate-700/30'}`}
                                           draggable
                                           onDragStart={(e) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify({
@@ -803,13 +816,20 @@ export const DriverPanel: React.FC<DriverPanelProps> = ({
                                               nodeType: node.type,
                                             }));
                                           }}
+                                          onClick={() => {
+                                            if (shNodeConnecting && onRemoteDriverPointClick) {
+                                              onRemoteDriverPointClick({ instanceId: instance.id, instanceName: instance.name, driverType: 'sheet', sheetId: sheet.id, sheetName: sheet.name, nodeId: node.id, nodeName: node.label, unit: node.unit, nodeType: node.type, entityId: node.entityId });
+                                            }
+                                          }}
                                         >
                                           <div className="w-1.5 h-1.5 rounded-full bg-blue-500/70 flex-shrink-0" />
                                           <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
                                           <span className="flex-1 text-[10px] text-slate-300 truncate">{node.label}</span>
                                           {node.unit && <span className="text-[9px] text-slate-500">{node.unit}</span>}
+                                          {shNodeConnecting && <span className="text-[8px] text-blue-400 flex-shrink-0">verb.</span>}
                                         </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>

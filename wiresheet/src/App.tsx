@@ -990,6 +990,48 @@ function App() {
     cancelConnection();
   }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
 
+  const handleRemoteDriverPointClick = useCallback((params: {
+    instanceId: string; instanceName: string; driverType: string;
+    deviceId?: string; deviceName?: string; datapointId?: string; datapointName?: string;
+    sheetId?: string; sheetName?: string; nodeId?: string; nodeName?: string;
+    unit?: string; nodeType?: string; entityId?: string;
+  }) => {
+    if (!connectingFrom) return;
+    const hasWireConnection = connections.some(
+      c => c.target === connectingFrom.nodeId && c.targetPort === connectingFrom.portId
+    );
+    if (hasWireConnection) {
+      showErrorToast('Verbindung nicht möglich: Eingang bereits verbunden');
+      cancelConnection();
+      return;
+    }
+    const isModbus = params.driverType === 'modbus';
+    const newBinding: DriverBinding = {
+      id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      nodeId: connectingFrom.nodeId,
+      portId: connectingFrom.portId,
+      driverType: isModbus ? 'remote-modbus' : 'remote-ha-sheet',
+      deviceId: isModbus ? `${params.instanceId}:${params.deviceId}` : `${params.instanceId}:${params.sheetId}:${params.nodeId}`,
+      deviceName: isModbus ? `${params.instanceName} / ${params.deviceName}` : `${params.instanceName} / ${params.sheetName}`,
+      datapointId: isModbus ? params.datapointId! : params.nodeId!,
+      datapointName: isModbus ? (params.datapointName || '') : (params.nodeName || ''),
+      direction: 'input',
+      instanceId: params.instanceId,
+      instanceName: params.instanceName,
+      ...(isModbus ? { remoteDeviceId: params.deviceId, remoteDatapointId: params.datapointId } : { remoteSheetId: params.sheetId, remoteNodeId: params.nodeId, remoteEntityId: params.entityId, remoteNodeType: params.nodeType }),
+      readOnly: true,
+    };
+    updateDriverBindings(prev => {
+      const filtered = prev.filter(
+        b => !(b.nodeId === connectingFrom.nodeId && b.portId === connectingFrom.portId)
+      );
+      return [...filtered, newBinding];
+    });
+    clearPortDefaultValue(connectingFrom.nodeId, connectingFrom.portId);
+    removeConnectionsToInputPort(connectingFrom.nodeId, connectingFrom.portId);
+    cancelConnection();
+  }, [connectingFrom, connections, cancelConnection, updateDriverBindings, clearPortDefaultValue, removeConnectionsToInputPort, showErrorToast]);
+
   const handleDriverPanelDragStart = useCallback((
     device: ModbusDevice,
     datapoint: ModbusDevice['datapoints'][0],
@@ -1807,6 +1849,7 @@ function App() {
               instanceDriverPoints={instanceDriverPoints}
               instanceGaPages={instanceGaPages}
               onGaNodeClick={handleGaNodeClick}
+              onRemoteDriverPointClick={handleRemoteDriverPointClick}
             />
 
             <div className={`${mobileSidebarOpen ? 'flex' : 'hidden'} sm:flex w-52 sm:w-64 flex-shrink-0 bg-slate-900 border-r border-slate-700 flex-col absolute sm:relative z-30 top-0 bottom-0 left-0 h-full`}>
@@ -1960,6 +2003,7 @@ function App() {
               onReloadInstanceEntities={() => loadInstanceEntities()}
               instanceDriverPoints={instanceDriverPoints}
               instanceGaPages={instanceGaPages}
+              onRemoteDriverPointClick={handleRemoteDriverPointClick}
             />
 
             {selectedNodeData && (
