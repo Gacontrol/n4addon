@@ -1597,10 +1597,10 @@ function buildProxyAssetUrl(assetUrl, proxyBase, token) {
   return `${proxyBase}/api/remote-visu-asset?url=${encodeURIComponent(assetUrl)}&token=${encodeURIComponent(token)}`;
 }
 
-function rewriteHtmlUrls(html, origin, proxyBase, token) {
+function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
   const absUrl = (rel) => {
     try {
-      return new URL(rel, origin).href;
+      return new URL(rel, targetBase).href;
     } catch {
       return null;
     }
@@ -1610,7 +1610,7 @@ function rewriteHtmlUrls(html, origin, proxyBase, token) {
     if (!url) return false;
     if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('javascript:') || url.startsWith('#')) return false;
     try {
-      const u = new URL(url, origin);
+      const u = new URL(url, targetBase);
       return u.origin === new URL(origin).origin;
     } catch {
       return false;
@@ -1693,6 +1693,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 
     const baseUrl = new URL(targetUrl);
     const origin = `${baseUrl.protocol}//${baseUrl.host}`;
+    const targetBase = targetUrl.split('?')[0].replace(/[^/]*$/, '');
 
     const injectScript = `
 <script>
@@ -1740,7 +1741,16 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 })();
 </script>`;
 
-    let processed = rewriteHtmlUrls(body, origin, proxyBase, token);
+    let processed = rewriteHtmlUrls(body, targetBase, origin, proxyBase, token);
+
+    const baseTag = `<base href="${targetBase}">`;
+    if (processed.includes('<head>')) {
+      processed = processed.replace('<head>', '<head>' + baseTag);
+    } else if (processed.includes('<head ')) {
+      processed = processed.replace(/<head(\s[^>]*)?>/, (m) => m + baseTag);
+    } else if (!processed.includes('<base ')) {
+      processed = baseTag + processed;
+    }
 
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
@@ -1778,11 +1788,34 @@ app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
     });
     if (!upstreamRes.ok) return res.status(upstreamRes.status).end();
     const contentType = upstreamRes.headers.get('content-type') || 'application/octet-stream';
-    const buf = await upstreamRes.arrayBuffer();
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
+
+    const isJs = contentType.includes('javascript') || targetUrl.match(/\.js(\?|$)/);
+    if (isJs) {
+      const jsText = await upstreamRes.text();
+      const assetBase = new URL(targetUrl);
+      const assetDir = `${assetBase.protocol}//${assetBase.host}${assetBase.pathname.replace(/[^/]*$/, '')}`;
+      const ingressPath = req.originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/)?.[1] || '';
+
+      const rewrittenJs = jsText.replace(
+        /(?:import\s*\(|from\s+)(["'])(\.[^"']+)\1/g,
+        (m, q, rel) => {
+          try {
+            const abs = new URL(rel, assetDir).href;
+            const proxied = buildProxyAssetUrl(abs, ingressPath, String(token));
+            return m.replace(`${q}${rel}${q}`, `${q}${proxied}${q}`);
+          } catch {
+            return m;
+          }
+        }
+      );
+      return res.send(rewrittenJs);
+    }
+
+    const buf = await upstreamRes.arrayBuffer();
     res.send(Buffer.from(buf));
   } catch (err) {
     console.error('[remote-visu-asset] error:', err.message);
