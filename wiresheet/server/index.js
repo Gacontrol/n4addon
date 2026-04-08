@@ -672,6 +672,162 @@ app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/stat
   }
 });
 
+app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/ga-control'], async (req, res) => {
+  const { instanceId } = req.params;
+  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
+
+  const tryIngressPath = async (ingressSlug) => {
+    const paths = [
+      `${base}/api/hassio_ingress/${ingressSlug}/api/pages`,
+      `${base}/api/hassio_ingress/${ingressSlug}/api/driver-config`,
+    ];
+    for (const p of paths) {
+      try {
+        const r = await fetch(p, { headers, signal: AbortSignal.timeout(5000) });
+        if (r.ok) return { url: p.replace('/api/pages', '').replace('/api/driver-config', ''), ok: true };
+      } catch {}
+    }
+    return null;
+  };
+
+  let wiresheetApiBase = null;
+  try {
+    const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    if (addonsRes.ok) {
+      const addonsData = await addonsRes.json();
+      const addons = addonsData.data?.addons || addonsData.addons || [];
+      const wsAddon = addons.find(a =>
+        (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+        (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+      );
+      if (wsAddon) {
+        const found = await tryIngressPath(wsAddon.slug);
+        if (found) wiresheetApiBase = found.url;
+        if (!wiresheetApiBase) wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+      }
+    }
+  } catch {}
+
+  if (!wiresheetApiBase) {
+    const commonSlugs = ['wiresheet', 'ga_control', 'ga-control', 'wiresheet_addon'];
+    for (const slug of commonSlugs) {
+      try {
+        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/pages`, { headers, signal: AbortSignal.timeout(3000) });
+        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+      } catch {}
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    const directPorts = [8100, 3000, 8080];
+    const hostMatch = base.match(/^(https?:\/\/[^:\/]+)/);
+    if (hostMatch) {
+      for (const port of directPorts) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/api/pages`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok) { wiresheetApiBase = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    return res.json({ pages: [], error: 'Wiresheet/GA-Control Addon nicht gefunden', wiresheetApiBase: null });
+  }
+
+  try {
+    const pagesRes = await fetch(`${wiresheetApiBase}/api/pages`, { headers, signal: AbortSignal.timeout(8000) });
+    if (!pagesRes.ok) return res.json({ pages: [], error: `Seiten konnten nicht geladen werden (${pagesRes.status})`, wiresheetApiBase });
+
+    const pages = await pagesRes.json();
+
+    const result = (Array.isArray(pages) ? pages : []).map(page => ({
+      id: page.id,
+      name: page.name || page.id,
+      nodes: (page.nodes || []).map(node => ({
+        id: node.id,
+        type: node.type,
+        label: node.data?.label || node.data?.name || node.id,
+        unit: node.data?.unit || '',
+        value: node.data?.value,
+        description: node.data?.description || ''
+      }))
+    }));
+
+    res.json({ pages: result, wiresheetApiBase });
+  } catch (err) {
+    res.json({ pages: [], error: err.message, wiresheetApiBase });
+  }
+});
+
+app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus'], async (req, res) => {
+  const { instanceId } = req.params;
+  const instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  const base = instance.url.replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${instance.token}` };
+
+  let wiresheetApiBase = null;
+  try {
+    const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    if (addonsRes.ok) {
+      const addonsData = await addonsRes.json();
+      const addons = addonsData.data?.addons || addonsData.addons || [];
+      const wsAddon = addons.find(a =>
+        (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
+        (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
+      );
+      if (wsAddon) wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+    }
+  } catch {}
+
+  if (!wiresheetApiBase) {
+    const commonSlugs = ['wiresheet', 'ga_control', 'ga-control'];
+    for (const slug of commonSlugs) {
+      try {
+        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/visu-pages`, { headers, signal: AbortSignal.timeout(3000) });
+        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+      } catch {}
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    const hostMatch = base.match(/^(https?:\/\/[^:\/]+)/);
+    if (hostMatch) {
+      for (const port of [8100, 3000, 8080]) {
+        try {
+          const r = await fetch(`${hostMatch[1]}:${port}/api/visu-pages`, { signal: AbortSignal.timeout(2000) });
+          if (r.ok) { wiresheetApiBase = `${hostMatch[1]}:${port}`; break; }
+        } catch {}
+      }
+    }
+  }
+
+  if (!wiresheetApiBase) {
+    return res.json({ visus: [], error: 'Wiresheet Addon nicht gefunden' });
+  }
+
+  try {
+    const visuRes = await fetch(`${wiresheetApiBase}/api/visu-pages`, { headers, signal: AbortSignal.timeout(8000) });
+    if (!visuRes.ok) return res.json({ visus: [], error: `Visus konnten nicht geladen werden (${visuRes.status})` });
+
+    const pages = await visuRes.json();
+    const visus = (Array.isArray(pages) ? pages : []).map(p => ({
+      id: p.id,
+      name: p.name || p.id,
+      widgetCount: (p.widgets || []).length,
+      backgroundColor: p.backgroundColor
+    }));
+
+    res.json({ visus });
+  } catch (err) {
+    res.json({ visus: [], error: err.message });
+  }
+});
+
 app.post(['/ha/instances/test', '/api/ha/instances/test'], async (req, res) => {
   const { url, token } = req.body;
   if (!url || !token) return res.status(400).json({ ok: false, msg: 'URL und Token erforderlich' });

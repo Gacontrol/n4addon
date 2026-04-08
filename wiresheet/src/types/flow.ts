@@ -253,6 +253,7 @@ export interface BindingStatus {
 
 export interface HaEntity {
   entity_id: string;
+  _original_entity_id?: string;
   state: string;
   attributes: Record<string, unknown>;
   last_changed: string;
