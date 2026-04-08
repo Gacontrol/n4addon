@@ -416,9 +416,8 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         position={[0, isDuct ? 0.55 + 0.15 * displaySize : 0.18, 0]}
         center
         sprite
-        occlude="blending"
         distanceFactor={6}
-        zIndexRange={[10, 0]}
+        zIndexRange={[100, 0]}
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
         <div style={{
