@@ -6,6 +6,54 @@ const axios = require('axios');
 const { spawn } = require('child_process');
 const dpStore = require('./dpStore');
 
+const NODE_TYPE_SLOTS = {
+  'dp-boolean':        { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'dp-numeric':        { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'dp-enum':           { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'ha-input':          { inputs: [], outputs: [{ id: 'out', label: 'Wert' }] },
+  'ha-output':         { inputs: [{ id: 'in', label: 'Wert' }], outputs: [] },
+  'and-gate':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'or-gate':           { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'xor-gate':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'not-gate':          { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'switch':            { inputs: [{ id: 'sw', label: 'Schalter' }, { id: 'a', label: 'Wert True' }, { id: 'b', label: 'Wert False' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'select':            { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'sel', label: 'Auswahl' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'compare':           { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'delay':             { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'hysteresis':        { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'math-add':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Summe' }] },
+  'math-sub':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Differenz' }] },
+  'math-mul':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Produkt' }] },
+  'math-div':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Quotient' }] },
+  'math-min':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Min' }] },
+  'math-max':          { inputs: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], outputs: [{ id: 'out', label: 'Max' }] },
+  'math-abs':          { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'pid-controller':    { inputs: [{ id: 'sp', label: 'Setpoint' }, { id: 'av', label: 'ActualValue' }, { id: 'en', label: 'Enable' }], outputs: [{ id: 'out', label: 'ControlOutput' }] },
+  'scaling':           { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'smoothing':         { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Geglaettet' }, { id: 'min', label: 'Min' }, { id: 'max', label: 'Max' }] },
+  'aggregate-control': { inputs: [{ id: 'start', label: 'StartCmd' }, { id: 'fb', label: 'Feedback' }, { id: 'fault', label: 'Fault' }, { id: 'rev', label: 'Revision' }, { id: 'hand', label: 'HandStart' }, { id: 'spd', label: 'SpeedSP' }, { id: 'rst', label: 'Reset' }], outputs: [{ id: 'cmd', label: 'Cmd' }, { id: 'spdout', label: 'SpeedOut' }, { id: 'run', label: 'Running' }, { id: 'fout', label: 'Fault' }, { id: 'ready', label: 'Ready' }, { id: 'alarm', label: 'Alarm' }, { id: 'hours', label: 'OpHours' }, { id: 'starts', label: 'Starts' }] },
+  'valve-control':     { inputs: [{ id: 'sp', label: 'Setpoint' }, { id: 'fb', label: 'Feedback' }, { id: 'rst', label: 'Reset' }], outputs: [{ id: 'out', label: 'ValveOut' }, { id: 'alarm', label: 'Alarm' }] },
+  'sensor-control':    { inputs: [{ id: 'in', label: 'SensorIn' }, { id: 'rst', label: 'AlarmReset' }], outputs: [{ id: 'out', label: 'SensorOut' }, { id: 'alarm', label: 'Alarm' }] },
+  'time-program':      { inputs: [], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'python-script':     { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
+  'case-container':    { inputs: [{ id: 'case', label: 'Case' }], outputs: [] },
+  'const-value':       { inputs: [], outputs: [{ id: 'out', label: 'Wert' }] },
+  'heating-curve':     { inputs: [{ id: 'in', label: 'Aussentemperatur' }], outputs: [{ id: 'out', label: 'Vorlauftemperatur' }] },
+};
+
+function resolveSlots(node, direction) {
+  const fromNode = node[direction] || node.data?.[direction];
+  if (Array.isArray(fromNode) && fromNode.length > 0) {
+    return fromNode.map((s, i) => ({
+      id: s.id || s.label || String(i),
+      label: s.label || s.id || String(i)
+    }));
+  }
+  const typeDef = NODE_TYPE_SLOTS[node.type];
+  if (typeDef) return typeDef[direction] || [];
+  return direction === 'outputs' ? [{ id: 'out', label: 'Ausgang' }] : [{ id: 'in', label: 'Eingang' }];
+}
+
 const app = express();
 const visuApp = express();
 const PORT = 8100;
@@ -754,8 +802,8 @@ app.get(['/ha/instances/:instanceId/ga-control', '/api/ha/instances/:instanceId/
         unit: node.data?.unit || '',
         value: node.data?.value,
         description: node.data?.description || '',
-        inputs: (node.inputs || []).map(s => ({ id: s.id || s.label || s, label: s.label || s.id || s })),
-        outputs: (node.outputs || []).map(s => ({ id: s.id || s.label || s, label: s.label || s.id || s }))
+        inputs: resolveSlots(node, 'inputs'),
+        outputs: resolveSlots(node, 'outputs')
       }))
     }));
 
