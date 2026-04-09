@@ -1784,22 +1784,17 @@ app.post(['/ha/authenticate', '/api/ha/authenticate'], async (req, res) => {
   }
 });
 
-function buildProxyAssetUrl(assetUrl, proxyBase, token, ingressPath) {
-  let url = `${proxyBase}/api/remote-visu-asset?url=${encodeURIComponent(assetUrl)}&token=${encodeURIComponent(token)}`;
+function buildProxyAssetUrl(assetUrl, token, ingressPath) {
+  let url = `remote-visu-asset?url=${encodeURIComponent(assetUrl)}&token=${encodeURIComponent(token)}`;
   if (ingressPath) url += `&ingressPath=${encodeURIComponent(ingressPath)}`;
   return url;
 }
 
-function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
-  const targetBaseUrl = new URL(targetBase);
-  const ingressPathPrefix = targetBaseUrl.pathname.replace(/\/[^/]*$/, '') || '';
-  console.log(`[rewriteHtmlUrls] targetBase=${targetBase} origin=${origin} proxyBase=${proxyBase} ingressPathPrefix=${ingressPathPrefix}`);
+function rewriteHtmlUrls(html, targetBase, origin, token, ingressPath) {
+  console.log(`[rewriteHtmlUrls] targetBase=${targetBase} origin=${origin} ingressPath=${ingressPath}`);
 
   const absUrl = (rel) => {
     try {
-      if (rel.startsWith('/') && !rel.startsWith('//')) {
-        return `${targetBaseUrl.protocol}//${targetBaseUrl.host}${ingressPathPrefix}${rel}`;
-      }
       return new URL(rel, targetBase).href;
     } catch {
       return null;
@@ -1817,17 +1812,10 @@ function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
     }
   };
 
-  let ingressPath = '';
-  try {
-    const proxyBaseUrl = new URL(proxyBase);
-    const m = proxyBaseUrl.pathname.match(/^(\/api\/hassio_ingress\/[^/]+)/);
-    if (m) ingressPath = m[1];
-  } catch {}
-
   const proxyUrl = (rel) => {
     const abs = absUrl(rel);
     if (!abs || !shouldProxy(abs)) return rel;
-    const proxied = buildProxyAssetUrl(abs, proxyBase, token, ingressPath);
+    const proxied = buildProxyAssetUrl(abs, token, ingressPath);
     console.log(`[rewriteHtmlUrls] rewriting: ${rel} -> abs=${abs} -> proxied=${proxied.slice(0, 120)}`);
     return proxied;
   };
@@ -1858,20 +1846,8 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     return res.status(400).json({ __proxyError: true, message: 'Ungültige URL' });
   }
 
-  const ingressHeader = req.headers['x-ingress-path'] || '';
-  let proxyBasePath = '';
-  if (ingressHeader) {
-    proxyBasePath = ingressHeader.replace(/\/$/, '');
-  } else {
-    const originalUrl = req.originalUrl || req.url || '';
-    const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
-    if (pathMatch) proxyBasePath = pathMatch[1];
-  }
-
-  const proto = req.headers['x-forwarded-proto'] || req.headers['x-scheme'] || (req.socket?.encrypted ? 'https' : 'http');
-  const host = req.headers['x-forwarded-host'] || req.headers['host'] || '';
-  const proxyBase = (host && proxyBasePath) ? `${proto}://${host}${proxyBasePath}` : proxyBasePath;
-  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader} host=${host}`);
+  const ingressPath = req.headers['x-ingress-path'] || '';
+  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} ingressPath=${ingressPath}`);
 
   try {
     console.log(`[remote-visu-proxy] fetching upstream: ${targetUrl}`);
@@ -1925,7 +1901,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       ? rawAssetBase.replace(/\/$/, '') + '/'
       : (finalBase !== rawTargetBase ? finalBase : rawTargetBase);
 
-    const remoteApiProxyBase = instanceId ? `${proxyBase}/api/remote-api-proxy/${instanceId}/api` : null;
+    const remoteApiProxyBase = instanceId ? `remote-api-proxy/${instanceId}/api` : null;
     console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} rawAssetBase=${rawAssetBase} remoteApiProxyBase=${remoteApiProxyBase}`);
 
     const injectScript = `
@@ -1979,7 +1955,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 })();
 </script>`;
 
-    let processed = rewriteHtmlUrls(body, targetBase, origin, proxyBase, token);
+    let processed = rewriteHtmlUrls(body, targetBase, origin, token, ingressPath);
 
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
@@ -2008,15 +1984,7 @@ app.get(['/remote-visu-proxy-debug', '/api/remote-visu-proxy-debug'], async (req
     if (!upstreamRes.ok) return res.status(upstreamRes.status).send(`upstream error: ${upstreamRes.status}`);
     const body = await upstreamRes.text();
 
-    const ingressHeader = req.headers['x-ingress-path'] || '';
-    let proxyBasePath = '';
-    if (ingressHeader) {
-      proxyBasePath = ingressHeader.replace(/\/$/, '');
-    } else {
-      const originalUrl = req.originalUrl || req.url || '';
-      const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
-      if (pathMatch) proxyBasePath = pathMatch[1];
-    }
+    const ingressPath = (req.headers['x-ingress-path'] || '').replace(/\/$/, '');
 
     const baseUrl = new URL(rawUrl);
     const origin = `${baseUrl.protocol}//${baseUrl.host}`;
@@ -2025,10 +1993,10 @@ app.get(['/remote-visu-proxy-debug', '/api/remote-visu-proxy-debug'], async (req
       ? rawAssetBase.replace(/\/$/, '') + '/'
       : `${baseUrl.protocol}//${baseUrl.host}/`;
 
-    const rewritten = rewriteHtmlUrls(body, targetBase, origin, proxyBasePath, token);
+    const rewritten = rewriteHtmlUrls(body, targetBase, origin, token, ingressPath);
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.send(`=== DEBUG INFO ===\nproxyBasePath=${proxyBasePath}\ntargetBase=${targetBase}\norigin=${origin}\ningressHeader=${ingressHeader}\nhost=${req.headers.host}\n\n=== RAW HTML (${body.length} chars) ===\n${body.slice(0, 3000)}\n\n=== REWRITTEN HTML (${rewritten.length} chars) ===\n${rewritten.slice(0, 5000)}`);
+    res.send(`=== DEBUG INFO ===\ningressPath=${ingressPath}\ntargetBase=${targetBase}\norigin=${origin}\nhost=${req.headers.host}\n\n=== RAW HTML (${body.length} chars) ===\n${body.slice(0, 3000)}\n\n=== REWRITTEN HTML (${rewritten.length} chars) ===\n${rewritten.slice(0, 5000)}`);
   } catch (e) {
     res.status(500).send(`error: ${e.message}\n${e.stack}`);
   }
@@ -2073,18 +2041,15 @@ app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
       const jsText = await upstreamRes.text();
       const assetBase = new URL(targetUrl);
       const assetDir = `${assetBase.protocol}//${assetBase.host}${assetBase.pathname.replace(/[^/]*$/, '')}`;
-      const ingressPathSegment = (req.query.ingressPath || req.headers['x-ingress-path'] || '').replace(/\/$/, '') || req.originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/)?.[1] || '';
-      const jsProto = req.headers['x-forwarded-proto'] || req.headers['x-scheme'] || (req.socket?.encrypted ? 'https' : 'http');
-      const jsHost = req.headers['x-forwarded-host'] || req.headers['host'] || '';
-      const jsProxyBase = jsHost ? `${jsProto}://${jsHost}${ingressPathSegment}` : ingressPathSegment;
-      console.log(`[remote-visu-asset] JS rewrite: assetDir=${assetDir} jsProxyBase=${jsProxyBase} ingressPath=${ingressPathSegment}`);
+      const ingressPathSegment = (req.query.ingressPath || req.headers['x-ingress-path'] || '').replace(/\/$/, '');
+      console.log(`[remote-visu-asset] JS rewrite: assetDir=${assetDir} ingressPath=${ingressPathSegment}`);
 
       const rewrittenJs = jsText.replace(
         /(?:import\s*\(|from\s+)(["'])(\.[^"']+)\1/g,
         (m, q, rel) => {
           try {
             const abs = new URL(rel, assetDir).href;
-            const proxied = buildProxyAssetUrl(abs, jsProxyBase, String(token), ingressPathSegment);
+            const proxied = buildProxyAssetUrl(abs, String(token), ingressPathSegment);
             console.log(`[remote-visu-asset] JS import rewrite: ${rel} -> ${proxied.slice(0, 120)}`);
             return m.replace(`${q}${rel}${q}`, `${q}${proxied}${q}`);
           } catch {

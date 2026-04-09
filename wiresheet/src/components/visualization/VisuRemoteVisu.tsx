@@ -48,15 +48,12 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
   const checkProxyError = useCallback(async (url: string) => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
-    console.log('[RemoteVisu] checkProxyError fetching:', url);
     try {
       const resp = await fetch(url, { signal: abortRef.current.signal });
-      console.log('[RemoteVisu] checkProxyError response status:', resp.status, 'contentType:', resp.headers.get('content-type'));
       if (!resp.ok) {
         const contentType = resp.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const data = await resp.json();
-          console.log('[RemoteVisu] checkProxyError error json:', data);
           if (data.__proxyError) {
             setError(data.message || `Fehler ${resp.status}`);
             setLoading(false);
@@ -66,24 +63,20 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
         setError(`Externe Instanz nicht erreichbar (${resp.status})`);
         setLoading(false);
       } else {
-        console.log('[RemoteVisu] checkProxyError OK, iframe should load');
       }
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') return;
-      console.error('[RemoteVisu] checkProxyError exception:', e);
       setError('Verbindung fehlgeschlagen');
       setLoading(false);
     }
   }, []);
 
   const handleLoad = useCallback(() => {
-    console.log('[RemoteVisu] iframe onLoad fired');
     setLoading(false);
     setError(null);
   }, []);
 
   const handleError = useCallback(() => {
-    console.error('[RemoteVisu] iframe onError fired');
     setLoading(false);
     setError('Verbindung fehlgeschlagen');
   }, []);
