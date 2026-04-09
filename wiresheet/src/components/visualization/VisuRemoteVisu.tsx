@@ -35,7 +35,7 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
     const base = (config.visuBaseUrl || '').replace(/\/$/, '');
     if (!base) return null;
     const pageParam = config.visuPageId ? `?page=${encodeURIComponent(config.visuPageId)}` : '';
-    return `${base}/${pageParam}`;
+    return `${base}${pageParam}`;
   }, [config.instanceToken, config.visuBaseUrl, config.visuPageId]);
 
   const proxyUrl = useMemo(() => {
@@ -141,13 +141,19 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
     );
   }
 
-  const scaledWidth = width / scale;
-  const scaledHeight = height / scale;
+  const cropTop = config.cropTop ?? 0;
+  const cropRight = config.cropRight ?? 0;
+  const cropBottom = config.cropBottom ?? 0;
+  const cropLeft = config.cropLeft ?? 0;
+  const hasCrop = cropTop > 0 || cropRight > 0 || cropBottom > 0 || cropLeft > 0;
+
+  const iframeWidth = (width + cropLeft + cropRight) / scale;
+  const iframeHeight = (height + cropTop + cropBottom) / scale;
 
   return (
     <div
       className="w-full h-full relative overflow-hidden"
-      style={{ borderRadius, border: borderStyle, background: '#0f172a' }}
+      style={{ borderRadius, border: borderStyle, background: 'transparent' }}
     >
       {loading && config.showLoadingIndicator !== false && !error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-slate-900/70 pointer-events-none gap-2">
@@ -229,13 +235,15 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
           onLoad={handleLoad}
           onError={handleError}
           style={{
-            width: scale !== 1 ? `${scaledWidth}px` : '100%',
-            height: scale !== 1 ? `${scaledHeight}px` : '100%',
+            width: `${iframeWidth}px`,
+            height: `${iframeHeight}px`,
+            position: 'absolute',
+            top: `${-cropTop}px`,
+            left: `${-cropLeft}px`,
             transform: scale !== 1 ? `scale(${scale})` : undefined,
-            transformOrigin: scale !== 1 ? 'top left' : undefined,
+            transformOrigin: 'top left',
             border: 'none',
             display: 'block',
-            borderRadius,
           }}
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
           allow="fullscreen"

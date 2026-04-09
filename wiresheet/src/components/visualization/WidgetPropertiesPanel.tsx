@@ -3506,6 +3506,66 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                 className="w-full"
               />
             </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-2">Zuschnitt (px)</label>
+              <div className="grid grid-cols-3 gap-1.5 items-center">
+                <div />
+                <div>
+                  <label className="block text-[9px] text-slate-500 text-center mb-0.5">Oben</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={rvCfg.cropTop ?? 0}
+                    onChange={(e) => onUpdate({ config: { ...rvCfg, cropTop: Math.max(0, parseInt(e.target.value) || 0) } })}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-200 text-center"
+                  />
+                </div>
+                <div />
+                <div>
+                  <label className="block text-[9px] text-slate-500 text-center mb-0.5">Links</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={rvCfg.cropLeft ?? 0}
+                    onChange={(e) => onUpdate({ config: { ...rvCfg, cropLeft: Math.max(0, parseInt(e.target.value) || 0) } })}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-200 text-center"
+                  />
+                </div>
+                <div className="flex items-center justify-center">
+                  <div className="w-8 h-6 border border-dashed border-slate-600 rounded-sm" />
+                </div>
+                <div>
+                  <label className="block text-[9px] text-slate-500 text-center mb-0.5">Rechts</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={rvCfg.cropRight ?? 0}
+                    onChange={(e) => onUpdate({ config: { ...rvCfg, cropRight: Math.max(0, parseInt(e.target.value) || 0) } })}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-200 text-center"
+                  />
+                </div>
+                <div />
+                <div>
+                  <label className="block text-[9px] text-slate-500 text-center mb-0.5">Unten</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2000}
+                    value={rvCfg.cropBottom ?? 0}
+                    onChange={(e) => onUpdate({ config: { ...rvCfg, cropBottom: Math.max(0, parseInt(e.target.value) || 0) } })}
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-200 text-center"
+                  />
+                </div>
+                <div />
+              </div>
+              <div className="text-[9px] text-slate-600 mt-1.5">
+                Pixel vom Rand abschneiden (z.B. Navigation ausblenden)
+              </div>
+            </div>
           </>
         );
       }

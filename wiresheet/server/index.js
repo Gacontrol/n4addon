@@ -1915,6 +1915,13 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   window.__WS_REMOTE_API_BASE__ = ${JSON.stringify(remoteApiBase)};
   window.__WS_REMOTE_WS_BASE__ = ${JSON.stringify(remoteWsBase)};
   window.__WS_REMOTE_PAGE__ = ${JSON.stringify(requestedPage)};
+  if (${JSON.stringify(requestedPage)}) {
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set('page', ${JSON.stringify(requestedPage)});
+      history.replaceState(null, '', u.toString());
+    } catch(e) {}
+  }
   try {
     localStorage.setItem('hassTokens', JSON.stringify({
       access_token: WS_TOKEN,

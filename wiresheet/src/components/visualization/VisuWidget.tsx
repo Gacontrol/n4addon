@@ -1577,9 +1577,10 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isHeatingCurveWidget = widget.type === 'visu-heating-curve';
   const isAlarmConsoleWidget = widget.type === 'visu-alarm-console';
   const is3DBuildingWidget = widget.type === 'visu-3d-building';
+  const isRemoteVisuWidget = widget.type === 'visu-remote-visu';
   const isLineInDrawingMode = widget.type === 'visu-line' && (widget.config as { x1?: number }).x1 === undefined;
   const isPolygonInDrawingMode = widget.type === 'visu-polygon' && (!(widget.config as { points?: unknown[] }).points || (widget.config as { points?: unknown[] }).points!.length === 0);
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isTrendTilesWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget;
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isTrendTilesWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget || isRemoteVisuWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',
@@ -1590,7 +1591,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
@@ -1617,8 +1618,8 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget ? 0 : 8,
-        overflow: is3DBuildingWidget ? 'hidden' : undefined,
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? 0 : 8,
+        overflow: is3DBuildingWidget || isRemoteVisuWidget ? 'hidden' : undefined,
         transition: isHighlighted ? 'box-shadow 0.3s ease-in-out, border 0.3s ease-in-out' : undefined
       } as React.CSSProperties}
       onMouseDown={onMouseDown}

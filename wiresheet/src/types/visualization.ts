@@ -903,6 +903,10 @@ export interface RemoteVisuConfig {
   borderColor?: string;
   borderRadius?: number;
   showLoadingIndicator?: boolean;
+  cropTop?: number;
+  cropRight?: number;
+  cropBottom?: number;
+  cropLeft?: number;
 }
 
 export interface TimeProgramParams {
