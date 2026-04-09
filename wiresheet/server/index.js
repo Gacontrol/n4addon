@@ -1795,7 +1795,7 @@ function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
 }
 
 app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
-  const { url: rawUrl, token, instanceId } = req.query;
+  const { url: rawUrl, token, instanceId, assetBase: rawAssetBase } = req.query;
   if (!rawUrl || !token) {
     return res.status(400).json({ __proxyError: true, message: 'Fehlende Parameter (url oder token)' });
   }
@@ -1854,7 +1854,13 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 
     const baseUrl = new URL(targetUrl);
     const origin = `${baseUrl.protocol}//${baseUrl.host}`;
-    const targetBase = targetUrl.split('?')[0].replace(/[^/]*$/, '');
+    const rawTargetBase = targetUrl.split('?')[0].replace(/[^/]*$/, '');
+    const finalUrl = upstreamRes.url || targetUrl;
+    const finalBase = finalUrl.split('?')[0].replace(/[^/]*$/, '');
+    const isValidUrl = (u) => { try { new URL(u); return true; } catch { return false; } };
+    const targetBase = (rawAssetBase && isValidUrl(rawAssetBase))
+      ? rawAssetBase.replace(/\/$/, '') + '/'
+      : (finalBase !== rawTargetBase ? finalBase : rawTargetBase);
 
     const remoteApiProxyBase = instanceId ? `${proxyBase}/api/remote-api-proxy/${instanceId}/api` : null;
 

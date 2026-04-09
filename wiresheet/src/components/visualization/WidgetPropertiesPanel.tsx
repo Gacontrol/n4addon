@@ -321,6 +321,7 @@ const RemoteVisuConfigPanel: React.FC<{
             instanceUrl: base?.instanceUrl || cfg.instanceUrl || '',
             instanceToken: base?.instanceToken || cfg.instanceToken || '',
             visuBaseUrl: data.visuBaseUrl,
+            wiresheetApiBase: data.wiresheetApiBase || data.visuBaseUrl,
             availablePages: pages,
           });
           pendingBaseRef.current = null;

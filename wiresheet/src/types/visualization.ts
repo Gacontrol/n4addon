@@ -893,6 +893,7 @@ export interface RemoteVisuConfig {
   instanceUrl?: string;
   instanceToken?: string;
   visuBaseUrl?: string;
+  wiresheetApiBase?: string;
   visuPageId?: string;
   visuPageName?: string;
   availablePages?: RemoteVisuPage[];
