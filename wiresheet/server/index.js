@@ -1300,7 +1300,7 @@ app.get(['/ha/instances/:instanceId/driver-points', '/api/ha/instances/:instance
     }
 
     res.json({
-      sheets,
+      sheets: [],
       modbusDevices: (driverPoints.modbusDevices || []).map(d => ({
         id: d.id,
         name: d.name || d.id,
@@ -1753,8 +1753,14 @@ function buildProxyAssetUrl(assetUrl, proxyBase, token) {
 }
 
 function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
+  const targetBaseUrl = new URL(targetBase);
+  const ingressPathPrefix = targetBaseUrl.pathname.replace(/\/[^/]*$/, '') || '';
+
   const absUrl = (rel) => {
     try {
+      if (rel.startsWith('/') && !rel.startsWith('//')) {
+        return `${targetBaseUrl.protocol}//${targetBaseUrl.host}${ingressPathPrefix}${rel}`;
+      }
       return new URL(rel, targetBase).href;
     } catch {
       return null;

@@ -898,8 +898,7 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
     setData({ entities: [], gaPages: [], visus: [], driverPoints: { sheets: [], modbusDevices: [], haRemoteInstances: [] } });
   };
 
-  const driverPointsTotal = data.driverPoints.sheets.reduce((s, sh) => s + sh.nodes.length, 0) +
-    data.driverPoints.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
+  const driverPointsTotal = data.driverPoints.modbusDevices.reduce((s, d) => s + d.datapoints.length, 0);
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'entities', label: 'Entities', icon: <Home className="w-3.5 h-3.5" />, count: data.entities.length || undefined },
