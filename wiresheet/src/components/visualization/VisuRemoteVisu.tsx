@@ -12,17 +12,27 @@ interface VisuRemoteVisuProps {
 function getApiBase(): string {
   const path = window.location.pathname;
   const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
-  return m ? `${m[1]}` : '';
+  const result = m ? `${m[1]}` : '';
+  console.log('[RemoteVisu] getApiBase:', result, '| pathname:', path);
+  return result;
 }
 
 function buildVisuUrl(config: RemoteVisuConfig): string | null {
-  if (!config.instanceToken) return null;
+  if (!config.instanceToken) {
+    console.log('[RemoteVisu] buildVisuUrl: no instanceToken');
+    return null;
+  }
 
   const base = (config.visuBaseUrl || '').replace(/\/$/, '');
-  if (!base) return null;
+  if (!base) {
+    console.log('[RemoteVisu] buildVisuUrl: no visuBaseUrl');
+    return null;
+  }
 
   const pageParam = config.visuPageId ? `?page=${encodeURIComponent(config.visuPageId)}` : '';
-  return `${base}/${pageParam}`;
+  const url = `${base}/${pageParam}`;
+  console.log('[RemoteVisu] buildVisuUrl:', url);
+  return url;
 }
 
 export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
@@ -46,17 +56,32 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
     ? `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&instanceId=${encodeURIComponent(config.instanceId || '')}${config.wiresheetApiBase ? `&assetBase=${encodeURIComponent(config.wiresheetApiBase)}` : ''}&_rk=${reloadKey}`
     : null;
 
+  console.log('[RemoteVisu] render:', {
+    hasConfig,
+    visuUrl,
+    proxyUrl,
+    instanceId: config.instanceId,
+    visuBaseUrl: config.visuBaseUrl,
+    visuPageId: config.visuPageId,
+    instanceToken: config.instanceToken ? `[len=${config.instanceToken.length}]` : 'MISSING',
+    wiresheetApiBase: config.wiresheetApiBase,
+    reloadKey,
+  });
+
   const scale = config.scale ?? 1;
 
   const checkProxyError = useCallback(async (url: string) => {
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
+    console.log('[RemoteVisu] checkProxyError fetching:', url);
     try {
       const resp = await fetch(url, { signal: abortRef.current.signal });
+      console.log('[RemoteVisu] checkProxyError response status:', resp.status, 'contentType:', resp.headers.get('content-type'));
       if (!resp.ok) {
         const contentType = resp.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const data = await resp.json();
+          console.log('[RemoteVisu] checkProxyError error json:', data);
           if (data.__proxyError) {
             setError(data.message || `Fehler ${resp.status}`);
             setLoading(false);
@@ -65,20 +90,25 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
         }
         setError(`Externe Instanz nicht erreichbar (${resp.status})`);
         setLoading(false);
+      } else {
+        console.log('[RemoteVisu] checkProxyError OK, iframe should load');
       }
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') return;
+      console.error('[RemoteVisu] checkProxyError exception:', e);
       setError('Verbindung fehlgeschlagen');
       setLoading(false);
     }
   }, []);
 
   const handleLoad = useCallback(() => {
+    console.log('[RemoteVisu] iframe onLoad fired');
     setLoading(false);
     setError(null);
   }, []);
 
   const handleError = useCallback(() => {
+    console.error('[RemoteVisu] iframe onError fired');
     setLoading(false);
     setError('Verbindung fehlgeschlagen');
   }, []);

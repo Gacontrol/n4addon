@@ -1113,14 +1113,19 @@ app.get(['/ha/instances/:instanceId/visus', '/api/ha/instances/:instanceId/visus
 
 app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/visu-pages'], async (req, res) => {
   const { instanceId } = req.params;
+  console.log(`[visu-pages] REQUEST instanceId=${instanceId}`);
   let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
   if (!instance) {
     try {
       const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
       if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
-    } catch {}
+    } catch (e) { console.log(`[visu-pages] driverConfigFile read error: ${e.message}`); }
   }
-  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  if (!instance) {
+    console.log(`[visu-pages] instance NOT FOUND for id=${instanceId}, known ids: ${(driverConfig.haInstances||[]).map(i=>i.id).join(',')}`);
+    return res.status(404).json({ error: 'Instance not found' });
+  }
+  console.log(`[visu-pages] instance found: url=${instance.url} tokenLen=${instance.token?.length}`);
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
 
@@ -1128,25 +1133,39 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
   let visuBaseUrl = null;
 
   try {
+    console.log(`[visu-pages] fetching addons from ${base}/api/hassio/addons`);
     const addonsRes = await fetch(`${base}/api/hassio/addons`, { headers, signal: AbortSignal.timeout(6000) });
+    console.log(`[visu-pages] addons response status=${addonsRes.status}`);
     if (addonsRes.ok) {
       const addonsData = await addonsRes.json();
       const addons = addonsData.data?.addons || addonsData.addons || [];
+      console.log(`[visu-pages] found ${addons.length} addons, slugs: ${addons.map(a=>a.slug).join(',')}`);
       const wsAddon = addons.find(a =>
         (a.slug && (a.slug.includes('wiresheet') || a.slug.includes('ga_control') || a.slug.includes('ga-control'))) ||
         (a.name && (a.name.toLowerCase().includes('wiresheet') || a.name.toLowerCase().includes('ga control')))
       );
-      if (wsAddon) wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+      if (wsAddon) {
+        wiresheetApiBase = `${base}/api/hassio_ingress/${wsAddon.slug}`;
+        console.log(`[visu-pages] found wiresheet addon slug=${wsAddon.slug} -> wiresheetApiBase=${wiresheetApiBase}`);
+      } else {
+        console.log(`[visu-pages] no wiresheet addon found in addons list`);
+      }
+    } else {
+      const txt = await addonsRes.text().catch(() => '');
+      console.log(`[visu-pages] addons endpoint failed status=${addonsRes.status} body=${txt.slice(0,200)}`);
     }
-  } catch {}
+  } catch (e) { console.log(`[visu-pages] addons fetch error: ${e.message}`); }
 
   if (!wiresheetApiBase) {
     const commonSlugs = ['wiresheet', 'ga_control', 'ga-control'];
     for (const slug of commonSlugs) {
       try {
-        const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/visu-pages`, { headers, signal: AbortSignal.timeout(3000) });
-        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; break; }
-      } catch {}
+        const testUrl = `${base}/api/hassio_ingress/${slug}/api/visu-pages`;
+        console.log(`[visu-pages] trying slug probe: ${testUrl}`);
+        const r = await fetch(testUrl, { headers, signal: AbortSignal.timeout(3000) });
+        console.log(`[visu-pages] slug=${slug} status=${r.status}`);
+        if (r.ok) { wiresheetApiBase = `${base}/api/hassio_ingress/${slug}`; console.log(`[visu-pages] slug probe success: ${wiresheetApiBase}`); break; }
+      } catch (e) { console.log(`[visu-pages] slug probe ${slug} error: ${e.message}`); }
     }
   }
 
@@ -1155,9 +1174,12 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
     if (hostMatch) {
       for (const port of [8101, 8100]) {
         try {
-          const r = await fetch(`${hostMatch[1]}:${port}/`, { signal: AbortSignal.timeout(2000) });
-          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; break; }
-        } catch {}
+          const testUrl = `${hostMatch[1]}:${port}/`;
+          console.log(`[visu-pages] probing visuBaseUrl: ${testUrl}`);
+          const r = await fetch(testUrl, { signal: AbortSignal.timeout(2000) });
+          console.log(`[visu-pages] port ${port} status=${r.status}`);
+          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; console.log(`[visu-pages] visuBaseUrl set to ${visuBaseUrl}`); break; }
+        } catch (e) { console.log(`[visu-pages] port ${port} probe error: ${e.message}`); }
       }
     }
   }
@@ -1167,23 +1189,35 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
     if (hostMatch) {
       for (const port of [8101, 8100, 3000]) {
         try {
-          const r = await fetch(`${hostMatch[1]}:${port}/`, { signal: AbortSignal.timeout(2000) });
-          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; break; }
-        } catch {}
+          const testUrl = `${hostMatch[1]}:${port}/`;
+          console.log(`[visu-pages] fallback port probe: ${testUrl}`);
+          const r = await fetch(testUrl, { signal: AbortSignal.timeout(2000) });
+          console.log(`[visu-pages] fallback port ${port} status=${r.status}`);
+          if (r.ok || r.status < 500) { visuBaseUrl = `${hostMatch[1]}:${port}`; console.log(`[visu-pages] fallback visuBaseUrl set to ${visuBaseUrl}`); break; }
+        } catch (e) { console.log(`[visu-pages] fallback port ${port} error: ${e.message}`); }
       }
     }
   }
 
   if (!wiresheetApiBase && !visuBaseUrl) {
+    console.log(`[visu-pages] RESULT: nothing found, returning error`);
     return res.json({ pages: [], visuBaseUrl: null, error: 'Wiresheet Addon nicht gefunden auf der externen Instanz' });
   }
 
   try {
     const apiBase = wiresheetApiBase || visuBaseUrl;
-    const visuRes = await fetch(`${apiBase}/api/visu-pages`, { headers, signal: AbortSignal.timeout(8000) });
-    if (!visuRes.ok) return res.json({ pages: [], visuBaseUrl, error: `Visu-Seiten konnten nicht geladen werden (${visuRes.status})` });
+    const fetchUrl = `${apiBase}/api/visu-pages`;
+    console.log(`[visu-pages] fetching visu-pages from ${fetchUrl}`);
+    const visuRes = await fetch(fetchUrl, { headers, signal: AbortSignal.timeout(8000) });
+    console.log(`[visu-pages] visu-pages response status=${visuRes.status}`);
+    if (!visuRes.ok) {
+      const txt = await visuRes.text().catch(() => '');
+      console.log(`[visu-pages] visu-pages FAILED body=${txt.slice(0,300)}`);
+      return res.json({ pages: [], visuBaseUrl, error: `Visu-Seiten konnten nicht geladen werden (${visuRes.status})` });
+    }
 
     const pagesData = await visuRes.json();
+    console.log(`[visu-pages] got ${Array.isArray(pagesData) ? pagesData.length : 'non-array'} pages`);
     const pages = (Array.isArray(pagesData) ? pagesData : []).map(p => ({
       id: p.id,
       name: p.name || p.id,
@@ -1192,8 +1226,10 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
     }));
 
     const effectiveVisuBase = wiresheetApiBase || visuBaseUrl;
+    console.log(`[visu-pages] RESULT OK: pages=${pages.length} visuBaseUrl=${effectiveVisuBase} wiresheetApiBase=${wiresheetApiBase}`);
     res.json({ pages, visuBaseUrl: effectiveVisuBase, wiresheetApiBase });
   } catch (err) {
+    console.log(`[visu-pages] RESULT ERROR: ${err.message}`);
     res.json({ pages: [], visuBaseUrl, error: err.message });
   }
 });
@@ -1796,14 +1832,17 @@ function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
 
 app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   const { url: rawUrl, token, instanceId, assetBase: rawAssetBase } = req.query;
+  console.log(`[remote-visu-proxy] REQUEST url=${rawUrl} instanceId=${instanceId} tokenLen=${token?.length} assetBase=${rawAssetBase}`);
   if (!rawUrl || !token) {
+    console.log(`[remote-visu-proxy] MISSING PARAMS: url=${!!rawUrl} token=${!!token}`);
     return res.status(400).json({ __proxyError: true, message: 'Fehlende Parameter (url oder token)' });
   }
   let targetUrl;
   try {
     targetUrl = rawUrl;
     new URL(targetUrl);
-  } catch {
+  } catch (e) {
+    console.log(`[remote-visu-proxy] INVALID URL: ${rawUrl} error=${e.message}`);
     return res.status(400).json({ __proxyError: true, message: 'Ungültige URL' });
   }
 
@@ -1816,8 +1855,10 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
     if (pathMatch) proxyBase = pathMatch[1];
   }
+  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} ingressHeader=${ingressHeader}`);
 
   try {
+    console.log(`[remote-visu-proxy] fetching upstream: ${targetUrl}`);
     const upstreamRes = await fetch(targetUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1827,8 +1868,11 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       signal: AbortSignal.timeout(15000),
       redirect: 'follow'
     });
+    console.log(`[remote-visu-proxy] upstream response status=${upstreamRes.status} finalUrl=${upstreamRes.url} contentType=${upstreamRes.headers.get('content-type')}`);
 
     if (!upstreamRes.ok) {
+      const errBody = await upstreamRes.text().catch(() => '');
+      console.log(`[remote-visu-proxy] upstream NOT OK: status=${upstreamRes.status} body=${errBody.slice(0,300)}`);
       return res.status(upstreamRes.status).json({
         __proxyError: true,
         message: `Externe Instanz antwortete mit ${upstreamRes.status} ${upstreamRes.statusText}`,
@@ -1837,8 +1881,10 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     }
 
     const contentType = upstreamRes.headers.get('content-type') || 'text/html';
+    console.log(`[remote-visu-proxy] contentType=${contentType} bodySize will be read`);
 
     if (!contentType.includes('text/html')) {
+      console.log(`[remote-visu-proxy] non-html response, passing through as-is`);
       const buf = await upstreamRes.arrayBuffer();
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'no-cache, max-age=3600');
@@ -1846,6 +1892,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     }
 
     const body = await upstreamRes.text();
+    console.log(`[remote-visu-proxy] html body length=${body.length} hasHead=${body.includes('<head')} hasBody=${body.includes('<body')}`);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.removeHeader('X-Frame-Options');
@@ -1863,6 +1910,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       : (finalBase !== rawTargetBase ? finalBase : rawTargetBase);
 
     const remoteApiProxyBase = instanceId ? `${proxyBase}/api/remote-api-proxy/${instanceId}/api` : null;
+    console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} rawAssetBase=${rawAssetBase} remoteApiProxyBase=${remoteApiProxyBase}`);
 
     const injectScript = `
 <script>
@@ -1934,9 +1982,10 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       processed = injectScript + processed;
     }
 
+    console.log(`[remote-visu-proxy] sending processed html, length=${processed.length}`);
     res.send(processed);
   } catch (err) {
-    console.error('[remote-visu-proxy] error:', err.message);
+    console.error('[remote-visu-proxy] CATCH error:', err.message, err.stack);
     res.status(502).json({ __proxyError: true, message: `Verbindungsfehler: ${err.message}` });
   }
 });
