@@ -1850,15 +1850,19 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   }
 
   const ingressHeader = req.headers['x-ingress-path'] || '';
-  let proxyBase = '';
+  let proxyBasePath = '';
   if (ingressHeader) {
-    proxyBase = ingressHeader.replace(/\/$/, '');
+    proxyBasePath = ingressHeader.replace(/\/$/, '');
   } else {
     const originalUrl = req.originalUrl || req.url || '';
     const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
-    if (pathMatch) proxyBase = pathMatch[1];
+    if (pathMatch) proxyBasePath = pathMatch[1];
   }
-  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} ingressHeader=${ingressHeader}`);
+
+  const proto = req.headers['x-forwarded-proto'] || req.headers['x-scheme'] || (req.socket?.encrypted ? 'https' : 'http');
+  const host = req.headers['x-forwarded-host'] || req.headers['host'] || '';
+  const proxyBase = host ? `${proto}://${host}${proxyBasePath}` : proxyBasePath;
+  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader} host=${host}`);
 
   try {
     console.log(`[remote-visu-proxy] fetching upstream: ${targetUrl}`);
