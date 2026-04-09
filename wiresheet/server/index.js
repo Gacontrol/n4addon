@@ -1904,7 +1904,8 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     const remoteApiBase = `${origin}/api`;
     const remoteWsProto = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
     const remoteWsBase = `${remoteWsProto}//${baseUrl.host}/ws`;
-    console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} remoteApiBase=${remoteApiBase} remoteWsBase=${remoteWsBase}`);
+    const requestedPage = baseUrl.searchParams.get('page') || '';
+    console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} remoteApiBase=${remoteApiBase} remoteWsBase=${remoteWsBase} page=${requestedPage}`);
 
     const injectScript = `
 <script>
@@ -1913,6 +1914,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   var WS_ORIGIN = ${JSON.stringify(origin)};
   window.__WS_REMOTE_API_BASE__ = ${JSON.stringify(remoteApiBase)};
   window.__WS_REMOTE_WS_BASE__ = ${JSON.stringify(remoteWsBase)};
+  window.__WS_REMOTE_PAGE__ = ${JSON.stringify(requestedPage)};
   try {
     localStorage.setItem('hassTokens', JSON.stringify({
       access_token: WS_TOKEN,

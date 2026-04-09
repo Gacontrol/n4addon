@@ -206,10 +206,16 @@ export function VisuApp() {
         })) : raw;
         if (Array.isArray(data) && data.length > 0) {
           setVisuPages(data);
-          setActivePageId(prev => prev || data[0].id);
-          setDisplayedPageId(prev => prev || data[0].id);
+          const remotePage = (window as Record<string, unknown>).__WS_REMOTE_PAGE__ as string | undefined;
+          const urlParams = new URLSearchParams(window.location.search);
+          const requestedPage = remotePage || urlParams.get('page') || '';
+          const initialPage = (requestedPage && data.some((p: VisuPage) => p.id === requestedPage))
+            ? requestedPage
+            : data[0].id;
+          setActivePageId(prev => prev || initialPage);
+          setDisplayedPageId(prev => prev || initialPage);
           if (pageHistoryRef.current.length === 0) {
-            pageHistoryRef.current = [data[0].id];
+            pageHistoryRef.current = [initialPage];
           }
         }
       }
