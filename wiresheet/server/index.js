@@ -1191,7 +1191,7 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
       backgroundColor: p.backgroundColor
     }));
 
-    const effectiveVisuBase = visuBaseUrl || wiresheetApiBase;
+    const effectiveVisuBase = wiresheetApiBase || visuBaseUrl;
     res.json({ pages, visuBaseUrl: effectiveVisuBase, wiresheetApiBase });
   } catch (err) {
     res.json({ pages: [], visuBaseUrl, error: err.message });
