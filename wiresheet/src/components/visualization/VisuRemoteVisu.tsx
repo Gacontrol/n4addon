@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Globe, RefreshCw, AlertTriangle, Loader2, ExternalLink, Maximize2, WifiOff } from 'lucide-react';
 import { RemoteVisuConfig } from '../../types/visualization';
 
@@ -9,33 +9,13 @@ interface VisuRemoteVisuProps {
   height: number;
 }
 
-function getApiBase(): string {
+const apiBase = (() => {
   const path = window.location.pathname;
   const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
-  const result = m ? `${m[1]}` : '';
-  console.log('[RemoteVisu] getApiBase:', result, '| pathname:', path);
-  return result;
-}
+  return m ? m[1] : '';
+})();
 
-function buildVisuUrl(config: RemoteVisuConfig): string | null {
-  if (!config.instanceToken) {
-    console.log('[RemoteVisu] buildVisuUrl: no instanceToken');
-    return null;
-  }
-
-  const base = (config.visuBaseUrl || '').replace(/\/$/, '');
-  if (!base) {
-    console.log('[RemoteVisu] buildVisuUrl: no visuBaseUrl');
-    return null;
-  }
-
-  const pageParam = config.visuPageId ? `?page=${encodeURIComponent(config.visuPageId)}` : '';
-  const url = `${base}/${pageParam}`;
-  console.log('[RemoteVisu] buildVisuUrl:', url);
-  return url;
-}
-
-export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
+export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = React.memo(({
   config,
   isEditMode,
   width,
@@ -48,25 +28,20 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
   const reloadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const visuUrl = buildVisuUrl(config);
   const hasConfig = !!(config.visuBaseUrl && config.instanceToken && config.visuPageId);
 
-  const apiBase = getApiBase();
-  const proxyUrl = (hasConfig && visuUrl)
-    ? `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&instanceId=${encodeURIComponent(config.instanceId || '')}${config.wiresheetApiBase ? `&assetBase=${encodeURIComponent(config.wiresheetApiBase)}` : ''}&_rk=${reloadKey}`
-    : null;
+  const visuUrl = useMemo(() => {
+    if (!config.instanceToken) return null;
+    const base = (config.visuBaseUrl || '').replace(/\/$/, '');
+    if (!base) return null;
+    const pageParam = config.visuPageId ? `?page=${encodeURIComponent(config.visuPageId)}` : '';
+    return `${base}/${pageParam}`;
+  }, [config.instanceToken, config.visuBaseUrl, config.visuPageId]);
 
-  console.log('[RemoteVisu] render:', {
-    hasConfig,
-    visuUrl,
-    proxyUrl,
-    instanceId: config.instanceId,
-    visuBaseUrl: config.visuBaseUrl,
-    visuPageId: config.visuPageId,
-    instanceToken: config.instanceToken ? `[len=${config.instanceToken.length}]` : 'MISSING',
-    wiresheetApiBase: config.wiresheetApiBase,
-    reloadKey,
-  });
+  const proxyUrl = useMemo(() => {
+    if (!hasConfig || !visuUrl) return null;
+    return `${apiBase}/api/remote-visu-proxy?url=${encodeURIComponent(visuUrl)}&token=${encodeURIComponent(config.instanceToken!)}&instanceId=${encodeURIComponent(config.instanceId || '')}${config.wiresheetApiBase ? `&assetBase=${encodeURIComponent(config.wiresheetApiBase)}` : ''}&_rk=${reloadKey}`;
+  }, [hasConfig, visuUrl, config.instanceToken, config.instanceId, config.wiresheetApiBase, reloadKey]);
 
   const scale = config.scale ?? 1;
 
@@ -276,4 +251,4 @@ export const VisuRemoteVisu: React.FC<VisuRemoteVisuProps> = ({
       )}
     </div>
   );
-};
+});
