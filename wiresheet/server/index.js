@@ -1901,19 +1901,18 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       ? rawAssetBase.replace(/\/$/, '') + '/'
       : (finalBase !== rawTargetBase ? finalBase : rawTargetBase);
 
-    const remoteApiProxyBase = null;
-    console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} rawAssetBase=${rawAssetBase} remoteApiProxyBase=${remoteApiProxyBase}`);
+    const remoteApiBase = `${origin}/api`;
+    const remoteWsProto = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    const remoteWsBase = `${remoteWsProto}//${baseUrl.host}/ws`;
+    console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} remoteApiBase=${remoteApiBase} remoteWsBase=${remoteWsBase}`);
 
     const injectScript = `
 <script>
 (function() {
   var WS_TOKEN = ${JSON.stringify(token)};
   var WS_ORIGIN = ${JSON.stringify(origin)};
-  var WS_REMOTE_API_BASE = ${JSON.stringify(remoteApiProxyBase)};
-  if (WS_REMOTE_API_BASE) {
-    window.__WS_REMOTE_API_BASE__ = WS_REMOTE_API_BASE;
-    window.__WS_REMOTE_WS_BASE__ = null;
-  }
+  window.__WS_REMOTE_API_BASE__ = ${JSON.stringify(remoteApiBase)};
+  window.__WS_REMOTE_WS_BASE__ = ${JSON.stringify(remoteWsBase)};
   try {
     localStorage.setItem('hassTokens', JSON.stringify({
       access_token: WS_TOKEN,
@@ -1931,14 +1930,30 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   var _origFetch = window.fetch;
   window.fetch = function(url, opts) {
     try {
-      var u = new URL(url, WS_ORIGIN);
-      if (u.origin === WS_ORIGIN) {
+      var u = typeof url === 'string' ? new URL(url, window.location.href) : new URL(url.url || url);
+      if (u.origin === WS_ORIGIN || u.origin === window.location.origin) {
         opts = opts || {};
         opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + WS_TOKEN });
       }
     } catch(e) {}
     return _origFetch.call(this, url, opts);
   };
+  var _origWS = window.WebSocket;
+  window.WebSocket = function(url, protocols) {
+    try {
+      var u = new URL(url);
+      if (u.pathname === '/ws' || u.pathname.endsWith('/ws')) {
+        url = ${JSON.stringify(remoteWsBase)};
+        console.log('[WS-proxy] redirecting WebSocket to', url);
+      }
+    } catch(e) {}
+    return new _origWS(url, protocols);
+  };
+  window.WebSocket.prototype = _origWS.prototype;
+  window.WebSocket.CONNECTING = _origWS.CONNECTING;
+  window.WebSocket.OPEN = _origWS.OPEN;
+  window.WebSocket.CLOSING = _origWS.CLOSING;
+  window.WebSocket.CLOSED = _origWS.CLOSED;
   var _origXHR = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url) {
     this._wsUrl = url;
