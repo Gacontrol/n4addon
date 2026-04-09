@@ -1791,6 +1791,7 @@ function buildProxyAssetUrl(assetUrl, proxyBase, token) {
 function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
   const targetBaseUrl = new URL(targetBase);
   const ingressPathPrefix = targetBaseUrl.pathname.replace(/\/[^/]*$/, '') || '';
+  console.log(`[rewriteHtmlUrls] targetBase=${targetBase} origin=${origin} proxyBase=${proxyBase} ingressPathPrefix=${ingressPathPrefix}`);
 
   const absUrl = (rel) => {
     try {
@@ -1817,7 +1818,9 @@ function rewriteHtmlUrls(html, targetBase, origin, proxyBase, token) {
   const proxyUrl = (rel) => {
     const abs = absUrl(rel);
     if (!abs || !shouldProxy(abs)) return rel;
-    return buildProxyAssetUrl(abs, proxyBase, token);
+    const proxied = buildProxyAssetUrl(abs, proxyBase, token);
+    console.log(`[rewriteHtmlUrls] rewriting: ${rel} -> abs=${abs} -> proxied=${proxied.slice(0, 120)}`);
+    return proxied;
   };
 
   return html
@@ -1992,15 +1995,18 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 
 app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
   const { url: rawUrl, token } = req.query;
-  if (!rawUrl || !token) return res.status(400).end();
+  console.log(`[remote-visu-asset] REQUEST url=${rawUrl} tokenLen=${token?.length}`);
+  if (!rawUrl || !token) { console.log(`[remote-visu-asset] MISSING PARAMS`); return res.status(400).end(); }
   let targetUrl;
   try {
     targetUrl = rawUrl;
     new URL(targetUrl);
-  } catch {
+  } catch (e) {
+    console.log(`[remote-visu-asset] INVALID URL: ${rawUrl} error=${e.message}`);
     return res.status(400).end();
   }
   try {
+    console.log(`[remote-visu-asset] fetching: ${targetUrl}`);
     const upstreamRes = await fetch(targetUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -2009,7 +2015,12 @@ app.get(['/remote-visu-asset', '/api/remote-visu-asset'], async (req, res) => {
       signal: AbortSignal.timeout(15000),
       redirect: 'follow'
     });
-    if (!upstreamRes.ok) return res.status(upstreamRes.status).end();
+    console.log(`[remote-visu-asset] upstream status=${upstreamRes.status} finalUrl=${upstreamRes.url}`);
+    if (!upstreamRes.ok) {
+      const errBody = await upstreamRes.text().catch(() => '');
+      console.log(`[remote-visu-asset] upstream NOT OK status=${upstreamRes.status} body=${errBody.slice(0,200)}`);
+      return res.status(upstreamRes.status).end();
+    }
     const contentType = upstreamRes.headers.get('content-type') || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
