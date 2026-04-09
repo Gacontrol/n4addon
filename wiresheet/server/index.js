@@ -1936,6 +1936,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   } catch(e) {}
   window.__WIRESHEET_PROXY_TOKEN__ = WS_TOKEN;
   window.__WIRESHEET_PROXY_ORIGIN__ = WS_ORIGIN;
+  var REQUESTED_PAGE = ${JSON.stringify(requestedPage)};
   var _origFetch = window.fetch;
   window.fetch = function(url, opts) {
     try {
@@ -1945,7 +1946,32 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
         opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + WS_TOKEN });
       }
     } catch(e) {}
-    return _origFetch.call(this, url, opts);
+    var result = _origFetch.call(this, url, opts);
+    if (REQUESTED_PAGE) {
+      try {
+        var pu = typeof url === 'string' ? new URL(url, window.location.href) : new URL(url.url || url);
+        if (pu.pathname.endsWith('/visu-pages')) {
+          return result.then(function(resp) {
+            return resp.clone().json().then(function(data) {
+              if (Array.isArray(data) && data.length > 1) {
+                var idx = data.findIndex(function(p) { return p.id === REQUESTED_PAGE; });
+                if (idx > 0) {
+                  var target = data.splice(idx, 1)[0];
+                  data.unshift(target);
+                  return new Response(JSON.stringify(data), {
+                    status: resp.status,
+                    statusText: resp.statusText,
+                    headers: resp.headers
+                  });
+                }
+              }
+              return resp;
+            }).catch(function() { return resp; });
+          });
+        }
+      } catch(e) {}
+    }
+    return result;
   };
   var _origWS = window.WebSocket;
   window.WebSocket = function(url, protocols) {
