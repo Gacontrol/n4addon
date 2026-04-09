@@ -1901,7 +1901,7 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
       ? rawAssetBase.replace(/\/$/, '') + '/'
       : (finalBase !== rawTargetBase ? finalBase : rawTargetBase);
 
-    const remoteApiProxyBase = instanceId ? `remote-api-proxy/${instanceId}/api` : null;
+    const remoteApiProxyBase = null;
     console.log(`[remote-visu-proxy] rewrite: origin=${origin} targetBase=${targetBase} rawAssetBase=${rawAssetBase} remoteApiProxyBase=${remoteApiProxyBase}`);
 
     const injectScript = `
@@ -1955,7 +1955,18 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 })();
 </script>`;
 
-    let processed = rewriteHtmlUrls(body, targetBase, origin, token, ingressPath);
+    const baseTag = `<base href="${targetBase}" />`;
+    let processed = body;
+
+    if (processed.includes('<head>')) {
+      processed = processed.replace('<head>', '<head>' + baseTag);
+    } else if (processed.includes('<head ')) {
+      processed = processed.replace(/<head\s[^>]*>/, (m) => m + baseTag);
+    } else if (processed.includes('<html')) {
+      processed = processed.replace(/<html[^>]*>/, (m) => m + '<head>' + baseTag + '</head>');
+    } else {
+      processed = baseTag + processed;
+    }
 
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
