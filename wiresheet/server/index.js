@@ -1868,8 +1868,10 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     if (pathMatch) proxyBasePath = pathMatch[1];
   }
 
-  const proxyBase = proxyBasePath;
-  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader}`);
+  const proto = req.headers['x-forwarded-proto'] || req.headers['x-scheme'] || (req.socket?.encrypted ? 'https' : 'http');
+  const host = req.headers['x-forwarded-host'] || req.headers['host'] || '';
+  const proxyBase = (host && proxyBasePath) ? `${proto}://${host}${proxyBasePath}` : proxyBasePath;
+  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader} host=${host}`);
 
   try {
     console.log(`[remote-visu-proxy] fetching upstream: ${targetUrl}`);
@@ -1978,15 +1980,6 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
 </script>`;
 
     let processed = rewriteHtmlUrls(body, targetBase, origin, proxyBase, token);
-
-    const baseTag = `<base href="${targetBase}">`;
-    if (processed.includes('<head>')) {
-      processed = processed.replace('<head>', '<head>' + baseTag);
-    } else if (processed.includes('<head ')) {
-      processed = processed.replace(/<head(\s[^>]*)?>/, (m) => m + baseTag);
-    } else if (!processed.includes('<base ')) {
-      processed = baseTag + processed;
-    }
 
     if (processed.includes('</head>')) {
       processed = processed.replace('</head>', injectScript + '</head>');
