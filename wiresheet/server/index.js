@@ -1868,10 +1868,8 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
     if (pathMatch) proxyBasePath = pathMatch[1];
   }
 
-  const proto = req.headers['x-forwarded-proto'] || req.headers['x-scheme'] || (req.socket?.encrypted ? 'https' : 'http');
-  const host = req.headers['x-forwarded-host'] || req.headers['host'] || '';
-  const proxyBase = host ? `${proto}://${host}${proxyBasePath}` : proxyBasePath;
-  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader} host=${host}`);
+  const proxyBase = proxyBasePath;
+  console.log(`[remote-visu-proxy] targetUrl=${targetUrl} proxyBase=${proxyBase} proxyBasePath=${proxyBasePath} ingressHeader=${ingressHeader}`);
 
   try {
     console.log(`[remote-visu-proxy] fetching upstream: ${targetUrl}`);
@@ -2003,6 +2001,43 @@ app.get(['/remote-visu-proxy', '/api/remote-visu-proxy'], async (req, res) => {
   } catch (err) {
     console.error('[remote-visu-proxy] CATCH error:', err.message, err.stack);
     res.status(502).json({ __proxyError: true, message: `Verbindungsfehler: ${err.message}` });
+  }
+});
+
+app.get(['/remote-visu-proxy-debug', '/api/remote-visu-proxy-debug'], async (req, res) => {
+  const { url: rawUrl, token, assetBase: rawAssetBase } = req.query;
+  if (!rawUrl || !token) return res.status(400).send('missing params');
+  try {
+    const upstreamRes = await fetch(rawUrl, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'text/html' },
+      signal: AbortSignal.timeout(10000), redirect: 'follow'
+    });
+    if (!upstreamRes.ok) return res.status(upstreamRes.status).send(`upstream error: ${upstreamRes.status}`);
+    const body = await upstreamRes.text();
+
+    const ingressHeader = req.headers['x-ingress-path'] || '';
+    let proxyBasePath = '';
+    if (ingressHeader) {
+      proxyBasePath = ingressHeader.replace(/\/$/, '');
+    } else {
+      const originalUrl = req.originalUrl || req.url || '';
+      const pathMatch = originalUrl.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+      if (pathMatch) proxyBasePath = pathMatch[1];
+    }
+
+    const baseUrl = new URL(rawUrl);
+    const origin = `${baseUrl.protocol}//${baseUrl.host}`;
+    const isValidUrl = (u) => { try { new URL(u); return true; } catch { return false; } };
+    const targetBase = (rawAssetBase && isValidUrl(rawAssetBase))
+      ? rawAssetBase.replace(/\/$/, '') + '/'
+      : `${baseUrl.protocol}//${baseUrl.host}/`;
+
+    const rewritten = rewriteHtmlUrls(body, targetBase, origin, proxyBasePath, token);
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(`=== DEBUG INFO ===\nproxyBasePath=${proxyBasePath}\ntargetBase=${targetBase}\norigin=${origin}\ningressHeader=${ingressHeader}\nhost=${req.headers.host}\n\n=== RAW HTML (${body.length} chars) ===\n${body.slice(0, 3000)}\n\n=== REWRITTEN HTML (${rewritten.length} chars) ===\n${rewritten.slice(0, 5000)}`);
+  } catch (e) {
+    res.status(500).send(`error: ${e.message}\n${e.stack}`);
   }
 });
 
