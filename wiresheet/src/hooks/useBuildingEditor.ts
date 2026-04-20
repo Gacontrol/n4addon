@@ -210,6 +210,11 @@ export function useBuildingEditor() {
     }
   }, [buildings, updateBuildings]);
 
+  const replaceBuilding = useCallback((updated: Building) => {
+    const next = buildings.map(b => b.id === updated.id ? updated : b);
+    updateBuildings(next);
+  }, [buildings, updateBuildings]);
+
   const addFloor = useCallback((buildingId: string) => {
     const building = buildings.find(b => b.id === buildingId);
     if (!building) return;
@@ -1530,6 +1535,7 @@ export function useBuildingEditor() {
     addBuilding,
     renameBuilding,
     deleteBuilding,
+    replaceBuilding,
     addFloor,
     addFloorBelow,
     renameFloor,

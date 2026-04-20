@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useBuildingContext } from './context/BuildingContext';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -10,7 +12,6 @@ import { DriversView } from './components/DriversView';
 import { DriverPanel } from './components/DriverPanel';
 import { AlarmManagementView } from './components/AlarmManagementView';
 import { TrendView } from './components/TrendView';
-import { BuildingView } from './components/building/BuildingView';
 import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
@@ -28,6 +29,9 @@ import {
 } from 'lucide-react';
 
 function App() {
+  const navigate = useNavigate();
+  const { activeBuildingId } = useBuildingContext();
+
   const {
     pages,
     activePage,
@@ -141,7 +145,7 @@ function App() {
   }, [unshelveExpiredAlarms]);
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | null>(null);
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | null>(null);
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -1686,12 +1690,8 @@ function App() {
             </button>
             {isAdmin && (
               <button
-                onClick={() => setMainView('building')}
-                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  mainView === 'building'
-                    ? 'bg-teal-600 text-white'
-                    : 'text-slate-400 hover:text-white'
-                }`}
+                onClick={() => navigate(activeBuildingId ? `/building/${activeBuildingId}/editor` : '/')}
+                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
               >
                 <Building2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Gebäude</span>
@@ -2290,8 +2290,6 @@ function App() {
           liveValues={liveValues}
           customBlockDefs={customBlocks}
         />
-      ) : mainView === 'building' ? (
-        <BuildingView haEntities={haEntities} haLoading={haLoading} onLoadHaEntities={loadHaEntities} pages={pages} liveValues={liveValues} />
       ) : (
         <VisualizationView
           visuPages={visuPages}

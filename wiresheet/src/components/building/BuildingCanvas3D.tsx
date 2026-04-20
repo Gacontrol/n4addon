@@ -85,6 +85,7 @@ interface Props {
   dpr?: number | [number, number];
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
+  onRoomHover?: (roomId: string | null, clientX?: number, clientY?: number) => void;
 }
 
 interface ErrorBoundaryState { hasError: boolean; error?: Error }
@@ -240,9 +241,11 @@ interface RoomMeshProps {
   faded: boolean;
   onSelect: () => void;
   castShadow: boolean;
+  onHover?: (clientX: number, clientY: number) => void;
+  onHoverEnd?: () => void;
 }
 
-function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs }: RoomMeshProps) {
+function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs, onHover, onHoverEnd }: RoomMeshProps) {
   const baseColor = hexToThree(color);
   const opacity = faded ? 0.08 : 0.18;
   const emissive = selected ? baseColor : new THREE.Color(0x000000);
@@ -270,7 +273,13 @@ function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSel
   const cz = y + hd;
 
   return (
-    <group position={[cx, cy, cz]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+    <group
+      position={[cx, cy, cz]}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onPointerEnter={(e) => { e.stopPropagation(); onHover?.(e.nativeEvent.clientX, e.nativeEvent.clientY); }}
+      onPointerMove={(e) => { onHover?.(e.nativeEvent.clientX, e.nativeEvent.clientY); }}
+      onPointerLeave={() => { onHoverEnd?.(); }}
+    >
       <mesh castShadow={cs} receiveShadow position={[0, -hh, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[width, depth]} />
         {mat}
@@ -310,9 +319,11 @@ interface PolygonRoomMeshProps {
   selected: boolean;
   faded: boolean;
   onSelect: () => void;
+  onHover?: (clientX: number, clientY: number) => void;
+  onHoverEnd?: () => void;
 }
 
-function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, faded, onSelect }: PolygonRoomMeshProps) {
+function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, faded, onSelect, onHover, onHoverEnd }: PolygonRoomMeshProps) {
   const baseColor = hexToThree(color);
   const opacity = faded ? 0.08 : 0.18;
 
@@ -333,6 +344,9 @@ function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, fade
       position={[offsetX, baseY, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onPointerEnter={(e) => { e.stopPropagation(); onHover?.(e.nativeEvent.clientX, e.nativeEvent.clientY); }}
+      onPointerMove={(e) => { onHover?.(e.nativeEvent.clientX, e.nativeEvent.clientY); }}
+      onPointerLeave={() => { onHoverEnd?.(); }}
       castShadow
       receiveShadow
     >
@@ -1048,6 +1062,7 @@ interface BuildingSceneProps {
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
   buildingMode?: import('../../types/building').BuildingDisplayMode;
+  onRoomHover?: (roomId: string | null, clientX?: number, clientY?: number) => void;
 }
 
 function BuildingScene({
@@ -1059,6 +1074,7 @@ function BuildingScene({
   highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
   visibleLayers, isolateActiveFloor = false, onFloorClick, onRoomZoom,
   buildingMode = 'normal',
+  onRoomHover,
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -1198,6 +1214,8 @@ function BuildingScene({
               selected={room.id === selectedRoomId}
               faded={faded}
               onSelect={handleRoomClick}
+              onHover={(cx, cy) => onRoomHover?.(room.id, cx, cy)}
+              onHoverEnd={() => onRoomHover?.(null)}
             />
           );
         } else {
@@ -1215,6 +1233,8 @@ function BuildingScene({
               faded={faded}
               onSelect={handleRoomClick}
               castShadow={lighting.shadowEnabled}
+              onHover={(cx, cy) => onRoomHover?.(room.id, cx, cy)}
+              onHoverEnd={() => onRoomHover?.(null)}
             />
           );
         }
@@ -1540,6 +1560,7 @@ export function BuildingCanvas3D({
   dpr,
   onFloorClick,
   onRoomZoom,
+  onRoomHover,
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
 
@@ -1614,6 +1635,7 @@ export function BuildingCanvas3D({
             onFloorClick={onFloorClick}
             onRoomZoom={onRoomZoom}
             buildingMode={buildingMode}
+            onRoomHover={onRoomHover}
           />
         </Suspense>
 
