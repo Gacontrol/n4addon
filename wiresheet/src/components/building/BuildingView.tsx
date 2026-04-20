@@ -2052,15 +2052,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                               const file = e.target.files?.[0];
                               if (!file || !activeBuilding) return;
                               try {
-                                const { supabase } = await import('../../lib/supabaseClient');
-                                const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                                const path = `${Date.now()}_${safeName}`;
-                                const { error: upErr } = await supabase.storage
-                                  .from('models-3d')
-                                  .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-                                if (upErr) throw upErr;
-                                const { data } = supabase.storage.from('models-3d').getPublicUrl(path);
-                                updateWidget3D(activeBuilding.id, selectedWidget.id, { modelUrl: data.publicUrl, modelName: file.name });
+                                const form = new FormData();
+                                form.append('file', file);
+                                const resUp = await fetch('api/models/upload', { method: 'POST', body: form });
+                                if (!resUp.ok) throw new Error(`HTTP ${resUp.status}`);
+                                const json = await resUp.json();
+                                if (!json.url) throw new Error('Keine URL empfangen');
+                                updateWidget3D(activeBuilding.id, selectedWidget.id, { modelUrl: json.url, modelName: file.name });
                               } catch (err: any) {
                                 alert('Upload fehlgeschlagen: ' + (err?.message || String(err)));
                               } finally {

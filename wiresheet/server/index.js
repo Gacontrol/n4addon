@@ -5869,6 +5869,117 @@ app.delete('/api/images/:filename', async (req, res) => {
   }
 });
 
+let modelsDir = '/data/wiresheet/models';
+
+app.post('/api/models/upload', async (req, res) => {
+  try {
+    await fs.mkdir(modelsDir, { recursive: true });
+    const contentType = req.headers['content-type'] || '';
+    const allowedExt = ['glb', 'gltf', 'obj'];
+
+    if (contentType.includes('multipart/form-data')) {
+      const boundary = contentType.split('boundary=')[1]?.trim();
+      if (!boundary) return res.status(400).json({ error: 'Kein boundary' });
+
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', async () => {
+        try {
+          const buf = Buffer.concat(chunks);
+          const boundaryBuf = Buffer.from('--' + boundary);
+          const parts = [];
+          let start = 0;
+          while (start < buf.length) {
+            const bIdx = buf.indexOf(boundaryBuf, start);
+            if (bIdx === -1) break;
+            const after = bIdx + boundaryBuf.length;
+            if (buf[after] === 45 && buf[after + 1] === 45) break;
+            const headerEnd = buf.indexOf('\r\n\r\n', after);
+            if (headerEnd === -1) break;
+            const headerStr = buf.slice(after + 2, headerEnd).toString();
+            const endBoundary = buf.indexOf(boundaryBuf, headerEnd + 4);
+            const dataEnd = endBoundary === -1 ? buf.length : endBoundary - 2;
+            const data = buf.slice(headerEnd + 4, dataEnd);
+            parts.push({ headers: headerStr, data });
+            start = endBoundary === -1 ? buf.length : endBoundary;
+          }
+          if (parts.length === 0) return res.status(400).json({ error: 'Keine Datei gefunden' });
+          const part = parts[0];
+          const nameMatch = part.headers.match(/filename="([^"]+)"/i);
+          const origName = nameMatch ? nameMatch[1] : 'model.glb';
+          const origExt = path.extname(origName).slice(1).toLowerCase();
+          const finalExt = allowedExt.includes(origExt) ? origExt : 'glb';
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${finalExt}`;
+          const filePath = path.join(modelsDir, filename);
+          await fs.writeFile(filePath, part.data);
+          res.json({ url: `/api/models/${filename}`, filename, name: origName, size: part.data.length });
+        } catch (err) {
+          console.error('Model Multipart Upload Fehler:', err);
+          res.status(500).json({ error: 'Upload fehlgeschlagen' });
+        }
+      });
+      req.on('error', () => res.status(500).json({ error: 'Upload fehlgeschlagen' }));
+    } else {
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end', async () => {
+        try {
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.glb`;
+          const filePath = path.join(modelsDir, filename);
+          await fs.writeFile(filePath, Buffer.concat(chunks));
+          res.json({ url: `/api/models/${filename}`, filename });
+        } catch (err) {
+          console.error('Model Raw Upload Fehler:', err);
+          res.status(500).json({ error: 'Upload fehlgeschlagen' });
+        }
+      });
+      req.on('error', () => res.status(500).json({ error: 'Upload fehlgeschlagen' }));
+    }
+  } catch (err) {
+    console.error('Modell Upload Fehler:', err);
+    res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+app.get('/api/models', async (req, res) => {
+  try {
+    await fs.mkdir(modelsDir, { recursive: true });
+    const files = await fs.readdir(modelsDir);
+    const list = await Promise.all(files.map(async (f) => {
+      const st = await fs.stat(path.join(modelsDir, f));
+      return { filename: f, url: `/api/models/${f}`, size: st.size, mtime: st.mtimeMs };
+    }));
+    res.json(list);
+  } catch (err) {
+    res.json([]);
+  }
+});
+
+app.get('/api/models/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(modelsDir, filename);
+    const data = await fs.readFile(filePath);
+    const ext = path.extname(filename).slice(1).toLowerCase();
+    const mimeMap = { glb: 'model/gltf-binary', gltf: 'model/gltf+json', obj: 'text/plain' };
+    res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(data);
+  } catch {
+    res.status(404).json({ error: 'Modell nicht gefunden' });
+  }
+});
+
+app.delete('/api/models/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    await fs.unlink(path.join(modelsDir, filename));
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: true });
+  }
+});
+
 visuApp.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
