@@ -1690,7 +1690,7 @@ function App() {
             </button>
             {isAdmin && (
               <button
-                onClick={() => navigate(activeBuildingId ? `/building/${activeBuildingId}/editor` : '/')}
+                onClick={() => { if (activeBuildingId) navigate(`/building/${activeBuildingId}/editor`); }}
                 className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
               >
                 <Building2 className="w-3.5 h-3.5" />

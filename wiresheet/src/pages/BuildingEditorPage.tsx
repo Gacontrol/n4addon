@@ -11,9 +11,19 @@ export function BuildingEditorPage() {
   const { buildingId } = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
-  const { buildings, replaceBuilding } = useBuildingContext();
+  const { buildings, replaceBuilding, isLoaded } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-screen bg-slate-950 items-center justify-center text-slate-400">
+        <div className="text-center">
+          <p className="text-sm">Gebäude wird geladen...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!building) {
     return (
