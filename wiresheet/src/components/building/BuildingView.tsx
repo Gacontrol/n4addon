@@ -484,6 +484,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     })).filter(g => g.datapoints.length > 0);
   }, [pages]);
 
+  const datapointLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const grp of logicPageGroups) {
+      for (const dp of grp.datapoints) {
+        if (dp.label && dp.label !== dp.entityId) map[dp.entityId] = dp.label;
+      }
+    }
+    for (const e of haEntities) {
+      const friendly = (e.attributes as Record<string, unknown> | undefined)?.['friendly_name'];
+      if (typeof friendly === 'string' && friendly.trim()) map[e.entity_id] = friendly;
+    }
+    return map;
+  }, [logicPageGroups, haEntities]);
+
   const openDatapointPicker = (target: 'new' | 'widget' | 'alarm') => {
     setDatapointPickerTarget(target);
     setEntitySearch('');
@@ -1026,6 +1040,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   showGrid={showGrid3D}
                   lighting={lighting}
                   liveValues={liveValues as Record<string, string | number>}
+                  datapointLabels={datapointLabels}
                   widgetPlacementMode={widgetPlacementMode}
                   onPlaceWidget={handlePlaceWidget}
                   explosion={explosion}

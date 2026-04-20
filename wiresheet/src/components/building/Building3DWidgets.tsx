@@ -125,7 +125,7 @@ function DamperFlap({ openPercent, color, size, shutoff }: { openPercent: number
   );
 }
 
-function DatapointNode({ datapoint, color, posY }: { datapoint: string; color: string; posY: number }) {
+function DatapointNode({ datapoint, displayName, color, posY }: { datapoint: string; displayName?: string; color: string; posY: number }) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -155,14 +155,14 @@ function DatapointNode({ datapoint, color, posY }: { datapoint: string; color: s
     ctx.fillStyle = '#f1f5f9';
     ctx.font = '500 48px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
     ctx.textBaseline = 'middle';
-    const label = datapoint || '(kein Datenpunkt)';
+    const label = (displayName && displayName.trim()) || datapoint || '(kein Datenpunkt)';
     const maxChars = 22;
     const shown = label.length > maxChars ? '…' + label.slice(-maxChars) : label;
     ctx.fillText(shown, 56, 64);
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, [datapoint, color]);
+  }, [datapoint, displayName, color]);
 
   return (
     <group position={[0, posY, 0]}>
@@ -469,9 +469,10 @@ interface Widget3DMeshProps {
   onSelect: () => void;
   baseY: number;
   onDragEnd?: (x: number, y: number, z: number) => void;
+  datapointLabel?: string;
 }
 
-export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd }: Widget3DMeshProps) {
+export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd, datapointLabel }: Widget3DMeshProps) {
   const baseColor = widget.color || WIDGET_COLORS[widget.type] || '#94a3b8';
   const wx = widget.x;
   const wy = baseY + widget.z;
@@ -626,7 +627,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           <pointLight position={[0, 0.1, 0]} color={baseColor} intensity={0.6} distance={4} />
         </>
       ) : isFan ? (
-        <group position={[0, 0.1, 0]}>
+        <group position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
           <mesh castShadow>
             <cylinderGeometry args={[0.22, 0.22, 0.08, 16]} />
             <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.3} />
@@ -634,12 +635,12 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           <SpinningFan color={baseColor} />
         </group>
       ) : isPump ? (
-        <mesh position={[0, 0.1, 0]} castShadow>
+        <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]} castShadow>
           <torusGeometry args={[0.16, 0.07, 8, 16]} />
           <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.4} />
         </mesh>
       ) : isValve ? (
-        <group position={[0, 0.1, 0]}>
+        <group position={[0, 0.1, 0]} rotation={[0, (widget.rotY || 0) * Math.PI / 180, 0]}>
           <mesh castShadow>
             <boxGeometry args={[0.3, 0.18, 0.18]} />
             <meshStandardMaterial color={baseColor} metalness={0.4} roughness={0.5} />
@@ -650,7 +651,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           </mesh>
         </group>
       ) : isFireDamper ? (
-        <group position={[0, 0, 0]}>
+        <group position={[0, 0.15 * displaySize, 0]} rotation={[Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
           <mesh castShadow>
             <boxGeometry args={[0.6 * displaySize, 0.6 * displaySize, 0.06]} />
             <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
@@ -669,7 +670,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           </mesh>
         </group>
       ) : isDamper || isShutoffDamper ? (
-        <group position={[0, 0.15 * displaySize, 0]} rotation={[0, (widget.rotY || 0) * Math.PI / 180, 0]}>
+        <group position={[0, 0.15 * displaySize, 0]} rotation={[-Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
           <DamperFlap
             openPercent={(() => {
               if (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === 'open' || liveValue === '1') return 100;
@@ -728,6 +729,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       {widget.showNode && widget.datapoint && (
         <DatapointNode
           datapoint={widget.datapoint}
+          displayName={datapointLabel}
           color={baseColor}
           posY={-0.32 * displaySize - 0.1}
         />

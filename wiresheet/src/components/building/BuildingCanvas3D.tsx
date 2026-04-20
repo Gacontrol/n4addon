@@ -60,6 +60,7 @@ interface Props {
   widgetPlacementMode?: boolean;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
+  datapointLabels?: Record<string, string>;
   highlightFloor: boolean;
   bgColor?: string;
   floorTransparent?: boolean;
@@ -1031,6 +1032,7 @@ interface BuildingSceneProps {
   widgetPlacementMode?: boolean;
   liveValues?: Record<string, string | number>;
   alarmStates?: Record<string, boolean>;
+  datapointLabels?: Record<string, string>;
   highlightFloor: boolean;
   lighting: LightingSettings;
   floorTransparent?: boolean;
@@ -1049,7 +1051,7 @@ function BuildingScene({
   selectedWidget3DId, selectedDuctId, selectedPipeId, selectedFurnitureId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
-  liveValues = {}, alarmStates = {},
+  liveValues = {}, alarmStates = {}, datapointLabels = {},
   highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
   visibleLayers, isolateActiveFloor = false, onFloorClick, onRoomZoom
 }: BuildingSceneProps) {
@@ -1443,6 +1445,7 @@ function BuildingScene({
               onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
               baseY={floorBaseYLocal}
               onDragEnd={(nx, ny, nz) => onUpdateWidget3D?.(wid.id, nx - offsetX, ny, nz)}
+              datapointLabel={datapointLabels[wid.datapoint]}
             />
           </group>
         );
@@ -1507,7 +1510,7 @@ export function BuildingCanvas3D({
   selectedWidget3DId, selectedDuctId, selectedPipeId, selectedFurnitureId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
   onPlaceWidget, widgetPlacementMode,
-  liveValues, alarmStates,
+  liveValues, alarmStates, datapointLabels,
   highlightFloor, bgColor = '#0a1020',
   floorTransparent = false,
   bgTransparent = false,
@@ -1587,6 +1590,7 @@ export function BuildingCanvas3D({
             widgetPlacementMode={widgetPlacementMode}
             liveValues={liveValues}
             alarmStates={alarmStates}
+            datapointLabels={datapointLabels}
             highlightFloor={highlightFloor}
             lighting={lighting}
             floorTransparent={floorTransparent}
