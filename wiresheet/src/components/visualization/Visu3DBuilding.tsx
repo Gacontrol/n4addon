@@ -36,6 +36,38 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const initializedRef = useRef(false);
   const myId = useRef(instanceId || `visu3d-${Math.random().toString(36).slice(2)}`);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [canvasDpr, setCanvasDpr] = useState<number>(() => Math.min(window.devicePixelRatio || 1, 2));
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const baseW = el.offsetWidth || rect.width;
+      const baseH = el.offsetHeight || rect.height;
+      const sx = baseW > 0 ? rect.width / baseW : 1;
+      const sy = baseH > 0 ? rect.height / baseH : 1;
+      const cssScale = Math.max(1, sx, sy);
+      const dpr = Math.min((window.devicePixelRatio || 1) * cssScale, 3);
+      setCanvasDpr(dpr);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    let parent = el.parentElement;
+    let depth = 0;
+    while (parent && depth < 6) {
+      ro.observe(parent);
+      parent = parent.parentElement;
+      depth++;
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [width, height]);
 
   const applyBuildingList = useCallback((buildingList: Building[]) => {
     setBuildings(buildingList);
@@ -294,8 +326,9 @@ export const Visu3DBuilding: React.FC<Visu3DBuildingProps> = ({
   const canClickFloors = floorsClickable && !config.showAllFloors;
 
   return (
-    <div className="absolute inset-0" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
+    <div ref={wrapperRef} className="absolute inset-0" style={{ backgroundColor: bgTransparent ? 'transparent' : bgColor }}>
       <BuildingCanvas3D
+        dpr={canvasDpr}
         buildings={filteredBuildings}
         activeFloorId={displayedFloorId}
         selectedRoomId={null}

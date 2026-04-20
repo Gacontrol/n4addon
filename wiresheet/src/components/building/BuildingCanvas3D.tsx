@@ -80,6 +80,7 @@ interface Props {
   compact?: boolean;
   widgetWidth?: number;
   widgetHeight?: number;
+  dpr?: number | [number, number];
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
 }
@@ -1444,7 +1445,7 @@ function BuildingScene({
               selected={wid.id === selectedWidget3DId}
               onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
               baseY={floorBaseYLocal}
-              onDragEnd={(nx, ny, nz) => onUpdateWidget3D?.(wid.id, nx - offsetX, ny, nz)}
+              onDragEnd={onUpdateWidget3D ? (nx, ny, nz) => onUpdateWidget3D(wid.id, nx - offsetX, ny, nz) : undefined}
               datapointLabel={datapointLabels[wid.datapoint]}
             />
           </group>
@@ -1528,6 +1529,7 @@ export function BuildingCanvas3D({
   compact = false,
   widgetWidth,
   widgetHeight,
+  dpr,
   onFloorClick,
   onRoomZoom,
 }: Props) {
@@ -1546,6 +1548,7 @@ export function BuildingCanvas3D({
     <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
         shadows={lighting.shadowEnabled ? 'soft' : false}
+        dpr={dpr ?? [1, 2]}
         camera={{ position: initCamPos, fov: 45, near: 0.1, far: 1000 }}
         gl={{
           antialias: true,
