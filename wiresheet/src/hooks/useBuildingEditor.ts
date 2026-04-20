@@ -85,30 +85,39 @@ export function useBuildingEditor() {
   useEffect(() => {
     const load = async () => {
       let loaded = false;
+      const apiBase = getApiBase();
+      console.log('[useBuildingEditor] load() start, apiBase:', apiBase);
       try {
-        const apiBase = getApiBase();
         const resp = await fetch(`${apiBase}/building-config`);
+        console.log('[useBuildingEditor] building-config response status:', resp.status);
         if (resp.ok) {
           const data = await resp.json();
+          console.log('[useBuildingEditor] building-config data:', JSON.stringify(data).slice(0, 200));
           if (data.buildings?.length > 0) {
             const migrated = migrateBuildings(data.buildings);
             setBuildings(migrated);
             setActiveBuildingId(migrated[0].id);
             setActiveFloorId(migrated[0].floors[0]?.id || '');
             loaded = true;
+            console.log('[useBuildingEditor] loaded from API, activeBuildingId:', migrated[0].id);
+          } else {
+            console.log('[useBuildingEditor] API returned empty/no buildings');
           }
         }
-      } catch { }
+      } catch (err) {
+        console.error('[useBuildingEditor] fetch error:', err);
+      }
 
       if (!loaded) {
         const fromLS = loadFromLocalStorage();
+        console.log('[useBuildingEditor] localStorage:', fromLS ? `${fromLS.length} buildings` : 'null');
         if (fromLS) {
           setBuildings(fromLS);
           setActiveBuildingId(fromLS[0].id);
           setActiveFloorId(fromLS[0].floors[0]?.id || '');
           loaded = true;
+          console.log('[useBuildingEditor] loaded from localStorage, activeBuildingId:', fromLS[0].id);
           try {
-            const apiBase = getApiBase();
             await fetch(`${apiBase}/building-config`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -123,8 +132,10 @@ export function useBuildingEditor() {
         setBuildings([def]);
         setActiveBuildingId(def.id);
         setActiveFloorId(def.floors[0].id);
+        console.log('[useBuildingEditor] created default building, activeBuildingId:', def.id);
       }
       setIsLoaded(true);
+      console.log('[useBuildingEditor] load() complete, isLoaded=true');
     };
     load();
   }, []);

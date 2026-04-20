@@ -258,20 +258,26 @@ function App() {
     const checkAdmin = async () => {
       try {
         const apiBase = getApiBase();
+        console.log('[checkAdmin] checking admin, apiBase:', apiBase);
         const resp = await fetch(`${apiBase}/admin-check`);
         const data = await resp.json().catch(() => ({}));
+        console.log('[checkAdmin] status:', resp.status, '| data:', JSON.stringify(data));
         if (resp.ok && data.isAdmin === true) {
+          console.log('[checkAdmin] isAdmin=true (ok+true)');
           setIsAdmin(true);
           setMainView('logic');
         } else if (!resp.ok && Object.keys(data).length === 0) {
+          console.log('[checkAdmin] isAdmin=true (non-ok, empty data fallback)');
           setIsAdmin(true);
           setMainView('logic');
         } else {
           const admin = data.isAdmin === true;
+          console.log('[checkAdmin] isAdmin:', admin, '(from data)');
           setIsAdmin(admin);
           setMainView(admin ? 'logic' : 'visu');
         }
-      } catch {
+      } catch (err) {
+        console.log('[checkAdmin] catch error:', err, '-> isAdmin=true fallback');
         setIsAdmin(true);
         setMainView('logic');
       }
@@ -1690,7 +1696,16 @@ function App() {
             </button>
             {isAdmin && (
               <button
-                onClick={() => { const bid = activeBuildingId || buildings[0]?.id; if (bid) navigate(`/building/${bid}/editor`); }}
+                onClick={() => {
+                  const bid = activeBuildingId || buildings[0]?.id;
+                  console.log('[GEBÄUDE BTN] clicked — activeBuildingId:', activeBuildingId, '| buildings.length:', buildings.length, '| buildings[0]?.id:', buildings[0]?.id, '| bid:', bid, '| isAdmin:', isAdmin);
+                  if (bid) {
+                    console.log('[GEBÄUDE BTN] navigating to:', `/building/${bid}/editor`);
+                    navigate(`/building/${bid}/editor`);
+                  } else {
+                    console.warn('[GEBÄUDE BTN] no building id available, cannot navigate');
+                  }
+                }}
                 className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
               >
                 <Building2 className="w-3.5 h-3.5" />

@@ -13,6 +13,8 @@ export function BuildingEditorPage() {
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
   const { buildings, replaceBuilding, isLoaded } = useBuildingContext();
 
+  console.log('[BuildingEditorPage] render — buildingId:', buildingId, '| isLoaded:', isLoaded, '| buildings.length:', buildings.length, '| buildings ids:', buildings.map(b => b.id));
+
   const building = buildings.find(b => b.id === buildingId);
 
   if (!isLoaded) {
