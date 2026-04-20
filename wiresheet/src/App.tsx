@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useBuildingContext } from './context/BuildingContext';
+import { BuildingEditorPage } from './pages/BuildingEditorPage';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 
 function App() {
-  const navigate = useNavigate();
   const { activeBuildingId, buildings } = useBuildingContext();
 
   const {
@@ -145,7 +144,7 @@ function App() {
   }, [unshelveExpiredAlarms]);
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | null>(null);
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | null>(null);
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -1614,6 +1613,10 @@ function App() {
     );
   }
 
+  if (mainView === 'building') {
+    return <BuildingEditorPage onBack={() => setMainView('logic')} />;
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
       <header className="bg-slate-800 border-b border-slate-700 px-2 sm:px-4 py-2 sm:py-2.5 flex-shrink-0">
@@ -1696,16 +1699,7 @@ function App() {
             </button>
             {isAdmin && (
               <button
-                onClick={() => {
-                  const bid = activeBuildingId || buildings[0]?.id;
-                  console.log('[GEBÄUDE BTN] clicked — activeBuildingId:', activeBuildingId, '| buildings.length:', buildings.length, '| buildings[0]?.id:', buildings[0]?.id, '| bid:', bid, '| isAdmin:', isAdmin);
-                  if (bid) {
-                    console.log('[GEBÄUDE BTN] navigating to:', `/building/${bid}/editor`);
-                    navigate(`/building/${bid}/editor`);
-                  } else {
-                    console.warn('[GEBÄUDE BTN] no building id available, cannot navigate');
-                  }
-                }}
+                onClick={() => setMainView('building')}
                 className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
               >
                 <Building2 className="w-3.5 h-3.5" />

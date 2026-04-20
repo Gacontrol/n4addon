@@ -7,15 +7,22 @@ import { useBuildingContext } from '../context/BuildingContext';
 
 type EditorSubMode = '3d' | 'rooms';
 
-export function BuildingEditorPage() {
-  const { buildingId } = useParams<{ buildingId: string }>();
+interface BuildingEditorPageProps {
+  onBack?: () => void;
+  onMonitor?: () => void;
+}
+
+export function BuildingEditorPage({ onBack, onMonitor }: BuildingEditorPageProps) {
+  const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
-  const { buildings, replaceBuilding, isLoaded } = useBuildingContext();
+  const { buildings, replaceBuilding, isLoaded, activeBuildingId } = useBuildingContext();
 
-  console.log('[BuildingEditorPage] render — buildingId:', buildingId, '| isLoaded:', isLoaded, '| buildings.length:', buildings.length, '| buildings ids:', buildings.map(b => b.id));
-
+  const buildingId = params.buildingId ?? activeBuildingId;
   const building = buildings.find(b => b.id === buildingId);
+
+  const handleBack = onBack ?? (() => navigate('/'));
+  const handleMonitor = onMonitor ?? (() => navigate(`/building/${buildingId}/monitor`));
 
   if (!isLoaded) {
     return (
@@ -32,7 +39,7 @@ export function BuildingEditorPage() {
       <div className="flex h-screen bg-slate-950 items-center justify-center text-slate-400">
         <div className="text-center">
           <p className="mb-4">Gebäude nicht gefunden</p>
-          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+          <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
             Zurück
           </button>
         </div>
@@ -44,7 +51,7 @@ export function BuildingEditorPage() {
     <div className="flex flex-col h-screen bg-slate-950">
       <header className="bg-slate-900 border-b border-slate-700 px-4 py-2.5 flex items-center gap-3 shrink-0">
         <button
-          onClick={() => navigate('/')}
+          onClick={handleBack}
           className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
         >
           <ArrowLeft size={15} />
@@ -78,7 +85,7 @@ export function BuildingEditorPage() {
 
         <div className="ml-auto">
           <button
-            onClick={() => navigate(`/building/${buildingId}/monitor`)}
+            onClick={handleMonitor}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs text-white font-medium transition-colors"
           >
             <Monitor size={13} />
