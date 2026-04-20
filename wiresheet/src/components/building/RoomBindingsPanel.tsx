@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Thermometer, Droplets, Wind, Bell, Activity, Fan, Lightbulb,
-  Gauge, Zap, Flame, Snowflake, X, Check, Search, Sparkles, Save,
+  Gauge, Zap, Flame, Snowflake, X, Search, Sparkles, Save,
   ChevronsUpDown, ChevronDown, ChevronUp, Trash2, Users, Blinds, Plug
 } from 'lucide-react';
 import type { Building, Floor, Room, Widget3D, Widget3DType } from '../../types/building';
@@ -15,6 +15,12 @@ export interface DatapointGroup {
   pageId: string;
   pageName: string;
   datapoints: DatapointOption[];
+}
+
+function displayLabel(entityId: string, labels?: Record<string, string>): string {
+  if (!entityId) return '';
+  if (labels && labels[entityId]) return labels[entityId];
+  return entityId;
 }
 
 export interface HvacRole {
@@ -93,6 +99,7 @@ interface Props {
   floor: Floor;
   room: Room;
   datapointGroups: DatapointGroup[];
+  datapointLabels?: Record<string, string>;
   addWidget3D: (buildingId: string, widget: Omit<Widget3D, 'id'>) => string;
   updateWidget3D: (buildingId: string, widgetId: string, changes: Partial<Widget3D>) => void;
   deleteWidget3D: (buildingId: string, widgetId: string) => void;
@@ -114,6 +121,7 @@ export function RoomBindingsPanel({
   floor,
   room,
   datapointGroups,
+  datapointLabels,
   addWidget3D,
   updateWidget3D,
   deleteWidget3D,
@@ -141,21 +149,10 @@ export function RoomBindingsPanel({
   const [drafts, setDrafts] = useState<Record<string, DraftBinding>>(initialDrafts);
   const [dpSearch, setDpSearch] = useState('');
   const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
+  const [pickerPageId, setPickerPageId] = useState<string | null>(null);
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
     climate: true, air: true, actuator: true, lighting: true, safety: true, energy: true,
   });
-
-  const allDps = useMemo(() => {
-    const arr: { entityId: string; label: string; groupName: string }[] = [];
-    for (const g of datapointGroups) for (const d of g.datapoints) arr.push({ ...d, groupName: g.pageName });
-    return arr;
-  }, [datapointGroups]);
-
-  const filteredDps = useMemo(() => {
-    const q = dpSearch.toLowerCase();
-    if (!q) return allDps.slice(0, 120);
-    return allDps.filter(d => d.entityId.toLowerCase().includes(q) || d.label.toLowerCase().includes(q)).slice(0, 120);
-  }, [allDps, dpSearch]);
 
   const rolesByCat = useMemo(() => {
     const map: Record<string, HvacRole[]> = {};
@@ -330,7 +327,6 @@ export function RoomBindingsPanel({
                     {roles.map(role => {
                       const draft = drafts[role.key];
                       if (!draft) return null;
-                      const picking = openPickerFor === role.key;
                       return (
                         <div key={role.key} className={`px-4 py-3 ${draft.enabled ? 'bg-slate-900/20' : ''}`}>
                           <div className="flex items-center gap-3">
@@ -353,55 +349,25 @@ export function RoomBindingsPanel({
                               </div>
                               {draft.enabled && (
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <div className="relative flex-1 min-w-[200px]">
+                                  <div className="flex-1 min-w-[220px]">
                                     <button
-                                      onClick={() => { setOpenPickerFor(picking ? null : role.key); setDpSearch(''); }}
-                                      className="w-full text-left px-2.5 py-1.5 rounded-md bg-slate-950 border border-slate-700 hover:border-slate-600 text-xs text-slate-200 font-mono truncate transition-colors flex items-center justify-between gap-2"
+                                      onClick={() => { setOpenPickerFor(role.key); setPickerPageId(null); setDpSearch(''); }}
+                                      className="w-full text-left px-2.5 py-1.5 rounded-md bg-slate-950 border border-slate-700 hover:border-sky-600 text-xs transition-colors flex items-center justify-between gap-2"
                                     >
-                                      <span className={draft.datapoint ? '' : 'text-slate-500'}>
-                                        {draft.datapoint || 'Datenpunkt w\u00e4hlen\u2026'}
-                                      </span>
+                                      <div className="flex-1 min-w-0 truncate">
+                                        {draft.datapoint ? (
+                                          <>
+                                            <div className="text-slate-200 truncate">{displayLabel(draft.datapoint, datapointLabels)}</div>
+                                            {displayLabel(draft.datapoint, datapointLabels) !== draft.datapoint && (
+                                              <div className="text-[10px] text-slate-500 font-mono truncate">{draft.datapoint}</div>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <span className="text-slate-500">Datenpunkt wählen…</span>
+                                        )}
+                                      </div>
                                       <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
                                     </button>
-                                    {picking && (
-                                      <div className="absolute top-full left-0 right-0 mt-1 bg-slate-950 border border-slate-700 rounded-lg shadow-2xl z-20 max-h-72 overflow-hidden flex flex-col">
-                                        <div className="p-2 border-b border-slate-800 flex items-center gap-2 bg-slate-900">
-                                          <Search className="w-3.5 h-3.5 text-slate-500" />
-                                          <input
-                                            autoFocus
-                                            value={dpSearch}
-                                            onChange={e => setDpSearch(e.target.value)}
-                                            placeholder="Suchen…"
-                                            className="flex-1 bg-transparent outline-none text-xs text-white placeholder:text-slate-600"
-                                          />
-                                          <button
-                                            onClick={() => { updateDraft(role.key, { datapoint: '' }); setOpenPickerFor(null); }}
-                                            className="text-[10px] text-slate-500 hover:text-rose-400"
-                                          >
-                                            leer
-                                          </button>
-                                        </div>
-                                        <div className="overflow-y-auto flex-1">
-                                          {filteredDps.length === 0 && (
-                                            <div className="px-3 py-4 text-xs text-slate-500 text-center">Keine Datenpunkte gefunden.</div>
-                                          )}
-                                          {filteredDps.map(dp => (
-                                            <button
-                                              key={dp.entityId}
-                                              onClick={() => { updateDraft(role.key, { datapoint: dp.entityId }); setOpenPickerFor(null); }}
-                                              className="w-full text-left px-3 py-1.5 hover:bg-slate-800 border-b border-slate-900 last:border-b-0"
-                                            >
-                                              <div className="text-xs text-white font-mono truncate">{dp.entityId}</div>
-                                              <div className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
-                                                <span>{dp.label}</span>
-                                                <span className="text-slate-700">&middot;</span>
-                                                <span>{dp.groupName}</span>
-                                              </div>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
                                   </div>
 
                                   <input
@@ -476,6 +442,141 @@ export function RoomBindingsPanel({
           </div>
         </div>
       </div>
+
+      {openPickerFor && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+          onClick={() => setOpenPickerFor(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Datenpunkt wählen</div>
+                <div className="text-sm font-semibold text-white">
+                  {HVAC_ROLES.find(r => r.key === openPickerFor)?.label || ''}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { updateDraft(openPickerFor, { datapoint: '' }); setOpenPickerFor(null); }}
+                  className="px-2 py-1 rounded text-[10px] text-slate-400 hover:text-rose-300 hover:bg-rose-900/30 transition-colors"
+                >
+                  Zurücksetzen
+                </button>
+                <button onClick={() => setOpenPickerFor(null)} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {pickerPageId !== null && (
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
+                <button
+                  onClick={() => { setPickerPageId(null); setDpSearch(''); }}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  <ChevronDown className="w-3.5 h-3.5 rotate-90" />
+                  Zurück
+                </button>
+                <span className="text-slate-600 text-xs">/</span>
+                <span className="text-xs text-slate-200 font-medium truncate">
+                  {datapointGroups.find(g => g.pageId === pickerPageId)?.pageName ?? pickerPageId}
+                </span>
+              </div>
+            )}
+
+            <div className="px-4 py-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5">
+                <Search className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={dpSearch}
+                  onChange={e => setDpSearch(e.target.value)}
+                  placeholder="Suchen…"
+                  className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder:text-slate-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {pickerPageId === null ? (
+                datapointGroups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <Activity className="w-8 h-8 mb-2 opacity-30" />
+                    <span className="text-xs">Keine Logik-Datenpunkte gefunden</span>
+                  </div>
+                ) : (
+                  datapointGroups
+                    .filter(g => !dpSearch || g.pageName.toLowerCase().includes(dpSearch.toLowerCase())
+                      || g.datapoints.some(d => d.entityId.toLowerCase().includes(dpSearch.toLowerCase()) || d.label.toLowerCase().includes(dpSearch.toLowerCase())))
+                    .map(group => (
+                      <button
+                        key={group.pageId}
+                        onClick={() => { setPickerPageId(group.pageId); setDpSearch(''); }}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800/50"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                          </div>
+                          <span className="text-xs text-slate-200 font-medium">{group.pageName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{group.datapoints.length}</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-500 -rotate-90" />
+                        </div>
+                      </button>
+                    ))
+                )
+              ) : (() => {
+                const group = datapointGroups.find(g => g.pageId === pickerPageId);
+                const q = dpSearch.trim().toLowerCase();
+                const dps = group
+                  ? (q ? group.datapoints.filter(d =>
+                      d.entityId.toLowerCase().includes(q) ||
+                      d.label.toLowerCase().includes(q) ||
+                      displayLabel(d.entityId, datapointLabels).toLowerCase().includes(q)
+                    ) : group.datapoints)
+                  : [];
+                if (dps.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                      <Search className="w-8 h-8 mb-2 opacity-30" />
+                      <span className="text-xs">Keine Treffer</span>
+                    </div>
+                  );
+                }
+                return dps.map(dp => {
+                  const human = displayLabel(dp.entityId, datapointLabels);
+                  const primary = dp.label && dp.label !== dp.entityId ? dp.label : human;
+                  const showSecondary = primary !== dp.entityId;
+                  return (
+                    <button
+                      key={dp.entityId}
+                      onClick={() => { updateDraft(openPickerFor, { datapoint: dp.entityId }); setOpenPickerFor(null); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-800 transition-colors text-left border-b border-slate-800/30"
+                    >
+                      <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-3 h-3 text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-slate-200 truncate">{primary}</div>
+                        {showSecondary && (
+                          <div className="text-[10px] text-slate-500 truncate font-mono">{dp.entityId}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

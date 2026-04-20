@@ -1499,7 +1499,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 selectedSlabId={selectedSlabId}
                 onSelectSlab={id => { setSelectedSlabId(id); setSelectedWidget3DId(null); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setShowRoomPanel(true); }}
                 onAddSlab={slab => { if (activeBuilding && activeFloor) addSlab(activeBuilding.id, activeFloor.id, slab); }}
-                onAddPolygonRoom={points => { if (activeBuilding && activeFloor) addPolygonRoom(activeBuilding.id, activeFloor.id, points, newRoomType); }}
+                onAddPolygonRoom={points => { if (activeBuilding && activeFloor) { addPolygonRoom(activeBuilding.id, activeFloor.id, points, newRoomType); setTool('select'); } }}
                 onDeleteSlab={id => { if (activeBuilding && activeFloor) { deleteSlab(activeBuilding.id, activeFloor.id, id); setSelectedSlabId(null); } }}
                 onCopySelected={handleCopySelected}
                 onPasteClipboard={handlePasteClipboard}
@@ -2966,6 +2966,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
           floor={activeFloor}
           room={selectedRoom}
           datapointGroups={logicPageGroups}
+          datapointLabels={datapointLabels}
           addWidget3D={addWidget3D}
           updateWidget3D={updateWidget3D}
           deleteWidget3D={deleteWidget3D}
