@@ -14,6 +14,7 @@ import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers, FurnitureItem, FurnitureTemplate, FurnitureCategory } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
+import { RoomBindingsPanel } from './RoomBindingsPanel';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
@@ -174,6 +175,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   } = useBuildingEditor();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
+  const [roomBindingsOpen, setRoomBindingsOpen] = useState(false);
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editingBuildingName, setEditingBuildingName] = useState('');
   const [editingFloorId, setEditingFloorId] = useState<string | null>(null);
@@ -2604,6 +2606,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       <div className="text-sm font-semibold text-slate-200">{(selectedRoom.width * selectedRoom.depth).toFixed(1)} m²</div>
                     </div>
                     <button
+                      onClick={() => setRoomBindingsOpen(true)}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-2 bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 text-white rounded text-xs font-semibold shadow-md shadow-sky-900/40 transition-all"
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      HLK-Belegung konfigurieren
+                    </button>
+                    <button
                       onClick={() => { if (activeBuilding && activeFloor) deleteRoom(activeBuilding.id, activeFloor.id, selectedRoom.id); }}
                       className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs"
                     >
@@ -2949,6 +2958,19 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
             </div>
           </div>
         </div>
+      )}
+
+      {roomBindingsOpen && activeBuilding && activeFloor && selectedRoom && (
+        <RoomBindingsPanel
+          building={activeBuilding}
+          floor={activeFloor}
+          room={selectedRoom}
+          datapointGroups={logicPageGroups}
+          addWidget3D={addWidget3D}
+          updateWidget3D={updateWidget3D}
+          deleteWidget3D={deleteWidget3D}
+          onClose={() => setRoomBindingsOpen(false)}
+        />
       )}
     </div>
   );
