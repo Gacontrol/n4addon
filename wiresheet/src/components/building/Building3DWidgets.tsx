@@ -746,7 +746,12 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
         isBoolean={isBoolean}
         showLabel={widget.showLabel !== false}
         showValue={widget.showValue !== false}
-        posY={isDuct ? 0.55 + 0.15 * displaySize : 0.42}
+        posY={
+          isDuct ? 0.55 + 0.15 * displaySize :
+          (isFan || isPump || isValve || isDamper || isShutoffDamper || isFireDamper) ? 0.55 + 0.35 * displaySize :
+          isModel3D ? 0.55 + 0.25 * displaySize :
+          0.42 + 0.2 * displaySize
+        }
         displaySize={displaySize}
       />
     </group>
