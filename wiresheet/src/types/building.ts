@@ -91,6 +91,9 @@ export type Widget3DType =
   | 'roomcolor'
   | 'duct'
   | 'fire-damper'
+  | 'damper'
+  | 'shutoff-damper'
+  | 'model3d'
   | 'boolean';
 
 export interface Widget3D {
@@ -113,6 +116,10 @@ export interface Widget3D {
   maxValue?: number;
   roomIds?: string[];
   opacity?: number;
+  rotY?: number;
+  modelUrl?: string;
+  modelName?: string;
+  showNode?: boolean;
 }
 
 // ---- Ducts & Pipes ----

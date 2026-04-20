@@ -1,7 +1,185 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState, Suspense } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType } from '../../types/building';
+
+// ─── simple GLTF cache ────────────────────────────────────────────────────
+const _modelCache = new Map<string, Promise<THREE.Group>>();
+function loadGLTFModel(url: string): Promise<THREE.Group> {
+  let p = _modelCache.get(url);
+  if (!p) {
+    const loader = new GLTFLoader();
+    p = new Promise<THREE.Group>((resolve, reject) => {
+      loader.load(
+        url,
+        (gltf) => resolve(gltf.scene),
+        undefined,
+        (err) => reject(err)
+      );
+    });
+    _modelCache.set(url, p);
+  }
+  return p;
+}
+
+function ModelMesh({ url, displaySize, color, onError }: { url: string; displaySize: number; color: string; onError?: () => void }) {
+  const [scene, setScene] = useState<THREE.Group | null>(null);
+  const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setErrored(false);
+    setScene(null);
+    if (!url) return;
+    loadGLTFModel(url)
+      .then((src) => {
+        if (cancelled) return;
+        const cloned = src.clone(true);
+        cloned.traverse((o: any) => {
+          if (o.isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+          }
+        });
+        const box = new THREE.Box3().setFromObject(cloned);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const s = (displaySize * 0.8) / maxDim;
+        cloned.scale.setScalar(s);
+        const c = new THREE.Vector3();
+        box.getCenter(c);
+        cloned.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+        setScene(cloned);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setErrored(true);
+        onError?.();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url, displaySize]);
+
+  if (errored || !scene) {
+    return (
+      <mesh castShadow>
+        <boxGeometry args={[0.3 * displaySize, 0.3 * displaySize, 0.3 * displaySize]} />
+        <meshStandardMaterial color={errored ? '#ef4444' : color} wireframe metalness={0.2} roughness={0.7} />
+      </mesh>
+    );
+  }
+
+  return <primitive object={scene} />;
+}
+
+// Animated butterfly damper/flap
+function DamperFlap({ openPercent, color, size, shutoff }: { openPercent: number; color: string; size: number; shutoff?: boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const targetAngle = useRef(0);
+  const currentAngle = useRef(0);
+
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    const pct = Math.max(0, Math.min(100, openPercent));
+    targetAngle.current = (pct / 100) * (Math.PI / 2);
+    currentAngle.current += (targetAngle.current - currentAngle.current) * Math.min(1, dt * 6);
+    ref.current.rotation.x = currentAngle.current;
+  });
+
+  const housingColor = shutoff ? '#334155' : '#1e293b';
+  const r = 0.28 * size;
+  const depth = 0.18 * size;
+
+  return (
+    <group>
+      <mesh castShadow>
+        <cylinderGeometry args={[r, r, depth, 24, 1, true]} />
+        <meshStandardMaterial color={housingColor} metalness={0.6} roughness={0.35} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, depth / 2, 0]} castShadow>
+        <ringGeometry args={[r * 0.92, r, 24]} />
+        <meshStandardMaterial color={housingColor} metalness={0.6} roughness={0.35} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -depth / 2, 0]} castShadow>
+        <ringGeometry args={[r * 0.92, r, 24]} />
+        <meshStandardMaterial color={housingColor} metalness={0.6} roughness={0.35} side={THREE.DoubleSide} />
+      </mesh>
+      <group ref={ref}>
+        <mesh castShadow>
+          <cylinderGeometry args={[r * 0.88, r * 0.88, 0.02, 24]} />
+          <meshStandardMaterial color={color} metalness={0.5} roughness={0.4} emissive={new THREE.Color(color)} emissiveIntensity={0.12} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+      <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.02 * size, 0.02 * size, r * 2.1, 8]} />
+        <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.25} />
+      </mesh>
+      <mesh position={[r * 1.05, 0.05 * size, 0]} castShadow>
+        <boxGeometry args={[0.1 * size, 0.06 * size, 0.1 * size]} />
+        <meshStandardMaterial color={shutoff ? '#0ea5e9' : '#10b981'} metalness={0.4} roughness={0.4} emissive={new THREE.Color(shutoff ? '#0ea5e9' : '#10b981')} emissiveIntensity={0.35} />
+      </mesh>
+    </group>
+  );
+}
+
+function DatapointNode({ datapoint, color, posY }: { datapoint: string; color: string; posY: number }) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 512, 128);
+    ctx.fillStyle = 'rgba(15,23,42,0.85)';
+    const r = 16;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(512 - r, 0);
+    ctx.quadraticCurveTo(512, 0, 512, r);
+    ctx.lineTo(512, 128 - r);
+    ctx.quadraticCurveTo(512, 128, 512 - r, 128);
+    ctx.lineTo(r, 128);
+    ctx.quadraticCurveTo(0, 128, 0, 128 - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(32, 64, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f1f5f9';
+    ctx.font = '500 48px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    ctx.textBaseline = 'middle';
+    const label = datapoint || '(kein Datenpunkt)';
+    const maxChars = 22;
+    const shown = label.length > maxChars ? '…' + label.slice(-maxChars) : label;
+    ctx.fillText(shown, 56, 64);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [datapoint, color]);
+
+  return (
+    <group position={[0, posY, 0]}>
+      <mesh position={[0, 0.12, 0]} castShadow>
+        <icosahedronGeometry args={[0.06, 0]} />
+        <meshStandardMaterial color={color} emissive={new THREE.Color(color)} emissiveIntensity={0.6} metalness={0.4} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.06, 0]}>
+        <cylinderGeometry args={[0.004, 0.004, 0.12, 6]} />
+        <meshBasicMaterial color={color} transparent opacity={0.7} />
+      </mesh>
+      <sprite position={[0, 0.22, 0]} scale={[0.9, 0.22, 1]}>
+        <spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} sizeAttenuation={true} />
+      </sprite>
+    </group>
+  );
+}
 
 export const WIDGET_COLORS: Record<Widget3DType, string> = {
   temperature:  '#ef4444',
@@ -20,6 +198,9 @@ export const WIDGET_COLORS: Record<Widget3DType, string> = {
   roomcolor:    '#22c55e',
   duct:         '#60a5fa',
   'fire-damper':'#f43f5e',
+  damper:        '#10b981',
+  'shutoff-damper':'#0ea5e9',
+  model3d:      '#94a3b8',
   boolean:      '#22d3ee',
 };
 
@@ -40,6 +221,9 @@ export const WIDGET_LABELS: Record<Widget3DType, string> = {
   roomcolor:    'Raumeinfärbung',
   duct:         'Kanal-Sensor',
   'fire-damper':'Brandschutzklappe',
+  damper:        'Klappe (Drossel)',
+  'shutoff-damper':'Absperrklappe',
+  model3d:      '3D-Modell',
   boolean:      'Boolean',
 };
 
@@ -301,6 +485,9 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
   const isRoomColor = widget.type === 'roomcolor';
   const isDuct = widget.type === 'duct';
   const isFireDamper = widget.type === 'fire-damper';
+  const isDamper = widget.type === 'damper';
+  const isShutoffDamper = widget.type === 'shutoff-damper';
+  const isModel3D = widget.type === 'model3d';
   const isBoolean = widget.type === 'boolean';
   const displaySize = (widget.size ?? 1.0) * (widget.scale || 1);
 
@@ -481,6 +668,33 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
             <meshStandardMaterial color={alarmActive ? '#ef4444' : baseColor} emissive={new THREE.Color(alarmActive ? '#ef4444' : baseColor)} emissiveIntensity={0.3} metalness={0.4} roughness={0.3} />
           </mesh>
         </group>
+      ) : isDamper || isShutoffDamper ? (
+        <group position={[0, 0.15 * displaySize, 0]} rotation={[0, (widget.rotY || 0) * Math.PI / 180, 0]}>
+          <DamperFlap
+            openPercent={(() => {
+              if (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === 'open' || liveValue === '1') return 100;
+              if (liveValue === false || liveValue === 'false' || liveValue === 'off' || liveValue === 'closed' || liveValue === '0') return 0;
+              const n = typeof liveValue === 'number' ? liveValue : parseFloat(String(liveValue ?? ''));
+              return isFinite(n) ? n : (isShutoffDamper ? 0 : 50);
+            })()}
+            color={alarmActive ? '#ef4444' : baseColor}
+            size={displaySize}
+            shutoff={isShutoffDamper}
+          />
+        </group>
+      ) : isModel3D ? (
+        <group position={[0, 0, 0]} rotation={[0, (widget.rotY || 0) * Math.PI / 180, 0]}>
+          <Suspense fallback={null}>
+            {widget.modelUrl ? (
+              <ModelMesh url={widget.modelUrl} displaySize={displaySize} color={baseColor} />
+            ) : (
+              <mesh castShadow>
+                <boxGeometry args={[0.3 * displaySize, 0.3 * displaySize, 0.3 * displaySize]} />
+                <meshStandardMaterial color={baseColor} wireframe metalness={0.2} roughness={0.7} />
+              </mesh>
+            )}
+          </Suspense>
+        </group>
       ) : isBoolean ? (
         <group position={[0, 0, 0]}>
           <mesh castShadow>
@@ -509,6 +723,14 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           <planeGeometry args={[0.52 * displaySize + 0.12, 0.52 * displaySize + 0.12]} />
           <meshBasicMaterial color="#60a5fa" transparent opacity={0.25} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
+      )}
+
+      {widget.showNode && widget.datapoint && (
+        <DatapointNode
+          datapoint={widget.datapoint}
+          color={baseColor}
+          posY={-0.32 * displaySize - 0.1}
+        />
       )}
 
       <WidgetLabel3D

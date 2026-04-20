@@ -2008,7 +2008,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         <span className="text-xs text-slate-400">{selectedWidget.color}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
                         <input type="checkbox" checked={selectedWidget.showLabel}
                           onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { showLabel: e.target.checked })}
@@ -2021,7 +2021,59 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           className="accent-blue-500" />
                         Wert
                       </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" checked={!!selectedWidget.showNode}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { showNode: e.target.checked })}
+                          className="accent-blue-500" />
+                        Datenpunkt-Node
+                      </label>
                     </div>
+                    {(selectedWidget.type === 'damper' || selectedWidget.type === 'shutoff-damper' || selectedWidget.type === 'model3d') && (
+                      <div>
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Drehung Y ({selectedWidget.rotY || 0} deg)</label>
+                        <input type="range" min={0} max={360} step={5} value={selectedWidget.rotY || 0}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { rotY: parseInt(e.target.value, 10) })}
+                          className="w-full accent-blue-500" />
+                      </div>
+                    )}
+                    {selectedWidget.type === 'model3d' && (
+                      <div className="space-y-2 border-t border-slate-700 pt-2">
+                        <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">3D-Modell (GLB/GLTF)</label>
+                        <input className="w-full bg-slate-700 border border-slate-600 text-slate-200 text-xs px-2 py-1.5 rounded outline-none focus:border-blue-500"
+                          placeholder="URL zu .glb / .gltf"
+                          value={selectedWidget.modelUrl || ''}
+                          onChange={e => activeBuilding && updateWidget3D(activeBuilding.id, selectedWidget.id, { modelUrl: e.target.value })} />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+                            className="flex-1 text-xs text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-600 file:text-white file:cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !activeBuilding) return;
+                              try {
+                                const { supabase } = await import('../../lib/supabaseClient');
+                                const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                                const path = `${Date.now()}_${safeName}`;
+                                const { error: upErr } = await supabase.storage
+                                  .from('models-3d')
+                                  .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+                                if (upErr) throw upErr;
+                                const { data } = supabase.storage.from('models-3d').getPublicUrl(path);
+                                updateWidget3D(activeBuilding.id, selectedWidget.id, { modelUrl: data.publicUrl, modelName: file.name });
+                              } catch (err: any) {
+                                alert('Upload fehlgeschlagen: ' + (err?.message || String(err)));
+                              } finally {
+                                (e.target as HTMLInputElement).value = '';
+                              }
+                            }}
+                          />
+                        </div>
+                        {selectedWidget.modelName && (
+                          <div className="text-[10px] text-slate-500">Datei: {selectedWidget.modelName}</div>
+                        )}
+                      </div>
+                    )}
                     <button onClick={() => { if (activeBuilding) { deleteWidget3D(activeBuilding.id, selectedWidget.id); setSelectedWidget3DId(null); } }}
                       className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 border border-red-800 rounded text-xs">
                       <Trash2 className="w-3.5 h-3.5" />
