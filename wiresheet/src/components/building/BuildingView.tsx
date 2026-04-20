@@ -5,7 +5,7 @@ import {
   Layers, Box, MousePointer, MousePointer2, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
   Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw,
-  Eye, EyeOff, GripVertical, RotateCcw
+  Eye, EyeOff, GripVertical, RotateCcw, Gauge
 } from 'lucide-react';
 import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
@@ -215,6 +215,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [dropOpeningType, setDropOpeningType] = useState<WallOpeningType | null>(null);
   const [showOpeningPanel, setShowOpeningPanel] = useState(false);
   const [showWidget3DPanel, setShowWidget3DPanel] = useState(false);
+  const [showWidgetPalette, setShowWidgetPalette] = useState(false);
+  const [dropWidget3DType, setDropWidget3DType] = useState<Widget3DType | null>(null);
   const [sectionAxis, setSectionAxis] = useState<'xz' | 'yz'>('xz');
   const [sectionSliceDepth, setSectionSliceDepth] = useState<number>(5);
   const [showAnsichtPanel, setShowAnsichtPanel] = useState(false);
@@ -981,12 +983,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   Öffnungen
                 </button>
                 <button
-                  onClick={() => { setShowFurniturePanel(p => !p); if (showOpeningPanel) setShowOpeningPanel(false); }}
+                  onClick={() => { setShowFurniturePanel(p => !p); if (showOpeningPanel) setShowOpeningPanel(false); if (showWidgetPalette) setShowWidgetPalette(false); }}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showFurniturePanel ? 'bg-amber-700 text-white border-amber-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
                   title="Mobiliar-Palette"
                 >
                   <GripVertical className="w-3.5 h-3.5" />
                   Mobiliar
+                </button>
+                <button
+                  onClick={() => { setShowWidgetPalette(p => !p); if (showOpeningPanel) setShowOpeningPanel(false); if (showFurniturePanel) setShowFurniturePanel(false); }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors ${showWidgetPalette ? 'bg-cyan-700 text-white border-cyan-600' : 'bg-slate-700 text-slate-400 hover:text-white border-slate-600'}`}
+                  title="3D-Visu-Widgets platzieren"
+                >
+                  <Gauge className="w-3.5 h-3.5" />
+                  3D-Widgets
                 </button>
               </>
             )}
@@ -1494,6 +1504,41 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                 onDeleteFurniture={itemId => { if (activeBuilding && activeFloor) { deleteFurniture(activeBuilding.id, activeFloor.id, itemId); setSelectedFurnitureId(null); } }}
                 dropFurnitureTemplate={dropFurnitureTemplate}
                 dropOpeningType={dropOpeningType}
+                dropWidget3DType={dropWidget3DType}
+                widgets3d={activeBuilding?.widgets3d}
+                selectedWidget3DId={selectedWidget3DId}
+                onSelectWidget3D={id => {
+                  setSelectedWidget3DId(id);
+                  setSelectedWallId(null); setSelectedRoomId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null);
+                  if (id) setShowRoomPanel(true);
+                }}
+                onDropWidget3D={(type, x, y) => {
+                  if (!activeBuilding || !activeFloor) return;
+                  addWidget3D(activeBuilding.id, {
+                    type,
+                    label: WIDGET_LABELS[type],
+                    datapoint: '',
+                    unit: '',
+                    x,
+                    y: 0,
+                    z: y,
+                    floorId: activeFloor.id,
+                    scale: 1,
+                    color: WIDGET_COLORS[type] || '#94a3b8',
+                    showLabel: true,
+                    showValue: true,
+                    roomIds: [],
+                  } as any);
+                }}
+                onMoveWidget3D={(id, x, z) => {
+                  if (!activeBuilding) return;
+                  updateWidget3D(activeBuilding.id, id, { x, z });
+                }}
+                onDeleteWidget3D={id => {
+                  if (!activeBuilding) return;
+                  deleteWidget3D(activeBuilding.id, id);
+                  setSelectedWidget3DId(null);
+                }}
                 onAddWallOpening={(wallId, type, position, width, height, sillHeight) => {
                   if (!activeBuilding || !activeFloor) return;
                   addWallOpening(activeBuilding.id, activeFloor.id, wallId, { type, position, width, height, sillHeight });
@@ -1604,6 +1649,40 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
               </div>
               <div className="px-3 py-2 border-t border-slate-700 text-[10px] text-slate-500">
                 Elemente in den Grundriss ziehen
+              </div>
+            </div>
+          )}
+
+          {showWidgetPalette && viewMode === 'floor' && (
+            <div className="w-56 flex-shrink-0 border-l border-slate-700 bg-slate-800 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-700">
+                <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5" />3D-Visu-Widgets
+                </span>
+                <button onClick={() => setShowWidgetPalette(false)} className="w-4 h-4 text-slate-500 hover:text-white flex items-center justify-center">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                {(Object.keys(WIDGET_LABELS) as Widget3DType[]).filter(t => t !== 'roomcolor').map(t => (
+                  <div
+                    key={t}
+                    draggable
+                    onDragStart={() => setDropWidget3DType(t)}
+                    onDragEnd={() => setDropWidget3DType(null)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-slate-750 border border-slate-700 hover:border-cyan-600 hover:bg-slate-700 cursor-grab active:cursor-grabbing transition-colors group"
+                    title={`Widget ${WIDGET_LABELS[t]} platzieren`}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0 border border-slate-600"
+                      style={{ backgroundColor: WIDGET_COLORS[t] }}
+                    />
+                    <span className="flex-1 text-xs text-slate-300 truncate group-hover:text-white">{WIDGET_LABELS[t]}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-3 py-2 border-t border-slate-700 text-[10px] text-slate-500">
+                Widgets auf den Grundriss ziehen. Sie erscheinen auf dem 3D-Widget-Layer.
               </div>
             </div>
           )}
