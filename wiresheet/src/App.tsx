@@ -15,6 +15,7 @@ import { useWiresheetPages } from './hooks/useWiresheetPages';
 import { useCustomBlocks } from './hooks/useCustomBlocks';
 import { useVisualization } from './hooks/useVisualization';
 import { useAlarmManagement } from './hooks/useAlarmManagement';
+import { useRemoteAlarms } from './hooks/useRemoteAlarms';
 import { NodeTemplate, FlowNode, CustomBlockDefinition, Connection, ModbusDevice, WiresheetPage, DriverBinding, HaDevice, HaEntity, BindingStatus, HaInstance } from './types/flow';
 import { VisuBindingInfo } from './components/FlowNode';
 import { VisuPage, parseDpKey } from './types/visualization';
@@ -41,6 +42,7 @@ function App() {
     liveValues,
     driverLiveValues,
     modbusDeviceStatusSSE,
+    haInstanceStatus,
     haEntities,
     haLoading,
     haError,
@@ -165,6 +167,7 @@ function App() {
   const [driverBindings, setDriverBindings] = useState<DriverBinding[]>([]);
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haInstances, setHaInstances] = useState<HaInstance[]>([]);
+  const remoteAlarms = useRemoteAlarms(haInstances, haInstanceStatus);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [instanceDevices, setInstanceDevices] = useState<Record<string, HaDevice[]>>({});
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
@@ -2204,6 +2207,7 @@ function App() {
           onRefreshHaEntities={loadHaEntities}
           haInstances={haInstances}
           onHaInstancesChange={handleHaInstancesChange}
+          haInstanceStatus={haInstanceStatus}
           driverLiveValues={driverLiveValues}
           instanceGaPages={instanceGaPages}
           instanceDriverPoints={instanceDriverPoints}
@@ -2223,6 +2227,8 @@ function App() {
           onClearAlarm={clearAlarm}
           pages={pages}
           onUpdateNodeConfig={updateNodeConfigOnPage}
+          haInstances={haInstances}
+          remoteAlarms={remoteAlarms}
         />
       ) : mainView === 'trends' ? (
         <TrendView

@@ -30,6 +30,7 @@ interface DriversViewProps {
   onRefreshHaEntities: () => void;
   haInstances?: HaInstance[];
   onHaInstancesChange?: (instances: HaInstance[]) => void;
+  haInstanceStatus?: Record<string, { online: boolean; lastSeen?: number; lastChecked?: number }>;
   driverLiveValues?: { modbus: Record<string, unknown>; ha: Record<string, { state: string; attributes: Record<string, unknown> }> };
   instanceGaPages?: Record<string, { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; value?: unknown; inputs?: { id: string; label: string }[]; outputs?: { id: string; label: string }[] }[] }[]>;
   instanceDriverPoints?: Record<string, { sheets: { id: string; name: string; nodes: { id: string; type: string; label: string; unit: string; entityId: string }[] }[]; modbusDevices: { id: string; name: string; datapoints: { id: string; name: string; unit: string; type: string; register?: number }[] }[] }>;
@@ -102,6 +103,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
   onRefreshHaEntities,
   haInstances = [],
   onHaInstancesChange,
+  haInstanceStatus = {},
   driverLiveValues = { modbus: {}, ha: {} },
   instanceGaPages = {},
   instanceDriverPoints = {},
@@ -805,7 +807,26 @@ export const DriversView: React.FC<DriversViewProps> = ({
               >
                 <div className="flex-shrink-0 relative">
                   <Wifi className="w-4 h-4" />
-                  <div className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${instance.enabled ? 'bg-green-500' : 'bg-slate-500'}`} />
+                  <div
+                    className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${
+                      !instance.enabled
+                        ? 'bg-slate-500'
+                        : haInstanceStatus[instance.id]?.online
+                          ? 'bg-green-500'
+                          : haInstanceStatus[instance.id]?.online === false
+                            ? 'bg-red-500'
+                            : 'bg-amber-500'
+                    }`}
+                    title={
+                      !instance.enabled
+                        ? 'Deaktiviert'
+                        : haInstanceStatus[instance.id]?.online
+                          ? 'Online'
+                          : haInstanceStatus[instance.id]?.online === false
+                            ? 'Offline'
+                            : 'Wird geprüft...'
+                    }
+                  />
                 </div>
                 <div className="text-left min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{instance.name}</div>
@@ -1297,6 +1318,7 @@ export const DriversView: React.FC<DriversViewProps> = ({
             <HomeAssistantDriverPanel
               key={selectedInstance.id}
               instance={selectedInstance}
+              onlineStatus={haInstanceStatus[selectedInstance.id]}
               liveValues={driverLiveValues.ha}
               onDelete={(id) => { handleDeleteHaInstance(id); setSelectedDriverType('homeassistant'); }}
               onToggle={handleToggleHaInstance}

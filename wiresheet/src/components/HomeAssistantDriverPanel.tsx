@@ -80,6 +80,7 @@ interface InstanceData {
 
 interface HomeAssistantDriverPanelProps {
   instance: HaInstance;
+  onlineStatus?: { online: boolean; lastSeen?: number; lastChecked?: number };
   liveValues?: Record<string, { state: string; attributes: Record<string, unknown> }>;
   onDelete: (id: string) => void;
   onToggle: (id: string) => void;
@@ -711,6 +712,7 @@ type TabType = 'entities' | 'ga-control' | 'driver-points' | 'visus';
 
 export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> = ({
   instance,
+  onlineStatus,
   liveValues,
   onDelete,
   onToggle,
@@ -864,10 +866,11 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
   useEffect(() => {
     if (activeTab !== 'ga-control') return;
     const interval = setInterval(() => {
+      if (onlineStatus?.online === false) return;
       loadGaControl(true);
     }, 3000);
     return () => clearInterval(interval);
-  }, [activeTab, loadGaControl]);
+  }, [activeTab, loadGaControl, onlineStatus?.online]);
 
   const handleTest = async () => {
     setTesting(true);
@@ -921,7 +924,26 @@ export const HomeAssistantDriverPanel: React.FC<HomeAssistantDriverPanelProps> =
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <div className="relative shrink-0">
               <Wifi className="w-5 h-5 text-cyan-400" />
-              <div className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${instance.enabled ? 'bg-green-500' : 'bg-slate-500'}`} />
+              <div
+                className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-800 ${
+                  !instance.enabled
+                    ? 'bg-slate-500'
+                    : onlineStatus?.online
+                      ? 'bg-green-500'
+                      : onlineStatus?.online === false
+                        ? 'bg-red-500'
+                        : 'bg-amber-500'
+                }`}
+                title={
+                  !instance.enabled
+                    ? 'Deaktiviert'
+                    : onlineStatus?.online
+                      ? 'Online'
+                      : onlineStatus?.online === false
+                        ? 'Offline'
+                        : 'Wird geprüft...'
+                }
+              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

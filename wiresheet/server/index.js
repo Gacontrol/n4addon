@@ -110,6 +110,7 @@ let isPollingRunning = false;
 let lastFullPollTime = 0;
 const lastSentDriverValues = { modbus: {}, ha: {} };
 const modbusDeviceOnlineStatus = new Map();
+const haInstanceOnlineStatus = new Map();
 
 async function pingModbusDevice(device) {
   const net = require('net');
@@ -197,13 +198,19 @@ async function pollAllDrivers() {
   }
 
   const extraInstances = (driverConfig.haInstances || []).filter(i => i.enabled && i.url && i.token);
+  const currentInstanceIds = new Set(extraInstances.map(i => i.id));
+  for (const id of Array.from(haInstanceOnlineStatus.keys())) {
+    if (!currentInstanceIds.has(id)) haInstanceOnlineStatus.delete(id);
+  }
   for (const instance of extraInstances) {
+    let reachable = false;
     try {
       const haRes = await fetch(`${instance.url}/api/states`, {
         headers: { Authorization: `Bearer ${instance.token}` },
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(5000)
       });
       if (haRes.ok) {
+        reachable = true;
         const states = await haRes.json();
         for (const entity of states) {
           haLiveValues.set(`${instance.id}:${entity.entity_id}`, {
@@ -212,9 +219,16 @@ async function pollAllDrivers() {
           });
         }
       }
-    } catch (err) {
-      console.log(`HA extra instance poll error [${instance.name}]: ${err.message}`);
-    }
+    } catch {}
+    const prev = haInstanceOnlineStatus.get(instance.id);
+    const consecutiveFailures = reachable ? 0 : ((prev?.consecutiveFailures || 0) + 1);
+    const online = reachable ? true : (consecutiveFailures < 2 ? (prev?.online ?? false) : false);
+    haInstanceOnlineStatus.set(instance.id, {
+      online,
+      lastSeen: reachable ? Date.now() : (prev?.lastSeen),
+      lastChecked: Date.now(),
+      consecutiveFailures
+    });
   }
 
   const hasRemoteBindings = (driverConfig.driverBindings || []).some(b =>
@@ -300,6 +314,7 @@ async function pollAllDrivers() {
     }
   }
   broadcastSSE('modbus-device-status', Object.fromEntries(modbusDeviceOnlineStatus));
+  broadcastSSE('ha-instance-status', Object.fromEntries(haInstanceOnlineStatus));
   } catch (err) {
     console.error('pollAllDrivers error:', err.message);
   } finally {
@@ -830,6 +845,10 @@ app.get(['/modbus-device-status', '/api/modbus-device-status'], (req, res) => {
   res.json(Object.fromEntries(modbusDeviceOnlineStatus));
 });
 
+app.get(['/ha-instance-status', '/api/ha-instance-status'], (req, res) => {
+  res.json(Object.fromEntries(haInstanceOnlineStatus));
+});
+
 app.post(['/driver-config', '/api/driver-config'], async (req, res) => {
   try {
     const cfg = req.body;
@@ -1231,6 +1250,36 @@ app.get(['/ha/instances/:instanceId/visu-pages', '/api/ha/instances/:instanceId/
   } catch (err) {
     console.log(`[visu-pages] RESULT ERROR: ${err.message}`);
     res.json({ pages: [], visuBaseUrl, error: err.message });
+  }
+});
+
+app.get(['/ha/instances/:instanceId/alarm-config', '/api/ha/instances/:instanceId/alarm-config'], async (req, res) => {
+  const { instanceId } = req.params;
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  try {
+    const apiBase = await resolveRemoteGaApiBase(instance);
+    if (!apiBase) return res.status(502).json({ error: 'Wiresheet-Addon auf Zielinstanz nicht gefunden' });
+    const headers = { Authorization: `Bearer ${instance.token}` };
+    const r = await fetch(`${apiBase}/api/alarm-config`, { headers, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return res.status(r.status).json({ error: `Remote antwortete mit ${r.status}` });
+    const data = await r.json();
+    res.json({
+      instanceId,
+      instanceName: instance.name,
+      alarmClasses: data.alarmClasses || [],
+      alarmConsoles: data.alarmConsoles || [],
+      activeAlarms: data.activeAlarms || [],
+      alarmHistory: data.alarmHistory || []
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message || 'Remote fetch failed' });
   }
 });
 
@@ -5107,6 +5156,7 @@ function setupWSServer(httpServer) {
         if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'state', data: { liveValues, nodeConfigs } }));
         if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'driver-values', data: { modbus: Object.fromEntries(modbusLiveValues), ha: Object.fromEntries(haLiveValues) } }));
         if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'modbus-device-status', data: Object.fromEntries(modbusDeviceOnlineStatus) }));
+        if (ws.readyState === 1) ws.send(JSON.stringify({ event: 'ha-instance-status', data: Object.fromEntries(haInstanceOnlineStatus) }));
       } catch {}
     })();
     const heartbeat = setInterval(() => {

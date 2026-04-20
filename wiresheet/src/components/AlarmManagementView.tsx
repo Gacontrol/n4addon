@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Bell, Plus, Trash2, CreditCard as Edit2, Check, X, AlertTriangle, AlertCircle, Info, ChevronDown, ChevronRight, Monitor, Settings, Cpu } from 'lucide-react';
 import { AlarmClass, AlarmConsole, AlarmPriority, ActiveAlarm } from '../types/alarm';
-import { FlowNode, WiresheetPage } from '../types/flow';
+import { FlowNode, WiresheetPage, HaInstance } from '../types/flow';
+import { RemoteInstanceAlarms } from '../hooks/useRemoteAlarms';
 
 interface AlarmManagementViewProps {
   alarmClasses: AlarmClass[];
@@ -17,6 +18,8 @@ interface AlarmManagementViewProps {
   onClearAlarm: (alarmId: string) => void;
   pages?: WiresheetPage[];
   onUpdateNodeConfig?: (pageId: string, nodeId: string, config: Record<string, unknown>) => void;
+  haInstances?: HaInstance[];
+  remoteAlarms?: RemoteInstanceAlarms[];
 }
 
 const PRIORITY_CONFIG: Record<AlarmPriority, { label: string; color: string; icon: React.ReactNode }> = {
@@ -52,7 +55,9 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
   onAcknowledgeAlarm,
   onClearAlarm,
   pages = [],
-  onUpdateNodeConfig
+  onUpdateNodeConfig,
+  haInstances = [],
+  remoteAlarms = []
 }) => {
   const [activeTab, setActiveTab] = useState<'classes' | 'consoles' | 'active' | 'sources'>('classes');
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
@@ -121,6 +126,23 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
 
   const getAlarmCountForClass = (classId: string) => {
     return activeAlarms.filter(a => a.alarmClassId === classId).length;
+  };
+
+  const combinedActiveAlarms = useMemo(() => {
+    const local = activeAlarms.map(a => ({ alarm: a, instanceId: null as string | null, instanceName: 'Lokal' }));
+    const remote: { alarm: ActiveAlarm; instanceId: string; instanceName: string }[] = [];
+    for (const ri of remoteAlarms) {
+      for (const a of ri.activeAlarms) {
+        remote.push({ alarm: a, instanceId: ri.instanceId, instanceName: ri.instanceName });
+      }
+    }
+    return [...local, ...remote];
+  }, [activeAlarms, remoteAlarms]);
+
+  const resolveAlarmClassFor = (alarmClassId: string, instanceId: string | null) => {
+    if (!instanceId) return alarmClasses.find(ac => ac.id === alarmClassId);
+    const ri = remoteAlarms.find(r => r.instanceId === instanceId);
+    return ri?.alarmClasses.find(ac => ac.id === alarmClassId) || alarmClasses.find(ac => ac.id === alarmClassId);
   };
 
   const getAlarmCountForConsole = (consoleId: string) => {
@@ -417,6 +439,53 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                 ))}
               </div>
             )}
+
+            {remoteAlarms.length > 0 && (
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-sm font-semibold text-slate-200">Alarmklassen weiterer Controller</h3>
+                </div>
+                {remoteAlarms.map(ri => (
+                  <div key={ri.instanceId} className="bg-slate-800/40 border border-slate-700 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${ri.online && !ri.error ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <span className="text-sm font-medium text-white">{ri.instanceName}</span>
+                        <span className="text-[10px] text-slate-500">({ri.alarmClasses.length} Klassen)</span>
+                      </div>
+                      {ri.error && <span className="text-[10px] text-red-400">{ri.error}</span>}
+                    </div>
+                    {ri.alarmClasses.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">Keine Alarmklassen verfügbar.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {ri.alarmClasses.map(ac => {
+                          const remoteCount = ri.activeAlarms.filter(a => a.alarmClassId === ac.id).length;
+                          return (
+                            <div key={ac.id} className="flex items-center gap-3 px-3 py-2 bg-slate-900 rounded-lg border border-slate-700">
+                              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ac.color }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm text-white truncate">{ac.name}</div>
+                                {ac.description && <div className="text-[11px] text-slate-500 truncate">{ac.description}</div>}
+                              </div>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                                {PRIORITY_CONFIG[ac.priority]?.label || ac.priority}
+                              </span>
+                              {remoteCount > 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/40 text-red-300">
+                                  {remoteCount} aktiv
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -552,15 +621,15 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
               <div>
                 <h2 className="text-xl font-semibold text-white">Aktive Alarme</h2>
                 <p className="text-sm text-slate-400 mt-1">
-                  {activeAlarms.length === 0
+                  {combinedActiveAlarms.length === 0
                     ? 'Keine aktiven Alarme vorhanden.'
-                    : `${activeAlarms.length} aktive${activeAlarms.length === 1 ? 'r Alarm' : ' Alarme'}`
+                    : `${combinedActiveAlarms.length} aktive${combinedActiveAlarms.length === 1 ? 'r Alarm' : ' Alarme'}${haInstances.length > 0 ? ` (${activeAlarms.length} lokal, ${combinedActiveAlarms.length - activeAlarms.length} remote)` : ''}`
                   }
                 </p>
               </div>
             </div>
 
-            {activeAlarms.length === 0 ? (
+            {combinedActiveAlarms.length === 0 ? (
               <div className="text-center py-12 bg-slate-800/50 rounded-xl border border-dashed border-slate-600">
                 <Check className="w-12 h-12 text-green-500 mx-auto mb-3" />
                 <p className="text-green-400 font-medium">Alles in Ordnung</p>
@@ -568,13 +637,14 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {activeAlarms
-                  .sort((a, b) => b.triggeredAt - a.triggeredAt)
-                  .map(alarm => {
-                    const alarmClass = alarmClasses.find(ac => ac.id === alarm.alarmClassId);
+                {combinedActiveAlarms
+                  .sort((a, b) => b.alarm.triggeredAt - a.alarm.triggeredAt)
+                  .map(({ alarm, instanceId, instanceName }) => {
+                    const alarmClass = resolveAlarmClassFor(alarm.alarmClassId, instanceId);
+                    const isRemote = !!instanceId;
                     return (
                       <div
-                        key={alarm.id}
+                        key={`${instanceId || 'local'}-${alarm.id}`}
                         className={`bg-slate-800 rounded-xl p-4 border-l-4 ${
                           alarm.state === 'acknowledged' ? 'opacity-70' : ''
                         }`}
@@ -593,9 +663,14 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                               )}
                             </div>
                             <div>
-                              <p className="text-white font-medium">{alarm.alarmText}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-white font-medium">{alarm.alarmText || alarm.message || 'Alarm'}</p>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${isRemote ? 'bg-cyan-900/50 text-cyan-300 border border-cyan-700/50' : 'bg-slate-700 text-slate-300'}`}>
+                                  {isRemote ? <><Cpu className="w-2.5 h-2.5 inline mr-1" />{instanceName}</> : 'Lokal'}
+                                </span>
+                              </div>
                               <p className="text-xs text-slate-400 mt-1">
-                                Quelle: {alarm.sourceNodeName} | Klasse: {alarmClass?.name || 'Unbekannt'}
+                                Quelle: {alarm.sourceNodeName || alarm.sourceNodeId} | Klasse: {alarmClass?.name || 'Unbekannt'}
                               </p>
                               <p className="text-xs text-slate-500 mt-0.5">
                                 Ausgeloest: {new Date(alarm.triggeredAt).toLocaleString('de-DE')}
@@ -606,7 +681,7 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {alarm.state === 'active' && (
+                            {!isRemote && alarm.state === 'active' && (
                               <button
                                 onClick={() => onAcknowledgeAlarm(alarm.id)}
                                 className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs rounded-lg transition-colors"
@@ -614,12 +689,14 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                                 Quittieren
                               </button>
                             )}
-                            <button
-                              onClick={() => onClearAlarm(alarm.id)}
-                              className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded-lg transition-colors"
-                            >
-                              Loeschen
-                            </button>
+                            {!isRemote && (
+                              <button
+                                onClick={() => onClearAlarm(alarm.id)}
+                                className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded-lg transition-colors"
+                              >
+                                Loeschen
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
