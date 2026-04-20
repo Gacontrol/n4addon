@@ -190,9 +190,20 @@ function DPRow({ dp, onChange, onDelete }: DPRowProps) {
   );
 }
 
-export function RoomConfigPage() {
-  const { buildingId, roomId } = useParams<{ buildingId: string; roomId: string }>();
+interface RoomConfigPageProps {
+  buildingId?: string;
+  roomId?: string;
+  onBack?: () => void;
+  onOpenMonitor?: () => void;
+}
+
+export function RoomConfigPage({ buildingId: propBuildingId, roomId: propRoomId, onBack, onOpenMonitor }: RoomConfigPageProps) {
+  const params = useParams<{ buildingId: string; roomId: string }>();
   const navigate = useNavigate();
+  const buildingId = propBuildingId ?? params.buildingId;
+  const roomId = propRoomId ?? params.roomId;
+  const handleBack = onBack ?? (() => navigate(-1));
+  const handleOpenMonitor = onOpenMonitor ?? (() => navigate(`/building/${buildingId}/room/${roomId}/monitor`));
   const { buildings, monitorConfigs, saveRoomMonitorConfig } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
@@ -252,7 +263,7 @@ export function RoomConfigPage() {
       <div className="flex h-screen bg-slate-950 text-slate-200 items-center justify-center">
         <div className="text-center">
           <p className="text-slate-400 mb-4">Raum nicht gefunden</p>
-          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">Zurück</button>
+          <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">Zurück</button>
         </div>
       </div>
     );
@@ -262,12 +273,12 @@ export function RoomConfigPage() {
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden">
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-3">
         <div className="flex items-center gap-3 mb-2">
-          <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={handleBack} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
             <ArrowLeft size={16} />
           </button>
           <Breadcrumbs items={[
-            { label: building.name, path: `/building/${buildingId}/monitor`, icon: 'building' },
-            { label: room.name, path: `/building/${buildingId}/room/${roomId}/monitor`, icon: 'room' },
+            { label: building.name, onClick: handleBack, icon: 'building' },
+            { label: room.name, onClick: handleOpenMonitor, icon: 'room' },
             { label: 'Konfiguration' },
           ]} />
         </div>
@@ -278,7 +289,7 @@ export function RoomConfigPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate(`/building/${buildingId}/room/${roomId}/monitor`)}
+              onClick={handleOpenMonitor}
               className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 transition-colors"
             >
               Abbrechen

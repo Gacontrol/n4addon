@@ -5,7 +5,6 @@ import {
   Users, AlertTriangle, Zap, TrendingUp, TrendingDown, Minus,
   Clock, RefreshCw, ChevronRight, Box
 } from 'lucide-react';
-import { Room } from '../types/building';
 import { DataPoint, DataPointCategory } from '../types/bms';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
@@ -205,9 +204,20 @@ function PointRow({ dp, onWrite }: { dp: DataPoint; onWrite?: (v: number) => voi
   );
 }
 
-export function RoomMonitorPage() {
-  const { buildingId, roomId } = useParams<{ buildingId: string; roomId: string }>();
+interface RoomMonitorPageProps {
+  buildingId?: string;
+  roomId?: string;
+  onBack?: () => void;
+  onOpenConfig?: () => void;
+}
+
+export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId, onBack, onOpenConfig }: RoomMonitorPageProps) {
+  const params = useParams<{ buildingId: string; roomId: string }>();
   const navigate = useNavigate();
+  const buildingId = propBuildingId ?? params.buildingId;
+  const roomId = propRoomId ?? params.roomId;
+  const handleBack = onBack ?? (() => navigate(`/building/${buildingId}/monitor`));
+  const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
   const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'alarms' | 'trends'>('overview');
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const { buildings } = useBuildingContext();
@@ -235,7 +245,7 @@ export function RoomMonitorPage() {
       <div className="flex h-screen bg-slate-950 text-slate-200 items-center justify-center">
         <div className="text-center">
           <p className="text-slate-400 mb-4">Raum nicht gefunden</p>
-          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+          <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
             Zurück
           </button>
         </div>
@@ -248,14 +258,14 @@ export function RoomMonitorPage() {
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-3">
         <div className="flex items-center gap-3 mb-2">
           <button
-            onClick={() => navigate(`/building/${buildingId}/monitor`)}
+            onClick={handleBack}
             className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
           >
             <ArrowLeft size={16} />
           </button>
           <Breadcrumbs items={[
-            { label: building.name, path: `/building/${buildingId}/monitor`, icon: 'building' },
-            { label: floor.name, path: `/building/${buildingId}/monitor`, icon: 'floor' },
+            { label: building.name, onClick: handleBack, icon: 'building' },
+            { label: floor.name, onClick: handleBack, icon: 'floor' },
             { label: room.name, icon: 'room' },
           ]} />
         </div>
@@ -285,7 +295,7 @@ export function RoomMonitorPage() {
               <RefreshCw size={14} />
             </button>
             <button
-              onClick={() => navigate(`/building/${buildingId}/room/${roomId}/config`)}
+              onClick={handleOpenConfig}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
             >
               <Settings size={13} />

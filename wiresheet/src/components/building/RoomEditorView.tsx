@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Plus, Trash2, CreditCard as Edit3, Check, X, MousePointer, Hexagon, Settings, ChevronDown, Layers, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { Building, Floor, Room, RoomType } from '../../types/building';
-import { useNavigate } from 'react-router-dom';
 
 interface Point { x: number; y: number }
 
@@ -29,10 +28,11 @@ function snapToGrid(v: number): number {
 interface RoomEditorViewProps {
   building: Building;
   onUpdateBuilding: (b: Building) => void;
+  onOpenRoom?: (roomId: string) => void;
+  onConfigRoom?: (roomId: string) => void;
 }
 
-export function RoomEditorView({ building, onUpdateBuilding }: RoomEditorViewProps) {
-  const navigate = useNavigate();
+export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfigRoom }: RoomEditorViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -453,7 +453,7 @@ export function RoomEditorView({ building, onUpdateBuilding }: RoomEditorViewPro
                 <Edit3 size={13} />
               </button>
               <button
-                onClick={() => navigate(`/building/${building.id}/room/${selectedRoom.id}/config`)}
+                onClick={() => onConfigRoom?.(selectedRoom.id)}
                 className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200 transition-colors"
                 title="Konfigurieren"
               >
@@ -494,13 +494,13 @@ export function RoomEditorView({ building, onUpdateBuilding }: RoomEditorViewPro
               </div>
             </div>
             <button
-              onClick={() => navigate(`/building/${building.id}/room/${selectedRoom.id}/monitor`)}
+              onClick={() => onOpenRoom?.(selectedRoom.id)}
               className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors"
             >
               Raumseite öffnen
             </button>
             <button
-              onClick={() => navigate(`/building/${building.id}/room/${selectedRoom.id}/config`)}
+              onClick={() => onConfigRoom?.(selectedRoom.id)}
               className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors"
             >
               Datenpunkte konfigurieren

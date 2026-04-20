@@ -39,9 +39,22 @@ function interpolateHex(a: string, b: string, t: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${bl.toString(16).padStart(2, '0')}`;
 }
 
-export function BuildingMonitorPage() {
-  const { buildingId } = useParams<{ buildingId: string }>();
+interface BuildingMonitorPageProps {
+  buildingId?: string;
+  onBack?: () => void;
+  onOpenEditor?: () => void;
+  onOpenRoom?: (roomId: string) => void;
+}
+
+export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpenEditor, onOpenRoom }: BuildingMonitorPageProps) {
+  const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
+  const buildingId = propBuildingId ?? params.buildingId;
+
+  const handleBack = onBack ?? (() => navigate('/'));
+  const handleOpenEditor = onOpenEditor ?? (() => navigate(`/building/${buildingId}/editor`));
+  const handleOpenRoom = onOpenRoom ?? ((roomId: string) => navigate(`/building/${buildingId}/room/${roomId}/monitor`));
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFloorFilter, setSelectedFloorFilter] = useState<string>('all');
@@ -73,10 +86,8 @@ export function BuildingMonitorPage() {
   }, [setHoveredRoom]);
 
   const handleRoomClick = useCallback((roomId: string | null) => {
-    if (roomId) {
-      navigate(`/building/${buildingId}/room/${roomId}/monitor`);
-    }
-  }, [buildingId, navigate]);
+    if (roomId) handleOpenRoom(roomId);
+  }, [handleOpenRoom]);
 
   const buildingsWithLayerColors = useMemo(() => {
     if (!building || activeLayer === 'normal') return buildings;
@@ -124,7 +135,7 @@ export function BuildingMonitorPage() {
       <div className="flex h-screen bg-slate-950 items-center justify-center text-slate-400">
         <div className="text-center">
           <p className="mb-4">Gebäude nicht gefunden</p>
-          <button onClick={() => navigate(-1)} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
+          <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
             Zurück
           </button>
         </div>
@@ -136,7 +147,7 @@ export function BuildingMonitorPage() {
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200">
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center gap-3">
         <button
-          onClick={() => navigate('/')}
+          onClick={handleBack}
           className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
         >
           <ArrowLeft size={15} />
@@ -154,7 +165,7 @@ export function BuildingMonitorPage() {
         )}
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => navigate(`/building/${buildingId}/editor`)}
+            onClick={handleOpenEditor}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-200 transition-colors"
           >
             <Edit3 size={12} />
@@ -234,7 +245,7 @@ export function BuildingMonitorPage() {
               {filteredRooms.slice(0, 8).map(({ room, floor }) => (
                 <button
                   key={room.id}
-                  onClick={() => navigate(`/building/${buildingId}/room/${room.id}/monitor`)}
+                  onClick={() => handleOpenRoom(room.id)}
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700 transition-colors text-left"
                 >
                   <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: room.color || '#94a3b8' }} />
@@ -273,7 +284,7 @@ export function BuildingMonitorPage() {
                 return (
                   <button
                     key={room.id}
-                    onClick={() => navigate(`/building/${buildingId}/room/${room.id}/monitor`)}
+                    onClick={() => handleOpenRoom(room.id)}
                     className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-800 transition-colors text-left group"
                   >
                     <span

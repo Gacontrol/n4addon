@@ -10,9 +10,11 @@ type EditorSubMode = '3d' | 'rooms';
 interface BuildingEditorPageProps {
   onBack?: () => void;
   onMonitor?: () => void;
+  onOpenRoom?: (roomId: string) => void;
+  onConfigRoom?: (roomId: string) => void;
 }
 
-export function BuildingEditorPage({ onBack, onMonitor }: BuildingEditorPageProps) {
+export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom }: BuildingEditorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
@@ -98,7 +100,12 @@ export function BuildingEditorPage({ onBack, onMonitor }: BuildingEditorPageProp
         {editorMode === '3d' ? (
           <BuildingView liveValues={{}} />
         ) : (
-          <RoomEditorView building={building} onUpdateBuilding={replaceBuilding} />
+          <RoomEditorView
+            building={building}
+            onUpdateBuilding={replaceBuilding}
+            onOpenRoom={onOpenRoom}
+            onConfigRoom={onConfigRoom}
+          />
         )}
       </div>
     </div>
