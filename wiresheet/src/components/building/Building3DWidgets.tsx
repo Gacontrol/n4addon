@@ -651,23 +651,18 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
           </mesh>
         </group>
       ) : isFireDamper ? (
-        <group position={[0, 0.15 * displaySize, 0]} rotation={[Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.6 * displaySize, 0.6 * displaySize, 0.06]} />
-            <meshStandardMaterial color="#1e293b" metalness={0.6} roughness={0.4} />
-          </mesh>
-          <mesh position={[0, 0, 0.04]} castShadow>
-            <boxGeometry args={[0.52 * displaySize, 0.04, 0.02]} />
-            <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0, 0.04]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <boxGeometry args={[0.52 * displaySize, 0.04, 0.02]} />
-            <meshStandardMaterial color={baseColor} metalness={0.5} roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0, 0.04]} rotation={[0, 0, Math.PI / 4]} castShadow>
-            <boxGeometry args={[0.52 * displaySize * 1.41, 0.04, 0.02]} />
-            <meshStandardMaterial color={alarmActive ? '#ef4444' : baseColor} emissive={new THREE.Color(alarmActive ? '#ef4444' : baseColor)} emissiveIntensity={0.3} metalness={0.4} roughness={0.3} />
-          </mesh>
+        <group position={[0, 0.15 * displaySize, 0]} rotation={[-Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
+          <DamperFlap
+            openPercent={(() => {
+              if (liveValue === true || liveValue === 'true' || liveValue === 'on' || liveValue === 'open' || liveValue === '1') return 100;
+              if (liveValue === false || liveValue === 'false' || liveValue === 'off' || liveValue === 'closed' || liveValue === '0') return 0;
+              const n = typeof liveValue === 'number' ? liveValue : parseFloat(String(liveValue ?? ''));
+              return isFinite(n) ? n : 0;
+            })()}
+            color={alarmActive ? '#ef4444' : baseColor}
+            size={displaySize}
+            shutoff={false}
+          />
         </group>
       ) : isDamper || isShutoffDamper ? (
         <group position={[0, 0.15 * displaySize, 0]} rotation={[-Math.PI / 2, 0, (widget.rotY || 0) * Math.PI / 180]}>
