@@ -15,6 +15,8 @@ import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers, FurnitureItem, FurnitureTemplate, FurnitureCategory } from '../../types/building';
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
+import { RoomDetailsPage } from './RoomDetailsPage';
+import { useRoomDisplayConfig } from '../../hooks/useRoomDisplayConfig';
 import { RoomBindingsPanel } from './RoomBindingsPanel';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
@@ -176,6 +178,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   } = useBuildingEditor();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
+  const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
+  const {
+    buildingState: buildingDisplayState,
+    getConfig: getRoomDisplayConfig,
+    saveRoomConfig: saveRoomDisplayConfig,
+  } = useRoomDisplayConfig(activeBuildingId ?? null);
   const [roomBindingsOpen, setRoomBindingsOpen] = useState(false);
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editingBuildingName, setEditingBuildingName] = useState('');
@@ -2607,6 +2615,13 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         <span className="text-xs text-slate-400">{selectedRoom.color}</span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => setRoomDetailsOpen(true)}
+                      className="w-full flex items-center justify-center gap-1.5 px-2 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded text-xs font-semibold transition-all border border-slate-600"
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      Raum-Details öffnen
+                    </button>
                     <div className="pt-2 border-t border-slate-700">
                       <div className="text-[10px] text-slate-500 mb-1">Fläche</div>
                       <div className="text-sm font-semibold text-slate-200">{(selectedRoom.width * selectedRoom.depth).toFixed(1)} m²</div>
@@ -2960,6 +2975,28 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     ))}
                   </>
                 );
+      {roomDetailsOpen && activeBuilding && activeFloor && selectedRoom && (
+        <RoomDetailsPage
+          building={activeBuilding}
+          floor={activeFloor}
+          room={selectedRoom}
+          initialConfig={getRoomDisplayConfig(selectedRoom.id)}
+          datapointGroups={logicPageGroups}
+          datapointLabels={datapointLabels}
+          liveValues={liveValues as Record<string, unknown>}
+          buildingMode={buildingDisplayState.mode}
+          onSave={(cfg) => { saveRoomDisplayConfig(cfg); }}
+          onDelete={() => {
+            if (activeBuilding && activeFloor) {
+              deleteRoom(activeBuilding.id, activeFloor.id, selectedRoom.id);
+              setRoomDetailsOpen(false);
+            }
+          }}
+          onClose={() => setRoomDetailsOpen(false)}
+          onOpenBindings={() => { setRoomDetailsOpen(false); setRoomBindingsOpen(true); }}
+        />
+      )}
+
               })()}
             </div>
           </div>

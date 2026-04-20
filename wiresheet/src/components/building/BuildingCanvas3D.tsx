@@ -1047,6 +1047,7 @@ interface BuildingSceneProps {
   isolateActiveFloor?: boolean;
   onFloorClick?: (floorId: string, cx: number, baseY: number, cz: number, floorHeight: number, minX: number, maxX: number, minZ: number, maxZ: number) => void;
   onRoomZoom?: (cx: number, baseY: number, cz: number, w: number, d: number, h: number) => void;
+  buildingMode?: import('../../types/building').BuildingDisplayMode;
 }
 
 function BuildingScene({
@@ -1056,7 +1057,8 @@ function BuildingScene({
   onPlaceWidget, widgetPlacementMode,
   liveValues = {}, alarmStates = {}, datapointLabels = {},
   highlightFloor, lighting, floorTransparent, showGrid = true, explosion, wallsTransparent = false, xrayOpacity = 0.2,
-  visibleLayers, isolateActiveFloor = false, onFloorClick, onRoomZoom
+  visibleLayers, isolateActiveFloor = false, onFloorClick, onRoomZoom,
+  buildingMode = 'normal',
 }: BuildingSceneProps) {
   const elements: JSX.Element[] = [];
   let allSize = 20;
@@ -1611,6 +1613,7 @@ export function BuildingCanvas3D({
             explosion={explosion}
             onFloorClick={onFloorClick}
             onRoomZoom={onRoomZoom}
+            buildingMode={buildingMode}
           />
         </Suspense>
 
