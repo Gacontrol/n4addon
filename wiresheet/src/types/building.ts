@@ -58,6 +58,45 @@ export interface Window2D {
   sillHeight: number;
 }
 
+export type DataPointCategory =
+  | 'temperature'
+  | 'humidity'
+  | 'co2'
+  | 'airflow'
+  | 'pressure'
+  | 'occupancy'
+  | 'alarm'
+  | 'energy'
+  | 'setpoint'
+  | 'mode'
+  | 'valve'
+  | 'generic';
+
+export type RoomDataPointDisplay = 'tile' | 'badge' | 'trend' | 'icon' | 'gauge' | 'value';
+
+export interface RoomDataPointBinding {
+  id: string;
+  datapoint: string;
+  label?: string;
+  category: DataPointCategory;
+  unit?: string;
+  icon?: string;
+  display: RoomDataPointDisplay;
+  showInRoom: boolean;
+  showInBuilding: boolean;
+  writable?: boolean;
+  minValue?: number;
+  maxValue?: number;
+  order: number;
+}
+
+export interface RoomDisplayConfig {
+  primaryBuildingPoint?: string;
+  primaryRoomPoint?: string;
+  accent?: string;
+  iconOverride?: string;
+}
+
 export interface Room {
   id: string;
   name: string;
@@ -70,6 +109,34 @@ export interface Room {
   doors: Door[];
   windows: Window2D[];
   points?: { x: number; y: number }[];
+  description?: string;
+  hidden?: boolean;
+  number?: string;
+  setpointHeating?: number;
+  setpointCooling?: number;
+  bindings?: RoomDataPointBinding[];
+  displayConfig?: RoomDisplayConfig;
+  tags?: string[];
+}
+
+export type BuildingDisplayMode =
+  | 'normal'
+  | 'temperature'
+  | 'co2'
+  | 'humidity'
+  | 'alarm'
+  | 'presence'
+  | 'mode'
+  | 'airflow'
+  | 'energy';
+
+export interface BuildingDisplayModeConfig {
+  id: BuildingDisplayMode;
+  label: string;
+  icon: string;
+  category: DataPointCategory | 'neutral';
+  description: string;
+  colorScale: { stops: Array<{ at: number; color: string }>; min: number; max: number; unit: string };
 }
 
 // ---- 3D Widgets ----

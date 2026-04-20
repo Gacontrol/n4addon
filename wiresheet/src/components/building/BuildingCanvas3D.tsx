@@ -3,6 +3,7 @@ import { Canvas, useThree, useFrame, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
+import { computeRoomColor } from '../../utils/buildingModes';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
 import { FurnitureMesh } from './Furniture3D';
 
@@ -75,6 +76,7 @@ interface Props {
   isolateActiveFloor?: boolean;
   autoRotate?: boolean;
   autoRotateSpeed?: number;
+  buildingMode?: import('../../types/building').BuildingDisplayMode;
   lockTarget?: boolean;
   focusDuctId?: string | null;
   compact?: boolean;
@@ -1168,8 +1170,11 @@ function BuildingScene({
 
       for (const room of floor.rooms) {
         if (!flLayers.rooms || !layerEnabled('rooms')) break;
+        if (room.hidden) continue;
         const roomCX = room.x + offsetX + room.width / 2;
         const roomCZ = room.y + room.depth / 2;
+        const modeResult = computeRoomColor(room, buildingMode, liveValues as Record<string, unknown>);
+        const effectiveColor = buildingMode === 'normal' ? room.color : modeResult.color;
         const handleRoomClick = shouldIsolate && onRoomZoom
           ? () => {
               onSelectRoom(room.id);
@@ -1187,7 +1192,7 @@ function BuildingScene({
               offsetX={offsetX}
               baseY={baseY}
               height={floor.height}
-              color={room.color}
+              color={effectiveColor}
               selected={room.id === selectedRoomId}
               faded={faded}
               onSelect={handleRoomClick}
@@ -1203,7 +1208,7 @@ function BuildingScene({
               width={room.width}
               depth={room.depth}
               height={floor.height}
-              color={room.color}
+              color={effectiveColor}
               selected={room.id === selectedRoomId}
               faded={faded}
               onSelect={handleRoomClick}
@@ -1524,6 +1529,7 @@ export function BuildingCanvas3D({
   isolateActiveFloor = false,
   autoRotate = false,
   autoRotateSpeed = 1.0,
+  buildingMode = 'normal',
   lockTarget = false,
   focusDuctId,
   compact = false,

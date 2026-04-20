@@ -10,6 +10,7 @@ import {
 import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING, ExplosionSettings, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
+import { BuildingModeSelector } from './BuildingModeSelector';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
 import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Widget3D, Widget3DType, Duct, Pipe, DuctType, PipeType, DuctShape, Slab, DEFAULT_LAYERS, FloorLayers, FurnitureItem, FurnitureTemplate, FurnitureCategory } from '../../types/building';
@@ -196,6 +197,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [explosion, setExplosion] = useState<ExplosionSettings>(DEFAULT_EXPLOSION);
   const [showExplosionPanel, setShowExplosionPanel] = useState(false);
   const [autoRotate3D, setAutoRotate3D] = useState(false);
+  const [buildingMode, setBuildingMode] = useState<import('../../types/building').BuildingDisplayMode>('normal');
 
   const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
   const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
@@ -1072,7 +1074,11 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   onPlaceWidget={handlePlaceWidget}
                   explosion={explosion}
                   autoRotate={autoRotate3D}
+                  buildingMode={buildingMode}
                 />
+                <div className="absolute top-3 left-3 z-10 max-w-md">
+                  <BuildingModeSelector mode={buildingMode} onChange={setBuildingMode} />
+                </div>
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
                     <div className="flex items-center justify-between mb-1">
