@@ -17,6 +17,8 @@ import { Room, RoomType, Wall, WallOpening, WallOpeningType, BackgroundImage, Wi
 import { WIDGET_COLORS, WIDGET_LABELS } from './Building3DWidgets';
 import { RoomDetailsPage } from './RoomDetailsPage';
 import { useRoomDisplayConfig } from '../../hooks/useRoomDisplayConfig';
+import { useAppMode } from '../../hooks/useAppMode';
+import { AppModeToggle } from './AppModeToggle';
 import { RoomBindingsPanel } from './RoomBindingsPanel';
 import { HaEntity, WiresheetPage } from '../../types/flow';
 
@@ -179,10 +181,15 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
   const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
+  const { mode: appMode, setMode: setAppMode } = useAppMode();
+  useEffect(() => {
+    if (appMode === 'editor') setShowRoomPanel(true);
+  }, [appMode]);
   const {
     buildingState: buildingDisplayState,
     getConfig: getRoomDisplayConfig,
     saveRoomConfig: saveRoomDisplayConfig,
+    setBuildingMode: setBuildingDisplayMode,
   } = useRoomDisplayConfig(activeBuildingId ?? null);
   const [roomBindingsOpen, setRoomBindingsOpen] = useState(false);
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
@@ -206,6 +213,20 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [showExplosionPanel, setShowExplosionPanel] = useState(false);
   const [autoRotate3D, setAutoRotate3D] = useState(false);
   const [buildingMode, setBuildingMode] = useState<import('../../types/building').BuildingDisplayMode>('normal');
+  useEffect(() => {
+    const map: Record<string, import('../../types/building').BuildingDisplayMode> = {
+      none: 'normal',
+      temperature: 'temperature',
+      co2: 'co2',
+      humidity: 'humidity',
+      alarm: 'alarm',
+      presence: 'presence',
+      mode: 'mode',
+      custom: 'normal',
+    };
+    const next = map[buildingDisplayState.mode] ?? 'normal';
+    setBuildingMode(next);
+  }, [buildingDisplayState.mode]);
 
   const [selectedDuctId, setSelectedDuctId] = useState<string | null>(null);
   const [selectedPipeId, setSelectedPipeId] = useState<string | null>(null);
@@ -1057,7 +1078,15 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedWidget3DId={selectedWidget3DId}
                   selectedDuctId={selectedDuctId}
                   selectedPipeId={selectedPipeId}
-                  onSelectRoom={id => { setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectRoom={id => {
+                    setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null);
+                    if (id) {
+                      if (appMode === 'monitor' || appMode === 'service') setRoomDetailsOpen(true);
+                      else setShowRoomPanel(true);
+                    } else {
+                      setShowRoomPanel(true);
+                    }
+                  }}
                   onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
                   onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
                   onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
@@ -1084,8 +1113,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   autoRotate={autoRotate3D}
                   buildingMode={buildingMode}
                 />
-                <div className="absolute top-3 left-3 z-10 max-w-md">
-                  <BuildingModeSelector mode={buildingMode} onChange={setBuildingMode} />
+                <div className="absolute top-3 left-3 z-10 flex items-center gap-2 flex-wrap max-w-3xl">
+                  <AppModeToggle mode={appMode} onChange={setAppMode} />
+                  {appMode !== 'editor' && (
+                    <BuildingModeSelector
+                      activeMode={buildingDisplayState.mode}
+                      onChange={(m) => { void setBuildingDisplayMode(m); }}
+                    />
+                  )}
                 </div>
                 {showLightingPanel && (
                   <div className="absolute top-10 right-2 z-20 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 w-52 space-y-2.5">
@@ -2615,13 +2650,24 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         <span className="text-xs text-slate-400">{selectedRoom.color}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setRoomDetailsOpen(true)}
-                      className="w-full flex items-center justify-center gap-1.5 px-2 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded text-xs font-semibold transition-all border border-slate-600"
-                    >
-                      <Activity className="w-3.5 h-3.5" />
-                      Raum-Details öffnen
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setRoomDetailsOpen(true)}
+                        className="flex items-center justify-center gap-1.5 px-2 py-2 bg-emerald-700/80 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-all border border-emerald-800 shadow-md"
+                        title="Monitor-Ansicht / KPIs / Trends"
+                      >
+                        <Activity className="w-3.5 h-3.5" />
+                        Monitor
+                      </button>
+                      <button
+                        onClick={() => setRoomBindingsOpen(true)}
+                        className="flex items-center justify-center gap-1.5 px-2 py-2 bg-amber-700/80 hover:bg-amber-600 text-white rounded text-xs font-semibold transition-all border border-amber-800 shadow-md"
+                        title="Raum-Datenpunkte und Anzeige konfigurieren"
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                        Konfig
+                      </button>
+                    </div>
                     <div className="pt-2 border-t border-slate-700">
                       <div className="text-[10px] text-slate-500 mb-1">Fläche</div>
                       <div className="text-sm font-semibold text-slate-200">{(selectedRoom.width * selectedRoom.depth).toFixed(1)} m²</div>
