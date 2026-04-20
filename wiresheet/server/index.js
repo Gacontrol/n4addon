@@ -1263,13 +1263,71 @@ app.get(['/ha/instances/:instanceId/alarm-config', '/api/ha/instances/:instanceI
     } catch {}
   }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
+
+  const emptyPayload = (error) => ({
+    instanceId,
+    instanceName: instance.name,
+    alarmClasses: [],
+    alarmConsoles: [],
+    activeAlarms: [],
+    alarmHistory: [],
+    ...(error ? { error } : {}),
+  });
+
   try {
-    const apiBase = await resolveRemoteGaApiBase(instance);
-    if (!apiBase) return res.status(502).json({ error: 'Wiresheet-Addon auf Zielinstanz nicht gefunden' });
+    let apiBase = await resolveRemoteGaApiBase(instance);
+
+    if (!apiBase) {
+      const base = instance.url.replace(/\/$/, '');
+      const headers = { Authorization: `Bearer ${instance.token}` };
+      const commonSlugs = ['wiresheet', 'ga_control', 'ga-control', 'wiresheet_addon'];
+      for (const slug of commonSlugs) {
+        try {
+          const r = await fetch(`${base}/api/hassio_ingress/${slug}/api/alarm-config`, { headers, signal: AbortSignal.timeout(4000) });
+          if (r.ok) { apiBase = `${base}/api/hassio_ingress/${slug}`; break; }
+        } catch {}
+      }
+      if (!apiBase) {
+        const hostMatch = base.match(/^(https?:\/\/[^:/]+)/);
+        if (hostMatch) {
+          for (const port of [8100, 3000, 8080]) {
+            try {
+              const r = await fetch(`${hostMatch[1]}:${port}/api/alarm-config`, { signal: AbortSignal.timeout(3000) });
+              if (r.ok) { apiBase = `${hostMatch[1]}:${port}`; break; }
+            } catch {}
+          }
+        }
+      }
+    }
+
+    if (!apiBase) {
+      return res.status(200).json(emptyPayload('Wiresheet-Addon auf Zielinstanz nicht gefunden'));
+    }
+
     const headers = { Authorization: `Bearer ${instance.token}` };
-    const r = await fetch(`${apiBase}/api/alarm-config`, { headers, signal: AbortSignal.timeout(6000) });
-    if (!r.ok) return res.status(r.status).json({ error: `Remote antwortete mit ${r.status}` });
-    const data = await r.json();
+    const paths = ['/api/alarm-config', '/alarm-config'];
+    let data = null;
+    let lastStatus = 0;
+    for (const p of paths) {
+      try {
+        const r = await fetch(`${apiBase}${p}`, { headers, signal: AbortSignal.timeout(10000) });
+        lastStatus = r.status;
+        if (r.ok) {
+          const ct = r.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            data = await r.json();
+            break;
+          }
+        }
+      } catch (e) {
+        lastStatus = 0;
+      }
+    }
+
+    if (!data) {
+      return res.status(200).json(emptyPayload(lastStatus ? `Remote antwortete mit ${lastStatus}` : 'Remote nicht erreichbar'));
+    }
+
     res.json({
       instanceId,
       instanceName: instance.name,
@@ -1279,7 +1337,7 @@ app.get(['/ha/instances/:instanceId/alarm-config', '/api/ha/instances/:instanceI
       alarmHistory: data.alarmHistory || []
     });
   } catch (err) {
-    res.status(502).json({ error: err.message || 'Remote fetch failed' });
+    res.status(200).json(emptyPayload(err.message || 'Remote fetch failed'));
   }
 });
 

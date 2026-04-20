@@ -62,7 +62,8 @@ export function useRemoteAlarms(
           online: true,
           alarmClasses: d.alarmClasses || [],
           alarmConsoles: d.alarmConsoles || [],
-          activeAlarms: d.activeAlarms || []
+          activeAlarms: d.activeAlarms || [],
+          ...(d.error ? { error: d.error } : {})
         };
       } catch (err) {
         return {
