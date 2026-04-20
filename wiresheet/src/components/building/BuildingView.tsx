@@ -1535,8 +1535,8 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     datapoint: '',
                     unit: '',
                     x,
-                    y: 0,
-                    z: y,
+                    y,
+                    z: 0,
                     floorId: activeFloor.id,
                     scale: 1,
                     color: WIDGET_COLORS[type] || '#94a3b8',
@@ -1545,9 +1545,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     roomIds: [],
                   } as any);
                 }}
-                onMoveWidget3D={(id, x, z) => {
+                onMoveWidget3D={(id, x, y) => {
                   if (!activeBuilding) return;
-                  updateWidget3D(activeBuilding.id, id, { x, z });
+                  updateWidget3D(activeBuilding.id, id, { x, y });
                 }}
                 onDeleteWidget3D={id => {
                   if (!activeBuilding) return;

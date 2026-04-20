@@ -1441,7 +1441,7 @@ export function FloorPlanEditor({
     if (layers.widgets3d !== false && widgets3d && widgets3d.length > 0) {
       const floorWidgets = widgets3d.filter(w => w.floorId === floor.id);
       for (const w of floorWidgets) {
-        const p = toScreen(w.x, w.z);
+        const p = toScreen(w.x, w.y);
         const isSel = w.id === selectedWidget3DId;
         const color = w.color || '#22d3ee';
         const radius = Math.max(8, 10 * Math.min(zoom, 2));
@@ -2066,7 +2066,7 @@ export function FloorPlanEditor({
           .filter(w => w.floorId === floor.id)
           .find(w => {
             const dx = world.x - w.x;
-            const dy = world.y - w.z;
+            const dy = world.y - w.y;
             return Math.sqrt(dx * dx + dy * dy) < radiusWorld;
           });
         if (hitWidget) {
@@ -2080,7 +2080,7 @@ export function FloorPlanEditor({
               startY: e.clientY,
               widgetId: hitWidget.id,
               widgetOrigX: hitWidget.x,
-              widgetOrigZ: hitWidget.z,
+              widgetOrigZ: hitWidget.y,
             };
           }
           return;
