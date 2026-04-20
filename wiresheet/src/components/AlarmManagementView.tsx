@@ -148,7 +148,15 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
   const getAlarmCountForConsole = (consoleId: string) => {
     const console = alarmConsoles.find(c => c.id === consoleId);
     if (!console) return 0;
-    return activeAlarms.filter(a => console.alarmClassIds.includes(a.alarmClassId)).length;
+    const localCount = activeAlarms.filter(a => console.alarmClassIds.includes(a.alarmClassId)).length;
+    let remoteCount = 0;
+    for (const ri of remoteAlarms) {
+      for (const a of ri.activeAlarms) {
+        const prefixed = `remote:${ri.instanceId}:${a.alarmClassId}`;
+        if (console.alarmClassIds.includes(prefixed)) remoteCount++;
+      }
+    }
+    return localCount + remoteCount;
   };
 
   const alarmSourceNodes = useMemo<AlarmSourceNode[]>(() => {
@@ -532,7 +540,7 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs text-slate-400 mb-2">Alarmklassen</label>
+                    <label className="block text-xs text-slate-400 mb-2">Alarmklassen (lokal)</label>
                     {alarmClasses.length === 0 ? (
                       <p className="text-sm text-slate-500">Erstellen Sie zuerst Alarmklassen.</p>
                     ) : (
@@ -563,6 +571,39 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                         ))}
                       </div>
                     )}
+                    {remoteAlarms.filter(ri => ri.alarmClasses.length > 0).map(ri => (
+                      <div key={ri.instanceId} className="mt-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Cpu className="w-3 h-3 text-cyan-400" />
+                          <span className="text-[11px] text-cyan-300">Remote: {ri.instanceName}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {ri.alarmClasses.map(ac => {
+                            const prefixedId = `remote:${ri.instanceId}:${ac.id}`;
+                            const selected = newConsoleClassIds.includes(prefixedId);
+                            return (
+                              <button
+                                key={prefixedId}
+                                onClick={() => {
+                                  setNewConsoleClassIds(prev =>
+                                    selected ? prev.filter(id => id !== prefixedId) : [...prev, prefixedId]
+                                  );
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border ${
+                                  selected
+                                    ? 'bg-cyan-700 text-white border-cyan-500'
+                                    : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                                }`}
+                              >
+                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ac.color }} />
+                                {ac.name}
+                                {selected && <Check className="w-3 h-3" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
@@ -608,6 +649,7 @@ export const AlarmManagementView: React.FC<AlarmManagementViewProps> = ({
                       setEditingConsoleId(null);
                     }}
                     onDelete={() => onDeleteAlarmConsole(console.id)}
+                    remoteAlarms={remoteAlarms}
                   />
                 ))}
               </div>
@@ -1233,6 +1275,7 @@ interface AlarmConsoleItemProps {
   onCancelEdit: () => void;
   onUpdate: (updates: Partial<AlarmConsole>) => void;
   onDelete: () => void;
+  remoteAlarms?: RemoteInstanceAlarms[];
 }
 
 const AlarmConsoleItem: React.FC<AlarmConsoleItemProps> = ({
@@ -1245,7 +1288,8 @@ const AlarmConsoleItem: React.FC<AlarmConsoleItemProps> = ({
   onEdit,
   onCancelEdit,
   onUpdate,
-  onDelete
+  onDelete,
+  remoteAlarms = []
 }) => {
   const [editName, setEditName] = useState(console.name);
   const [editDescription, setEditDescription] = useState(console.description || '');
@@ -1278,7 +1322,7 @@ const AlarmConsoleItem: React.FC<AlarmConsoleItemProps> = ({
             </div>
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-2">Alarmklassen</label>
+            <label className="block text-xs text-slate-400 mb-2">Alarmklassen (lokal)</label>
             <div className="flex flex-wrap gap-2">
               {alarmClasses.map(ac => (
                 <button
@@ -1305,6 +1349,39 @@ const AlarmConsoleItem: React.FC<AlarmConsoleItemProps> = ({
                 </button>
               ))}
             </div>
+            {remoteAlarms.filter(ri => ri.alarmClasses.length > 0).map(ri => (
+              <div key={ri.instanceId} className="mt-3">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Cpu className="w-3 h-3 text-cyan-400" />
+                  <span className="text-[11px] text-cyan-300">Remote: {ri.instanceName}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ri.alarmClasses.map(ac => {
+                    const prefixedId = `remote:${ri.instanceId}:${ac.id}`;
+                    const selected = editClassIds.includes(prefixedId);
+                    return (
+                      <button
+                        key={prefixedId}
+                        onClick={() => {
+                          setEditClassIds(prev =>
+                            selected ? prev.filter(id => id !== prefixedId) : [...prev, prefixedId]
+                          );
+                        }}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors border ${
+                          selected
+                            ? 'bg-cyan-700 text-white border-cyan-500'
+                            : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                        }`}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ac.color }} />
+                        {ac.name}
+                        {selected && <Check className="w-3 h-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">

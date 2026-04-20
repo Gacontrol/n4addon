@@ -168,6 +168,60 @@ function App() {
   const [haDriverEnabled, setHaDriverEnabled] = useState(true);
   const [haInstances, setHaInstances] = useState<HaInstance[]>([]);
   const remoteAlarms = useRemoteAlarms(haInstances, haInstanceStatus);
+
+  const combinedAlarmClasses = useMemo(() => {
+    const remote = remoteAlarms.flatMap(ri =>
+      ri.alarmClasses.map(ac => ({
+        ...ac,
+        id: `remote:${ri.instanceId}:${ac.id}`,
+        name: `${ac.name} (${ri.instanceName})`,
+        description: ac.description ? `${ac.description} - Remote: ${ri.instanceName}` : `Remote: ${ri.instanceName}`,
+      }))
+    );
+    return [...alarmClasses, ...remote];
+  }, [alarmClasses, remoteAlarms]);
+
+  const combinedActiveAlarms = useMemo(() => {
+    const remote = remoteAlarms.flatMap(ri =>
+      ri.activeAlarms.map(a => ({
+        ...a,
+        id: `remote:${ri.instanceId}:${a.id}`,
+        alarmClassId: `remote:${ri.instanceId}:${a.alarmClassId}`,
+        sourceNodeName: a.sourceNodeName ? `${a.sourceNodeName} @${ri.instanceName}` : `@${ri.instanceName}`,
+      }))
+    );
+    return [...activeAlarms, ...remote];
+  }, [activeAlarms, remoteAlarms]);
+
+  const getApiBaseForAck = useCallback((): string => {
+    const p = window.location.pathname;
+    const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+    return m ? `${m[1]}/api` : '/api';
+  }, []);
+
+  const handleAcknowledgeAlarmCombined = useCallback((alarmId: string) => {
+    if (alarmId.startsWith('remote:')) {
+      const rest = alarmId.slice('remote:'.length);
+      const idx = rest.indexOf(':');
+      if (idx > 0) {
+        const instanceId = rest.slice(0, idx);
+        const remoteAlarmId = rest.slice(idx + 1);
+        const apiBase = getApiBaseForAck();
+        fetch(`${apiBase}/ha/instances/${instanceId}/alarm/acknowledge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alarmId: remoteAlarmId }),
+        }).catch(() => {});
+      }
+      return;
+    }
+    acknowledgeAlarm(alarmId);
+  }, [acknowledgeAlarm, getApiBaseForAck]);
+
+  const handleClearAlarmCombined = useCallback((alarmId: string) => {
+    if (alarmId.startsWith('remote:')) return;
+    clearAlarm(alarmId);
+  }, [clearAlarm]);
   const [haDevices, setHaDevices] = useState<HaDevice[]>([]);
   const [instanceDevices, setInstanceDevices] = useState<Record<string, HaDevice[]>>({});
   const [instanceEntities, setInstanceEntities] = useState<Record<string, HaEntity[]>>({});
@@ -2223,8 +2277,8 @@ function App() {
           onAddAlarmConsole={addAlarmConsole}
           onUpdateAlarmConsole={updateAlarmConsole}
           onDeleteAlarmConsole={deleteAlarmConsole}
-          onAcknowledgeAlarm={acknowledgeAlarm}
-          onClearAlarm={clearAlarm}
+          onAcknowledgeAlarm={handleAcknowledgeAlarmCombined}
+          onClearAlarm={handleClearAlarmCombined}
           pages={pages}
           onUpdateNodeConfig={updateNodeConfigOnPage}
           haInstances={haInstances}
@@ -2253,12 +2307,12 @@ function App() {
           customBlocks={customBlocks.map(b => ({ id: b.id, name: b.name, description: b.description, color: b.color, icon: b.icon, hasVisuPage: !!b.visuPageData }))}
           onWidgetValueChange={handleVisuWidgetValueChange}
           highlightedWidgetId={highlightedWidgetId}
-          alarmClasses={alarmClasses}
+          alarmClasses={combinedAlarmClasses}
           alarmConsoles={alarmConsoles}
-          activeAlarms={activeAlarms}
-          onAcknowledgeAlarm={acknowledgeAlarm}
+          activeAlarms={combinedActiveAlarms}
+          onAcknowledgeAlarm={handleAcknowledgeAlarmCombined}
           onAcknowledgeAll={acknowledgeAll}
-          onClearAlarm={clearAlarm}
+          onClearAlarm={handleClearAlarmCombined}
           onShelveAlarm={shelveAlarm}
           haInstances={haInstances}
         />

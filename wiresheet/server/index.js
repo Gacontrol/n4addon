@@ -886,11 +886,18 @@ app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/stat
     } catch {}
   }
   if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  if (!instance.enabled) {
+    return res.status(200).json({ entities: [], error: 'disabled' });
+  }
+  const statusEntry = haInstanceOnlineStatus.get(instanceId);
+  if (statusEntry && statusEntry.online === false && (statusEntry.consecutiveFailures || 0) >= 2) {
+    return res.status(200).json({ entities: [], error: 'offline' });
+  }
   const base = instance.url.replace(/\/$/, '');
   const headers = { Authorization: `Bearer ${instance.token}` };
   try {
     const statesRes = await fetch(`${base}/api/states`, { headers, signal: AbortSignal.timeout(10000) });
-    if (!statesRes.ok) return res.status(502).json({ error: 'HA request failed', status: statesRes.status });
+    if (!statesRes.ok) return res.status(200).json({ entities: [], error: `HTTP ${statesRes.status}` });
     const states = await statesRes.json();
 
     let deviceMap = new Map();
@@ -938,7 +945,7 @@ app.get(['/ha/instances/:instanceId/states', '/api/ha/instances/:instanceId/stat
     });
     res.json({ entities });
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    res.status(200).json({ entities: [], error: err.message || 'Remote fetch failed' });
   }
 });
 
@@ -1273,6 +1280,14 @@ app.get(['/ha/instances/:instanceId/alarm-config', '/api/ha/instances/:instanceI
     alarmHistory: [],
     ...(error ? { error } : {}),
   });
+
+  if (!instance.enabled) {
+    return res.status(200).json(emptyPayload('disabled'));
+  }
+  const statusEntry = haInstanceOnlineStatus.get(instanceId);
+  if (statusEntry && statusEntry.online === false && (statusEntry.consecutiveFailures || 0) >= 2) {
+    return res.status(200).json(emptyPayload('offline'));
+  }
 
   try {
     let apiBase = await resolveRemoteGaApiBase(instance);
@@ -2359,6 +2374,47 @@ app.post(['/building-config', '/api/building-config'], async (req, res) => {
   } catch (err) {
     console.error('Fehler beim Speichern der Gebäude-Konfiguration:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(['/ha/instances/:instanceId/alarm/acknowledge', '/api/ha/instances/:instanceId/alarm/acknowledge'], async (req, res) => {
+  const { instanceId } = req.params;
+  let instance = (driverConfig.haInstances || []).find(i => i.id === instanceId);
+  if (!instance) {
+    try {
+      const diskData = JSON.parse(await fs.readFile(driverConfigFile, 'utf-8'));
+      if (diskData.haInstances) { driverConfig.haInstances = diskData.haInstances; instance = diskData.haInstances.find(i => i.id === instanceId); }
+    } catch {}
+  }
+  if (!instance) return res.status(404).json({ error: 'Instance not found' });
+  if (!instance.enabled) return res.status(200).json({ success: false, error: 'disabled' });
+  const statusEntry = haInstanceOnlineStatus.get(instanceId);
+  if (statusEntry && statusEntry.online === false && (statusEntry.consecutiveFailures || 0) >= 2) {
+    return res.status(200).json({ success: false, error: 'offline' });
+  }
+  try {
+    const apiBase = await resolveRemoteGaApiBase(instance);
+    if (!apiBase) return res.status(200).json({ success: false, error: 'Wiresheet-Addon auf Zielinstanz nicht gefunden' });
+    const headers = { Authorization: `Bearer ${instance.token}`, 'Content-Type': 'application/json' };
+    const paths = ['/api/alarm/acknowledge', '/alarm/acknowledge'];
+    let ok = false;
+    let lastStatus = 0;
+    for (const p of paths) {
+      try {
+        const r = await fetch(`${apiBase}${p}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(req.body || {}),
+          signal: AbortSignal.timeout(8000),
+        });
+        lastStatus = r.status;
+        if (r.ok) { ok = true; break; }
+      } catch (e) { lastStatus = 0; }
+    }
+    if (!ok) return res.status(200).json({ success: false, error: lastStatus ? `Remote antwortete mit ${lastStatus}` : 'Remote nicht erreichbar' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(200).json({ success: false, error: err.message || 'Remote ack failed' });
   }
 });
 

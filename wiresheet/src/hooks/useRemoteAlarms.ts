@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlarmClass, AlarmConsole, ActiveAlarm } from '../types/alarm';
 import { HaInstance } from '../types/flow';
 
@@ -23,6 +23,13 @@ export function useRemoteAlarms(
   instanceStatus: Record<string, { online: boolean }>
 ): RemoteInstanceAlarms[] {
   const [remote, setRemote] = useState<RemoteInstanceAlarms[]>([]);
+
+  const onlineSignature = useMemo(() => {
+    return haInstances
+      .filter(i => i.enabled && i.url && i.token)
+      .map(i => `${i.id}:${instanceStatus[i.id]?.online !== false ? '1' : '0'}`)
+      .join('|');
+  }, [haInstances, instanceStatus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +101,8 @@ export function useRemoteAlarms(
       cancelled = true;
       clearInterval(interval);
     };
-  }, [haInstances, instanceStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineSignature]);
 
   return remote;
 }
