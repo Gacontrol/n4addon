@@ -30,7 +30,7 @@ import {
 
 function App() {
   const navigate = useNavigate();
-  const { activeBuildingId } = useBuildingContext();
+  const { activeBuildingId, buildings } = useBuildingContext();
 
   const {
     pages,
@@ -1690,7 +1690,7 @@ function App() {
             </button>
             {isAdmin && (
               <button
-                onClick={() => { if (activeBuildingId) navigate(`/building/${activeBuildingId}/editor`); }}
+                onClick={() => { const bid = activeBuildingId || buildings[0]?.id; if (bid) navigate(`/building/${bid}/editor`); }}
                 className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
               >
                 <Building2 className="w-3.5 h-3.5" />
