@@ -6,6 +6,7 @@ import { BuildingCanvas3D } from '../components/building/BuildingCanvas3D';
 import { LayerSelector } from '../components/bms/LayerSelector';
 import { LegendPanel } from '../components/bms/LegendPanel';
 import { RoomTooltip } from '../components/bms/RoomTooltip';
+import { RoomMonitorPage } from './RoomMonitorPage';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
 import { useBuildingContext } from '../context/BuildingContext';
 
@@ -58,6 +59,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFloorFilter, setSelectedFloorFilter] = useState<string>('all');
+  const [openRoomId, setOpenRoomId] = useState<string | null>(null);
   const { buildings } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
@@ -86,8 +88,8 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   }, [setHoveredRoom]);
 
   const handleRoomClick = useCallback((roomId: string | null) => {
-    if (roomId) handleOpenRoom(roomId);
-  }, [handleOpenRoom]);
+    setOpenRoomId(roomId);
+  }, []);
 
   const buildingsWithLayerColors = useMemo(() => {
     if (!building || activeLayer === 'normal') return buildings;
@@ -213,7 +215,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
           <BuildingCanvas3D
             buildings={buildingsWithLayerColors}
             activeFloorId={selectedFloorFilter === 'all' ? null : selectedFloorFilter}
-            selectedRoomId={null}
+            selectedRoomId={openRoomId}
             selectedWallId={null}
             onSelectRoom={handleRoomClick}
             onSelectWall={() => {}}
@@ -245,7 +247,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
               {filteredRooms.slice(0, 8).map(({ room, floor }) => (
                 <button
                   key={room.id}
-                  onClick={() => handleOpenRoom(room.id)}
+                  onClick={() => setOpenRoomId(room.id)}
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-700 transition-colors text-left"
                 >
                   <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: room.color || '#94a3b8' }} />
@@ -284,7 +286,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
                 return (
                   <button
                     key={room.id}
-                    onClick={() => handleOpenRoom(room.id)}
+                    onClick={() => setOpenRoomId(room.id)}
                     className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-800 transition-colors text-left group"
                   >
                     <span
@@ -311,13 +313,23 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
         )}
       </div>
 
-      {hoveredRoom && (
+      {hoveredRoom && !openRoomId && (
         <RoomTooltip
           room={hoveredRoom}
           liveValue={hoveredRoomLiveValue}
           activeLayer={activeLayer}
           x={tooltipPos.x}
           y={tooltipPos.y}
+        />
+      )}
+
+      {openRoomId && (
+        <RoomMonitorPage
+          buildingId={buildingId}
+          roomId={openRoomId}
+          asPanel
+          onBack={() => setOpenRoomId(null)}
+          onOpenConfig={() => navigate(`/building/${buildingId}/room/${openRoomId}/config`)}
         />
       )}
     </div>
