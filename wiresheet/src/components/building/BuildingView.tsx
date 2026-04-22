@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
 import { useBuildingContext } from '../../context/BuildingContext';
-import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING, ExplosionSettings, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
+import { BuildingCanvas3D, LightingSettings, ExplosionSettings } from './BuildingCanvas3D';
+import { useCanvas3DSettings } from '../../hooks/useCanvas3DSettings';
 import { BuildingModeSelector } from './BuildingModeSelector';
 import { FloorPlanEditor } from './FloorPlanEditor';
 import { SectionView } from './SectionView';
@@ -203,16 +204,42 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [expanded3DFloors, setExpanded3DFloors] = useState<Record<string, boolean>>({});
   const [wallThickness, setWallThickness] = useState(0.25);
   const [gridSize, setGridSize] = useState(1);
-  const [bgColor, setBgColor] = useState('#0a1020');
-  const [floorTransparent, setFloorTransparent] = useState(false);
-  const [bgTransparent, setBgTransparent] = useState(false);
-  const [showGrid3D, setShowGrid3D] = useState(true);
-  const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
+  const {
+    settings: canvas3D,
+    updateSettings: setCanvas3D,
+    updateLighting,
+    updateExplosion,
+    resetLighting,
+    resetExplosion,
+  } = useCanvas3DSettings();
+  const bgColor = canvas3D.bgColor;
+  const setBgColor = (v: string) => setCanvas3D('bgColor', v);
+  const floorTransparent = canvas3D.floorTransparent;
+  const setFloorTransparent = (v: boolean | ((p: boolean) => boolean)) =>
+    setCanvas3D('floorTransparent', typeof v === 'function' ? v(canvas3D.floorTransparent) : v);
+  const bgTransparent = canvas3D.bgTransparent;
+  const setBgTransparent = (v: boolean | ((p: boolean) => boolean)) =>
+    setCanvas3D('bgTransparent', typeof v === 'function' ? v(canvas3D.bgTransparent) : v);
+  const showGrid3D = canvas3D.showGrid;
+  const setShowGrid3D = (v: boolean | ((p: boolean) => boolean)) =>
+    setCanvas3D('showGrid', typeof v === 'function' ? v(canvas3D.showGrid) : v);
+  const lighting = canvas3D.lighting;
+  const setLighting = (updater: LightingSettings | ((prev: LightingSettings) => LightingSettings)) => {
+    const next = typeof updater === 'function' ? updater(canvas3D.lighting) : updater;
+    updateLighting(next);
+  };
   const [showLightingPanel, setShowLightingPanel] = useState(false);
-  const [explosion, setExplosion] = useState<ExplosionSettings>(DEFAULT_EXPLOSION);
+  const explosion = canvas3D.explosion;
+  const setExplosion = (updater: ExplosionSettings | ((prev: ExplosionSettings) => ExplosionSettings)) => {
+    const next = typeof updater === 'function' ? updater(canvas3D.explosion) : updater;
+    updateExplosion(next);
+  };
   const [showExplosionPanel, setShowExplosionPanel] = useState(false);
-  const [autoRotate3D, setAutoRotate3D] = useState(false);
-  const [buildingMode, setBuildingMode] = useState<import('../../types/building').BuildingDisplayMode>('normal');
+  const autoRotate3D = canvas3D.autoRotate;
+  const setAutoRotate3D = (v: boolean | ((p: boolean) => boolean)) =>
+    setCanvas3D('autoRotate', typeof v === 'function' ? v(canvas3D.autoRotate) : v);
+  const buildingMode = canvas3D.buildingMode;
+  const setBuildingMode = (v: import('../../types/building').BuildingDisplayMode) => setCanvas3D('buildingMode', v);
   useEffect(() => {
     const map: Record<string, import('../../types/building').BuildingDisplayMode> = {
       none: 'normal',
@@ -239,8 +266,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [pipeDiameter, setPipeDiameter] = useState(0.05);
 
   const [showAllFloors, setShowAllFloors] = useState(false);
-  const [wallsTransparent, setWallsTransparent] = useState(false);
-  const [xrayOpacity, setXrayOpacity] = useState(0.2);
+  const wallsTransparent = canvas3D.wallsTransparent;
+  const setWallsTransparent = (v: boolean | ((p: boolean) => boolean)) =>
+    setCanvas3D('wallsTransparent', typeof v === 'function' ? v(canvas3D.wallsTransparent) : v);
+  const xrayOpacity = canvas3D.xrayOpacity;
+  const setXrayOpacity = (v: number | ((p: number) => number)) =>
+    setCanvas3D('xrayOpacity', typeof v === 'function' ? v(canvas3D.xrayOpacity) : v);
   const [showXrayPanel, setShowXrayPanel] = useState(false);
   const [dropFurnitureTemplate, setDropFurnitureTemplate] = useState<FurnitureTemplate | null>(null);
   const [showFurniturePanel, setShowFurniturePanel] = useState(false);
@@ -1246,7 +1277,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                         </button>
                       </div>
                     </div>
-                    <button onClick={() => setLighting(DEFAULT_LIGHTING)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
+                    <button onClick={resetLighting} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
                       Zurücksetzen
                     </button>
                   </div>
@@ -1286,7 +1317,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                           className="w-full h-1 accent-sky-500" />
                       </div>
                     ))}
-                    <button onClick={() => setExplosion(DEFAULT_EXPLOSION)} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
+                    <button onClick={resetExplosion} className="w-full text-[10px] text-slate-400 hover:text-white px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded border border-slate-600">
                       Zurücksetzen
                     </button>
                   </div>

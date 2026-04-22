@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useCanvas3DSettingsReadOnly } from '../hooks/useCanvas3DSettings';
 import { ArrowLeft, CreditCard as Edit3, Layers, Search, AlertTriangle } from 'lucide-react';
 import { BuildingLayerMode, LAYER_MODES } from '../types/bms';
 import { BuildingCanvas3D } from '../components/building/BuildingCanvas3D';
@@ -78,6 +79,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
     getRoomLayerValue,
   } = useBuildingMonitor(allRoomIds);
 
+  const canvas3D = useCanvas3DSettingsReadOnly();
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const handleRoomHover = useCallback((roomId: string | null, clientX?: number, clientY?: number) => {
@@ -220,8 +222,16 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
             onSelectRoom={handleRoomClick}
             onSelectWall={() => {}}
             highlightFloor={false}
-            bgColor="#0a0f1a"
-            buildingMode="normal"
+            bgColor={canvas3D.bgColor}
+            bgTransparent={canvas3D.bgTransparent}
+            buildingMode={canvas3D.buildingMode}
+            lighting={canvas3D.lighting}
+            explosion={canvas3D.explosion}
+            wallsTransparent={canvas3D.wallsTransparent}
+            xrayOpacity={canvas3D.xrayOpacity}
+            floorTransparent={canvas3D.floorTransparent}
+            showGrid={canvas3D.showGrid}
+            autoRotate={canvas3D.autoRotate}
             onRoomHover={handleRoomHover}
           />
 
