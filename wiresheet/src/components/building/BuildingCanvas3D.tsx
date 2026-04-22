@@ -1078,13 +1078,14 @@ const BuildingScene = memo(function BuildingScene({
   buildingMode = 'normal',
   onRoomHover,
 }: BuildingSceneProps) {
-  const elements: JSX.Element[] = [];
-  let allSize = 20;
-
   const sunAngleRad = (lighting.sunAngle * Math.PI) / 180;
   const sunDist = 30;
   const sunX = Math.cos(sunAngleRad) * sunDist;
   const sunZ = Math.sin(sunAngleRad) * sunDist;
+
+  const { elements, allSize } = useMemo(() => {
+  const elements: JSX.Element[] = [];
+  let allSize = 20;
 
   const explode = explosion?.enabled ?? false;
   const expOffX = explosion?.offsetX ?? 0;
@@ -1478,6 +1479,15 @@ const BuildingScene = memo(function BuildingScene({
 
     bldOffX += bldW + 3;
   }
+
+  return { elements, allSize };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildings, activeFloorId, selectedRoomId, selectedWallId, selectedWidget3DId,
+      selectedDuctId, selectedPipeId, selectedFurnitureId,
+      onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture,
+      onUpdateWidget3D, liveValues, alarmStates, datapointLabels,
+      highlightFloor, lighting.shadowEnabled, explosion, wallsTransparent, xrayOpacity,
+      visibleLayers, isolateActiveFloor, onFloorClick, onRoomZoom, buildingMode, onRoomHover]);
 
   return (
     <>
