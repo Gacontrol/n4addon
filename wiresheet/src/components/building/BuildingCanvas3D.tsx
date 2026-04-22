@@ -724,7 +724,8 @@ function animateCamera(
   endPos: THREE.Vector3,
   startTarget: THREE.Vector3,
   endTarget: THREE.Vector3,
-  duration: number
+  duration: number,
+  invalidate?: () => void
 ) {
   const startTime = performance.now();
   const animate = (now: number) => {
@@ -737,13 +738,14 @@ function animateCamera(
     } else {
       camera.lookAt(endTarget.x, endTarget.y, endTarget.z);
     }
+    invalidate?.();
     if (t < 1) requestAnimationFrame(animate);
   };
   requestAnimationFrame(animate);
 }
 
 function CameraFocusDuct({ buildings, focusDuctId }: { buildings: Building[]; focusDuctId?: string | null }) {
-  const { camera, controls } = useThree();
+  const { camera, controls, invalidate } = useThree();
   const prevId = useRef<string | null | undefined>(null);
 
   useEffect(() => {
@@ -789,7 +791,7 @@ function CameraFocusDuct({ buildings, focusDuctId }: { buildings: Building[]; fo
         const endPos = new THREE.Vector3(cx + dist * 0.6, cy + dist * 0.7, cz + dist * 0.6);
         const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, cy, cz);
         const endTarget = new THREE.Vector3(cx, cy, cz);
-        animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600);
+        animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600, invalidate);
         return;
       }
     }
@@ -799,7 +801,9 @@ function CameraFocusDuct({ buildings, focusDuctId }: { buildings: Building[]; fo
 }
 
 function CameraFocusFloor() {
-  const { camera, controls } = useThree();
+  const { camera, controls, invalidate } = useThree();
+  const invalidateRef = useRef(invalidate);
+  useEffect(() => { invalidateRef.current = invalidate; }, [invalidate]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -815,7 +819,7 @@ function CameraFocusFloor() {
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, floorCenterY, cz);
       const endTarget = new THREE.Vector3(cx, floorCenterY, cz);
 
-      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, duration);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, duration, invalidateRef.current);
     };
 
     window.addEventListener('focus-floor', handler);
@@ -826,7 +830,9 @@ function CameraFocusFloor() {
 }
 
 function CameraFocusRoom() {
-  const { camera, controls } = useThree();
+  const { camera, controls, invalidate } = useThree();
+  const invalidateRef = useRef(invalidate);
+  useEffect(() => { invalidateRef.current = invalidate; }, [invalidate]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -837,7 +843,7 @@ function CameraFocusRoom() {
       const endPos = new THREE.Vector3(cx, camHeight, cz + 0.001);
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, baseY + h / 2, cz);
       const endTarget = new THREE.Vector3(cx, baseY + h / 2, cz);
-      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 500);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 500, invalidateRef.current);
     };
 
     window.addEventListener('focus-room', handler);
@@ -848,7 +854,9 @@ function CameraFocusRoom() {
 }
 
 function CameraSetPos({ buildings, explosionOffset = 0 }: { buildings: Building[]; explosionOffset?: number }) {
-  const { camera, controls } = useThree();
+  const { camera, controls, invalidate } = useThree();
+  const invalidateRef = useRef(invalidate);
+  useEffect(() => { invalidateRef.current = invalidate; }, [invalidate]);
 
   const getBuildingCenter = useCallback(() => {
     return computeBuildingBounds(buildings) ?? { cx: 0, cz: 0, targetY: 0, totalH: 0, diag: 10 };
@@ -877,7 +885,7 @@ function CameraSetPos({ buildings, explosionOffset = 0 }: { buildings: Building[
       const startPos = camera.position.clone();
       const startTarget = controls ? (controls as any).target.clone() : new THREE.Vector3(cx, targetY, cz);
       const endTarget = new THREE.Vector3(cx, targetY, cz);
-      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600);
+      animateCamera(camera, controls, startPos, endPos, startTarget, endTarget, 600, invalidateRef.current);
     };
 
     window.addEventListener('set-camera-pos', handler);
@@ -963,8 +971,43 @@ function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building
   return null;
 }
 
+// Drives demand-mode rendering: invalidates frames while pointer is pressed or damping is settling
+function OrbitInvalidator({ autoRotate }: { autoRotate?: boolean }) {
+  const { invalidate, gl } = useThree();
+  const pointerDown = useRef(false);
+  const settlingFrames = useRef(0);
+
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const onDown = () => { pointerDown.current = true; settlingFrames.current = 0; invalidate(); };
+    const onUp = () => { pointerDown.current = false; settlingFrames.current = 30; };
+    const onMove = () => { if (pointerDown.current) invalidate(); };
+    const onWheel = () => { settlingFrames.current = 20; invalidate(); };
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('wheel', onWheel);
+    };
+  }, [gl, invalidate]);
+
+  useFrame(() => {
+    if (settlingFrames.current > 0) {
+      settlingFrames.current--;
+      invalidate();
+    }
+    if (autoRotate) invalidate();
+  });
+
+  return null;
+}
+
 function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
-  const { controls } = useThree();
+  const { controls, invalidate } = useThree(); // invalidate used in useFrame for lockTarget
   const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
   const targetInitialized = useRef(false);
   const _desiredVec = useRef(new THREE.Vector3());
@@ -1000,12 +1043,14 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
   // Only run useFrame when lockTarget is active — avoid per-frame cost otherwise
   useFrame(() => {
     if (!lockTarget || !buildingCenter || !controls || !(controls as any).target) return;
-    const t = (controls as any).target as THREE.Vector3;
+    const ctrl = controls as any;
+    const t = ctrl.target as THREE.Vector3;
     const desired = floorTargetOverride.current ?? _desiredVec.current.set(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
     const dx = desired.x - t.x, dy = desired.y - t.y, dz = desired.z - t.z;
     if (dx * dx + dy * dy + dz * dz > 0.0001) {
       t.lerp(desired, 0.2);
-      (controls as any).update?.();
+      ctrl.update?.();
+      invalidate();
     }
   });
 
@@ -1616,7 +1661,7 @@ export function BuildingCanvas3D({
     <CanvasErrorBoundary>
     <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
-        frameloop="always"
+        frameloop="demand"
         shadows={lighting.shadowEnabled}
         dpr={dpr ?? [1, 1]}
         camera={{ position: initCamPos, fov: 45, near: 0.5, far: 600 }}
@@ -1682,6 +1727,7 @@ export function BuildingCanvas3D({
           />
         </Suspense>
 
+        <OrbitInvalidator autoRotate={autoRotate} />
         <CameraAutoFit buildings={buildings} explosionOffset={explosion?.enabled ? (explosion?.offsetZ ?? 0) : 0} />
         <CameraFocusDuct buildings={buildings} focusDuctId={focusDuctId} />
         <CameraFocusFloor />
