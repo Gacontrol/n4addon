@@ -1671,58 +1671,6 @@ export function FloorPlanEditor({
       ctx.setLineDash([]);
     }
 
-    if (snapPoint && (tool === 'door' || tool === 'window')) {
-      let bestWall: typeof floor.walls[0] | null = null;
-      let bestDist = Infinity;
-      let bestT = 0;
-      for (const wall of floor.walls) {
-        const wdx = wall.x2 - wall.x1;
-        const wdy = wall.y2 - wall.y1;
-        const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
-        if (wlen < 0.01) continue;
-        const t = Math.max(0, Math.min(1, ((snapPoint.x - wall.x1) * wdx + (snapPoint.y - wall.y1) * wdy) / (wlen * wlen)));
-        const cx = wall.x1 + t * wdx;
-        const cy = wall.y1 + t * wdy;
-        const d = Math.sqrt((snapPoint.x - cx) ** 2 + (snapPoint.y - cy) ** 2);
-        if (d < bestDist) { bestDist = d; bestWall = wall; bestT = t; }
-      }
-      if (bestWall && bestDist < 2.0) {
-        const s1 = toScreen(bestWall.x1, bestWall.y1);
-        const s2 = toScreen(bestWall.x2, bestWall.y2);
-        const thickness = bestWall.thickness * CELL * zoom;
-        const wdx = s2.x - s1.x; const wdy = s2.y - s1.y;
-        const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
-        if (wlen > 0.5) {
-          const nx = (-wdy / wlen) * thickness / 2;
-          const ny = (wdx / wlen) * thickness / 2;
-          const hoverColor = tool === 'door' ? 'rgba(251,191,36,0.35)' : 'rgba(56,189,248,0.35)';
-          const hoverStroke = tool === 'door' ? '#fbbf24' : '#38bdf8';
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(s1.x + nx, s1.y + ny);
-          ctx.lineTo(s2.x + nx, s2.y + ny);
-          ctx.lineTo(s2.x - nx, s2.y - ny);
-          ctx.lineTo(s1.x - nx, s1.y - ny);
-          ctx.closePath();
-          ctx.fillStyle = hoverColor;
-          ctx.fill();
-          ctx.strokeStyle = hoverStroke;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 3]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          // Show placement indicator at hit point
-          const hx = s1.x + wdx * bestT;
-          const hy = s1.y + wdy * bestT;
-          ctx.beginPath();
-          ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-          ctx.fillStyle = hoverStroke;
-          ctx.fill();
-          ctx.restore();
-        }
-      }
-    }
-
     if (snapPoint && (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'vertical-duct' || tool === 'pipe' || tool === 'slab')) {
       const sp = toScreen(snapPoint.x, snapPoint.y);
       ctx.beginPath();
@@ -1989,32 +1937,6 @@ export function FloorPlanEditor({
     if (tool === 'wall') {
       setDrawingWall({ x1: snapped.x, y1: snapped.y, x2: snapped.x, y2: snapped.y });
       dragState.current = { type: 'draw-wall', startX: e.clientX, startY: e.clientY };
-      return;
-    }
-
-    if ((tool === 'door' || tool === 'window') && onAddWallOpening) {
-      let bestWall: Wall | null = null;
-      let bestDist = Infinity;
-      let bestPos = 0;
-      for (const wall of floor.walls) {
-        const dx = wall.x2 - wall.x1;
-        const dy = wall.y2 - wall.y1;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len < 0.01) continue;
-        const t = Math.max(0, Math.min(1, ((world.x - wall.x1) * dx + (world.y - wall.y1) * dy) / (len * len)));
-        const cx = wall.x1 + t * dx;
-        const cy = wall.y1 + t * dy;
-        const d = Math.sqrt((world.x - cx) ** 2 + (world.y - cy) ** 2);
-        if (d < bestDist) { bestDist = d; bestWall = wall; bestPos = t * len; }
-      }
-      if (bestWall && bestDist < 2.0) {
-        const openingType = tool === 'door' ? 'door' : 'window';
-        const isWindow = tool === 'window';
-        const defaultWidth = isWindow ? 1.2 : 0.9;
-        const defaultHeight = isWindow ? 1.2 : 2.1;
-        const sillH = isWindow ? 0.9 : 0;
-        onAddWallOpening(bestWall.id, openingType, bestPos, defaultWidth, defaultHeight, sillH);
-      }
       return;
     }
 
@@ -2383,7 +2305,7 @@ export function FloorPlanEditor({
     const snapped = getSnapPoint(world.x, world.y);
     setMouseWorld({ x: world.x, y: world.y });
 
-    if (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe' || tool === 'slab' || tool === 'door' || tool === 'window') {
+    if (tool === 'wall' || tool === 'room' || tool === 'duct' || tool === 'pipe' || tool === 'slab') {
       setSnapPoint(snapped);
     } else {
       setSnapPoint(null);
@@ -2601,7 +2523,7 @@ export function FloorPlanEditor({
   }, [onSetBackground]);
 
   const getCursor = () => {
-    if (tool === 'wall' || tool === 'room' || tool === 'polygon-room' || tool === 'duct' || tool === 'pipe' || tool === 'slab' || tool === 'door' || tool === 'window') return 'crosshair';
+    if (tool === 'wall' || tool === 'room' || tool === 'polygon-room' || tool === 'duct' || tool === 'pipe' || tool === 'slab') return 'crosshair';
     if (tool === 'delete') return 'not-allowed';
     if (tool === 'vertical-duct') return 'crosshair';
     if (dragState.current?.type === 'lasso') return 'crosshair';

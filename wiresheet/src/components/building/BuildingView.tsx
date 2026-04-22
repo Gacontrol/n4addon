@@ -5,7 +5,7 @@ import {
   Layers, Box, MousePointer, MousePointer2, Square, Settings2, X, Minus, Sun,
   Wind, Thermometer, Droplets, Bell, Activity,
   Zap, Fan, Lightbulb, ChevronsUpDown, Radio, Box as BoxIcon, Search, RefreshCw,
-  Eye, EyeOff, GripVertical, RotateCcw, Gauge, DoorOpen, RectangleHorizontal
+  Eye, EyeOff, GripVertical, RotateCcw, Gauge
 } from 'lucide-react';
 import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
 import { useBuildingEditor } from '../../hooks/useBuildingEditor';
@@ -789,22 +789,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     >
                       <Minus className="w-3.5 h-3.5 rotate-45" />
                       Wand
-                    </button>
-                    <button
-                      onClick={() => setTool('door')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'door' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                      title="Tür in Wand platzieren"
-                    >
-                      <DoorOpen className="w-3.5 h-3.5" />
-                      Tür
-                    </button>
-                    <button
-                      onClick={() => setTool('window')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'window' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}
-                      title="Fenster in Wand platzieren"
-                    >
-                      <RectangleHorizontal className="w-3.5 h-3.5" />
-                      Fenster
                     </button>
                     <button
                       onClick={() => setTool('room')}
