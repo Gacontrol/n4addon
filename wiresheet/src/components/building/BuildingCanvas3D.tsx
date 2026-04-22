@@ -1078,14 +1078,53 @@ const BuildingScene = memo(function BuildingScene({
   buildingMode = 'normal',
   onRoomHover,
 }: BuildingSceneProps) {
+  const { invalidate } = useThree();
+
   const sunAngleRad = (lighting.sunAngle * Math.PI) / 180;
   const sunDist = 30;
   const sunX = Math.cos(sunAngleRad) * sunDist;
   const sunZ = Math.sin(sunAngleRad) * sunDist;
 
+  // Use refs for live data so frequent polling doesn't invalidate the scene memo
+  const liveValuesRef = useRef(liveValues);
+  const alarmStatesRef = useRef(alarmStates);
+  const datapointLabelsRef = useRef(datapointLabels);
+  useEffect(() => {
+    liveValuesRef.current = liveValues;
+    alarmStatesRef.current = alarmStates;
+    datapointLabelsRef.current = datapointLabels;
+    invalidate();
+  }, [liveValues, alarmStates, datapointLabels, invalidate]);
+
+  // Stable callback refs so the scene memo doesn't break when parent re-renders
+  const onFloorClickRef = useRef(onFloorClick);
+  const onRoomZoomRef = useRef(onRoomZoom);
+  const onRoomHoverRef = useRef(onRoomHover);
+  const onSelectRoomRef = useRef(onSelectRoom);
+  const onSelectWallRef = useRef(onSelectWall);
+  const onSelectWidget3DRef = useRef(onSelectWidget3D);
+  const onSelectDuctRef = useRef(onSelectDuct);
+  const onSelectPipeRef = useRef(onSelectPipe);
+  const onSelectFurnitureRef = useRef(onSelectFurniture);
+  const onUpdateWidget3DRef = useRef(onUpdateWidget3D);
+  useEffect(() => { onFloorClickRef.current = onFloorClick; }, [onFloorClick]);
+  useEffect(() => { onRoomZoomRef.current = onRoomZoom; }, [onRoomZoom]);
+  useEffect(() => { onRoomHoverRef.current = onRoomHover; }, [onRoomHover]);
+  useEffect(() => { onSelectRoomRef.current = onSelectRoom; }, [onSelectRoom]);
+  useEffect(() => { onSelectWallRef.current = onSelectWall; }, [onSelectWall]);
+  useEffect(() => { onSelectWidget3DRef.current = onSelectWidget3D; }, [onSelectWidget3D]);
+  useEffect(() => { onSelectDuctRef.current = onSelectDuct; }, [onSelectDuct]);
+  useEffect(() => { onSelectPipeRef.current = onSelectPipe; }, [onSelectPipe]);
+  useEffect(() => { onSelectFurnitureRef.current = onSelectFurniture; }, [onSelectFurniture]);
+  useEffect(() => { onUpdateWidget3DRef.current = onUpdateWidget3D; }, [onUpdateWidget3D]);
+
   const { elements, allSize } = useMemo(() => {
   const elements: JSX.Element[] = [];
   let allSize = 20;
+
+  const lv = liveValuesRef.current;
+  const as = alarmStatesRef.current;
+  const dl = datapointLabelsRef.current;
 
   const explode = explosion?.enabled ?? false;
   const expOffX = explosion?.offsetX ?? 0;
@@ -1194,16 +1233,21 @@ const BuildingScene = memo(function BuildingScene({
         if (room.hidden) continue;
         const roomCX = room.x + offsetX + room.width / 2;
         const roomCZ = room.y + room.depth / 2;
-        const modeResult = computeRoomColor(room, buildingMode, liveValues as Record<string, unknown>);
+        const modeResult = computeRoomColor(room, buildingMode, lv as Record<string, unknown>);
         const effectiveColor = buildingMode === 'normal' ? room.color : modeResult.color;
-        const handleRoomClick = shouldIsolate && onRoomZoom
+        const _roomId = room.id;
+        const _roomCX = roomCX; const _roomCZ = roomCZ;
+        const _roomW = room.width; const _roomD = room.depth; const _flH = floor.height;
+        const handleRoomClick = shouldIsolate && onRoomZoomRef.current
           ? () => {
-              onSelectRoom(room.id);
-              onRoomZoom(roomCX, baseY, roomCZ, room.width, room.depth, floor.height);
+              onSelectRoomRef.current(_roomId);
+              onRoomZoomRef.current!(_roomCX, baseY, _roomCZ, _roomW, _roomD, _flH);
             }
-          : !shouldIsolate && onFloorClick && handleFloorZoom
-          ? () => { onSelectRoom(room.id); onSelectWall(null); handleFloorZoom(); }
-          : () => { onSelectRoom(room.id); onSelectWall(null); };
+          : !shouldIsolate && onFloorClickRef.current && handleFloorZoom
+          ? () => { onSelectRoomRef.current(_roomId); onSelectWallRef.current(null); handleFloorZoom?.(); }
+          : () => { onSelectRoomRef.current(_roomId); onSelectWallRef.current(null); };
+        const handleRoomHover = (cx: number, cy: number) => onRoomHoverRef.current?.(_roomId, cx, cy);
+        const handleRoomHoverEnd = () => onRoomHoverRef.current?.(null);
 
         if (room.points && room.points.length > 2) {
           floorElements.push(
@@ -1217,8 +1261,8 @@ const BuildingScene = memo(function BuildingScene({
               selected={room.id === selectedRoomId}
               faded={faded}
               onSelect={handleRoomClick}
-              onHover={(cx, cy) => onRoomHover?.(room.id, cx, cy)}
-              onHoverEnd={() => onRoomHover?.(null)}
+              onHover={handleRoomHover}
+              onHoverEnd={handleRoomHoverEnd}
             />
           );
         } else {
@@ -1236,8 +1280,8 @@ const BuildingScene = memo(function BuildingScene({
               faded={faded}
               onSelect={handleRoomClick}
               castShadow={lighting.shadowEnabled}
-              onHover={(cx, cy) => onRoomHover?.(room.id, cx, cy)}
-              onHoverEnd={() => onRoomHover?.(null)}
+              onHover={handleRoomHover}
+              onHoverEnd={handleRoomHoverEnd}
             />
           );
         }
@@ -1295,9 +1339,9 @@ const BuildingScene = memo(function BuildingScene({
             faded={faded}
             materialType={wallsTransparent ? 'glass' : (wall.materialType || 'concrete')}
             openings={wall.openings ?? EMPTY_OPENINGS}
-            onSelect={!shouldIsolate && onFloorClick && handleFloorZoom
-              ? () => { onSelectWall(wall.id); onSelectRoom(null); handleFloorZoom(); }
-              : () => { onSelectWall(wall.id); onSelectRoom(null); }}
+            onSelect={!shouldIsolate && onFloorClickRef.current && handleFloorZoom
+              ? (() => { const _wid = wall.id; return () => { onSelectWallRef.current(_wid); onSelectRoomRef.current(null); handleFloorZoom?.(); }; })()
+              : (() => { const _wid = wall.id; return () => { onSelectWallRef.current(_wid); onSelectRoomRef.current(null); }; })()}
             castShadow={lighting.shadowEnabled && !wallsTransparent}
           />
         );
@@ -1334,7 +1378,7 @@ const BuildingScene = memo(function BuildingScene({
                     baseY={segBaseY}
                     selected={duct.id === selectedDuctId}
                     faded={highlightFloor && segFloor.id !== activeFloorId}
-                    onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+                    onSelect={(() => { const _did = duct.id; return () => { onSelectDuctRef.current?.(_did); onSelectWallRef.current(null); onSelectRoomRef.current(null); }; })()}
                   />
                 </group>
               );
@@ -1348,7 +1392,7 @@ const BuildingScene = memo(function BuildingScene({
                 baseY={baseY}
                 selected={duct.id === selectedDuctId}
                 faded={faded}
-                onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+                onSelect={(() => { const _did = duct.id; return () => { onSelectDuctRef.current?.(_did); onSelectWallRef.current(null); onSelectRoomRef.current(null); }; })()}
               />
             );
           }
@@ -1364,7 +1408,7 @@ const BuildingScene = memo(function BuildingScene({
             baseY={baseY}
             selected={duct.id === selectedDuctId}
             faded={faded}
-            onSelect={() => { onSelectDuct?.(duct.id); onSelectWall(null); onSelectRoom(null); }}
+            onSelect={(() => { const _did = duct.id; return () => { onSelectDuctRef.current?.(_did); onSelectWallRef.current(null); onSelectRoomRef.current(null); }; })()}
           />
         );
       }
@@ -1379,7 +1423,7 @@ const BuildingScene = memo(function BuildingScene({
             baseY={baseY}
             selected={pipe.id === selectedPipeId}
             faded={faded}
-            onSelect={() => { onSelectPipe?.(pipe.id); onSelectWall(null); onSelectRoom(null); }}
+            onSelect={(() => { const _pid = pipe.id; return () => { onSelectPipeRef.current?.(_pid); onSelectWallRef.current(null); onSelectRoomRef.current(null); }; })()}
           />
         );
       }
@@ -1406,7 +1450,7 @@ const BuildingScene = memo(function BuildingScene({
               baseY={baseY}
               selected={fi.id === selectedFurnitureId}
               faded={faded}
-              onSelect={() => { onSelectFurniture?.(fi.id); onSelectWall(null); onSelectRoom(null); }}
+              onSelect={(() => { const _fid = fi.id; return () => { onSelectFurnitureRef.current?.(_fid); onSelectWallRef.current(null); onSelectRoomRef.current(null); }; })()}
             />
           );
         }
@@ -1440,6 +1484,10 @@ const BuildingScene = memo(function BuildingScene({
       const widOffZ = explode && widgetFloorIdx >= 0 ? widgetFloorIdx * expOffY : 0;
       const floorH = floorForWidget?.height ?? 3;
 
+      const _wgtId = widget.id;
+      const _wgtDp = widget.datapoint;
+      const _wgtAlarmDp = widget.alarmDatapoint;
+      const _wgtOffX = offsetX;
       if (widget.type === 'roomcolor') {
         elements.push(
           <group key={`widget3d-group-${widget.id}`} position={[widOffX, 0, widOffZ]}>
@@ -1450,10 +1498,10 @@ const BuildingScene = memo(function BuildingScene({
               floorHeight={floorH}
               offsetX={offsetX}
               buildings={buildings}
-              liveValue={liveValues[widget.datapoint]}
-              alarmActive={widget.alarmDatapoint ? alarmStates[widget.alarmDatapoint] : undefined}
+              liveValue={lv[_wgtDp]}
+              alarmActive={_wgtAlarmDp ? as[_wgtAlarmDp] : undefined}
               selected={widget.id === selectedWidget3DId}
-              onSelect={() => { onSelectWidget3D?.(widget.id); onSelectWall(null); onSelectRoom(null); }}
+              onSelect={() => { onSelectWidget3DRef.current?.(_wgtId); onSelectWallRef.current(null); onSelectRoomRef.current(null); }}
             />
           </group>
         );
@@ -1463,14 +1511,14 @@ const BuildingScene = memo(function BuildingScene({
           <group key={`widget3d-group-${wid.id}`} position={[widOffX, 0, widOffZ]}>
             <Widget3DMesh
               key={`widget3d-${wid.id}`}
-              widget={{ ...wid, x: wid.x + offsetX }}
-              liveValue={liveValues[wid.datapoint]}
-              alarmActive={wid.alarmDatapoint ? alarmStates[wid.alarmDatapoint] : undefined}
+              widget={{ ...wid, x: wid.x + _wgtOffX }}
+              liveValue={lv[_wgtDp]}
+              alarmActive={_wgtAlarmDp ? as[_wgtAlarmDp] : undefined}
               selected={wid.id === selectedWidget3DId}
-              onSelect={() => { onSelectWidget3D?.(wid.id); onSelectWall(null); onSelectRoom(null); }}
+              onSelect={() => { onSelectWidget3DRef.current?.(_wgtId); onSelectWallRef.current(null); onSelectRoomRef.current(null); }}
               baseY={floorBaseYLocal}
-              onDragEnd={onUpdateWidget3D ? (nx, ny, nz) => onUpdateWidget3D(wid.id, nx - offsetX, ny, nz) : undefined}
-              datapointLabel={datapointLabels[wid.datapoint]}
+              onDragEnd={onUpdateWidget3DRef.current ? (nx, ny, nz) => onUpdateWidget3DRef.current!(_wgtId, nx - _wgtOffX, ny, nz) : undefined}
+              datapointLabel={dl[_wgtDp]}
             />
           </group>
         );
@@ -1481,13 +1529,12 @@ const BuildingScene = memo(function BuildingScene({
   }
 
   return { elements, allSize };
+  // Callbacks are accessed via refs — only structural/visual props here
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildings, activeFloorId, selectedRoomId, selectedWallId, selectedWidget3DId,
       selectedDuctId, selectedPipeId, selectedFurnitureId,
-      onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture,
-      onUpdateWidget3D, liveValues, alarmStates, datapointLabels,
       highlightFloor, lighting.shadowEnabled, explosion, wallsTransparent, xrayOpacity,
-      visibleLayers, isolateActiveFloor, onFloorClick, onRoomZoom, buildingMode, onRoomHover]);
+      visibleLayers, isolateActiveFloor, buildingMode]);
 
   return (
     <>

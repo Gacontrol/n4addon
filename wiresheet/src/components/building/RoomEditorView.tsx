@@ -66,12 +66,19 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const [layers, setLayers] = useState<LayerVisibility>({ rooms: true, walls: true });
   const [showLayerPanel, setShowLayerPanel] = useState(false);
 
-  // Drag state for polygon rooms
+  // Drag state for polygon rooms (whole room move)
   const dragRoom = useRef<{
     roomId: string;
     origPoints: Point[];
     origX: number; origY: number;
     startSvgX: number; startSvgY: number;
+  } | null>(null);
+
+  // Drag state for individual polygon vertex
+  const dragVertex = useRef<{
+    roomId: string;
+    vertexIndex: number;
+    origPoints: Point[];
   } | null>(null);
 
   const activeFloor = building.floors.find(f => f.id === selectedFloorId);
@@ -115,6 +122,36 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       return;
     }
 
+    if (dragVertex.current && activeFloor) {
+      const world = svgToWorld(svgPt.x, svgPt.y);
+      const snappedWorld = { x: snapVal(world.x), y: snapVal(world.y) };
+      const newPoints = dragVertex.current.origPoints.map((p, i) =>
+        i === dragVertex.current!.vertexIndex ? snappedWorld : p
+      );
+      const xs = newPoints.map(p => p.x);
+      const ys = newPoints.map(p => p.y);
+      const roomId = dragVertex.current.roomId;
+      onUpdateBuilding({
+        ...building,
+        floors: building.floors.map(f =>
+          f.id === activeFloor.id
+            ? {
+                ...f,
+                rooms: f.rooms.map(r =>
+                  r.id === roomId
+                    ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
+                    : r
+                ),
+              }
+            : f
+        ),
+        updatedAt: Date.now(),
+      });
+      // Update origPoints so next move is relative to new position
+      dragVertex.current = { ...dragVertex.current, origPoints: newPoints };
+      return;
+    }
+
     if (dragRoom.current && activeFloor) {
       const dx = svgPt.x - dragRoom.current.startSvgX;
       const dy = svgPt.y - dragRoom.current.startSvgY;
@@ -138,14 +175,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                 ...f,
                 rooms: f.rooms.map(r =>
                   r.id === dragRoom.current!.roomId
-                    ? {
-                        ...r,
-                        points: newPoints,
-                        x: Math.min(...xs),
-                        y: Math.min(...ys),
-                        width: Math.max(...xs) - Math.min(...xs),
-                        depth: Math.max(...ys) - Math.min(...ys),
-                      }
+                    ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
                     : r
                 ),
               }
@@ -154,7 +184,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         updatedAt: Date.now(),
       });
     }
-  }, [getSvgPoint, svgToWorld, isPanning, dragRoom, activeFloor, building, onUpdateBuilding, zoom]);
+  }, [getSvgPoint, svgToWorld, isPanning, activeFloor, building, onUpdateBuilding, zoom]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button === 1 || (e.button === 0 && tool === 'move')) {
@@ -169,6 +199,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     dragRoom.current = null;
+    dragVertex.current = null;
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
@@ -177,12 +208,18 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     setZoom(z => Math.max(0.2, Math.min(5, z * factor)));
   }, []);
 
+  const getSvgPointFromAny = useCallback((e: React.MouseEvent): Point => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }, []);
+
   // ---------- Room mouse down (drag start) ----------
   const handleRoomMouseDown = useCallback((e: React.MouseEvent<SVGPolygonElement>, room: Room) => {
     if (tool !== 'select') return;
     e.stopPropagation();
     if (!room.points || room.points.length < 3) return;
-    const svgPt = getSvgPoint(e as unknown as React.MouseEvent<SVGSVGElement>);
+    const svgPt = getSvgPointFromAny(e);
     dragRoom.current = {
       roomId: room.id,
       origPoints: room.points.map(p => ({ ...p })),
@@ -192,7 +229,19 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       startSvgY: svgPt.y,
     };
     setSelectedRoomId(room.id);
-  }, [tool, getSvgPoint]);
+  }, [tool, getSvgPointFromAny]);
+
+  // ---------- Vertex mouse down (drag vertex) ----------
+  const handleVertexMouseDown = useCallback((e: React.MouseEvent<SVGCircleElement>, room: Room, vertexIndex: number) => {
+    if (tool !== 'select') return;
+    e.stopPropagation();
+    if (!room.points) return;
+    dragVertex.current = {
+      roomId: room.id,
+      vertexIndex,
+      origPoints: room.points.map(p => ({ ...p })),
+    };
+  }, [tool]);
 
   // ---------- Canvas click ----------
   const handleCanvasClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -559,9 +608,16 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                     }}
                     onMouseDown={isPolygon ? e => handleRoomMouseDown(e, room) : undefined}
                   />
-                  {/* Vertex handles on selected polygon room */}
+                  {/* Vertex handles on selected polygon room — draggable */}
                   {isSelected && isPolygon && poly.map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r={5} fill="#38bdf8" stroke="#0f172a" strokeWidth={1.5} style={{ pointerEvents: 'none' }} />
+                    <circle
+                      key={i}
+                      cx={p.x} cy={p.y} r={6}
+                      fill="#38bdf8" stroke="#0f172a" strokeWidth={1.5}
+                      className="cursor-crosshair"
+                      style={{ pointerEvents: 'all' }}
+                      onMouseDown={e => handleVertexMouseDown(e, room, i)}
+                    />
                   ))}
                   {zoom >= 0.5 && (
                     <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
