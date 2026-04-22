@@ -1,28 +1,17 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { Building } from '../types/building';
+import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab, FloorLayers, FurnitureItem } from '../types/building';
 import { useBuildingEditor } from '../hooks/useBuildingEditor';
 import { RoomMonitorConfig } from '../types/bms';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
+// Re-export the full hook return type so BuildingView can use context
+type BuildingEditorHook = ReturnType<typeof useBuildingEditor>;
 
-interface BuildingContextValue {
-  buildings: Building[];
-  activeBuildingId: string;
-  activeFloorId: string;
-  replaceBuilding: (b: Building) => void;
-  isLoaded: boolean;
+interface BuildingContextValue extends BuildingEditorHook {
   monitorConfigs: Record<string, RoomMonitorConfig>;
   saveRoomMonitorConfig: (config: RoomMonitorConfig) => void;
 }
 
-const BuildingContext = createContext<BuildingContextValue>({
-  buildings: [],
-  activeBuildingId: '',
-  activeFloorId: '',
-  replaceBuilding: () => {},
-  isLoaded: false,
-  monitorConfigs: {},
-  saveRoomMonitorConfig: () => {},
-});
+const BuildingContext = createContext<BuildingContextValue>({} as BuildingContextValue);
 
 export function BuildingProvider({ children }: { children: ReactNode }) {
   const editor = useBuildingEditor();
@@ -32,11 +21,7 @@ export function BuildingProvider({ children }: { children: ReactNode }) {
 
   return (
     <BuildingContext.Provider value={{
-      buildings: editor.buildings,
-      activeBuildingId: editor.activeBuildingId,
-      activeFloorId: editor.activeFloorId,
-      replaceBuilding: editor.replaceBuilding,
-      isLoaded: editor.isLoaded,
+      ...editor,
       monitorConfigs,
       saveRoomMonitorConfig,
     }}>

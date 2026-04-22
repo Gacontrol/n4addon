@@ -8,7 +8,7 @@ import {
   Eye, EyeOff, GripVertical, RotateCcw, Gauge
 } from 'lucide-react';
 import { FURNITURE_TEMPLATES, FURNITURE_BY_CATEGORY, FURNITURE_CATEGORY_LABELS } from '../../data/furnitureTemplates';
-import { useBuildingEditor } from '../../hooks/useBuildingEditor';
+import { useBuildingContext } from '../../context/BuildingContext';
 import { BuildingCanvas3D, LightingSettings, DEFAULT_LIGHTING, ExplosionSettings, DEFAULT_EXPLOSION } from './BuildingCanvas3D';
 import { BuildingModeSelector } from './BuildingModeSelector';
 import { FloorPlanEditor } from './FloorPlanEditor';
@@ -177,7 +177,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     addFurniture,
     updateFurniture,
     deleteFurniture,
-  } = useBuildingEditor();
+  } = useBuildingContext();
 
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
   const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
