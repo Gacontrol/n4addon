@@ -5,9 +5,10 @@ import {
   Users, AlertTriangle, Zap, TrendingUp, TrendingDown, Minus,
   Clock, RefreshCw, ChevronRight, Box
 } from 'lucide-react';
-import { DataPoint, DataPointCategory } from '../types/bms';
+import { DataPoint, DataPointCategory, RoomMonitorConfig } from '../types/bms';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
+import type { Room } from '../types/building';
 
 function generateMockDataPoints(room: Room): DataPoint[] {
   const base = room.id.charCodeAt(room.id.length - 1) || 42;
@@ -222,7 +223,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
   const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
   const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'alarms' | 'trends'>('overview');
   const [lastRefresh, setLastRefresh] = useState(Date.now());
-  const { buildings } = useBuildingContext();
+  const { buildings, monitorConfigs } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
   const { floor, room } = useMemo(() => {
@@ -233,11 +234,25 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
     }
     return { floor: null, room: null };
   }, [building, roomId]);
+  const roomConfig: RoomMonitorConfig | undefined = roomId ? monitorConfigs[roomId] : undefined;
 
   const dataPoints = useMemo(() => {
     if (!room) return [];
-    return generateMockDataPoints(room);
-  }, [room, lastRefresh]);
+    const all = generateMockDataPoints(room);
+    if (!roomConfig || roomConfig.datapoints.length === 0) return all;
+    // Apply config: filter, reorder, override writable
+    const visible = roomConfig.datapoints
+      .filter(cfg => cfg.showInMonitor)
+      .sort((a, b) => a.order - b.order);
+    const result: DataPoint[] = [];
+    for (const cfg of visible) {
+      const dp = all.find(d => d.id === cfg.datapointId || d.name === cfg.label || d.category === cfg.datapointId.split('-').pop());
+      if (dp) {
+        result.push({ ...dp, label: cfg.label, writable: cfg.writable });
+      }
+    }
+    return result.length > 0 ? result : all;
+  }, [room, lastRefresh, roomConfig]);
 
   const alarms = dataPoints.filter(dp => dp.status === 'alarm');
   const primaryKPIs = dataPoints.slice(0, 6);
