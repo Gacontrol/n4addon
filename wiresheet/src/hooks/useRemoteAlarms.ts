@@ -96,7 +96,7 @@ export function useRemoteAlarms(
     }
 
     loadAll();
-    const interval = setInterval(loadAll, 8000);
+    const interval = setInterval(loadAll, 30000);
     return () => {
       cancelled = true;
       clearInterval(interval);

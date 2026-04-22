@@ -1,5 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
-import { Building, Floor, Room, Wall, WallOpening, BackgroundImage, BuildingTool, ObjModel, Duct, Pipe, Widget3D, Slab, FloorLayers, FurnitureItem } from '../types/building';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useBuildingEditor } from '../hooks/useBuildingEditor';
 import { RoomMonitorConfig } from '../types/bms';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
@@ -16,7 +15,10 @@ const BuildingContext = createContext<BuildingContextValue>({} as BuildingContex
 export function BuildingProvider({ children }: { children: ReactNode }) {
   const editor = useBuildingEditor();
 
-  const allRoomIds = editor.buildings.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r.id)));
+  const allRoomIds = useMemo(
+    () => editor.buildings.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r.id))),
+    [editor.buildings]
+  );
   const { monitorConfigs, saveRoomMonitorConfig } = useBuildingMonitor(allRoomIds);
 
   return (

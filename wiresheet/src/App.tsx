@@ -419,9 +419,6 @@ function App() {
     return () => clearInterval(pollTimer);
   }, [mainView]);
 
-  useEffect(() => {
-    console.log('[APP] selectedNodes changed:', selectedNodes.size, Array.from(selectedNodes));
-  }, [selectedNodes]);
 
   const extractDeviceName = useCallback((entity: HaEntity): string => {
     const devName = entity.attributes._device_name as string | undefined;

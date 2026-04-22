@@ -105,7 +105,7 @@ export function useAlarmManagement() {
           if (data.activeAlarms) setActiveAlarms(data.activeAlarms);
         }
       } catch {}
-      if (isActive) pollTimer = setTimeout(pollAlarms, 3000);
+      if (isActive) pollTimer = setTimeout(pollAlarms, 5000);
     }
 
     function connect() {
@@ -119,17 +119,22 @@ export function useAlarmManagement() {
           if (data.alarmClasses) setAlarmClasses(data.alarmClasses);
           if (data.alarmConsoles) setAlarmConsoles(data.alarmConsoles);
           if (data.alarmHistory) setAlarmHistory(data.alarmHistory);
+          // SSE working — cancel any fallback poll
+          if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
         } catch {}
       });
 
       es.onerror = () => {
         es?.close();
-        if (isActive) reconnectTimer = setTimeout(connect, 3000);
+        if (isActive) {
+          reconnectTimer = setTimeout(connect, 5000);
+          // Start fallback polling only when SSE fails
+          if (!pollTimer) pollAlarms();
+        }
       };
     }
 
     connect();
-    pollAlarms();
 
     return () => {
       isActive = false;
