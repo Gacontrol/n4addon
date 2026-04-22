@@ -166,10 +166,9 @@ export function RoomDetailsPage({
   const handleSave = () => { onSave(cfg); };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-stretch justify-end">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative h-full w-full max-w-[720px] bg-slate-950 border-l border-slate-800 shadow-2xl flex flex-col animate-[slideInRight_.25s_ease-out]">
-        <div className="px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-950">
+    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[min(680px,48vw)] h-[min(88vh,900px)] flex flex-col pointer-events-none">
+      <div className="relative flex flex-col h-full w-full bg-slate-950/95 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-[0_8px_60px_rgba(0,0,0,0.7)] pointer-events-auto animate-[slideInRight_.22s_cubic-bezier(0.16,1,0.3,1)]">
+        <div className="px-6 py-4 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-950 rounded-t-2xl shrink-0">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
             <Home className="w-3 h-3" />
             <span className="truncate">{building.name}</span>

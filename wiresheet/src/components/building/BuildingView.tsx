@@ -1081,10 +1081,9 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   onSelectRoom={id => {
                     setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null);
                     if (id) {
-                      if (appMode === 'monitor' || appMode === 'service') setRoomDetailsOpen(true);
-                      else setShowRoomPanel(true);
+                      setRoomDetailsOpen(true);
                     } else {
-                      setShowRoomPanel(true);
+                      setRoomDetailsOpen(false);
                     }
                   }}
                   onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}

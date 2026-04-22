@@ -958,16 +958,11 @@ function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building
     }
   }, [explosionOffset, fitCamera]);
 
-  useFrame(() => {
-    if (fitted.current) return;
-    if (fitCamera()) fitted.current = true;
-  });
-
   return null;
 }
 
 function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
-  const { controls } = useThree();
+  const { controls, invalidate } = useThree();
   const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
   const targetInitialized = useRef(false);
 
@@ -1004,6 +999,8 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
 
   useFrame(() => {
     if (!buildingCenter || !controls || !(controls as any).target) return;
+    if (!lockTarget && !autoRotate) return;
+
     const t = (controls as any).target as THREE.Vector3;
 
     if (lockTarget) {
@@ -1014,15 +1011,16 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
         const alpha = Math.min(dist > 0.5 ? 0.12 : 0.18, 1);
         t.lerp(desired, alpha);
         (controls as any).update?.();
+        invalidate();
       }
       return;
     }
 
-    if (!autoRotate) return;
     const { cx, cz, targetY } = buildingCenter;
     if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
       t.lerp(new THREE.Vector3(cx, targetY, cz), 0.05);
       (controls as any).update?.();
+      invalidate();
     }
   });
 
@@ -1576,8 +1574,9 @@ export function BuildingCanvas3D({
     <CanvasErrorBoundary>
     <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
+        frameloop="demand"
         shadows={lighting.shadowEnabled ? 'soft' : false}
-        dpr={dpr ?? [1, 2]}
+        dpr={dpr ?? [1, 1.5]}
         camera={{ position: initCamPos, fov: 45, near: 0.1, far: 1000 }}
         gl={{
           antialias: true,
@@ -1648,6 +1647,7 @@ export function BuildingCanvas3D({
 
         <OrbitControls
           makeDefault
+          regress
           minPolarAngle={0.05}
           maxPolarAngle={Math.PI / 2 - 0.01}
           minDistance={1}
