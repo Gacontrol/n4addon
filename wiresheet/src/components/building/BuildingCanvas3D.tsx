@@ -2,7 +2,7 @@ import { Suspense, useRef, useEffect, useMemo, useCallback, Component, ErrorInfo
 import { Canvas, useThree, useFrame, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Building, Slab, DEFAULT_LAYERS } from '../../types/building';
+import { Building, Slab, DEFAULT_LAYERS, WallOpening } from '../../types/building';
 import { computeRoomColor } from '../../utils/buildingModes';
 import { Widget3DMesh, RoomColorOverlay, DuctMesh, PipeMesh } from './Building3DWidgets';
 import { FurnitureMesh } from './Furniture3D';
@@ -245,7 +245,7 @@ interface RoomMeshProps {
   onHoverEnd?: () => void;
 }
 
-function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs, onHover, onHoverEnd }: RoomMeshProps) {
+const RoomMesh = memo(function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSelect, castShadow: cs, onHover, onHoverEnd }: RoomMeshProps) {
   const baseColor = hexToThree(color);
   const opacity = faded ? 0.08 : 0.18;
   const emissive = selected ? baseColor : new THREE.Color(0x000000);
@@ -308,7 +308,7 @@ function RoomMesh({ x, y, z, width, depth, height, color, selected, faded, onSel
       )}
     </group>
   );
-}
+});
 
 interface PolygonRoomMeshProps {
   points: { x: number; y: number }[];
@@ -323,7 +323,7 @@ interface PolygonRoomMeshProps {
   onHoverEnd?: () => void;
 }
 
-function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, faded, onSelect, onHover, onHoverEnd }: PolygonRoomMeshProps) {
+const PolygonRoomMesh = memo(function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, faded, onSelect, onHover, onHoverEnd }: PolygonRoomMeshProps) {
   const baseColor = hexToThree(color);
   const opacity = faded ? 0.08 : 0.18;
 
@@ -364,7 +364,9 @@ function PolygonRoomMesh({ points, offsetX, baseY, height, color, selected, fade
       />
     </mesh>
   );
-}
+});
+
+const EMPTY_OPENINGS: WallOpening[] = [];
 
 interface WallSegmentProps {
   x1: number;
@@ -379,12 +381,12 @@ interface WallSegmentProps {
   selected: boolean;
   faded: boolean;
   materialType: string;
-  openings: { type: string; position: number; width: number; height: number; sillHeight: number }[];
+  openings: WallOpening[];
   onSelect: () => void;
   castShadow: boolean;
 }
 
-function WallSegment({
+const WallSegment = memo(function WallSegment({
   x1, y1, x2, y2, baseY, height, thickness, color, opacity: wallOpacity,
   selected, faded, materialType, openings, onSelect, castShadow: cs
 }: WallSegmentProps) {
@@ -516,7 +518,7 @@ function WallSegment({
       )}
     </group>
   );
-}
+});
 
 interface FloorPlaneProps {
   minX: number;
@@ -530,7 +532,7 @@ interface FloorPlaneProps {
   onClick?: () => void;
 }
 
-function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded, onClick }: FloorPlaneProps) {
+const FloorPlane = memo(function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded, onClick }: FloorPlaneProps) {
   const w = maxX - minX;
   const d = maxZ - minZ;
   if (w < 0.1 || d < 0.1) return null;
@@ -569,7 +571,7 @@ function FloorPlane({ minX, maxX, minZ, maxZ, baseY, color, active, faded, onCli
       />
     </mesh>
   );
-}
+});
 
 interface WidgetPlacementHelperProps {
   buildings: Building[];
@@ -965,6 +967,8 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
   const { controls, invalidate } = useThree();
   const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
   const targetInitialized = useRef(false);
+  const _desiredVec = useRef(new THREE.Vector3());
+  const _lerpTarget = useRef(new THREE.Vector3());
 
   const buildingCenter = useMemo(() => {
     return computeBuildingBounds(buildings);
@@ -1004,7 +1008,7 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
     const t = (controls as any).target as THREE.Vector3;
 
     if (lockTarget) {
-      const desired = floorTargetOverride.current ?? new THREE.Vector3(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
+      const desired = floorTargetOverride.current ?? _desiredVec.current.set(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
       const dx = desired.x - t.x, dy = desired.y - t.y, dz = desired.z - t.z;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (dist > 0.001) {
@@ -1018,7 +1022,7 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
 
     const { cx, cz, targetY } = buildingCenter;
     if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
-      t.lerp(new THREE.Vector3(cx, targetY, cz), 0.05);
+      t.lerp(_lerpTarget.current.set(cx, targetY, cz), 0.05);
       (controls as any).update?.();
       invalidate();
     }
@@ -1289,13 +1293,7 @@ const BuildingScene = memo(function BuildingScene({
             selected={wall.id === selectedWallId}
             faded={faded}
             materialType={wallsTransparent ? 'glass' : (wall.materialType || 'concrete')}
-            openings={(wall.openings ?? []).map(o => ({
-              type: o.type,
-              position: o.position,
-              width: o.width,
-              height: o.height,
-              sillHeight: o.sillHeight || 0,
-            }))}
+            openings={wall.openings ?? EMPTY_OPENINGS}
             onSelect={!shouldIsolate && onFloorClick && handleFloorZoom
               ? () => { onSelectWall(wall.id); onSelectRoom(null); handleFloorZoom(); }
               : () => { onSelectWall(wall.id); onSelectRoom(null); }}
@@ -1492,13 +1490,13 @@ const BuildingScene = memo(function BuildingScene({
         intensity={lighting.sunIntensity}
         color="#fff8ee"
         castShadow={lighting.shadowEnabled}
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-near={0.5}
-        shadow-camera-far={250}
-        shadow-camera-left={-80}
-        shadow-camera-right={80}
-        shadow-camera-top={80}
-        shadow-camera-bottom={-80}
+        shadow-camera-far={200}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
         shadow-bias={-0.001}
         shadow-normalBias={0.02}
         shadow-radius={lighting.shadowSoftness}

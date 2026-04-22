@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import * as THREE from 'three';
 import { FurnitureItem } from '../../types/building';
 
@@ -195,7 +196,7 @@ function VehicleMesh({ item, offsetX, baseY, selected, faded, onSelect }: Furnit
   );
 }
 
-export function FurnitureMesh({ item, offsetX, baseY, selected, faded, onSelect }: FurnitureMeshProps) {
+export const FurnitureMesh = memo(function FurnitureMesh({ item, offsetX, baseY, selected, faded, onSelect }: FurnitureMeshProps) {
   if (item.shape === 'circle') {
     return <CircleMesh item={item} offsetX={offsetX} baseY={baseY} selected={selected} faded={faded} onSelect={onSelect} />;
   }
@@ -209,4 +210,4 @@ export function FurnitureMesh({ item, offsetX, baseY, selected, faded, onSelect 
     return <VehicleMesh item={item} offsetX={offsetX} baseY={baseY} selected={selected} faded={faded} onSelect={onSelect} />;
   }
   return <DeskMesh item={item} offsetX={offsetX} baseY={baseY} selected={selected} faded={faded} onSelect={onSelect} />;
-}
+});

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { MultiSelection } from './FloorPlanEditor';
 import {
   Building2, Plus, Trash2, ChevronUp, ChevronDown, Pencil,
@@ -548,6 +548,78 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
     return map;
   }, [pages, logicPageGroups, haEntities]);
 
+  // Stable callbacks for BuildingCanvas3D so BuildingScene.memo stays effective
+  const handleUpdateWidget3D = useCallback((widgetId: string, x: number, y: number, z: number) => {
+    if (!activeBuilding) return;
+    updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
+  }, [activeBuilding, updateWidget3D]);
+
+  const handleSelectRoom3D = useCallback((id: string | null) => {
+    setSelectedRoomId(id);
+    setSelectedWallId(null);
+    setSelectedWidget3DId(null);
+    setSelectedDuctId(null);
+    setSelectedPipeId(null);
+    setSelectedSlabId(null);
+    setSelectedFurnitureId(null);
+    setRoomDetailsOpen(!!id);
+  }, []);
+
+  const handleSelectWall3D = useCallback((id: string | null) => {
+    setSelectedWallId(id);
+    setSelectedRoomId(null);
+    setSelectedWidget3DId(null);
+    setSelectedDuctId(null);
+    setSelectedPipeId(null);
+    setSelectedSlabId(null);
+    setSelectedFurnitureId(null);
+    if (id) setShowRoomPanel(true);
+  }, []);
+
+  const handleSelectWidget3D = useCallback((id: string | null) => {
+    setSelectedWidget3DId(id);
+    setSelectedRoomId(null);
+    setSelectedWallId(null);
+    setSelectedDuctId(null);
+    setSelectedPipeId(null);
+    setSelectedSlabId(null);
+    setSelectedFurnitureId(null);
+    if (id) setShowRoomPanel(true);
+  }, []);
+
+  const handleSelectDuct3D = useCallback((id: string | null) => {
+    setSelectedDuctId(id);
+    setSelectedRoomId(null);
+    setSelectedWallId(null);
+    setSelectedWidget3DId(null);
+    setSelectedPipeId(null);
+    setSelectedSlabId(null);
+    setSelectedFurnitureId(null);
+    if (id) setShowRoomPanel(true);
+  }, []);
+
+  const handleSelectPipe3D = useCallback((id: string | null) => {
+    setSelectedPipeId(id);
+    setSelectedRoomId(null);
+    setSelectedWallId(null);
+    setSelectedWidget3DId(null);
+    setSelectedDuctId(null);
+    setSelectedSlabId(null);
+    setSelectedFurnitureId(null);
+    if (id) setShowRoomPanel(true);
+  }, []);
+
+  const handleSelectFurniture3D = useCallback((id: string | null) => {
+    setSelectedFurnitureId(id);
+    setSelectedRoomId(null);
+    setSelectedWallId(null);
+    setSelectedWidget3DId(null);
+    setSelectedDuctId(null);
+    setSelectedPipeId(null);
+    setSelectedSlabId(null);
+    if (id) setShowRoomPanel(true);
+  }, []);
+
   const openDatapointPicker = (target: 'new' | 'widget' | 'alarm') => {
     setDatapointPickerTarget(target);
     setEntitySearch('');
@@ -1078,26 +1150,16 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   selectedWidget3DId={selectedWidget3DId}
                   selectedDuctId={selectedDuctId}
                   selectedPipeId={selectedPipeId}
-                  onSelectRoom={id => {
-                    setSelectedRoomId(id); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null);
-                    if (id) {
-                      setRoomDetailsOpen(true);
-                    } else {
-                      setRoomDetailsOpen(false);
-                    }
-                  }}
-                  onSelectWall={id => { setSelectedWallId(id); setSelectedRoomId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
-                  onSelectWidget3D={id => { setSelectedWidget3DId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
-                  onSelectDuct={id => { setSelectedDuctId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedPipeId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
-                  onSelectPipe={id => { setSelectedPipeId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedSlabId(null); setSelectedFurnitureId(null); setShowRoomPanel(true); }}
+                  onSelectRoom={handleSelectRoom3D}
+                  onSelectWall={handleSelectWall3D}
+                  onSelectWidget3D={handleSelectWidget3D}
+                  onSelectDuct={handleSelectDuct3D}
+                  onSelectPipe={handleSelectPipe3D}
                   selectedFurnitureId={selectedFurnitureId}
-                  onSelectFurniture={id => { setSelectedFurnitureId(id); setSelectedRoomId(null); setSelectedWallId(null); setSelectedWidget3DId(null); setSelectedDuctId(null); setSelectedPipeId(null); setSelectedSlabId(null); if (id) setShowRoomPanel(true); }}
+                  onSelectFurniture={handleSelectFurniture3D}
                   wallsTransparent={wallsTransparent}
                   xrayOpacity={xrayOpacity}
-                  onUpdateWidget3D={(widgetId, x, y, z) => {
-                    if (!activeBuilding) return;
-                    updateWidget3D(activeBuilding.id, widgetId, { x, y, z });
-                  }}
+                  onUpdateWidget3D={handleUpdateWidget3D}
                   highlightFloor={!showAllFloors}
                   bgColor={bgColor}
                   floorTransparent={floorTransparent}

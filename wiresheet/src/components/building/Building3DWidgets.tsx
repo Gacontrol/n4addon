@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, useState, Suspense } from 'react';
+import { useRef, useMemo, useEffect, useState, Suspense, memo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -472,7 +472,7 @@ interface Widget3DMeshProps {
   datapointLabel?: string;
 }
 
-export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd, datapointLabel }: Widget3DMeshProps) {
+export const Widget3DMesh = memo(function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelect, baseY, onDragEnd, datapointLabel }: Widget3DMeshProps) {
   const baseColor = widget.color || WIDGET_COLORS[widget.type] || '#94a3b8';
   const wx = widget.x;
   const wy = baseY + widget.z;
@@ -751,7 +751,7 @@ export function Widget3DMesh({ widget, liveValue, alarmActive, selected, onSelec
       />
     </group>
   );
-}
+});
 
 interface RoomColorOverlayProps {
   widget: Widget3D;
@@ -765,7 +765,7 @@ interface RoomColorOverlayProps {
   onSelect: () => void;
 }
 
-export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, buildings, liveValue, alarmActive, selected, onSelect }: RoomColorOverlayProps) {
+export const RoomColorOverlay = memo(function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, buildings, liveValue, alarmActive, selected, onSelect }: RoomColorOverlayProps) {
   const roomIds: string[] = (widget as any).roomIds ?? [];
 
   type RoomEntry =
@@ -850,7 +850,7 @@ export function RoomColorOverlay({ widget, baseY, floorHeight, offsetX, building
       })}
     </group>
   );
-}
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DUCT NETWORK – node-based architecture (Revit / MagiCAD style)
@@ -1386,7 +1386,7 @@ interface DuctMeshProps {
   onSelect: () => void;
 }
 
-export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: DuctMeshProps) {
+export const DuctMesh = memo(function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: DuctMeshProps) {
   const color    = duct.color || DUCT_COLORS[duct.type] || '#60a5fa';
   const elev     = baseY + (duct.elevation ?? 2.4);
   const w        = duct.width  || 0.3;
@@ -1537,7 +1537,7 @@ export function DuctMesh({ duct, offsetX, baseY, selected, faded, onSelect }: Du
 
     </group>
   );
-}
+});
 
 interface PipeMeshProps {
   pipe: Pipe;
@@ -1548,7 +1548,7 @@ interface PipeMeshProps {
   onSelect: () => void;
 }
 
-export function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: PipeMeshProps) {
+export const PipeMesh = memo(function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: PipeMeshProps) {
   const color = pipe.color || PIPE_COLORS[pipe.type] || '#ef4444';
   const elev  = baseY + (pipe.elevation ?? 2.2);
   const r     = (pipe.diameter || 0.05) / 2;
@@ -1647,4 +1647,4 @@ export function PipeMesh({ pipe, offsetX, baseY, selected, faded, onSelect }: Pi
       })}
     </group>
   );
-}
+});
