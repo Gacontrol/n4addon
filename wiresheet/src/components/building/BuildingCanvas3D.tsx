@@ -964,16 +964,14 @@ function CameraAutoFit({ buildings, explosionOffset = 0 }: { buildings: Building
 }
 
 function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: Building[]; autoRotate?: boolean; lockTarget?: boolean }) {
-  const { controls, invalidate } = useThree();
+  const { controls } = useThree();
   const floorTargetOverride = useRef<THREE.Vector3 | null>(null);
   const targetInitialized = useRef(false);
   const _desiredVec = useRef(new THREE.Vector3());
-  const _lerpTarget = useRef(new THREE.Vector3());
 
-  const buildingCenter = useMemo(() => {
-    return computeBuildingBounds(buildings);
-  }, [buildings]);
+  const buildingCenter = useMemo(() => computeBuildingBounds(buildings), [buildings]);
 
+  // Set initial target once
   useEffect(() => {
     if (!buildingCenter || !controls || !(controls as any).target) return;
     if (targetInitialized.current) return;
@@ -988,9 +986,7 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
       const { cx, baseY, cz, floorHeight } = (e as CustomEvent<FocusFloorDetail>).detail;
       floorTargetOverride.current = new THREE.Vector3(cx, baseY + floorHeight / 2, cz);
     };
-    const onReset = () => {
-      floorTargetOverride.current = null;
-    };
+    const onReset = () => { floorTargetOverride.current = null; };
     window.addEventListener('focus-floor', onFloorFocus);
     window.addEventListener('set-camera-pos', onReset);
     window.addEventListener('focus-room', onReset);
@@ -1001,30 +997,15 @@ function DynamicOrbitTarget({ buildings, autoRotate, lockTarget }: { buildings: 
     };
   }, []);
 
+  // Only run useFrame when lockTarget is active — avoid per-frame cost otherwise
   useFrame(() => {
-    if (!buildingCenter || !controls || !(controls as any).target) return;
-    if (!lockTarget && !autoRotate) return;
-
+    if (!lockTarget || !buildingCenter || !controls || !(controls as any).target) return;
     const t = (controls as any).target as THREE.Vector3;
-
-    if (lockTarget) {
-      const desired = floorTargetOverride.current ?? _desiredVec.current.set(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
-      const dx = desired.x - t.x, dy = desired.y - t.y, dz = desired.z - t.z;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist > 0.001) {
-        const alpha = Math.min(dist > 0.5 ? 0.12 : 0.18, 1);
-        t.lerp(desired, alpha);
-        (controls as any).update?.();
-        invalidate();
-      }
-      return;
-    }
-
-    const { cx, cz, targetY } = buildingCenter;
-    if (Math.abs(t.x - cx) > 0.01 || Math.abs(t.y - targetY) > 0.01 || Math.abs(t.z - cz) > 0.01) {
-      t.lerp(_lerpTarget.current.set(cx, targetY, cz), 0.05);
+    const desired = floorTargetOverride.current ?? _desiredVec.current.set(buildingCenter.cx, buildingCenter.targetY, buildingCenter.cz);
+    const dx = desired.x - t.x, dy = desired.y - t.y, dz = desired.z - t.z;
+    if (dx * dx + dy * dy + dz * dz > 0.0001) {
+      t.lerp(desired, 0.2);
       (controls as any).update?.();
-      invalidate();
     }
   });
 
@@ -1547,16 +1528,14 @@ const BuildingScene = memo(function BuildingScene({
         intensity={lighting.sunIntensity}
         color="#fff8ee"
         castShadow={lighting.shadowEnabled}
-        shadow-mapSize={[1024, 1024]}
-        shadow-camera-near={0.5}
-        shadow-camera-far={200}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-bias={-0.001}
-        shadow-normalBias={0.02}
-        shadow-radius={lighting.shadowSoftness}
+        shadow-mapSize={[512, 512]}
+        shadow-camera-near={1}
+        shadow-camera-far={150}
+        shadow-camera-left={-50}
+        shadow-camera-right={50}
+        shadow-camera-top={50}
+        shadow-camera-bottom={-50}
+        shadow-bias={-0.002}
       />
 
       <directionalLight
@@ -1637,10 +1616,10 @@ export function BuildingCanvas3D({
     <CanvasErrorBoundary>
     <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
-        frameloop="demand"
-        shadows={lighting.shadowEnabled ? 'soft' : false}
-        dpr={dpr ?? [1, 1.5]}
-        camera={{ position: initCamPos, fov: 45, near: 0.1, far: 1000 }}
+        frameloop="always"
+        shadows={lighting.shadowEnabled}
+        dpr={dpr ?? [1, 1]}
+        camera={{ position: initCamPos, fov: 45, near: 0.5, far: 600 }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
@@ -1648,6 +1627,8 @@ export function BuildingCanvas3D({
           outputColorSpace: THREE.SRGBColorSpace,
           alpha: bgTransparent,
           powerPreference: 'high-performance',
+          stencil: false,
+          depth: true,
         }}
         onPointerMissed={() => { stableSelectRoom(null); stableSelectWall(null); stableSelectWidget3D(null); stableSelectDuct(null); stableSelectPipe(null); stableSelectFurniture(null); }}
         style={{
@@ -1661,7 +1642,7 @@ export function BuildingCanvas3D({
         }}
       >
         {!bgTransparent && <color attach="background" args={[bgColor]} />}
-        {!bgTransparent && <fog attach="fog" args={[effectiveBgColor, 60, 200]} />}
+        {!bgTransparent && <fog attach="fog" args={[effectiveBgColor, 80, 400]} />}
 
         <Suspense fallback={null}>
           <BuildingScene
@@ -1710,16 +1691,15 @@ export function BuildingCanvas3D({
 
         <OrbitControls
           makeDefault
-          regress
           minPolarAngle={0.05}
           maxPolarAngle={Math.PI / 2 - 0.01}
           minDistance={1}
           maxDistance={200}
           enableDamping
-          dampingFactor={0.08}
-          panSpeed={0.8}
-          rotateSpeed={0.6}
-          zoomSpeed={1.0}
+          dampingFactor={0.25}
+          panSpeed={1.2}
+          rotateSpeed={0.9}
+          zoomSpeed={1.2}
           autoRotate={autoRotate}
           autoRotateSpeed={autoRotateSpeed}
           enablePan={!lockTarget}
