@@ -1,4 +1,4 @@
-import { Suspense, useRef, useEffect, useMemo, useCallback, Component, ErrorInfo, ReactNode } from 'react';
+import { Suspense, useRef, useEffect, useMemo, useCallback, Component, ErrorInfo, ReactNode, memo } from 'react';
 import { Canvas, useThree, useFrame, ThreeEvent } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -1063,7 +1063,7 @@ interface BuildingSceneProps {
   onRoomHover?: (roomId: string | null, clientX?: number, clientY?: number) => void;
 }
 
-function BuildingScene({
+const BuildingScene = memo(function BuildingScene({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
   selectedWidget3DId, selectedDuctId, selectedPipeId, selectedFurnitureId,
   onSelectRoom, onSelectWall, onSelectWidget3D, onSelectDuct, onSelectPipe, onSelectFurniture, onUpdateWidget3D,
@@ -1529,7 +1529,7 @@ function BuildingScene({
       )}
     </>
   );
-}
+});
 
 export function BuildingCanvas3D({
   buildings, activeFloorId, selectedRoomId, selectedWallId,
@@ -1562,6 +1562,14 @@ export function BuildingCanvas3D({
 }: Props) {
   const effectiveBgColor = bgTransparent ? '#000000' : bgColor;
 
+  // Stabilize callbacks so BuildingScene.memo doesn't break on every parent render
+  const stableSelectRoom = useCallback((id: string | null) => onSelectRoom(id), [onSelectRoom]);
+  const stableSelectWall = useCallback((id: string | null) => onSelectWall(id), [onSelectWall]);
+  const stableSelectWidget3D = useCallback((id: string | null) => onSelectWidget3D?.(id), [onSelectWidget3D]);
+  const stableSelectDuct = useCallback((id: string | null) => onSelectDuct?.(id), [onSelectDuct]);
+  const stableSelectPipe = useCallback((id: string | null) => onSelectPipe?.(id), [onSelectPipe]);
+  const stableSelectFurniture = useCallback((id: string | null) => onSelectFurniture?.(id), [onSelectFurniture]);
+
   const initialBounds = computeBuildingBounds(buildings);
   let initCamPos: [number, number, number] = [14, 18, 20];
   if (initialBounds) {
@@ -1586,7 +1594,7 @@ export function BuildingCanvas3D({
           alpha: bgTransparent,
           powerPreference: 'high-performance',
         }}
-        onPointerMissed={() => { onSelectRoom(null); onSelectWall(null); onSelectWidget3D?.(null); onSelectDuct?.(null); onSelectPipe?.(null); onSelectFurniture?.(null); }}
+        onPointerMissed={() => { stableSelectRoom(null); stableSelectWall(null); stableSelectWidget3D(null); stableSelectDuct(null); stableSelectPipe(null); stableSelectFurniture(null); }}
         style={{
           background: bgTransparent ? 'transparent' : bgColor,
           display: 'block',
@@ -1610,12 +1618,12 @@ export function BuildingCanvas3D({
             selectedDuctId={selectedDuctId}
             selectedPipeId={selectedPipeId}
             selectedFurnitureId={selectedFurnitureId}
-            onSelectRoom={onSelectRoom}
-            onSelectWall={onSelectWall}
-            onSelectWidget3D={onSelectWidget3D}
-            onSelectDuct={onSelectDuct}
-            onSelectPipe={onSelectPipe}
-            onSelectFurniture={onSelectFurniture}
+            onSelectRoom={stableSelectRoom}
+            onSelectWall={stableSelectWall}
+            onSelectWidget3D={stableSelectWidget3D}
+            onSelectDuct={stableSelectDuct}
+            onSelectPipe={stableSelectPipe}
+            onSelectFurniture={stableSelectFurniture}
             onUpdateWidget3D={onUpdateWidget3D}
             onPlaceWidget={onPlaceWidget}
             widgetPlacementMode={widgetPlacementMode}

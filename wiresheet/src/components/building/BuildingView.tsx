@@ -3020,6 +3020,12 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                     ))}
                   </>
                 );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {roomDetailsOpen && activeBuilding && activeFloor && selectedRoom && (
         <RoomDetailsPage
           building={activeBuilding}
@@ -3040,12 +3046,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
           onClose={() => setRoomDetailsOpen(false)}
           onOpenBindings={() => { setRoomDetailsOpen(false); setRoomBindingsOpen(true); }}
         />
-      )}
-
-              })()}
-            </div>
-          </div>
-        </div>
       )}
 
       {roomBindingsOpen && activeBuilding && activeFloor && selectedRoom && (
