@@ -1662,8 +1662,8 @@ export function BuildingCanvas3D({
     <div className="select-none" style={{ position: 'relative', width: '100%', height: '100%', ...(bgTransparent ? { background: 'transparent' } : {}) }}>
       <Canvas
         frameloop="demand"
-        shadows={lighting.shadowEnabled}
-        dpr={dpr ?? [1, 1]}
+        shadows={{ type: THREE.PCFShadowMap }}
+        dpr={dpr ?? 1}
         camera={{ position: initCamPos, fov: 45, near: 0.5, far: 600 }}
         gl={{
           antialias: true,
