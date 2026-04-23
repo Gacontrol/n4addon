@@ -51,11 +51,27 @@ export interface DataPoint {
   historicValues?: { ts: number; value: number }[];
 }
 
+export type WidgetType =
+  | 'kpi'
+  | 'row'
+  | 'slider'
+  | 'incrementer'
+  | 'gauge'
+  | 'badge'
+  | 'switch'
+  | 'chart'
+  | 'label';
+
 export interface RoomDataPointConfig {
   datapointId: string;
   label: string;
   displayType: DataPointDisplayType;
+  widgetType: WidgetType;
   order: number;
+  panelCol?: number;
+  panelRow?: number;
+  panelW?: number;
+  panelH?: number;
   showInMonitor: boolean;
   showInService: boolean;
   showInTooltip: boolean;
@@ -63,6 +79,11 @@ export interface RoomDataPointConfig {
   isPrimaryRoomKPI: boolean;
   isPrimaryBuildingPoint: boolean;
   writable: boolean;
+  unit?: string;
+  minValue?: number;
+  maxValue?: number;
+  category?: string;
+  sourceDatapoint?: string;
 }
 
 export interface RoomMonitorConfig {

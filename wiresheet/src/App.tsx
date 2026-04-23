@@ -1266,6 +1266,20 @@ function App() {
   const allLogicNodes = pages.flatMap(p => p.nodes);
   const allNodeIdsStr = allLogicNodes.map(n => n.id).sort().join(',');
 
+  const appLogicPageGroups = useMemo(() => pages.map(page => ({
+    pageId: page.id,
+    pageName: page.name,
+    datapoints: page.nodes
+      .filter(n => n.type === 'datapoint' || n.type === 'dp-read' || n.type === 'dp-write' || n.type === 'ha-entity')
+      .map(n => ({
+        entityId: (n.data.config as Record<string, unknown> | undefined)?.['dpKey'] as string
+          || (n.data.config as Record<string, unknown> | undefined)?.['entityId'] as string
+          || n.id,
+        label: n.data.label || (n.data.config as Record<string, unknown> | undefined)?.['label'] as string || n.id,
+      }))
+      .filter(d => d.entityId),
+  })).filter(g => g.datapoints.length > 0), [pages]);
+
   useEffect(() => {
     const nodeIdSet = new Set(allNodeIdsStr.split(',').filter(Boolean));
     const orphanedBindings = driverBindings.filter(b => !nodeIdSet.has(b.nodeId));
@@ -1660,6 +1674,7 @@ function App() {
         roomId={activeRoomId}
         onBack={() => setMainView('roomMonitor')}
         onOpenMonitor={() => setMainView('roomMonitor')}
+        datapointGroups={appLogicPageGroups}
       />
     );
   }

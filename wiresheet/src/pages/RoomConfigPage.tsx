@@ -1,14 +1,19 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Check, Thermometer, Wind, Droplets, Activity, Users, AlertTriangle,
-  Zap, Settings, Eye, EyeOff, Star, Building2, GripVertical, ChevronDown, ChevronUp,
-  Gauge, RefreshCw, Plug, Fan, Lightbulb, Bell, Snowflake, Flame
+  Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
+  Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
+  SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
+  Monitor,
 } from 'lucide-react';
-import { RoomMonitorConfig, RoomDataPointConfig } from '../types/bms';
+import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../types/bms';
 import { RoomDataPointBinding } from '../types/building';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
+import type { DatapointGroup } from '../components/building/RoomBindingsPanel';
+
+// ---- Category display helpers ----
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   temperature: <Thermometer size={13} />,
@@ -36,376 +41,461 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   generic: <Activity size={13} />,
 };
 
+const CATEGORY_COLORS: Record<string, string> = {
+  temperature: '#ef4444',
+  setpoint: '#f97316',
+  humidity: '#06b6d4',
+  co2: '#a78bfa',
+  airflow: '#0ea5e9',
+  occupancy: '#10b981',
+  alarm: '#ef4444',
+  energy: '#f59e0b',
+  valvePosition: '#14b8a6',
+  fanSpeed: '#6366f1',
+  mode: '#8b5cf6',
+  generic: '#64748b',
+  light: '#fbbf24',
+  pump: '#22c55e',
+  cold: '#67e8f9',
+};
+
 const STATUS_COLORS: Record<string, string> = {
   ok: '#22c55e', warning: '#f59e0b', alarm: '#ef4444', offline: '#64748b',
 };
 
-const DISPLAY_TYPE_LABELS: Record<string, string> = {
-  kpi: 'KPI-Kachel',
-  row: 'Zeile',
-  badge: 'Badge',
-  trend: 'Trend',
-  statusIcon: 'Status-Symbol',
-  trafficLight: 'Ampel',
-  miniChart: 'Mini-Chart',
-};
+// ---- Widget type definitions ----
 
-function bindingToConfig(b: RoomDataPointBinding, index: number): RoomDataPointConfig {
-  return {
-    datapointId: b.id,
-    label: b.label ?? b.datapoint,
-    displayType: b.category === 'alarm' ? 'badge' : index < 4 ? 'kpi' : 'row',
-    order: b.order ?? index,
-    showInMonitor: b.showInRoom !== false,
-    showInService: true,
-    showInTooltip: index < 3,
-    showInBuilding: b.showInBuilding !== false,
-    isPrimaryRoomKPI: index === 0,
-    isPrimaryBuildingPoint: index === 0,
-    writable: b.writable ?? false,
-  };
-}
+const WIDGET_TYPES: {
+  type: WidgetType;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+  defaultW: number;
+  defaultH: number;
+}[] = [
+  { type: 'kpi',         label: 'KPI',        icon: <Hash size={13} />,              description: 'Großer Zahlenwert',    defaultW: 1, defaultH: 1 },
+  { type: 'gauge',       label: 'Gauge',       icon: <CircleDot size={13} />,          description: 'Kreisanzeige',          defaultW: 1, defaultH: 1 },
+  { type: 'slider',      label: 'Slider',      icon: <SlidersHorizontal size={13} />,  description: 'Sollwert-Regler',       defaultW: 2, defaultH: 1 },
+  { type: 'incrementer', label: 'Inkrement.',  icon: <ChevronLeft size={13} />,        description: '+/– Schaltflächen',     defaultW: 1, defaultH: 1 },
+  { type: 'switch',      label: 'Schalter',    icon: <ToggleLeft size={13} />,         description: 'Ein/Aus',               defaultW: 1, defaultH: 1 },
+  { type: 'badge',       label: 'Badge',       icon: <AlertTriangle size={13} />,      description: 'Status-Badge',          defaultW: 1, defaultH: 1 },
+  { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',        defaultW: 2, defaultH: 1 },
+  { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,          description: 'Historischer Verlauf',  defaultW: 2, defaultH: 1 },
+  { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',     defaultW: 1, defaultH: 1 },
+];
 
-// ---- Live Preview ----
+// ---- Grid constants ----
 
-function getMockValue(category: string, binding: RoomDataPointBinding): { value: string; unit: string; status: string } {
-  const seed = binding.id.charCodeAt(binding.id.length - 1) || 42;
-  const rand = ((seed * 9301 + 49297) % 233280) / 233280;
-  const unit = binding.unit ?? '';
-  switch (category) {
-    case 'temperature': return { value: (19 + rand * 8).toFixed(1), unit: unit || '°C', status: rand > 0.85 ? 'alarm' : rand > 0.7 ? 'warning' : 'ok' };
-    case 'setpoint': return { value: (20 + rand * 3).toFixed(1), unit: unit || '°C', status: 'ok' };
-    case 'humidity': return { value: (35 + rand * 35).toFixed(0), unit: unit || '%', status: rand > 0.85 ? 'warning' : 'ok' };
-    case 'co2': return { value: (400 + rand * 800).toFixed(0), unit: unit || 'ppm', status: rand > 0.7 ? 'warning' : 'ok' };
-    case 'airflow': return { value: (rand * 400).toFixed(0), unit: unit || 'm³/h', status: 'ok' };
-    case 'occupancy': return { value: rand > 0.5 ? 'Belegt' : 'Frei', unit: '', status: 'ok' };
-    case 'alarm': return { value: rand > 0.8 ? 'Alarm' : 'OK', unit: '', status: rand > 0.8 ? 'alarm' : 'ok' };
-    case 'energy': return { value: (rand * 1200).toFixed(0), unit: unit || 'W', status: 'ok' };
-    default: return { value: (rand * 100).toFixed(1), unit, status: 'ok' };
+const COLS = 4;
+const ROWS = 8;
+const CW = 144;
+const CH = 84;
+const GAP = 8;
+
+// ---- Mock value for widget previews ----
+
+function mockVal(cat: string, unit?: string) {
+  const r = ((cat.charCodeAt(0) * 9301 + 49297) % 233280) / 233280;
+  const u = unit ?? '';
+  switch (cat) {
+    case 'temperature': return { v: (19 + r * 8).toFixed(1), u: u || '°C', n: 19 + r * 8, s: r > 0.85 ? 'alarm' : r > 0.7 ? 'warning' : 'ok' };
+    case 'setpoint':    return { v: (20 + r * 3).toFixed(1), u: u || '°C', n: 20 + r * 3, s: 'ok' };
+    case 'humidity':    return { v: (35 + r * 35).toFixed(0), u: u || '%', n: 35 + r * 35, s: r > 0.85 ? 'warning' : 'ok' };
+    case 'co2':         return { v: (400 + r * 800).toFixed(0), u: u || 'ppm', n: 400 + r * 800, s: r > 0.7 ? 'warning' : 'ok' };
+    case 'airflow':     return { v: (r * 400).toFixed(0), u: u || 'm³/h', n: r * 400, s: 'ok' };
+    case 'occupancy':   return { v: r > 0.5 ? 'Belegt' : 'Frei', u: '', n: r > 0.5 ? 1 : 0, s: 'ok' };
+    case 'alarm':       return { v: r > 0.8 ? 'Alarm' : 'OK', u: '', n: r > 0.8 ? 1 : 0, s: r > 0.8 ? 'alarm' : 'ok' };
+    case 'energy':      return { v: (r * 1200).toFixed(0), u: u || 'W', n: r * 1200, s: 'ok' };
+    default:            return { v: (r * 100).toFixed(1), u, n: r * 100, s: 'ok' };
   }
 }
 
-interface PreviewProps {
-  roomName: string;
-  roomColor: string;
-  accentColor: string;
-  configs: RoomDataPointConfig[];
-  bindings: RoomDataPointBinding[];
-}
+// ---- Widget preview ----
 
-function LivePreview({ roomName, roomColor, accentColor, configs, bindings }: PreviewProps) {
-  const visible = configs.filter(c => c.showInMonitor).sort((a, b) => a.order - b.order);
-  const kpis = visible.filter(c => c.displayType === 'kpi').slice(0, 4);
-  const rows = visible.filter(c => c.displayType !== 'kpi');
-  const primary = kpis[0] ?? rows[0];
-  const primaryBinding = primary ? bindings.find(b => b.id === primary.datapointId) : null;
-  const primaryMock = primaryBinding ? getMockValue(primaryBinding.category, primaryBinding) : null;
+function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; accent: string; selected: boolean }) {
+  const cat = cfg.category ?? 'generic';
+  const m = mockVal(cat, cfg.unit);
+  const icon = CATEGORY_ICONS[cat] ?? CATEGORY_ICONS.generic;
+  const cc = CATEGORY_COLORS[cat] ?? '#64748b';
+  const sc = STATUS_COLORS[m.s] ?? '#64748b';
+  const min = cfg.minValue ?? 0;
+  const max = cfg.maxValue ?? 100;
+  const pct = Math.min(100, Math.max(0, ((m.n - min) / (max - min)) * 100));
+  const border = selected ? `2px solid ${accent}` : '1px solid rgba(100,116,139,0.25)';
 
-  return (
-    <div className="bg-slate-900 border border-slate-700/60 rounded-xl overflow-hidden shadow-xl">
-      <div
-        className="px-4 py-3 border-b border-slate-800"
-        style={{ borderLeftColor: accentColor || roomColor, borderLeftWidth: 3 }}
-      >
-        <div className="flex items-center gap-2 mb-0.5">
-          <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: roomColor || '#94a3b8' }} />
-          <span className="text-sm font-semibold text-white truncate flex-1">{roomName}</span>
-          {primaryMock && (
-            <span className="text-sm font-bold shrink-0" style={{ color: STATUS_COLORS[primaryMock.status] || '#94a3b8' }}>
-              {primaryMock.value}{primaryMock.unit ? ` ${primaryMock.unit}` : ''}
-            </span>
-          )}
-        </div>
-        {primary && <p className="text-[10px] text-slate-500">{primary.label}</p>}
-      </div>
+  const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80';
 
-      {kpis.length > 0 && (
-        <div className={`grid gap-2 p-3 grid-cols-2`}>
-          {kpis.map(cfg => {
-            const b = bindings.find(x => x.id === cfg.datapointId);
-            const mock = b ? getMockValue(b.category, b) : null;
-            const icon = CATEGORY_ICONS[b?.category ?? 'generic'] ?? CATEGORY_ICONS.generic;
-            const statusColor = mock ? (STATUS_COLORS[mock.status] || '#94a3b8') : '#94a3b8';
-            return (
-              <div key={cfg.datapointId} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-2.5">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span style={{ color: statusColor }}>{icon}</span>
-                  <span className="text-[10px] text-slate-400 truncate">{cfg.label}</span>
-                </div>
-                {mock && (
-                  <div className="flex items-end gap-1">
-                    <span className="text-base font-bold text-white leading-none">{mock.value}</span>
-                    {mock.unit && <span className="text-[10px] text-slate-400 pb-0.5">{mock.unit}</span>}
-                  </div>
-                )}
-                {cfg.writable && mock && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[9px] text-slate-500">Sollwert</span>
-                      <span className="text-[9px] text-sky-400">{mock.value} {mock.unit}</span>
-                    </div>
-                    <div className="relative h-1.5 rounded-full bg-slate-700 overflow-hidden">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{
-                          width: `${Math.min(100, Math.max(0, (parseFloat(mock.value) - (b?.minValue ?? 15)) / ((b?.maxValue ?? 30) - (b?.minValue ?? 15)) * 100))}%`,
-                          background: accentColor || '#0ea5e9',
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {rows.length > 0 && (
-        <div className="px-3 pb-3 flex flex-col gap-1">
-          {rows.slice(0, 4).map(cfg => {
-            const b = bindings.find(x => x.id === cfg.datapointId);
-            const mock = b ? getMockValue(b.category, b) : null;
-            const icon = CATEGORY_ICONS[b?.category ?? 'generic'] ?? CATEGORY_ICONS.generic;
-            const statusColor = mock ? (STATUS_COLORS[mock.status] || '#94a3b8') : '#94a3b8';
-            return (
-              <div key={cfg.datapointId} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-slate-800/40 border border-slate-700/40">
-                <span style={{ color: statusColor }} className="shrink-0">{icon}</span>
-                <span className="text-[11px] text-slate-300 flex-1 truncate">{cfg.label}</span>
-                {mock && (
-                  <span className="text-[11px] font-semibold text-white shrink-0">
-                    {mock.value}{mock.unit ? ` ${mock.unit}` : ''}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {rows.length > 4 && (
-            <p className="text-[10px] text-slate-600 text-center py-0.5">+{rows.length - 4} weitere</p>
-          )}
-        </div>
-      )}
-
-      {visible.length === 0 && (
-        <div className="px-4 py-8 text-center text-slate-600 text-xs">
-          Keine sichtbaren Datenpunkte konfiguriert
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---- Config Row ----
-
-interface ConfigRowProps {
-  cfg: RoomDataPointConfig;
-  binding?: RoomDataPointBinding;
-  onChange: (updated: RoomDataPointConfig) => void;
-  onDelete: () => void;
-}
-
-function ConfigRow({ cfg, binding, onChange, onDelete }: ConfigRowProps) {
-  const [expanded, setExpanded] = useState(false);
-  const category = (binding?.category ?? 'generic') as string;
-  const icon = CATEGORY_ICONS[category] ?? CATEGORY_ICONS.generic;
-
-  return (
-    <div className={`bg-slate-800/70 border rounded-xl overflow-hidden transition-all ${cfg.showInMonitor ? 'border-slate-700' : 'border-slate-800 opacity-60'}`}>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <GripVertical size={13} className="text-slate-600 cursor-grab shrink-0" />
-        <span className="text-slate-400 shrink-0">{icon}</span>
-        <div className="flex-1 min-w-0">
-          <input
-            type="text"
-            value={cfg.label}
-            onChange={e => onChange({ ...cfg, label: e.target.value })}
-            className="w-full bg-transparent text-sm text-slate-200 focus:outline-none"
-          />
-          {binding && (
-            <p className="text-[10px] text-slate-600 font-mono truncate">{binding.datapoint}</p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={() => onChange({ ...cfg, showInMonitor: !cfg.showInMonitor })}
-            title={cfg.showInMonitor ? 'Im Monitor sichtbar' : 'Versteckt'}
-            className={`p-1.5 rounded-lg transition-colors ${cfg.showInMonitor ? 'text-sky-400 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-700 hover:text-slate-400'}`}
-          >
-            {cfg.showInMonitor ? <Eye size={13} /> : <EyeOff size={13} />}
-          </button>
-          <button
-            onClick={() => onChange({ ...cfg, isPrimaryBuildingPoint: !cfg.isPrimaryBuildingPoint })}
-            title="Gebäude-Hauptwert"
-            className={`p-1.5 rounded-lg transition-colors ${cfg.isPrimaryBuildingPoint ? 'text-amber-400 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-700 hover:text-slate-400'}`}
-          >
-            <Building2 size={13} />
-          </button>
-          <button
-            onClick={() => onChange({ ...cfg, isPrimaryRoomKPI: !cfg.isPrimaryRoomKPI })}
-            title="Primärer Raum-KPI"
-            className={`p-1.5 rounded-lg transition-colors ${cfg.isPrimaryRoomKPI ? 'text-yellow-400 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-700 hover:text-slate-400'}`}
-          >
-            <Star size={13} />
-          </button>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className={`p-1.5 rounded-lg transition-colors ${expanded ? 'text-slate-300 bg-slate-700' : 'text-slate-500 hover:bg-slate-700 hover:text-slate-300'}`}
-          >
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 rounded-lg text-slate-600 hover:bg-red-900/40 hover:text-red-400 transition-colors"
-          >
-            <AlertTriangle size={12} />
-          </button>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="border-t border-slate-700/50 px-3 py-3 bg-slate-900/40 grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1.5">Darstellung</label>
-            <select
-              value={cfg.displayType}
-              onChange={e => onChange({ ...cfg, displayType: e.target.value as RoomDataPointConfig['displayType'] })}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-            >
-              {Object.entries(DISPLAY_TYPE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={cfg.writable}
-                onChange={e => onChange({ ...cfg, writable: e.target.checked })}
-                className="rounded border-slate-600 accent-sky-500"
-              />
-              Steuerbar (Sollwert-Slider)
-            </label>
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={cfg.showInTooltip}
-                onChange={e => onChange({ ...cfg, showInTooltip: e.target.checked })}
-                className="rounded border-slate-600 accent-sky-500"
-              />
-              Im Tooltip anzeigen
-            </label>
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={cfg.showInBuilding}
-                onChange={e => onChange({ ...cfg, showInBuilding: e.target.checked })}
-                className="rounded border-slate-600 accent-sky-500"
-              />
-              Im Gebäude-Layer
-            </label>
-            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={cfg.showInService}
-                onChange={e => onChange({ ...cfg, showInService: e.target.checked })}
-                className="rounded border-slate-600 accent-sky-500"
-              />
-              Im Service-Modus
-            </label>
-          </div>
-          {binding && (
-            <div className="col-span-2 bg-slate-800/60 rounded-lg px-3 py-2 border border-slate-700/40">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Datenpunkt-Binding</p>
-              <p className="text-xs text-slate-200 font-mono truncate">{binding.datapoint}</p>
-              {binding.unit && <p className="text-[10px] text-slate-500 mt-0.5">Einheit: {binding.unit}</p>}
-              {(binding.minValue !== undefined || binding.maxValue !== undefined) && (
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Bereich: {binding.minValue ?? '—'} … {binding.maxValue ?? '—'}
-                </p>
-              )}
+  switch (cfg.widgetType) {
+    case 'slider':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col justify-between p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
+              <span className="text-xs font-bold text-white shrink-0">{m.v}<span className="text-[9px] font-normal text-slate-400 ml-0.5">{m.u}</span></span>
             </div>
-          )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
+              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
+              </div>
+              <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-  );
+      );
+
+    case 'incrementer':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold">−</div>
+              <span className="text-sm font-bold text-white min-w-8 text-center">{m.v}</span>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ background: accent }}>+</div>
+            </div>
+            <span className="text-[9px] text-slate-500">{m.u}</span>
+          </div>
+        </div>
+      );
+
+    case 'gauge':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="relative w-12 h-12">
+              <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
+                <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
+                <circle cx="24" cy="24" r="18" fill="none" stroke={accent} strokeWidth="4"
+                  strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center rotate-90">
+                <span className="text-[10px] font-bold text-white">{m.v}</span>
+              </div>
+            </div>
+            <span className="text-[9px] text-slate-500">{m.u}</span>
+          </div>
+        </div>
+      );
+
+    case 'badge':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
+            <span style={{ color: cc }}>{icon}</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
+            <span className="text-[9px] text-slate-500 truncate text-center">{cfg.label}</span>
+          </div>
+        </div>
+      );
+
+    case 'switch':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="w-9 h-5 rounded-full flex items-center px-0.5" style={{ background: accent }}>
+              <div className="w-4 h-4 bg-white rounded-full ml-auto shadow" />
+            </div>
+            <span className="text-[9px] text-slate-400">EIN</span>
+          </div>
+        </div>
+      );
+
+    case 'chart':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col justify-between p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
+              <span className="text-xs font-bold text-white shrink-0">{m.v} {m.u}</span>
+            </div>
+            <svg viewBox="0 0 80 20" className="w-full" preserveAspectRatio="none">
+              {[.4,.6,.5,.7,.45,.8,.6,.75,.65,.55].map((v, i, a) =>
+                i < a.length - 1 ? (
+                  <line key={i}
+                    x1={(i / (a.length - 1)) * 80} y1={20 - v * 18}
+                    x2={((i + 1) / (a.length - 1)) * 80} y2={20 - (a[i + 1]) * 18}
+                    stroke={accent} strokeWidth="1.5" strokeLinecap="round" />
+                ) : null
+              )}
+            </svg>
+          </div>
+        </div>
+      );
+
+    case 'row':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex items-center gap-2.5 px-3">
+            <span style={{ color: cc }} className="shrink-0">{icon}</span>
+            <span className="text-xs text-slate-300 flex-1 truncate">{cfg.label}</span>
+            <span className="text-xs font-semibold text-white shrink-0">{m.v} {m.u}</span>
+          </div>
+        </div>
+      );
+
+    case 'label':
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
+            <span style={{ color: cc }}>{icon}</span>
+            <span className="text-lg font-bold text-white leading-none">{m.v}</span>
+            <span className="text-[10px] text-slate-400">{m.u}</span>
+            <span className="text-[9px] text-slate-500 truncate">{cfg.label}</span>
+          </div>
+        </div>
+      );
+
+    default: // kpi
+      return (
+        <div className={base} style={{ border }}>
+          <div className="h-full flex flex-col justify-between p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-[10px] text-slate-400 truncate">{cfg.label}</span>
+            </div>
+            <div className="flex items-end gap-1">
+              <span className="text-xl font-bold leading-none" style={{ color: sc }}>{m.v}</span>
+              {m.u && <span className="text-xs text-slate-400 pb-0.5">{m.u}</span>}
+            </div>
+          </div>
+        </div>
+      );
+  }
 }
 
-// ---- Main Page ----
+// ---- Helpers ----
+
+interface PaletteSource {
+  id: string;
+  label: string;
+  datapoint: string;
+  category: string;
+  unit?: string;
+  minValue?: number;
+  maxValue?: number;
+  isBinding: boolean;
+}
+
+function defaultWidgetType(cat: string): WidgetType {
+  if (cat === 'setpoint') return 'slider';
+  if (cat === 'alarm') return 'badge';
+  if (cat === 'occupancy') return 'badge';
+  if (cat === 'mode') return 'switch';
+  return 'kpi';
+}
+
+function findFreeCell(widgets: RoomDataPointConfig[], w: number, h: number): { col: number; row: number } {
+  for (let row = 0; row <= ROWS - h; row++) {
+    for (let col = 0; col <= COLS - w; col++) {
+      const blocked = widgets.some(wg => {
+        const wc = wg.panelCol ?? 0, wr = wg.panelRow ?? 0;
+        const ww = wg.panelW ?? 1, wh = wg.panelH ?? 1;
+        return col < wc + ww && col + w > wc && row < wr + wh && row + h > wr;
+      });
+      if (!blocked) return { col, row };
+    }
+  }
+  return { col: 0, row: widgets.length % ROWS };
+}
+
+function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDataPointConfig {
+  const wt = defaultWidgetType(src.category);
+  const def = WIDGET_TYPES.find(x => x.type === wt)!;
+  const pos = findFreeCell(existing, def.defaultW, def.defaultH);
+  return {
+    datapointId: src.id,
+    label: src.label,
+    displayType: 'kpi',
+    widgetType: wt,
+    order: existing.length,
+    panelCol: pos.col,
+    panelRow: pos.row,
+    panelW: def.defaultW,
+    panelH: def.defaultH,
+    showInMonitor: true,
+    showInService: true,
+    showInTooltip: existing.length < 3,
+    showInBuilding: true,
+    isPrimaryRoomKPI: existing.length === 0,
+    isPrimaryBuildingPoint: existing.length === 0,
+    writable: wt === 'slider' || wt === 'incrementer' || wt === 'switch',
+    unit: src.unit,
+    minValue: src.minValue,
+    maxValue: src.maxValue,
+    category: src.category,
+    sourceDatapoint: src.datapoint,
+  };
+}
+
+// ---- Page ----
 
 interface RoomConfigPageProps {
   buildingId?: string;
   roomId?: string;
   onBack?: () => void;
   onOpenMonitor?: () => void;
+  datapointGroups?: DatapointGroup[];
 }
 
-export function RoomConfigPage({ buildingId: propBuildingId, roomId: propRoomId, onBack, onOpenMonitor }: RoomConfigPageProps) {
+export function RoomConfigPage({
+  buildingId: propBuildingId,
+  roomId: propRoomId,
+  onBack,
+  onOpenMonitor,
+  datapointGroups = [],
+}: RoomConfigPageProps) {
   const params = useParams<{ buildingId: string; roomId: string }>();
   const navigate = useNavigate();
-  const buildingId = propBuildingId ?? params.buildingId;
-  const roomId = propRoomId ?? params.roomId;
-  const handleBack = onBack ?? (() => navigate(-1));
-  const handleOpenMonitor = onOpenMonitor ?? (() => navigate(`/building/${buildingId}/room/${roomId}/monitor`));
+  const bId = propBuildingId ?? params.buildingId;
+  const rId = propRoomId ?? params.roomId;
+  const goBack = onBack ?? (() => navigate(-1));
+  const goMonitor = onOpenMonitor ?? (() => navigate(`/building/${bId}/room/${rId}/monitor`));
   const { buildings, monitorConfigs, saveRoomMonitorConfig } = useBuildingContext();
 
-  const building = buildings.find(b => b.id === buildingId);
+  const building = buildings.find(b => b.id === bId);
   const { floor, room } = useMemo(() => {
     if (!building) return { floor: null, room: null };
     for (const f of building.floors) {
-      const r = f.rooms.find(r => r.id === roomId);
+      const r = f.rooms.find(r => r.id === rId);
       if (r) return { floor: f, room: r };
     }
     return { floor: null, room: null };
-  }, [building, roomId]);
+  }, [building, rId]);
 
-  const bindings: RoomDataPointBinding[] = useMemo(() => room?.bindings ?? [], [room]);
+  const bindings: RoomDataPointBinding[] = room?.bindings ?? [];
 
-  const initialConfig = useMemo<RoomMonitorConfig>(() => {
-    if (!roomId) return { roomId: '', datapoints: [] };
-    const saved = monitorConfigs[roomId];
-    if (saved) return saved;
-    if (bindings.length > 0) {
-      return {
-        roomId,
-        datapoints: bindings
-          .slice()
-          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-          .map((b, i) => bindingToConfig(b, i)),
-      };
-    }
-    return { roomId, datapoints: [] };
-  }, [roomId, monitorConfigs, bindings]);
-
-  const [config, setConfig] = useState<RoomMonitorConfig>(initialConfig);
-  const [accentColor, setAccentColor] = useState(initialConfig.accentColor ?? room?.color ?? '#0ea5e9');
-  const [saved, setSaved] = useState(false);
-
-  const unaddedBindings = bindings.filter(b => !config.datapoints.find(d => d.datapointId === b.id));
-
-  const addBinding = (b: RoomDataPointBinding) => {
-    setConfig(c => ({
-      ...c,
-      datapoints: [...c.datapoints, bindingToConfig(b, c.datapoints.length)],
+  // Build palette: room bindings first, then external datapoints
+  const allSources = useMemo<PaletteSource[]>(() => {
+    const list: PaletteSource[] = bindings.map(b => ({
+      id: b.id,
+      label: b.label ?? b.datapoint,
+      datapoint: b.datapoint,
+      category: b.category,
+      unit: b.unit,
+      minValue: b.minValue,
+      maxValue: b.maxValue,
+      isBinding: true,
     }));
-  };
+    for (const grp of datapointGroups) {
+      for (const dp of grp.datapoints) {
+        if (!list.find(s => s.datapoint === dp.entityId)) {
+          list.push({
+            id: `ext-${dp.entityId}`,
+            label: dp.label || dp.entityId,
+            datapoint: dp.entityId,
+            category: 'generic',
+            isBinding: false,
+          });
+        }
+      }
+    }
+    return list;
+  }, [bindings, datapointGroups]);
 
-  const updateDp = (i: number, dp: RoomDataPointConfig) => {
-    setConfig(c => {
-      const dps = [...c.datapoints];
-      dps[i] = dp;
-      return { ...c, datapoints: dps };
-    });
-  };
+  // Initial widgets from saved config or auto-generate from bindings
+  const initialWidgets = useMemo<RoomDataPointConfig[]>(() => {
+    if (!rId) return [];
+    const saved = monitorConfigs[rId];
+    if (saved && saved.datapoints.length > 0) {
+      return saved.datapoints.map(dp => ({
+        ...dp,
+        widgetType: dp.widgetType ?? defaultWidgetType(dp.category ?? 'generic'),
+        panelW: dp.panelW ?? 1,
+        panelH: dp.panelH ?? 1,
+      }));
+    }
+    if (bindings.length > 0) {
+      const result: RoomDataPointConfig[] = [];
+      for (const b of [...bindings].sort((a, x) => (a.order ?? 0) - (x.order ?? 0))) {
+        result.push(makeWidget({ id: b.id, label: b.label ?? b.datapoint, datapoint: b.datapoint, category: b.category, unit: b.unit, minValue: b.minValue, maxValue: b.maxValue, isBinding: true }, result));
+      }
+      return result;
+    }
+    return [];
+  }, [rId, monitorConfigs, bindings]);
 
-  const deleteDp = (i: number) => {
-    setConfig(c => ({ ...c, datapoints: c.datapoints.filter((_, idx) => idx !== i) }));
-  };
+  const [widgets, setWidgets] = useState<RoomDataPointConfig[]>(initialWidgets);
+  const [accent, setAccent] = useState(monitorConfigs[rId ?? '']?.accentColor ?? room?.color ?? '#0ea5e9');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dropOver, setDropOver] = useState<{ col: number; row: number } | null>(null);
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const paletteDragSrc = useRef<PaletteSource | null>(null);
+  const widgetDragId = useRef<string | null>(null);
+
+  const selected = widgets.find(w => w.datapointId === selectedId) ?? null;
+  const usedIds = new Set(widgets.map(w => w.datapointId));
+  const available = allSources.filter(s => !usedIds.has(s.id));
+  const filtered = search.trim()
+    ? available.filter(s => s.label.toLowerCase().includes(search.toLowerCase()) || s.datapoint.toLowerCase().includes(search.toLowerCase()))
+    : available;
+
+  const getCell = useCallback((cx: number, cy: number) => {
+    if (!canvasRef.current) return null;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const col = Math.floor((cx - rect.left - GAP) / (CW + GAP));
+    const row = Math.floor((cy - rect.top - GAP) / (CH + GAP));
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+    return { col, row };
+  }, []);
+
+  const removeWidget = useCallback((id: string) => {
+    setWidgets(p => p.filter(w => w.datapointId !== id));
+    if (selectedId === id) setSelectedId(null);
+  }, [selectedId]);
+
+  const updateWidget = useCallback((id: string, patch: Partial<RoomDataPointConfig>) => {
+    setWidgets(p => p.map(w => w.datapointId === id ? { ...w, ...patch } : w));
+  }, []);
+
+  const changeWidgetType = useCallback((id: string, type: WidgetType) => {
+    const def = WIDGET_TYPES.find(x => x.type === type)!;
+    updateWidget(id, { widgetType: type, panelW: def.defaultW, panelH: def.defaultH });
+  }, [updateWidget]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDropOver(null);
+    const cell = getCell(e.clientX, e.clientY);
+    if (!cell) return;
+
+    // Widget repositioning
+    if (widgetDragId.current) {
+      const id = widgetDragId.current;
+      widgetDragId.current = null;
+      const wg = widgets.find(w => w.datapointId === id);
+      if (wg) {
+        updateWidget(id, {
+          panelCol: Math.min(cell.col, COLS - (wg.panelW ?? 1)),
+          panelRow: Math.min(cell.row, ROWS - (wg.panelH ?? 1)),
+        });
+      }
+      return;
+    }
+
+    // Palette drop
+    if (paletteDragSrc.current) {
+      const src = paletteDragSrc.current;
+      paletteDragSrc.current = null;
+      const newW = makeWidget(src, widgets);
+      newW.panelCol = Math.min(cell.col, COLS - (newW.panelW ?? 1));
+      newW.panelRow = Math.min(cell.row, ROWS - (newW.panelH ?? 1));
+      setWidgets(p => [...p, newW]);
+      setSelectedId(newW.datapointId);
+    }
+  }, [getCell, widgets, updateWidget]);
 
   const handleSave = () => {
-    saveRoomMonitorConfig({ ...config, accentColor });
+    if (!rId) return;
+    saveRoomMonitorConfig({ roomId: rId, datapoints: widgets, accentColor: accent, layout: 'grid' });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -413,178 +503,389 @@ export function RoomConfigPage({ buildingId: propBuildingId, roomId: propRoomId,
   if (!building || !room || !floor) {
     return (
       <div className="flex h-screen bg-slate-950 text-slate-200 items-center justify-center">
-        <div className="text-center">
-          <p className="text-slate-400 mb-4">Raum nicht gefunden</p>
-          <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">Zurück</button>
-        </div>
+        <p className="text-slate-400 mr-4">Raum nicht gefunden</p>
+        <button onClick={goBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">Zurück</button>
       </div>
     );
   }
 
-  const sortedDps = config.datapoints.slice().sort((a, b) => a.order - b.order);
+  const canvasW = COLS * (CW + GAP) + GAP;
+  const canvasH = ROWS * (CH + GAP) + GAP;
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden">
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-3 shrink-0">
-        <div className="flex items-center gap-3 mb-2">
-          <button onClick={handleBack} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
-            <ArrowLeft size={16} />
-          </button>
-          <Breadcrumbs items={[
-            { label: building.name, onClick: handleBack, icon: 'building' },
-            { label: room.name, onClick: handleOpenMonitor, icon: 'room' },
-            { label: 'Konfiguration' },
-          ]} />
+
+      {/* Header */}
+      <header className="bg-slate-900 border-b border-slate-800 px-5 py-2.5 shrink-0 flex items-center gap-3">
+        <button onClick={goBack} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+          <ArrowLeft size={15} />
+        </button>
+        <Breadcrumbs items={[
+          { label: building.name, onClick: goBack, icon: 'building' },
+          { label: room.name, onClick: goMonitor, icon: 'room' },
+          { label: 'Panel-Designer' },
+        ]} />
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 mr-2">
+          <span className="text-[10px] text-slate-500">Akzentfarbe</span>
+          <input type="color" value={accent} onChange={e => setAccent(e.target.value)}
+            className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0" />
         </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-white leading-tight">{room.name}</h1>
-            <p className="text-xs text-slate-400">{floor.name} · Monitor-Konfiguration</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleOpenMonitor} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-300 transition-colors">
-              Abbrechen
-            </button>
-            <button
-              onClick={handleSave}
-              className={[
-                'flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all',
-                saved ? 'bg-emerald-600 text-white' : 'bg-sky-600 hover:bg-sky-500 text-white',
-              ].join(' ')}
-            >
-              <Check size={14} />
-              {saved ? 'Gespeichert' : 'Speichern'}
-            </button>
-          </div>
-        </div>
+        <button onClick={goMonitor} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-colors flex items-center gap-1.5">
+          <Monitor size={12} /> Monitor
+        </button>
+        <button
+          onClick={handleSave}
+          className={['flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all',
+            saved ? 'bg-emerald-600 text-white' : 'bg-sky-600 hover:bg-sky-500 text-white'].join(' ')}
+        >
+          <Check size={14} />
+          {saved ? 'Gespeichert' : 'Speichern'}
+        </button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Config panel */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl space-y-8">
 
-            <section>
-              <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Darstellung</h2>
-              <div className="bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Raumname</label>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/40 rounded-lg text-sm text-slate-300 border border-slate-700/60">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: room.color || '#94a3b8' }} />
-                    {room.name}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Akzentfarbe (Label)</label>
-                  <div className="flex items-center gap-2.5">
-                    <input
-                      type="color"
-                      value={accentColor}
-                      onChange={e => setAccentColor(e.target.value)}
-                      className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
-                    />
-                    <span className="text-xs text-slate-400 font-mono">{accentColor}</span>
-                    <button
-                      onClick={() => setAccentColor(room.color || '#0ea5e9')}
-                      className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      zurücksetzen
-                    </button>
-                  </div>
-                </div>
+        {/* ---- LEFT: Palette ---- */}
+        <div className="w-60 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
+          <div className="px-3 pt-3 pb-2 border-b border-slate-800 shrink-0">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Datenpunkte</p>
+            <div className="relative">
+              <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Suchen…"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {allSources.length === 0 && (
+              <div className="py-8 text-center text-slate-600 text-xs">
+                <Settings size={18} className="mx-auto mb-2 opacity-30" />
+                <p>Keine Datenpunkte verfügbar.</p>
+                <p className="mt-1 text-slate-700">Weise dem Raum im Editor zuerst Bindings zu.</p>
               </div>
-            </section>
+            )}
 
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Datenpunkte ({config.datapoints.length})
-                  </h2>
-                  <p className="text-[10px] text-slate-600 mt-0.5 flex items-center gap-2">
-                    <Star size={9} className="text-yellow-400" /> Primär-KPI &nbsp;
-                    <Building2 size={9} className="text-amber-400" /> Gebäudewert &nbsp;
-                    <Eye size={9} className="text-sky-400" /> Monitor
-                  </p>
-                </div>
-              </div>
+            {filtered.length === 0 && allSources.length > 0 && (
+              <p className="text-xs text-slate-600 text-center py-4">Keine Treffer</p>
+            )}
 
-              {bindings.length === 0 && (
-                <div className="mb-4 px-4 py-3 rounded-xl bg-amber-950/30 border border-amber-800/40 text-xs text-amber-300 flex items-start gap-2">
-                  <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-400" />
-                  <div>
-                    <p className="font-medium mb-0.5">Keine Bindings konfiguriert</p>
-                    <p className="text-amber-400/70">
-                      Öffne den Gebäude-Editor und weise dem Raum unter "HLK-Belegung" Datenpunkte zu. Danach erscheinen sie hier.
-                    </p>
+            {filtered.map(src => {
+              const cc = CATEGORY_COLORS[src.category] ?? '#64748b';
+              const icon = CATEGORY_ICONS[src.category] ?? CATEGORY_ICONS.generic;
+              return (
+                <div
+                  key={src.id}
+                  draggable
+                  onDragStart={e => {
+                    paletteDragSrc.current = src;
+                    widgetDragId.current = null;
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-colors group select-none"
+                >
+                  <span style={{ color: cc }} className="shrink-0">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-300 truncate group-hover:text-white transition-colors">{src.label}</p>
+                    <p className="text-[10px] text-slate-600 font-mono truncate">{src.datapoint}</p>
                   </div>
+                  {src.isBinding && (
+                    <span className="text-[9px] text-sky-700 shrink-0">●</span>
+                  )}
                 </div>
-              )}
+              );
+            })}
 
-              <div className="flex flex-col gap-2">
-                {sortedDps.map((dp, i) => {
-                  const binding = bindings.find(b => b.id === dp.datapointId);
+            {widgets.length > 0 && (
+              <div className="pt-2 border-t border-slate-800 mt-2">
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider px-1 mb-1.5">Im Panel ({widgets.length})</p>
+                {widgets.map(w => {
+                  const cc = CATEGORY_COLORS[w.category ?? 'generic'] ?? '#64748b';
+                  const icon = CATEGORY_ICONS[w.category ?? 'generic'] ?? CATEGORY_ICONS.generic;
                   return (
-                    <ConfigRow
-                      key={dp.datapointId + i}
-                      cfg={dp}
-                      binding={binding}
-                      onChange={updated => updateDp(i, updated)}
-                      onDelete={() => deleteDp(i)}
-                    />
+                    <div
+                      key={w.datapointId}
+                      onClick={() => setSelectedId(w.datapointId === selectedId ? null : w.datapointId)}
+                      className={['flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors',
+                        selectedId === w.datapointId ? 'bg-sky-900/40 border border-sky-700/50' : 'hover:bg-slate-800/50 border border-transparent'].join(' ')}
+                    >
+                      <span style={{ color: cc }} className="shrink-0">{icon}</span>
+                      <span className="text-xs text-slate-400 flex-1 truncate">{w.label}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
+                        className="p-0.5 text-slate-600 hover:text-red-400 transition-colors shrink-0"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
-
-              {unaddedBindings.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Weitere verfügbare Datenpunkte</p>
-                  <div className="flex flex-col gap-1.5">
-                    {unaddedBindings.map(b => {
-                      const cat = b.category as string;
-                      const icon = CATEGORY_ICONS[cat] ?? CATEGORY_ICONS.generic;
-                      return (
-                        <button
-                          key={b.id}
-                          onClick={() => addBinding(b)}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-800/40 border border-dashed border-slate-700 hover:border-sky-700 hover:bg-slate-800 text-left transition-colors group"
-                        >
-                          <span className="text-slate-500 group-hover:text-sky-400 shrink-0">{icon}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-slate-400 group-hover:text-slate-200 truncate">{b.label ?? b.datapoint}</p>
-                            <p className="text-[10px] text-slate-600 font-mono truncate">{b.datapoint}</p>
-                          </div>
-                          <span className="text-[10px] text-sky-600 group-hover:text-sky-400 shrink-0">+ Hinzufügen</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {config.datapoints.length === 0 && bindings.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-10 text-slate-600 border border-dashed border-slate-800 rounded-xl">
-                  <Settings size={22} className="mb-2 text-slate-700" />
-                  <p className="text-xs">Weise dem Raum im Editor zuerst Datenpunkte zu.</p>
-                </div>
-              )}
-            </section>
+            )}
           </div>
         </div>
 
-        {/* Live preview */}
-        <div className="w-72 shrink-0 border-l border-slate-800 bg-slate-900/50 p-5 overflow-y-auto">
-          <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-4">Vorschau — Monitor-Label</h2>
-          <LivePreview
-            roomName={room.name}
-            roomColor={room.color}
-            accentColor={accentColor}
-            configs={config.datapoints}
-            bindings={bindings}
-          />
-          <p className="mt-4 text-[10px] text-slate-600 leading-relaxed">
-            Die Vorschau zeigt wie der Raum im Monitor-Panel erscheint. Aktiviere den Sichtbarkeits-Button um Datenpunkte ein-/auszublenden.
+        {/* ---- CENTER: Canvas ---- */}
+        <div
+          className="flex-1 overflow-auto bg-slate-950 flex flex-col items-center py-6 px-4"
+          onClick={() => setSelectedId(null)}
+        >
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800">
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: room.color || '#94a3b8' }} />
+              <span className="text-sm font-semibold text-white">{room.name}</span>
+              <span className="text-xs text-slate-500">{floor.name}</span>
+            </div>
+            <span className="text-xs text-slate-600">Datenpunkte auf das Panel ziehen · Widget anklicken zum Bearbeiten</span>
+          </div>
+
+          <div
+            ref={canvasRef}
+            style={{ width: canvasW, minWidth: canvasW, height: canvasH, minHeight: canvasH }}
+            className="relative rounded-2xl border border-slate-800 bg-slate-900/60"
+            onDragOver={e => {
+              e.preventDefault();
+              const cell = getCell(e.clientX, e.clientY);
+              setDropOver(cell);
+            }}
+            onDrop={handleDrop}
+            onDragLeave={() => setDropOver(null)}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Grid cells */}
+            {Array.from({ length: ROWS }, (_, row) =>
+              Array.from({ length: COLS }, (_, col) => (
+                <div
+                  key={`g-${col}-${row}`}
+                  style={{
+                    position: 'absolute',
+                    left: GAP + col * (CW + GAP),
+                    top: GAP + row * (CH + GAP),
+                    width: CW, height: CH,
+                  }}
+                  className="rounded-xl border border-slate-800/50 bg-slate-800/10"
+                />
+              ))
+            )}
+
+            {/* Drop preview */}
+            {dropOver && paletteDragSrc.current && (() => {
+              const wt = defaultWidgetType(paletteDragSrc.current!.category);
+              const def = WIDGET_TYPES.find(x => x.type === wt)!;
+              const w = def.defaultW, h = def.defaultH;
+              const col = Math.min(dropOver.col, COLS - w);
+              const row = Math.min(dropOver.row, ROWS - h);
+              return (
+                <div style={{
+                  position: 'absolute',
+                  left: GAP + col * (CW + GAP),
+                  top: GAP + row * (CH + GAP),
+                  width: w * CW + (w - 1) * GAP,
+                  height: h * CH + (h - 1) * GAP,
+                  border: `2px dashed ${accent}`,
+                  borderRadius: 12,
+                  background: `${accent}18`,
+                  pointerEvents: 'none',
+                  zIndex: 5,
+                }} />
+              );
+            })()}
+
+            {/* Widgets */}
+            {widgets.map(w => {
+              const col = w.panelCol ?? 0, row = w.panelRow ?? 0;
+              const ww = w.panelW ?? 1, wh = w.panelH ?? 1;
+              return (
+                <div
+                  key={w.datapointId}
+                  draggable
+                  onDragStart={e => {
+                    e.stopPropagation();
+                    widgetDragId.current = w.datapointId;
+                    paletteDragSrc.current = null;
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onClick={e => { e.stopPropagation(); setSelectedId(w.datapointId === selectedId ? null : w.datapointId); }}
+                  style={{
+                    position: 'absolute',
+                    left: GAP + col * (CW + GAP),
+                    top: GAP + row * (CH + GAP),
+                    width: ww * CW + (ww - 1) * GAP,
+                    height: wh * CH + (wh - 1) * GAP,
+                    zIndex: selectedId === w.datapointId ? 10 : 2,
+                  }}
+                  className="cursor-grab active:cursor-grabbing select-none"
+                >
+                  <WidgetPreview cfg={w} accent={accent} selected={selectedId === w.datapointId} />
+                  {selectedId === w.datapointId && (
+                    <button
+                      onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg z-20"
+                    >
+                      <Trash2 size={9} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-3 text-[10px] text-slate-700">
+            {COLS} Spalten × {ROWS} Zeilen · Widgets ziehen zum Verschieben
           </p>
+        </div>
+
+        {/* ---- RIGHT: Properties ---- */}
+        <div className="w-68 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden" style={{ width: 272 }}>
+          {selected ? (
+            <>
+              <div className="px-4 pt-3 pb-2.5 border-b border-slate-800 shrink-0">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Widget-Eigenschaften</p>
+                <input
+                  value={selected.label}
+                  onChange={e => updateWidget(selected.datapointId, { label: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500"
+                />
+                {selected.sourceDatapoint && (
+                  <p className="text-[10px] text-slate-600 font-mono mt-1 truncate">{selected.sourceDatapoint}</p>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+                {/* Widget type selector */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Darstellungstyp</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {WIDGET_TYPES.map(wt => (
+                      <button
+                        key={wt.type}
+                        onClick={() => changeWidgetType(selected.datapointId, wt.type)}
+                        title={wt.description}
+                        className={['flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border text-[10px] transition-all',
+                          selected.widgetType === wt.type
+                            ? 'border-sky-500 bg-sky-950/50 text-sky-300'
+                            : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-500 hover:text-slate-200'].join(' ')}
+                      >
+                        <span>{wt.icon}</span>
+                        {wt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Size */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Größe</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] text-slate-600 mb-1">Breite (Spalten)</p>
+                      <select value={selected.panelW ?? 1} onChange={e => updateWidget(selected.datapointId, { panelW: +e.target.value })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                        {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-600 mb-1">Höhe (Zeilen)</p>
+                      <select value={selected.panelH ?? 1} onChange={e => updateWidget(selected.datapointId, { panelH: +e.target.value })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                        {[1, 2].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Value range for slider/gauge/incrementer */}
+                {(selected.widgetType === 'slider' || selected.widgetType === 'gauge' || selected.widgetType === 'incrementer') && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Wertebereich</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[10px] text-slate-600 mb-1">Min</p>
+                        <input type="number" value={selected.minValue ?? 0}
+                          onChange={e => updateWidget(selected.datapointId, { minValue: +e.target.value })}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-600 mb-1">Max</p>
+                        <input type="number" value={selected.maxValue ?? 100}
+                          onChange={e => updateWidget(selected.datapointId, { maxValue: +e.target.value })}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-600 mb-1">Einheit</p>
+                        <input type="text" value={selected.unit ?? ''} placeholder="°C"
+                          onChange={e => updateWidget(selected.datapointId, { unit: e.target.value })}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Visibility toggles */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Sichtbarkeit</p>
+                  <div className="space-y-2">
+                    {([
+                      ['showInMonitor',  'Im Monitor anzeigen',  <Monitor size={10} />],
+                      ['showInBuilding', 'Im Gebäude-Layer',     <Building2 size={10} />],
+                      ['showInTooltip',  'Im Tooltip',           <Tag size={10} />],
+                      ['showInService',  'Im Service-Modus',     <Settings size={10} />],
+                    ] as [keyof RoomDataPointConfig, string, React.ReactNode][]).map(([key, lbl, icon]) => (
+                      <label key={key} className="flex items-center gap-2.5 cursor-pointer">
+                        <div onClick={() => updateWidget(selected.datapointId, { [key]: !selected[key] })}
+                          className={['w-8 h-4 rounded-full flex items-center px-0.5 transition-colors cursor-pointer shrink-0',
+                            selected[key] ? 'bg-sky-600' : 'bg-slate-700'].join(' ')}>
+                          <div className={['w-3 h-3 bg-white rounded-full shadow transition-transform',
+                            selected[key] ? 'translate-x-4' : ''].join(' ')} />
+                        </div>
+                        <span className="text-slate-500 shrink-0">{icon}</span>
+                        <span className="text-xs text-slate-400">{lbl}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Priorität</p>
+                  <div className="space-y-2">
+                    {([
+                      ['isPrimaryRoomKPI',       'Primärer Raum-KPI',    <Star size={10} />,     'bg-yellow-500'],
+                      ['isPrimaryBuildingPoint', 'Gebäude-Hauptwert',    <Building2 size={10} />, 'bg-amber-500'],
+                    ] as [keyof RoomDataPointConfig, string, React.ReactNode, string][]).map(([key, lbl, icon, activeBg]) => (
+                      <label key={key} className="flex items-center gap-2.5 cursor-pointer">
+                        <div onClick={() => updateWidget(selected.datapointId, { [key]: !selected[key] })}
+                          className={['w-8 h-4 rounded-full flex items-center px-0.5 transition-colors cursor-pointer shrink-0',
+                            selected[key] ? activeBg : 'bg-slate-700'].join(' ')}>
+                          <div className={['w-3 h-3 bg-white rounded-full shadow transition-transform',
+                            selected[key] ? 'translate-x-4' : ''].join(' ')} />
+                        </div>
+                        <span className="text-slate-500 shrink-0">{icon}</span>
+                        <span className="text-xs text-slate-400">{lbl}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => removeWidget(selected.datapointId)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400 hover:bg-red-950/60 text-xs transition-colors"
+                >
+                  <Trash2 size={11} /> Widget entfernen
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+              <GripVertical size={28} className="mb-3 text-slate-700" />
+              <p className="text-xs font-medium text-slate-500 mb-1">Kein Widget gewählt</p>
+              <p className="text-[10px] text-slate-600">Datenpunkt aus der linken Palette auf das Panel ziehen oder vorhandenes Widget anklicken.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
