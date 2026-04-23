@@ -5,7 +5,7 @@ import {
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
   SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
-  Monitor,
+  Monitor, Link, Type, X,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../types/bms';
 import { RoomDataPointBinding } from '../types/building';
@@ -63,6 +63,11 @@ const STATUS_COLORS: Record<string, string> = {
   ok: '#22c55e', warning: '#f59e0b', alarm: '#ef4444', offline: '#64748b',
 };
 
+const CATEGORY_OPTIONS = [
+  'temperature','setpoint','humidity','co2','airflow','occupancy',
+  'alarm','energy','mode','valvePosition','fanSpeed','generic',
+];
+
 // ---- Widget type definitions ----
 
 const WIDGET_TYPES: {
@@ -73,15 +78,15 @@ const WIDGET_TYPES: {
   defaultW: number;
   defaultH: number;
 }[] = [
-  { type: 'kpi',         label: 'KPI',        icon: <Hash size={13} />,              description: 'Großer Zahlenwert',    defaultW: 1, defaultH: 1 },
-  { type: 'gauge',       label: 'Gauge',       icon: <CircleDot size={13} />,          description: 'Kreisanzeige',          defaultW: 1, defaultH: 1 },
-  { type: 'slider',      label: 'Slider',      icon: <SlidersHorizontal size={13} />,  description: 'Sollwert-Regler',       defaultW: 2, defaultH: 1 },
-  { type: 'incrementer', label: 'Inkrement.',  icon: <ChevronLeft size={13} />,        description: '+/– Schaltflächen',     defaultW: 1, defaultH: 1 },
-  { type: 'switch',      label: 'Schalter',    icon: <ToggleLeft size={13} />,         description: 'Ein/Aus',               defaultW: 1, defaultH: 1 },
-  { type: 'badge',       label: 'Badge',       icon: <AlertTriangle size={13} />,      description: 'Status-Badge',          defaultW: 1, defaultH: 1 },
-  { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',        defaultW: 2, defaultH: 1 },
-  { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,          description: 'Historischer Verlauf',  defaultW: 2, defaultH: 1 },
-  { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',     defaultW: 1, defaultH: 1 },
+  { type: 'kpi',         label: 'KPI',        icon: <Hash size={13} />,              description: 'Großer Zahlenwert',   defaultW: 1, defaultH: 1 },
+  { type: 'gauge',       label: 'Gauge',       icon: <CircleDot size={13} />,          description: 'Kreisanzeige',         defaultW: 1, defaultH: 1 },
+  { type: 'slider',      label: 'Slider',      icon: <SlidersHorizontal size={13} />,  description: 'Sollwert-Regler',      defaultW: 2, defaultH: 1 },
+  { type: 'incrementer', label: 'Inkrement.',  icon: <ChevronLeft size={13} />,        description: '+/– Schaltflächen',    defaultW: 1, defaultH: 1 },
+  { type: 'switch',      label: 'Schalter',    icon: <ToggleLeft size={13} />,         description: 'Ein/Aus',              defaultW: 1, defaultH: 1 },
+  { type: 'badge',       label: 'Badge',       icon: <AlertTriangle size={13} />,      description: 'Status-Badge',         defaultW: 1, defaultH: 1 },
+  { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',       defaultW: 2, defaultH: 1 },
+  { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,          description: 'Historischer Verlauf', defaultW: 2, defaultH: 1 },
+  { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',    defaultW: 1, defaultH: 1 },
 ];
 
 // ---- Grid constants ----
@@ -110,7 +115,7 @@ function mockVal(cat: string, unit?: string) {
   }
 }
 
-// ---- Widget preview ----
+// ---- Widget preview (design-time rendering) ----
 
 function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; accent: string; selected: boolean }) {
   const cat = cfg.category ?? 'generic';
@@ -122,7 +127,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
   const max = cfg.maxValue ?? 100;
   const pct = Math.min(100, Math.max(0, ((m.n - min) / (max - min)) * 100));
   const border = selected ? `2px solid ${accent}` : '1px solid rgba(100,116,139,0.25)';
-
   const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80';
 
   switch (cfg.widgetType) {
@@ -145,7 +149,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'incrementer':
       return (
         <div className={base} style={{ border }}>
@@ -160,7 +163,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'gauge':
       return (
         <div className={base} style={{ border }}>
@@ -180,7 +182,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'badge':
       return (
         <div className={base} style={{ border }}>
@@ -191,7 +192,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'switch':
       return (
         <div className={base} style={{ border }}>
@@ -204,7 +204,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'chart':
       return (
         <div className={base} style={{ border }}>
@@ -227,7 +226,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'row':
       return (
         <div className={base} style={{ border }}>
@@ -238,7 +236,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     case 'label':
       return (
         <div className={base} style={{ border }}>
@@ -250,7 +247,6 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
-
     default: // kpi
       return (
         <div className={base} style={{ border }}>
@@ -269,7 +265,18 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
   }
 }
 
-// ---- Helpers ----
+// ---- Toggle switch ----
+
+function Toggle({ value, onChange, color = 'bg-sky-600' }: { value: boolean; onChange: (v: boolean) => void; color?: string }) {
+  return (
+    <div onClick={() => onChange(!value)}
+      className={['w-8 h-4 rounded-full flex items-center px-0.5 transition-colors cursor-pointer shrink-0', value ? color : 'bg-slate-700'].join(' ')}>
+      <div className={['w-3 h-3 bg-white rounded-full shadow transition-transform', value ? 'translate-x-4' : ''].join(' ')} />
+    </div>
+  );
+}
+
+// ---- Types ----
 
 interface PaletteSource {
   id: string;
@@ -281,6 +288,8 @@ interface PaletteSource {
   maxValue?: number;
   isBinding: boolean;
 }
+
+// ---- Helpers ----
 
 function defaultWidgetType(cat: string): WidgetType {
   if (cat === 'setpoint') return 'slider';
@@ -333,6 +342,68 @@ function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDa
   };
 }
 
+// ---- Datapoint binding input with autocomplete ----
+
+interface DpBindingInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  suggestions: PaletteSource[];
+}
+
+function DpBindingInput({ value, onChange, suggestions }: DpBindingInputProps) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState(value);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = q.length > 0
+    ? suggestions.filter(s =>
+        s.datapoint.toLowerCase().includes(q.toLowerCase()) ||
+        s.label.toLowerCase().includes(q.toLowerCase())
+      ).slice(0, 12)
+    : suggestions.slice(0, 12);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Link size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        <input
+          value={q}
+          onChange={e => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Datenpunkt-Pfad…"
+          className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white font-mono placeholder-slate-600 focus:outline-none focus:border-sky-500"
+        />
+        {q && (
+          <button onClick={() => { setQ(''); onChange(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+            <X size={10} />
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+          {filtered.map(s => (
+            <button
+              key={s.id}
+              onMouseDown={() => { setQ(s.datapoint); onChange(s.datapoint); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-700 text-left transition-colors"
+            >
+              <span style={{ color: CATEGORY_COLORS[s.category] ?? '#64748b' }} className="shrink-0">
+                {CATEGORY_ICONS[s.category] ?? CATEGORY_ICONS.generic}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-200 truncate">{s.label}</p>
+                <p className="text-[10px] text-slate-500 font-mono truncate">{s.datapoint}</p>
+              </div>
+              {s.isBinding && <span className="text-[9px] text-sky-600">●</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---- Page ----
 
 interface RoomConfigPageProps {
@@ -370,7 +441,7 @@ export function RoomConfigPage({
 
   const bindings: RoomDataPointBinding[] = room?.bindings ?? [];
 
-  // Build palette: room bindings first, then external datapoints
+  // All palette sources: room bindings + external datapoints from logic
   const allSources = useMemo<PaletteSource[]>(() => {
     const list: PaletteSource[] = bindings.map(b => ({
       id: b.id,
@@ -398,12 +469,12 @@ export function RoomConfigPage({
     return list;
   }, [bindings, datapointGroups]);
 
-  // Initial widgets from saved config or auto-generate from bindings
+  const savedCfg = monitorConfigs[rId ?? ''];
+
   const initialWidgets = useMemo<RoomDataPointConfig[]>(() => {
     if (!rId) return [];
-    const saved = monitorConfigs[rId];
-    if (saved && saved.datapoints.length > 0) {
-      return saved.datapoints.map(dp => ({
+    if (savedCfg && savedCfg.datapoints.length > 0) {
+      return savedCfg.datapoints.map(dp => ({
         ...dp,
         widgetType: dp.widgetType ?? defaultWidgetType(dp.category ?? 'generic'),
         panelW: dp.panelW ?? 1,
@@ -413,15 +484,21 @@ export function RoomConfigPage({
     if (bindings.length > 0) {
       const result: RoomDataPointConfig[] = [];
       for (const b of [...bindings].sort((a, x) => (a.order ?? 0) - (x.order ?? 0))) {
-        result.push(makeWidget({ id: b.id, label: b.label ?? b.datapoint, datapoint: b.datapoint, category: b.category, unit: b.unit, minValue: b.minValue, maxValue: b.maxValue, isBinding: true }, result));
+        result.push(makeWidget({
+          id: b.id, label: b.label ?? b.datapoint, datapoint: b.datapoint,
+          category: b.category, unit: b.unit, minValue: b.minValue, maxValue: b.maxValue,
+          isBinding: true,
+        }, result));
       }
       return result;
     }
     return [];
-  }, [rId, monitorConfigs, bindings]);
+  }, [rId, savedCfg, bindings]);
 
   const [widgets, setWidgets] = useState<RoomDataPointConfig[]>(initialWidgets);
-  const [accent, setAccent] = useState(monitorConfigs[rId ?? '']?.accentColor ?? room?.color ?? '#0ea5e9');
+  const [accent, setAccent] = useState(savedCfg?.accentColor ?? room?.color ?? '#0ea5e9');
+  const [panelTitle, setPanelTitle] = useState(savedCfg?.panelTitle ?? '');
+  const [panelSubtitle, setPanelSubtitle] = useState(savedCfg?.panelSubtitle ?? '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [search, setSearch] = useState('');
@@ -467,21 +544,17 @@ export function RoomConfigPage({
     const cell = getCell(e.clientX, e.clientY);
     if (!cell) return;
 
-    // Widget repositioning
     if (widgetDragId.current) {
       const id = widgetDragId.current;
       widgetDragId.current = null;
       const wg = widgets.find(w => w.datapointId === id);
-      if (wg) {
-        updateWidget(id, {
-          panelCol: Math.min(cell.col, COLS - (wg.panelW ?? 1)),
-          panelRow: Math.min(cell.row, ROWS - (wg.panelH ?? 1)),
-        });
-      }
+      if (wg) updateWidget(id, {
+        panelCol: Math.min(cell.col, COLS - (wg.panelW ?? 1)),
+        panelRow: Math.min(cell.row, ROWS - (wg.panelH ?? 1)),
+      });
       return;
     }
 
-    // Palette drop
     if (paletteDragSrc.current) {
       const src = paletteDragSrc.current;
       paletteDragSrc.current = null;
@@ -495,7 +568,7 @@ export function RoomConfigPage({
 
   const handleSave = () => {
     if (!rId) return;
-    saveRoomMonitorConfig({ roomId: rId, datapoints: widgets, accentColor: accent, layout: 'grid' });
+    saveRoomMonitorConfig({ roomId: rId, datapoints: widgets, accentColor: accent, layout: 'grid', panelTitle, panelSubtitle });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -552,27 +625,22 @@ export function RoomConfigPage({
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Datenpunkte</p>
             <div className="relative">
               <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              <input
-                value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Suchen…"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
-              />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500" />
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {allSources.length === 0 && (
-              <div className="py-8 text-center text-slate-600 text-xs">
+              <div className="py-8 text-center text-slate-600 text-xs px-2">
                 <Settings size={18} className="mx-auto mb-2 opacity-30" />
                 <p>Keine Datenpunkte verfügbar.</p>
                 <p className="mt-1 text-slate-700">Weise dem Raum im Editor zuerst Bindings zu.</p>
               </div>
             )}
-
             {filtered.length === 0 && allSources.length > 0 && (
               <p className="text-xs text-slate-600 text-center py-4">Keine Treffer</p>
             )}
-
             {filtered.map(src => {
               const cc = CATEGORY_COLORS[src.category] ?? '#64748b';
               const icon = CATEGORY_ICONS[src.category] ?? CATEGORY_ICONS.generic;
@@ -592,15 +660,13 @@ export function RoomConfigPage({
                     <p className="text-xs text-slate-300 truncate group-hover:text-white transition-colors">{src.label}</p>
                     <p className="text-[10px] text-slate-600 font-mono truncate">{src.datapoint}</p>
                   </div>
-                  {src.isBinding && (
-                    <span className="text-[9px] text-sky-700 shrink-0">●</span>
-                  )}
+                  {src.isBinding && <span className="text-[9px] text-sky-700 shrink-0">●</span>}
                 </div>
               );
             })}
 
             {widgets.length > 0 && (
-              <div className="pt-2 border-t border-slate-800 mt-2">
+              <div className="pt-2 border-t border-slate-800 mt-1">
                 <p className="text-[10px] text-slate-600 uppercase tracking-wider px-1 mb-1.5">Im Panel ({widgets.length})</p>
                 {widgets.map(w => {
                   const cc = CATEGORY_COLORS[w.category ?? 'generic'] ?? '#64748b';
@@ -614,10 +680,8 @@ export function RoomConfigPage({
                     >
                       <span style={{ color: cc }} className="shrink-0">{icon}</span>
                       <span className="text-xs text-slate-400 flex-1 truncate">{w.label}</span>
-                      <button
-                        onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
-                        className="p-0.5 text-slate-600 hover:text-red-400 transition-colors shrink-0"
-                      >
+                      <button onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
+                        className="p-0.5 text-slate-600 hover:text-red-400 transition-colors shrink-0">
                         <Trash2 size={10} />
                       </button>
                     </div>
@@ -629,28 +693,42 @@ export function RoomConfigPage({
         </div>
 
         {/* ---- CENTER: Canvas ---- */}
-        <div
-          className="flex-1 overflow-auto bg-slate-950 flex flex-col items-center py-6 px-4"
-          onClick={() => setSelectedId(null)}
-        >
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800">
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: room.color || '#94a3b8' }} />
-              <span className="text-sm font-semibold text-white">{room.name}</span>
-              <span className="text-xs text-slate-500">{floor.name}</span>
+        <div className="flex-1 overflow-auto bg-slate-950 flex flex-col items-center py-5 px-4"
+          onClick={() => setSelectedId(null)}>
+
+          {/* Panel header preview + config */}
+          <div className="mb-3 w-full" style={{ maxWidth: canvasW }}>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-1 h-10 rounded-full shrink-0" style={{ background: accent }} />
+              <div className="flex-1 min-w-0">
+                <input
+                  value={panelTitle || room.name}
+                  onChange={e => setPanelTitle(e.target.value)}
+                  placeholder={room.name}
+                  className="w-full bg-transparent text-base font-bold text-white focus:outline-none placeholder-slate-600"
+                  onClick={e => e.stopPropagation()}
+                />
+                <input
+                  value={panelSubtitle}
+                  onChange={e => setPanelSubtitle(e.target.value)}
+                  placeholder={`${floor.name} · Untertitel…`}
+                  className="w-full bg-transparent text-xs text-slate-400 focus:outline-none placeholder-slate-600 mt-0.5"
+                  onClick={e => e.stopPropagation()}
+                />
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                <Type size={10} />
+                Panel-Kopfzeile
+              </div>
             </div>
-            <span className="text-xs text-slate-600">Datenpunkte auf das Panel ziehen · Widget anklicken zum Bearbeiten</span>
           </div>
 
+          {/* Drop canvas */}
           <div
             ref={canvasRef}
             style={{ width: canvasW, minWidth: canvasW, height: canvasH, minHeight: canvasH }}
             className="relative rounded-2xl border border-slate-800 bg-slate-900/60"
-            onDragOver={e => {
-              e.preventDefault();
-              const cell = getCell(e.clientX, e.clientY);
-              setDropOver(cell);
-            }}
+            onDragOver={e => { e.preventDefault(); setDropOver(getCell(e.clientX, e.clientY)); }}
             onDrop={handleDrop}
             onDragLeave={() => setDropOver(null)}
             onClick={e => e.stopPropagation()}
@@ -658,16 +736,11 @@ export function RoomConfigPage({
             {/* Grid cells */}
             {Array.from({ length: ROWS }, (_, row) =>
               Array.from({ length: COLS }, (_, col) => (
-                <div
-                  key={`g-${col}-${row}`}
-                  style={{
-                    position: 'absolute',
-                    left: GAP + col * (CW + GAP),
-                    top: GAP + row * (CH + GAP),
-                    width: CW, height: CH,
-                  }}
-                  className="rounded-xl border border-slate-800/50 bg-slate-800/10"
-                />
+                <div key={`g-${col}-${row}`} style={{
+                  position: 'absolute',
+                  left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
+                  width: CW, height: CH,
+                }} className="rounded-xl border border-slate-800/50 bg-slate-800/10" />
               ))
             )}
 
@@ -681,15 +754,10 @@ export function RoomConfigPage({
               return (
                 <div style={{
                   position: 'absolute',
-                  left: GAP + col * (CW + GAP),
-                  top: GAP + row * (CH + GAP),
-                  width: w * CW + (w - 1) * GAP,
-                  height: h * CH + (h - 1) * GAP,
-                  border: `2px dashed ${accent}`,
-                  borderRadius: 12,
-                  background: `${accent}18`,
-                  pointerEvents: 'none',
-                  zIndex: 5,
+                  left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
+                  width: w * CW + (w - 1) * GAP, height: h * CH + (h - 1) * GAP,
+                  border: `2px dashed ${accent}`, borderRadius: 12,
+                  background: `${accent}18`, pointerEvents: 'none', zIndex: 5,
                 }} />
               );
             })()}
@@ -699,8 +767,7 @@ export function RoomConfigPage({
               const col = w.panelCol ?? 0, row = w.panelRow ?? 0;
               const ww = w.panelW ?? 1, wh = w.panelH ?? 1;
               return (
-                <div
-                  key={w.datapointId}
+                <div key={w.datapointId}
                   draggable
                   onDragStart={e => {
                     e.stopPropagation();
@@ -711,20 +778,16 @@ export function RoomConfigPage({
                   onClick={e => { e.stopPropagation(); setSelectedId(w.datapointId === selectedId ? null : w.datapointId); }}
                   style={{
                     position: 'absolute',
-                    left: GAP + col * (CW + GAP),
-                    top: GAP + row * (CH + GAP),
-                    width: ww * CW + (ww - 1) * GAP,
-                    height: wh * CH + (wh - 1) * GAP,
+                    left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
+                    width: ww * CW + (ww - 1) * GAP, height: wh * CH + (wh - 1) * GAP,
                     zIndex: selectedId === w.datapointId ? 10 : 2,
                   }}
                   className="cursor-grab active:cursor-grabbing select-none"
                 >
                   <WidgetPreview cfg={w} accent={accent} selected={selectedId === w.datapointId} />
                   {selectedId === w.datapointId && (
-                    <button
-                      onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
-                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg z-20"
-                    >
+                    <button onClick={e => { e.stopPropagation(); removeWidget(w.datapointId); }}
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg z-20">
                       <Trash2 size={9} />
                     </button>
                   )}
@@ -733,13 +796,11 @@ export function RoomConfigPage({
             })}
           </div>
 
-          <p className="mt-3 text-[10px] text-slate-700">
-            {COLS} Spalten × {ROWS} Zeilen · Widgets ziehen zum Verschieben
-          </p>
+          <p className="mt-2 text-[10px] text-slate-700">{COLS} Spalten × {ROWS} Zeilen · Widgets ziehen zum Verschieben</p>
         </div>
 
         {/* ---- RIGHT: Properties ---- */}
-        <div className="w-68 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden" style={{ width: 272 }}>
+        <div className="shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col overflow-hidden" style={{ width: 272 }}>
           {selected ? (
             <>
               <div className="px-4 pt-3 pb-2.5 border-b border-slate-800 shrink-0">
@@ -748,17 +809,44 @@ export function RoomConfigPage({
                   value={selected.label}
                   onChange={e => updateWidget(selected.datapointId, { label: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500"
+                  placeholder="Bezeichnung"
                 />
-                {selected.sourceDatapoint && (
-                  <p className="text-[10px] text-slate-600 font-mono mt-1 truncate">{selected.sourceDatapoint}</p>
-                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
+                {/* Datenpunkt-Binding */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Datenpunkt</p>
+                  <DpBindingInput
+                    value={selected.sourceDatapoint ?? ''}
+                    onChange={v => {
+                      const src = allSources.find(s => s.datapoint === v);
+                      updateWidget(selected.datapointId, {
+                        sourceDatapoint: v,
+                        ...(src ? { category: src.category, unit: src.unit, minValue: src.minValue, maxValue: src.maxValue } : {}),
+                      });
+                    }}
+                    suggestions={allSources}
+                  />
+                  {/* Category override */}
+                  <div className="mt-2">
+                    <p className="text-[10px] text-slate-600 mb-1">Kategorie</p>
+                    <select
+                      value={selected.category ?? 'generic'}
+                      onChange={e => updateWidget(selected.datapointId, { category: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+                    >
+                      {CATEGORY_OPTIONS.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Widget type selector */}
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Darstellungstyp</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Darstellungstyp</p>
                   <div className="grid grid-cols-3 gap-1">
                     {WIDGET_TYPES.map(wt => (
                       <button
@@ -779,7 +867,7 @@ export function RoomConfigPage({
 
                 {/* Size */}
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Größe</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Größe</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-[10px] text-slate-600 mb-1">Breite (Spalten)</p>
@@ -798,10 +886,10 @@ export function RoomConfigPage({
                   </div>
                 </div>
 
-                {/* Value range for slider/gauge/incrementer */}
+                {/* Value range */}
                 {(selected.widgetType === 'slider' || selected.widgetType === 'gauge' || selected.widgetType === 'incrementer') && (
                   <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Wertebereich</p>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Wertebereich</p>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <p className="text-[10px] text-slate-600 mb-1">Min</p>
@@ -825,9 +913,9 @@ export function RoomConfigPage({
                   </div>
                 )}
 
-                {/* Visibility toggles */}
+                {/* Visibility */}
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Sichtbarkeit</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Sichtbarkeit</p>
                   <div className="space-y-2">
                     {([
                       ['showInMonitor',  'Im Monitor anzeigen',  <Monitor size={10} />],
@@ -836,12 +924,7 @@ export function RoomConfigPage({
                       ['showInService',  'Im Service-Modus',     <Settings size={10} />],
                     ] as [keyof RoomDataPointConfig, string, React.ReactNode][]).map(([key, lbl, icon]) => (
                       <label key={key} className="flex items-center gap-2.5 cursor-pointer">
-                        <div onClick={() => updateWidget(selected.datapointId, { [key]: !selected[key] })}
-                          className={['w-8 h-4 rounded-full flex items-center px-0.5 transition-colors cursor-pointer shrink-0',
-                            selected[key] ? 'bg-sky-600' : 'bg-slate-700'].join(' ')}>
-                          <div className={['w-3 h-3 bg-white rounded-full shadow transition-transform',
-                            selected[key] ? 'translate-x-4' : ''].join(' ')} />
-                        </div>
+                        <Toggle value={!!selected[key]} onChange={v => updateWidget(selected.datapointId, { [key]: v })} />
                         <span className="text-slate-500 shrink-0">{icon}</span>
                         <span className="text-xs text-slate-400">{lbl}</span>
                       </label>
@@ -851,30 +934,23 @@ export function RoomConfigPage({
 
                 {/* Priority */}
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Priorität</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Priorität</p>
                   <div className="space-y-2">
-                    {([
-                      ['isPrimaryRoomKPI',       'Primärer Raum-KPI',    <Star size={10} />,     'bg-yellow-500'],
-                      ['isPrimaryBuildingPoint', 'Gebäude-Hauptwert',    <Building2 size={10} />, 'bg-amber-500'],
-                    ] as [keyof RoomDataPointConfig, string, React.ReactNode, string][]).map(([key, lbl, icon, activeBg]) => (
-                      <label key={key} className="flex items-center gap-2.5 cursor-pointer">
-                        <div onClick={() => updateWidget(selected.datapointId, { [key]: !selected[key] })}
-                          className={['w-8 h-4 rounded-full flex items-center px-0.5 transition-colors cursor-pointer shrink-0',
-                            selected[key] ? activeBg : 'bg-slate-700'].join(' ')}>
-                          <div className={['w-3 h-3 bg-white rounded-full shadow transition-transform',
-                            selected[key] ? 'translate-x-4' : ''].join(' ')} />
-                        </div>
-                        <span className="text-slate-500 shrink-0">{icon}</span>
-                        <span className="text-xs text-slate-400">{lbl}</span>
-                      </label>
-                    ))}
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <Toggle value={!!selected.isPrimaryRoomKPI} onChange={v => updateWidget(selected.datapointId, { isPrimaryRoomKPI: v })} color="bg-yellow-500" />
+                      <Star size={10} className="text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-400">Primärer Raum-KPI</span>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <Toggle value={!!selected.isPrimaryBuildingPoint} onChange={v => updateWidget(selected.datapointId, { isPrimaryBuildingPoint: v })} color="bg-amber-500" />
+                      <Building2 size={10} className="text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-400">Gebäude-Hauptwert</span>
+                    </label>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => removeWidget(selected.datapointId)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400 hover:bg-red-950/60 text-xs transition-colors"
-                >
+                <button onClick={() => removeWidget(selected.datapointId)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400 hover:bg-red-950/60 text-xs transition-colors">
                   <Trash2 size={11} /> Widget entfernen
                 </button>
               </div>

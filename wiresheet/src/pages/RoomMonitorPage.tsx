@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Settings, Thermometer, Wind, Droplets, Activity,
   Users, AlertTriangle, Zap, TrendingUp, TrendingDown, Minus,
-  Clock, RefreshCw, ChevronRight, Box
+  Clock, RefreshCw, ChevronRight, Box, LayoutDashboard,
+  Gauge, Fan, Plug, Lightbulb, Bell, Snowflake, Flame,
+  Hash, SlidersHorizontal, ToggleLeft, BarChart2, Tag, CircleDot, Eye,
 } from 'lucide-react';
-import { DataPoint, DataPointCategory, RoomMonitorConfig } from '../types/bms';
+import { DataPoint, DataPointCategory, RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../types/bms';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
 import type { Room } from '../types/building';
@@ -92,6 +94,273 @@ const STATUS_COLORS: Record<string, string> = {
   offline: '#64748b',
   unknown: '#64748b',
 };
+
+const CAT_COLORS_MONITOR: Record<string, string> = {
+  temperature: '#ef4444', setpoint: '#f97316', humidity: '#06b6d4', co2: '#a78bfa',
+  airflow: '#0ea5e9', occupancy: '#10b981', alarm: '#ef4444', energy: '#f59e0b',
+  valvePosition: '#14b8a6', fanSpeed: '#6366f1', mode: '#8b5cf6', generic: '#64748b',
+};
+
+// ---- Custom Panel live rendering ----
+
+function mockLiveVal(cat: string, unit?: string) {
+  const r = ((cat.charCodeAt(0) * 9301 + 49297) % 233280) / 233280;
+  const u = unit ?? '';
+  switch (cat) {
+    case 'temperature': return { v: (19 + r * 8).toFixed(1), u: u || '°C', n: 19 + r * 8, s: r > 0.85 ? 'alarm' : r > 0.7 ? 'warning' : 'ok' };
+    case 'setpoint':    return { v: (20 + r * 3).toFixed(1), u: u || '°C', n: 20 + r * 3, s: 'ok' };
+    case 'humidity':    return { v: (35 + r * 35).toFixed(0), u: u || '%', n: 35 + r * 35, s: r > 0.85 ? 'warning' : 'ok' };
+    case 'co2':         return { v: (400 + r * 800).toFixed(0), u: u || 'ppm', n: 400 + r * 800, s: r > 0.7 ? 'warning' : 'ok' };
+    case 'airflow':     return { v: (r * 400).toFixed(0), u: u || 'm³/h', n: r * 400, s: 'ok' };
+    case 'occupancy':   return { v: r > 0.5 ? 'Belegt' : 'Frei', u: '', n: r > 0.5 ? 1 : 0, s: 'ok' };
+    case 'alarm':       return { v: r > 0.8 ? 'Alarm' : 'OK', u: '', n: r > 0.8 ? 1 : 0, s: r > 0.8 ? 'alarm' : 'ok' };
+    case 'energy':      return { v: (r * 1200).toFixed(0), u: u || 'W', n: r * 1200, s: 'ok' };
+    default:            return { v: (r * 100).toFixed(1), u, n: r * 100, s: 'ok' };
+  }
+}
+
+const MONITOR_CAT_ICONS: Record<string, React.ReactNode> = {
+  temperature: <Thermometer size={13} />, humidity: <Droplets size={13} />,
+  co2: <Wind size={13} />, airflow: <Wind size={13} />, pressure: <Activity size={13} />,
+  occupancy: <Users size={13} />, alarm: <AlertTriangle size={13} />, mode: <RefreshCw size={13} />,
+  setpoint: <Gauge size={13} />, energy: <Zap size={13} />, valvePosition: <Activity size={13} />,
+  fanSpeed: <Fan size={13} />, light: <Lightbulb size={13} />, pump: <Plug size={13} />,
+  cold: <Snowflake size={13} />, bell: <Bell size={13} />, fire: <Flame size={13} />,
+  generic: <Activity size={13} />,
+};
+
+function LiveWidget({ cfg, accent }: { cfg: RoomDataPointConfig; accent: string }) {
+  const cat = cfg.category ?? 'generic';
+  const m = mockLiveVal(cat, cfg.unit);
+  const icon = MONITOR_CAT_ICONS[cat] ?? MONITOR_CAT_ICONS.generic;
+  const cc = CAT_COLORS_MONITOR[cat] ?? '#64748b';
+  const sc = STATUS_COLORS[m.s] ?? '#64748b';
+  const min = cfg.minValue ?? 0;
+  const max = cfg.maxValue ?? 100;
+  const pct = Math.min(100, Math.max(0, ((m.n - min) / (max - min)) * 100));
+
+  const base = 'w-full h-full rounded-xl bg-slate-800/70 border border-slate-700/40';
+
+  switch (cfg.widgetType as WidgetType) {
+    case 'slider':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col justify-between p-3">
+            <div className="flex items-center gap-2">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-xs text-slate-300 truncate flex-1">{cfg.label}</span>
+              <span className="text-sm font-bold text-white shrink-0">{m.v} <span className="text-xs font-normal text-slate-400">{m.u}</span></span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-slate-500">{min}</span>
+                <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden relative">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: accent }} />
+                </div>
+                <span className="text-[9px] text-slate-500">{max}</span>
+              </div>
+              <div className="flex justify-center gap-3 mt-2">
+                <button className="w-7 h-7 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold text-sm flex items-center justify-center transition-colors">−</button>
+                <button className="w-7 h-7 rounded-lg text-white font-bold text-sm flex items-center justify-center transition-colors" style={{ background: accent }}>+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    case 'incrementer':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-3">
+            <span className="text-xs text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="flex items-center gap-3">
+              <button className="w-8 h-8 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-lg font-bold flex items-center justify-center transition-colors">−</button>
+              <div className="text-center">
+                <span className="text-xl font-bold text-white">{m.v}</span>
+                <span className="text-xs text-slate-400 ml-1">{m.u}</span>
+              </div>
+              <button className="w-8 h-8 rounded-xl text-white text-lg font-bold flex items-center justify-center transition-colors" style={{ background: accent }}>+</button>
+            </div>
+          </div>
+        </div>
+      );
+    case 'gauge':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1 p-3">
+            <span className="text-xs text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="relative w-14 h-14">
+              <svg viewBox="0 0 56 56" className="w-full h-full -rotate-90">
+                <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="5" />
+                <circle cx="28" cy="28" r="22" fill="none" stroke={accent} strokeWidth="5"
+                  strokeDasharray={`${2 * Math.PI * 22 * pct / 100} ${2 * Math.PI * 22}`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center rotate-90">
+                <span className="text-xs font-bold text-white">{m.v}</span>
+              </div>
+            </div>
+            <span className="text-[10px] text-slate-400">{m.u}</span>
+          </div>
+        </div>
+      );
+    case 'badge':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-3">
+            <span style={{ color: cc }}>{icon}</span>
+            <span className="px-3 py-1 rounded-full text-sm font-semibold" style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
+            <span className="text-[10px] text-slate-500 text-center truncate">{cfg.label}</span>
+          </div>
+        </div>
+      );
+    case 'switch':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-2 p-3">
+            <span className="text-xs text-slate-300">{cfg.label}</span>
+            <button className="w-12 h-6 rounded-full flex items-center px-1 transition-colors" style={{ background: accent }}>
+              <div className="w-5 h-5 bg-white rounded-full ml-auto shadow-sm" />
+            </button>
+            <span className="text-[10px] text-slate-400">EIN</span>
+          </div>
+        </div>
+      );
+    case 'chart':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col justify-between p-3">
+            <div className="flex items-center gap-2">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-xs text-slate-300 flex-1 truncate">{cfg.label}</span>
+              <span className="text-sm font-bold text-white shrink-0">{m.v} {m.u}</span>
+            </div>
+            <svg viewBox="0 0 80 24" className="w-full" preserveAspectRatio="none">
+              {[.4,.6,.5,.7,.45,.8,.6,.75,.65,.55].map((v, i, a) =>
+                i < a.length - 1 ? (
+                  <line key={i}
+                    x1={(i / (a.length - 1)) * 80} y1={24 - v * 22}
+                    x2={((i + 1) / (a.length - 1)) * 80} y2={24 - (a[i + 1]) * 22}
+                    stroke={accent} strokeWidth="1.5" strokeLinecap="round" />
+                ) : null
+              )}
+            </svg>
+          </div>
+        </div>
+      );
+    case 'row':
+      return (
+        <div className={base}>
+          <div className="h-full flex items-center gap-3 px-3">
+            <span style={{ color: cc }} className="shrink-0">{icon}</span>
+            <span className="text-sm text-slate-200 flex-1 truncate">{cfg.label}</span>
+            <span className="text-sm font-bold text-white shrink-0">{m.v} {m.u}</span>
+          </div>
+        </div>
+      );
+    case 'label':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-3">
+            <span style={{ color: cc }}>{icon}</span>
+            <span className="text-2xl font-bold text-white leading-none">{m.v}</span>
+            <span className="text-xs text-slate-400">{m.u}</span>
+            <span className="text-[10px] text-slate-500 truncate">{cfg.label}</span>
+          </div>
+        </div>
+      );
+    default: // kpi
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col justify-between p-3">
+            <div className="flex items-center gap-2">
+              <span style={{ color: cc }}>{icon}</span>
+              <span className="text-xs text-slate-400 truncate">{cfg.label}</span>
+            </div>
+            <div className="flex items-end gap-1.5">
+              <span className="text-2xl font-bold leading-none" style={{ color: sc }}>{m.v}</span>
+              {m.u && <span className="text-sm text-slate-400 pb-0.5">{m.u}</span>}
+            </div>
+          </div>
+        </div>
+      );
+  }
+}
+
+const PANEL_CW = 152;
+const PANEL_CH = 92;
+const PANEL_GAP = 8;
+const PANEL_COLS = 4;
+
+function CustomPanel({ config, accent, roomColor, onConfigure }: {
+  config: RoomMonitorConfig;
+  accent: string;
+  roomColor: string;
+  onConfigure: () => void;
+}) {
+  const widgets = config.datapoints.filter(w => w.showInMonitor !== false);
+  const title = config.panelTitle;
+  const subtitle = config.panelSubtitle;
+
+  if (widgets.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-slate-600 text-sm gap-2">
+        <LayoutDashboard size={28} className="opacity-30" />
+        <p>Kein Panel konfiguriert.</p>
+        <button onClick={onConfigure} className="mt-2 px-4 py-1.5 bg-sky-700 hover:bg-sky-600 rounded-lg text-white text-xs transition-colors">
+          Panel konfigurieren
+        </button>
+      </div>
+    );
+  }
+
+  const maxCol = Math.max(...widgets.map(w => (w.panelCol ?? 0) + (w.panelW ?? 1)));
+  const maxRow = Math.max(...widgets.map(w => (w.panelRow ?? 0) + (w.panelH ?? 1)));
+  const cols = Math.max(maxCol, PANEL_COLS);
+  const panelW = cols * (PANEL_CW + PANEL_GAP) + PANEL_GAP;
+  const panelH = maxRow * (PANEL_CH + PANEL_GAP) + PANEL_GAP;
+
+  return (
+    <div className="p-4 flex flex-col items-center">
+      {/* Panel header */}
+      {(title || subtitle) && (
+        <div className="w-full mb-3" style={{ maxWidth: panelW }}>
+          <div className="flex items-center gap-3 bg-slate-800/50 rounded-xl px-4 py-2.5 border border-slate-700/40">
+            <div className="w-1 h-8 rounded-full shrink-0" style={{ background: accent }} />
+            <div>
+              <p className="text-sm font-semibold text-white leading-tight">{title}</p>
+              {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ position: 'relative', width: panelW, height: panelH }}>
+        {widgets.map(w => {
+          const col = w.panelCol ?? 0, row = w.panelRow ?? 0;
+          const ww = w.panelW ?? 1, wh = w.panelH ?? 1;
+          return (
+            <div
+              key={w.datapointId}
+              style={{
+                position: 'absolute',
+                left: PANEL_GAP + col * (PANEL_CW + PANEL_GAP),
+                top: PANEL_GAP + row * (PANEL_CH + PANEL_GAP),
+                width: ww * PANEL_CW + (ww - 1) * PANEL_GAP,
+                height: wh * PANEL_CH + (wh - 1) * PANEL_GAP,
+              }}
+            >
+              <LiveWidget cfg={w} accent={accent} />
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={onConfigure}
+        className="mt-4 flex items-center gap-1.5 text-[10px] text-slate-600 hover:text-slate-400 transition-colors">
+        <Settings size={10} /> Panel bearbeiten
+      </button>
+    </div>
+  );
+}
 
 function TrendIcon({ trend }: { trend?: string }) {
   if (trend === 'up') return <TrendingUp size={12} className="text-red-400" />;
@@ -221,7 +490,8 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
   const roomId = propRoomId ?? params.roomId;
   const handleBack = onBack ?? (() => navigate(`/building/${buildingId}/monitor`));
   const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
-  const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'alarms' | 'trends'>('overview');
+  const hasCustomPanel = !!(roomId && monitorConfigs[roomId]?.datapoints?.length);
+  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms' | 'trends'>(hasCustomPanel ? 'panel' : 'overview');
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const { buildings, monitorConfigs } = useBuildingContext();
 
@@ -329,6 +599,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
           {/* Tabs */}
           <div className="flex border-b border-slate-800 bg-slate-900/60 px-4 shrink-0">
             {([
+              ...(hasCustomPanel ? [{ id: 'panel', label: 'Panel' }] : []),
               { id: 'overview', label: 'Übersicht' },
               { id: 'points', label: `Datenpunkte (${dataPoints.length})` },
               { id: 'alarms', label: `Alarme${alarms.length > 0 ? ` (${alarms.length})` : ''}` },
@@ -349,6 +620,14 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
+            {activeTab === 'panel' && roomConfig && (
+              <CustomPanel
+                config={roomConfig}
+                accent={roomConfig.accentColor ?? room.color ?? '#0ea5e9'}
+                roomColor={room.color}
+                onConfigure={handleOpenConfig}
+              />
+            )}
             {activeTab === 'overview' && (
               <div className="p-4">
                 <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Kennwerte</h2>
@@ -493,6 +772,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
       {/* Tabs */}
       <div className="flex border-b border-slate-800 bg-slate-900/60 px-6 shrink-0">
         {([
+          ...(hasCustomPanel ? [{ id: 'panel', label: 'Panel' }] : []),
           { id: 'overview', label: 'Übersicht' },
           { id: 'points', label: `Datenpunkte (${dataPoints.length})` },
           { id: 'alarms', label: `Alarme${alarms.length > 0 ? ` (${alarms.length})` : ''}` },
@@ -515,6 +795,16 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
+        {activeTab === 'panel' && roomConfig && (
+          <div className="flex justify-center">
+            <CustomPanel
+              config={roomConfig}
+              accent={roomConfig.accentColor ?? room.color ?? '#0ea5e9'}
+              roomColor={room.color}
+              onConfigure={handleOpenConfig}
+            />
+          </div>
+        )}
         {activeTab === 'overview' && (
           <div className="p-6 max-w-5xl mx-auto">
             <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Kennwerte</h2>

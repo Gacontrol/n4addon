@@ -91,6 +91,8 @@ export interface RoomMonitorConfig {
   datapoints: RoomDataPointConfig[];
   accentColor?: string;
   layout?: 'grid' | 'list';
+  panelTitle?: string;
+  panelSubtitle?: string;
 }
 
 export type BuildingLayerMode =
