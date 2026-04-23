@@ -1623,6 +1623,10 @@ function App() {
         onMonitor={() => setMainView('buildingMonitor')}
         onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
         onConfigRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomConfig'); }}
+        pages={pages}
+        haEntities={haEntities}
+        haLoading={haLoading}
+        onLoadHaEntities={loadHaEntities}
       />
     );
   }

@@ -884,24 +884,14 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   <MousePointer className="w-3.5 h-3.5" />
                 </button>
                 {viewMode === 'floor' && (
-                  <>
-                    <button
-                      onClick={() => setTool('wall')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'wall' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                      title="Wand zeichnen"
-                    >
-                      <Minus className="w-3.5 h-3.5 rotate-45" />
-                      Wand
-                    </button>
-                    <button
-                      onClick={() => setTool('room')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'room' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                      title="Raum zeichnen"
-                    >
-                      <Square className="w-3.5 h-3.5" />
-                      Raum
-                    </button>
-                  </>
+                  <button
+                    onClick={() => setTool('wall')}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'wall' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                    title="Wand zeichnen"
+                  >
+                    <Minus className="w-3.5 h-3.5 rotate-45" />
+                    Wand
+                  </button>
                 )}
                 <button
                   onClick={() => setTool('duct')}
@@ -940,14 +930,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                       Platte
                     </button>
                     <button
-                      onClick={() => setTool('polygon-room')}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors ${tool === 'polygon-room' ? 'bg-green-700 text-white' : 'text-slate-400 hover:text-white'}`}
-                      title="Raumzone zeichnen (Polygon)"
-                    >
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12 L8 4 L16 4 L21 12 L16 20 L8 20 Z"/></svg>
-                      Zone
-                    </button>
-                    <button
                       onClick={() => setTool('delete')}
                       className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${tool === 'delete' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}
                       title="Löschen"
@@ -957,18 +939,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
                   </>
                 )}
               </div>
-            )}
-
-            {viewMode === 'floor' && (tool === 'room' || tool === 'polygon-room') && (
-              <select
-                value={newRoomType}
-                onChange={e => setNewRoomType(e.target.value as RoomType)}
-                className="bg-slate-700 border border-slate-600 text-slate-300 text-xs rounded px-2 py-1 outline-none"
-              >
-                {(Object.keys(ROOM_TYPE_LABELS) as RoomType[]).map(t => (
-                  <option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>
-                ))}
-              </select>
             )}
 
             {(viewMode === 'floor' || viewMode === 'section') && tool === 'duct' && (

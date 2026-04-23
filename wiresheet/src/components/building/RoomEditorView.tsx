@@ -1,14 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  Plus, Trash2, CreditCard as Edit3, Check, X, MousePointer, Hexagon,
-  Settings, Layers, ZoomIn, ZoomOut, Move,
-  ChevronDown, ChevronRight, Eye, EyeOff,
+  Plus, Trash2, Check, X, MousePointer, Hexagon,
+  Layers, ZoomIn, ZoomOut, Move,
+  ChevronDown, ChevronRight, Eye, EyeOff, CreditCard as Edit3,
+  Zap, Search, Settings, Star, Activity,
+  Thermometer, Droplets, Wind, Users, AlertTriangle, Gauge, Flame, Fan,
+  Lightbulb, Plug, Snowflake, Bell,
 } from 'lucide-react';
-import { Building, Floor, Room, RoomType, Wall } from '../../types/building';
+import { Building, Floor, Room, RoomType, Wall, RoomDataPointBinding } from '../../types/building';
+import type { DatapointGroup } from './RoomBindingsPanel';
 
 interface Point { x: number; y: number }
 
 type EditorTool = 'select' | 'polygon' | 'move';
+type RightTab = 'properties' | 'datapoints';
 
 const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   room: 'Zimmer', corridor: 'Korridor', staircase: 'Treppenhaus',
@@ -38,19 +43,64 @@ interface LayerVisibility {
   walls: boolean;
 }
 
+// ---- Datapoint role definitions (matching RoomBindingsPanel) ----
+
+interface BindingRole {
+  key: string;
+  label: string;
+  unit: string;
+  icon: React.ReactNode;
+  accent: string;
+  category: string;
+  min?: number;
+  max?: number;
+}
+
+const BINDING_ROLES: BindingRole[] = [
+  { key: 'temperature', label: 'Raumtemperatur', unit: '°C', icon: <Thermometer size={14} />, accent: '#ef4444', category: 'temperature', min: 15, max: 30 },
+  { key: 'setpoint', label: 'Sollwert', unit: '°C', icon: <Gauge size={14} />, accent: '#f97316', category: 'setpoint', min: 15, max: 28 },
+  { key: 'humidity', label: 'Feuchte', unit: '%', icon: <Droplets size={14} />, accent: '#06b6d4', category: 'humidity', min: 20, max: 80 },
+  { key: 'co2', label: 'CO₂', unit: 'ppm', icon: <Wind size={14} />, accent: '#84cc16', category: 'co2', min: 400, max: 2000 },
+  { key: 'presence', label: 'Präsenz', unit: '', icon: <Users size={14} />, accent: '#0ea5e9', category: 'occupancy' },
+  { key: 'airflow', label: 'Zuluft', unit: 'm³/h', icon: <Wind size={14} />, accent: '#3b82f6', category: 'airflow', min: 0, max: 1000 },
+  { key: 'energy', label: 'Energie', unit: 'kWh', icon: <Zap size={14} />, accent: '#eab308', category: 'energy' },
+  { key: 'alarm', label: 'Alarm', unit: '', icon: <Bell size={14} />, accent: '#ef4444', category: 'alarm' },
+  { key: 'valveHeat', label: 'Heizventil', unit: '%', icon: <Flame size={14} />, accent: '#dc2626', category: 'valve', min: 0, max: 100 },
+  { key: 'valveCool', label: 'Kühlventil', unit: '%', icon: <Snowflake size={14} />, accent: '#0284c7', category: 'valve', min: 0, max: 100 },
+  { key: 'fan', label: 'Ventilator', unit: '%', icon: <Fan size={14} />, accent: '#6366f1', category: 'fanSpeed', min: 0, max: 100 },
+  { key: 'light', label: 'Licht', unit: '%', icon: <Lightbulb size={14} />, accent: '#facc15', category: 'light', min: 0, max: 100 },
+  { key: 'pump', label: 'Pumpe', unit: '', icon: <Plug size={14} />, accent: '#2563eb', category: 'pump' },
+];
+
+const BINDING_ROLE_CATEGORIES: { id: string; label: string; keys: string[] }[] = [
+  { id: 'climate', label: 'Klima', keys: ['temperature', 'setpoint', 'humidity', 'co2', 'presence'] },
+  { id: 'air', label: 'Luft & Energie', keys: ['airflow', 'energy'] },
+  { id: 'actuator', label: 'Aktoren', keys: ['valveHeat', 'valveCool', 'fan', 'light', 'pump'] },
+  { id: 'safety', label: 'Sicherheit', keys: ['alarm'] },
+];
+
+function displayLabel(entityId: string, labels?: Record<string, string>): string {
+  if (!entityId) return '';
+  if (labels && labels[entityId]) return labels[entityId];
+  return entityId;
+}
+
 interface RoomEditorViewProps {
   building: Building;
   onUpdateBuilding: (b: Building) => void;
   onOpenRoom?: (roomId: string) => void;
   onConfigRoom?: (roomId: string) => void;
+  datapointGroups?: DatapointGroup[];
+  datapointLabels?: Record<string, string>;
 }
 
-export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfigRoom }: RoomEditorViewProps) {
+export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfigRoom, datapointGroups = [], datapointLabels = {} }: RoomEditorViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [selectedFloorId, setSelectedFloorId] = useState<string>(building.floors[0]?.id ?? '');
   const [tool, setTool] = useState<EditorTool>('select');
+  const [rightTab, setRightTab] = useState<RightTab>('properties');
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[]>([]);
@@ -66,19 +116,23 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const [layers, setLayers] = useState<LayerVisibility>({ rooms: true, walls: true });
   const [showLayerPanel, setShowLayerPanel] = useState(false);
 
-  // Drag state for polygon rooms (whole room move)
+  // Datapoint picker state
+  const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
+  const [pickerPageId, setPickerPageId] = useState<string | null>(null);
+  const [dpSearch, setDpSearch] = useState('');
+
+  // Expanded category state for binding roles
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
+    climate: true, air: false, actuator: false, safety: false,
+  });
+
   const dragRoom = useRef<{
-    roomId: string;
-    origPoints: Point[];
-    origX: number; origY: number;
-    startSvgX: number; startSvgY: number;
+    roomId: string; origPoints: Point[];
+    origX: number; origY: number; startSvgX: number; startSvgY: number;
   } | null>(null);
 
-  // Drag state for individual polygon vertex
   const dragVertex = useRef<{
-    roomId: string;
-    vertexIndex: number;
-    origPoints: Point[];
+    roomId: string; vertexIndex: number; origPoints: Point[];
   } | null>(null);
 
   const activeFloor = building.floors.find(f => f.id === selectedFloorId);
@@ -86,7 +140,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const walls = activeFloor?.walls ?? [];
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) ?? null;
 
-  // ---------- Coordinate transforms ----------
+  // ---- Coordinate transforms ----
   const worldToSvg = useCallback((wx: number, wy: number): Point => ({
     x: wx * SCALE * zoom + pan.x,
     y: wy * SCALE * zoom + pan.y,
@@ -109,7 +163,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     return { x: snapVal(world.x), y: snapVal(world.y) };
   }, [getSvgPoint, svgToWorld]);
 
-  // ---------- Mouse events ----------
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svgPt = getSvgPoint(e);
     const world = svgToWorld(svgPt.x, svgPt.y);
@@ -135,19 +188,13 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         ...building,
         floors: building.floors.map(f =>
           f.id === activeFloor.id
-            ? {
-                ...f,
-                rooms: f.rooms.map(r =>
-                  r.id === roomId
-                    ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
-                    : r
-                ),
-              }
+            ? { ...f, rooms: f.rooms.map(r => r.id === roomId
+                ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
+                : r) }
             : f
         ),
         updatedAt: Date.now(),
       });
-      // Update origPoints so next move is relative to new position
       dragVertex.current = { ...dragVertex.current, origPoints: newPoints };
       return;
     }
@@ -159,26 +206,16 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       const dyWorld = dy / (SCALE * zoom);
       const snapDx = snapVal(dragRoom.current.origX + dxWorld) - dragRoom.current.origX;
       const snapDy = snapVal(dragRoom.current.origY + dyWorld) - dragRoom.current.origY;
-
-      const newPoints = dragRoom.current.origPoints.map(p => ({
-        x: p.x + snapDx,
-        y: p.y + snapDy,
-      }));
+      const newPoints = dragRoom.current.origPoints.map(p => ({ x: p.x + snapDx, y: p.y + snapDy }));
       const xs = newPoints.map(p => p.x);
       const ys = newPoints.map(p => p.y);
-
       onUpdateBuilding({
         ...building,
         floors: building.floors.map(f =>
           f.id === activeFloor.id
-            ? {
-                ...f,
-                rooms: f.rooms.map(r =>
-                  r.id === dragRoom.current!.roomId
-                    ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
-                    : r
-                ),
-              }
+            ? { ...f, rooms: f.rooms.map(r => r.id === dragRoom.current!.roomId
+                ? { ...r, points: newPoints, x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), depth: Math.max(...ys) - Math.min(...ys) }
+                : r) }
             : f
         ),
         updatedAt: Date.now(),
@@ -214,36 +251,25 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }, []);
 
-  // ---------- Room mouse down (drag start) ----------
   const handleRoomMouseDown = useCallback((e: React.MouseEvent<SVGPolygonElement>, room: Room) => {
     if (tool !== 'select') return;
     e.stopPropagation();
     if (!room.points || room.points.length < 3) return;
     const svgPt = getSvgPointFromAny(e);
     dragRoom.current = {
-      roomId: room.id,
-      origPoints: room.points.map(p => ({ ...p })),
-      origX: room.x,
-      origY: room.y,
-      startSvgX: svgPt.x,
-      startSvgY: svgPt.y,
+      roomId: room.id, origPoints: room.points.map(p => ({ ...p })),
+      origX: room.x, origY: room.y, startSvgX: svgPt.x, startSvgY: svgPt.y,
     };
     setSelectedRoomId(room.id);
   }, [tool, getSvgPointFromAny]);
 
-  // ---------- Vertex mouse down (drag vertex) ----------
   const handleVertexMouseDown = useCallback((e: React.MouseEvent<SVGCircleElement>, room: Room, vertexIndex: number) => {
     if (tool !== 'select') return;
     e.stopPropagation();
     if (!room.points) return;
-    dragVertex.current = {
-      roomId: room.id,
-      vertexIndex,
-      origPoints: room.points.map(p => ({ ...p })),
-    };
+    dragVertex.current = { roomId: room.id, vertexIndex, origPoints: room.points.map(p => ({ ...p })) };
   }, [tool]);
 
-  // ---------- Canvas click ----------
   const handleCanvasClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (isPanning || tool === 'move') return;
     const snapped = getSnappedWorld(e);
@@ -254,7 +280,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     }
 
     if (tool === 'polygon') {
-      // Close polygon if clicking near first point
       if (drawingPoints.length >= 3) {
         const first = worldToSvg(drawingPoints[0].x, drawingPoints[0].y);
         const cur = worldToSvg(snapped.x, snapped.y);
@@ -266,7 +291,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       }
       setDrawingPoints(prev => [...prev, snapped]);
     }
-  // finishPolygonWithPoints defined below — split to avoid circular dep
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPanning, tool, drawingPoints, worldToSvg, getSnappedWorld]);
 
@@ -289,8 +313,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     onUpdateBuilding({
       ...building,
       floors: building.floors.map(f => f.id === activeFloor.id
-        ? { ...activeFloor, rooms: [...activeFloor.rooms, newRoom] }
-        : f),
+        ? { ...activeFloor, rooms: [...activeFloor.rooms, newRoom] } : f),
       updatedAt: now,
     });
     setDrawingPoints([]);
@@ -312,8 +335,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     onUpdateBuilding({
       ...building,
       floors: building.floors.map(f => f.id === activeFloor.id
-        ? { ...activeFloor, rooms: activeFloor.rooms.filter(r => r.id !== roomId) }
-        : f),
+        ? { ...activeFloor, rooms: activeFloor.rooms.filter(r => r.id !== roomId) } : f),
       updatedAt: Date.now(),
     });
     setSelectedRoomId(null);
@@ -325,23 +347,28 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     onUpdateBuilding({
       ...building,
       floors: building.floors.map(f => f.id === activeFloor.id
-        ? { ...activeFloor, rooms: activeFloor.rooms.map(r => r.id === editingRoom.id ? editingRoom : r) }
-        : f),
+        ? { ...activeFloor, rooms: activeFloor.rooms.map(r => r.id === editingRoom.id ? editingRoom : r) } : f),
       updatedAt: Date.now(),
     });
     setEditingRoom(null);
   }, [editingRoom, activeFloor, building, onUpdateBuilding]);
 
+  const updateRoomBindings = useCallback((roomId: string, bindings: RoomDataPointBinding[]) => {
+    if (!activeFloor) return;
+    onUpdateBuilding({
+      ...building,
+      floors: building.floors.map(f => f.id === activeFloor.id
+        ? { ...f, rooms: f.rooms.map(r => r.id === roomId ? { ...r, bindings } : r) } : f),
+      updatedAt: Date.now(),
+    });
+  }, [activeFloor, building, onUpdateBuilding]);
+
   const addFloor = useCallback(() => {
     const now = Date.now();
     const maxLevel = Math.max(...building.floors.map(f => f.level), -1);
     const newFloor: Floor = {
-      id: `floor-${now}`,
-      name: `Obergeschoss ${maxLevel + 1}`,
-      level: maxLevel + 1,
-      height: 3.0,
-      rooms: [], walls: [], ducts: [], pipes: [], slabs: [],
-      backgroundImage: null,
+      id: `floor-${now}`, name: `Obergeschoss ${maxLevel + 1}`, level: maxLevel + 1,
+      height: 3.0, rooms: [], walls: [], ducts: [], pipes: [], slabs: [], backgroundImage: null,
     };
     onUpdateBuilding({ ...building, floors: [...building.floors, newFloor], updatedAt: now });
     setSelectedFloorId(newFloor.id);
@@ -371,10 +398,8 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     return {
       s, e,
       corners: [
-        { x: s.x + nx, y: s.y + ny },
-        { x: e.x + nx, y: e.y + ny },
-        { x: e.x - nx, y: e.y - ny },
-        { x: s.x - nx, y: s.y - ny },
+        { x: s.x + nx, y: s.y + ny }, { x: e.x + nx, y: e.y + ny },
+        { x: e.x - nx, y: e.y - ny }, { x: s.x - nx, y: s.y - ny },
       ],
     };
   }, [worldToSvg, zoom]);
@@ -383,7 +408,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const livePoint = worldToSvg(mousePos.x, mousePos.y);
   const currentDrawSvgPts = drawingPoints.map(p => worldToSvg(p.x, p.y));
 
-  // Is cursor close to first drawing point?
   const nearFirstPoint = drawingPoints.length >= 3 && (() => {
     const first = currentDrawSvgPts[0];
     return Math.hypot(livePoint.x - first.x, livePoint.y - first.y) < 14;
@@ -395,12 +419,49 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     { id: 'polygon', label: 'Raum zeichnen', Icon: Hexagon },
   ] as const;
 
+  // ---- Datapoint picker helpers ----
+  const getBinding = (room: Room, roleKey: string): RoomDataPointBinding | undefined =>
+    (room.bindings ?? []).find(b => b.id === `${room.id}-${roleKey}`);
+
+  const setBindingDatapoint = (room: Room, roleKey: string, datapoint: string) => {
+    const role = BINDING_ROLES.find(r => r.key === roleKey);
+    if (!role) return;
+    const existing = room.bindings ?? [];
+    const bindingId = `${room.id}-${roleKey}`;
+    const hasBinding = existing.find(b => b.id === bindingId);
+    let next: RoomDataPointBinding[];
+    if (datapoint === '') {
+      next = existing.filter(b => b.id !== bindingId);
+    } else if (hasBinding) {
+      next = existing.map(b => b.id === bindingId ? { ...b, datapoint } : b);
+    } else {
+      const newBinding: RoomDataPointBinding = {
+        id: bindingId,
+        datapoint,
+        label: role.label,
+        category: role.category as RoomDataPointBinding['category'],
+        unit: role.unit,
+        display: 'tile',
+        showInRoom: true,
+        showInBuilding: roleKey === 'temperature',
+        writable: roleKey === 'setpoint',
+        minValue: role.min,
+        maxValue: role.max,
+        order: BINDING_ROLES.findIndex(r => r.key === roleKey),
+      };
+      next = [...existing, newBinding];
+    }
+    updateRoomBindings(room.id, next);
+  };
+
+  const removeBinding = (room: Room, roleKey: string) => {
+    setBindingDatapoint(room, roleKey, '');
+  };
+
   return (
     <div className="flex h-full bg-slate-900 text-slate-200 overflow-hidden">
-      {/* ── Left sidebar ── */}
+      {/* Left sidebar */}
       <div className="w-52 border-r border-slate-700 flex flex-col shrink-0 overflow-hidden">
-
-        {/* Floors */}
         <div className="p-3 border-b border-slate-700">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Etagen</h3>
           <div className="flex flex-col gap-0.5">
@@ -427,7 +488,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
           </button>
         </div>
 
-        {/* Tools */}
         <div className="p-3 border-b border-slate-700">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Werkzeuge</h3>
           <div className="flex flex-col gap-0.5">
@@ -450,7 +510,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
           </div>
         </div>
 
-        {/* Layer toggle */}
         <div className="p-3 border-b border-slate-700">
           <button
             onClick={() => setShowLayerPanel(!showLayerPanel)}
@@ -475,7 +534,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
           )}
         </div>
 
-        {/* Room list */}
         <div className="flex-1 overflow-y-auto p-3 min-h-0">
           {rooms.length > 0 && (
             <div>
@@ -494,6 +552,9 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   >
                     <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: room.color || '#94a3b8' }} />
                     <span className="flex-1 truncate">{room.name}</span>
+                    {(room.bindings?.length ?? 0) > 0 && (
+                      <span className="text-[9px] text-sky-400 shrink-0">{room.bindings!.length}</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -502,9 +563,8 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         </div>
       </div>
 
-      {/* ── Canvas ── */}
+      {/* Canvas */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Toolbar bar */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800 shrink-0">
           <span className="text-sm text-slate-300 font-medium truncate">
             {activeFloor?.name ?? 'Keine Etage'}
@@ -536,8 +596,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         <div ref={containerRef} className="flex-1 overflow-hidden relative">
           <svg
             ref={svgRef}
-            width="100%"
-            height="100%"
+            width="100%" height="100%"
             className={[
               'w-full h-full select-none',
               tool === 'polygon' ? 'cursor-crosshair' : '',
@@ -552,7 +611,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
             onMouseUp={handleMouseUp}
             onWheel={handleWheel}
           >
-            {/* Grid */}
             <defs>
               <pattern id="re-grid-sm" width={SCALE * zoom} height={SCALE * zoom} patternUnits="userSpaceOnUse"
                 x={pan.x % (SCALE * zoom)} y={pan.y % (SCALE * zoom)}>
@@ -567,25 +625,15 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
             <rect width="100%" height="100%" fill="#0f172a" />
             <rect width="100%" height="100%" fill="url(#re-grid-lg)" />
 
-            {/* ── Walls (read-only, from building data) ── */}
             {layers.walls && walls.map(wall => {
               const wp = getWallSvgPoints(wall);
               if (!wp) return null;
               const pts = wp.corners.map(p => `${p.x},${p.y}`).join(' ');
               return (
-                <polygon
-                  key={wall.id}
-                  points={pts}
-                  fill="#475569"
-                  fillOpacity={0.6}
-                  stroke="#64748b"
-                  strokeWidth={1}
-                  style={{ pointerEvents: 'none' }}
-                />
+                <polygon key={wall.id} points={pts} fill="#475569" fillOpacity={0.6} stroke="#64748b" strokeWidth={1} style={{ pointerEvents: 'none' }} />
               );
             })}
 
-            {/* ── Rooms ── */}
             {layers.rooms && rooms.map(room => {
               const poly = getRoomPolygon(room);
               const pts = poly.map(p => `${p.x},${p.y}`).join(' ');
@@ -593,6 +641,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
               const cx = poly.reduce((s, p) => s + p.x, 0) / poly.length;
               const cy = poly.reduce((s, p) => s + p.y, 0) / poly.length;
               const isPolygon = !!(room.points && room.points.length >= 3);
+              const bindingCount = room.bindings?.length ?? 0;
               return (
                 <g key={room.id}>
                   <polygon
@@ -608,11 +657,9 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                     }}
                     onMouseDown={isPolygon ? e => handleRoomMouseDown(e, room) : undefined}
                   />
-                  {/* Vertex handles on selected polygon room — draggable */}
                   {isSelected && isPolygon && poly.map((p, i) => (
                     <circle
-                      key={i}
-                      cx={p.x} cy={p.y} r={6}
+                      key={i} cx={p.x} cy={p.y} r={6}
                       fill="#38bdf8" stroke="#0f172a" strokeWidth={1.5}
                       className="cursor-crosshair"
                       style={{ pointerEvents: 'all' }}
@@ -620,17 +667,23 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                     />
                   ))}
                   {zoom >= 0.5 && (
-                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+                    <text x={cx} y={cy - (bindingCount > 0 ? 6 * zoom : 0)} textAnchor="middle" dominantBaseline="middle"
                       fill={isSelected ? '#e2e8f0' : '#94a3b8'} fontSize={11 * zoom}
                       style={{ pointerEvents: 'none', userSelect: 'none' }}>
                       {room.name}
+                    </text>
+                  )}
+                  {zoom >= 0.7 && bindingCount > 0 && (
+                    <text x={cx} y={cy + 10 * zoom} textAnchor="middle" dominantBaseline="middle"
+                      fill="#38bdf8" fontSize={9 * zoom}
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                      {bindingCount} DP
                     </text>
                   )}
                 </g>
               );
             })}
 
-            {/* Polygon drawing preview */}
             {currentDrawSvgPts.length > 0 && (
               <g>
                 <polygon
@@ -648,18 +701,14 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   stroke="#38bdf8" strokeWidth={1.5} strokeDasharray="5,3"
                   style={{ pointerEvents: 'none' }}
                 />
-                {/* Snap-to-close indicator */}
                 {nearFirstPoint && (
-                  <circle
-                    cx={currentDrawSvgPts[0].x} cy={currentDrawSvgPts[0].y}
+                  <circle cx={currentDrawSvgPts[0].x} cy={currentDrawSvgPts[0].y}
                     r={12} fill="#38bdf8" fillOpacity={0.2} stroke="#38bdf8" strokeWidth={2}
-                    style={{ pointerEvents: 'none' }}
-                  />
+                    style={{ pointerEvents: 'none' }} />
                 )}
               </g>
             )}
 
-            {/* Cursor position */}
             <text x={12} y={canvasHeight - 12} fill="#334155" fontSize={10} style={{ userSelect: 'none' }}>
               {mousePos.x.toFixed(2)}m, {mousePos.y.toFixed(2)}m
             </text>
@@ -667,65 +716,358 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         </div>
       </div>
 
-      {/* ── Right panel: Room properties ── */}
-      {selectedRoom && !editingRoom && (
-        <div className="w-60 border-l border-slate-700 flex flex-col bg-slate-800 shrink-0">
-          <div className="p-3 border-b border-slate-700 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-200">Raum</h3>
-            <div className="flex items-center gap-0.5">
-              <button onClick={() => setEditingRoom({ ...selectedRoom })} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Bearbeiten"><Edit3 size={13} /></button>
-              <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Konfigurieren"><Settings size={13} /></button>
-              <button onClick={() => deleteRoom(selectedRoom.id)} className="p-1.5 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400" title="Löschen"><Trash2 size={13} /></button>
-            </div>
-          </div>
-          <div className="p-3 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-sm shrink-0" style={{ background: selectedRoom.color || '#94a3b8' }} />
-              <span className="text-sm font-medium text-white">{selectedRoom.name}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <div className="bg-slate-700/50 rounded p-2"><p className="text-slate-400 mb-0.5">Typ</p><p className="text-slate-200 font-medium">{ROOM_TYPE_LABELS[selectedRoom.type]}</p></div>
-              {selectedRoom.number && <div className="bg-slate-700/50 rounded p-2"><p className="text-slate-400 mb-0.5">Nummer</p><p className="text-slate-200 font-medium">{selectedRoom.number}</p></div>}
-              <div className="bg-slate-700/50 rounded p-2"><p className="text-slate-400 mb-0.5">Datenpunkte</p><p className="text-slate-200 font-medium">{selectedRoom.bindings?.length ?? 0}</p></div>
-              {selectedRoom.points && (
-                <div className="bg-slate-700/50 rounded p-2"><p className="text-slate-400 mb-0.5">Ecken</p><p className="text-slate-200 font-medium">{selectedRoom.points.length}</p></div>
+      {/* Right panel */}
+      {(selectedRoom || editingRoom) && (
+        <div className="w-80 border-l border-slate-700 flex flex-col bg-slate-900 shrink-0 overflow-hidden">
+          {/* Tab header */}
+          <div className="flex border-b border-slate-700 bg-slate-800 shrink-0">
+            <button
+              onClick={() => { setRightTab('properties'); setEditingRoom(null); }}
+              className={[
+                'flex-1 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
+                rightTab === 'properties' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
+              ].join(' ')}
+            >
+              Eigenschaften
+            </button>
+            <button
+              onClick={() => { setRightTab('datapoints'); setEditingRoom(null); }}
+              className={[
+                'flex-1 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
+                rightTab === 'datapoints' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
+              ].join(' ')}
+            >
+              Datenpunkte
+              {(selectedRoom?.bindings?.length ?? 0) > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-[9px] bg-sky-600/30 text-sky-400">
+                  {selectedRoom!.bindings!.length}
+                </span>
               )}
-            </div>
-            <p className="text-xs text-slate-500 text-center">Raum ziehen zum Verschieben</p>
-            <button onClick={() => onOpenRoom?.(selectedRoom.id)} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">Raumseite öffnen</button>
-            <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-colors">Datenpunkte konfigurieren</button>
+            </button>
           </div>
+
+          {/* Properties tab */}
+          {rightTab === 'properties' && !editingRoom && selectedRoom && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-3 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: selectedRoom.color || '#94a3b8' }} />
+                  <span className="text-sm font-semibold text-white truncate">{selectedRoom.name}</span>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <button onClick={() => setEditingRoom({ ...selectedRoom })} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Bearbeiten"><Edit3 size={13} /></button>
+                  <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Monitor-Konfiguration"><Settings size={13} /></button>
+                  <button onClick={() => deleteRoom(selectedRoom.id)} className="p-1.5 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400" title="Löschen"><Trash2 size={13} /></button>
+                </div>
+              </div>
+              <div className="p-3 flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                    <p className="text-slate-500 mb-0.5">Typ</p>
+                    <p className="text-slate-200 font-medium">{ROOM_TYPE_LABELS[selectedRoom.type]}</p>
+                  </div>
+                  {selectedRoom.number && (
+                    <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                      <p className="text-slate-500 mb-0.5">Nummer</p>
+                      <p className="text-slate-200 font-medium">{selectedRoom.number}</p>
+                    </div>
+                  )}
+                  <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                    <p className="text-slate-500 mb-0.5">Datenpunkte</p>
+                    <p className="text-slate-200 font-medium">{selectedRoom.bindings?.length ?? 0}</p>
+                  </div>
+                  {selectedRoom.points && (
+                    <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
+                      <p className="text-slate-500 mb-0.5">Ecken</p>
+                      <p className="text-slate-200 font-medium">{selectedRoom.points.length}</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-600 text-center">Raum ziehen zum Verschieben</p>
+                {onOpenRoom && (
+                  <button onClick={() => onOpenRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
+                    Monitor öffnen
+                  </button>
+                )}
+                {onConfigRoom && (
+                  <button onClick={() => onConfigRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition-colors">
+                    Monitor-Konfiguration
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Edit room form */}
+          {editingRoom && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-3 border-b border-slate-800 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-200">Raum bearbeiten</h3>
+                <div className="flex gap-0.5">
+                  <button onClick={saveEditingRoom} className="p-1.5 hover:bg-slate-700 rounded text-sky-400"><Check size={13} /></button>
+                  <button onClick={() => setEditingRoom(null)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400"><X size={13} /></button>
+                </div>
+              </div>
+              <div className="p-3 flex flex-col gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Name</label>
+                  <input type="text" value={editingRoom.name}
+                    onChange={e => setEditingRoom(r => r ? { ...r, name: e.target.value } : r)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Nummer</label>
+                  <input type="text" value={editingRoom.number ?? ''}
+                    onChange={e => setEditingRoom(r => r ? { ...r, number: e.target.value } : r)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" placeholder="z.B. 1.01" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Typ</label>
+                  <select value={editingRoom.type}
+                    onChange={e => { const t = e.target.value as RoomType; setEditingRoom(r => r ? { ...r, type: t, color: ROOM_TYPE_COLORS[t] } : r); }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                    {Object.entries(ROOM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Farbe</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={editingRoom.color || '#94a3b8'}
+                      onChange={e => setEditingRoom(r => r ? { ...r, color: e.target.value } : r)}
+                      className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0" />
+                    <span className="text-xs text-slate-400 font-mono">{editingRoom.color}</span>
+                  </div>
+                </div>
+                <button onClick={saveEditingRoom} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
+                  Speichern
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Datapoints tab */}
+          {rightTab === 'datapoints' && selectedRoom && !editingRoom && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-3 border-b border-slate-800">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">HLK-Datenpunkte</p>
+                <p className="text-[10px] text-slate-600 mt-0.5">{selectedRoom.name} · {(selectedRoom.bindings?.length ?? 0)} zugewiesen</p>
+              </div>
+
+              {datapointGroups.length === 0 && (
+                <div className="px-4 py-6 text-center">
+                  <Activity size={22} className="mx-auto mb-2 text-slate-700" />
+                  <p className="text-xs text-slate-500">Keine Datenpunkte verfügbar.</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Verbinde einen Treiber (z.B. Home Assistant) um Datenpunkte zu laden.</p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1 p-2">
+                {BINDING_ROLE_CATEGORIES.map(cat => {
+                  const isOpen = expandedCats[cat.id] !== false;
+                  const roles = BINDING_ROLES.filter(r => cat.keys.includes(r.key));
+                  const assigned = roles.filter(r => getBinding(selectedRoom, r.key)?.datapoint).length;
+                  return (
+                    <div key={cat.id} className="border border-slate-800 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedCats(s => ({ ...s, [cat.id]: !isOpen }))}
+                        className="w-full flex items-center justify-between px-3 py-2 bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-200">{cat.label}</span>
+                          {assigned > 0 && (
+                            <span className="text-[9px] text-sky-400 bg-sky-900/40 px-1.5 py-0.5 rounded-full">{assigned}/{roles.length}</span>
+                          )}
+                        </div>
+                        {isOpen ? <ChevronDown size={11} className="text-slate-500" /> : <ChevronRight size={11} className="text-slate-500" />}
+                      </button>
+
+                      {isOpen && (
+                        <div className="divide-y divide-slate-800/60">
+                          {roles.map(role => {
+                            const binding = getBinding(selectedRoom, role.key);
+                            const hasBinding = !!(binding?.datapoint);
+                            return (
+                              <div key={role.key} className={`px-3 py-2.5 ${hasBinding ? 'bg-slate-800/20' : ''}`}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-all"
+                                    style={hasBinding
+                                      ? { backgroundColor: role.accent + '22', borderColor: role.accent + '66', color: role.accent }
+                                      : { backgroundColor: '#1e293b', borderColor: '#334155', color: '#64748b' }
+                                    }
+                                  >
+                                    {role.icon}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-xs font-medium ${hasBinding ? 'text-white' : 'text-slate-400'}`}>{role.label}</p>
+                                    {hasBinding ? (
+                                      <p className="text-[10px] text-slate-500 font-mono truncate">{displayLabel(binding!.datapoint, datapointLabels)}</p>
+                                    ) : (
+                                      <p className="text-[10px] text-slate-600">{role.unit || 'kein Datenpunkt'}</p>
+                                    )}
+                                  </div>
+                                  {hasBinding ? (
+                                    <button
+                                      onClick={() => removeBinding(selectedRoom, role.key)}
+                                      className="p-1 rounded hover:bg-red-900/40 text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setOpenPickerFor(role.key); setPickerPageId(null); setDpSearch(''); }}
+                                      className="p-1 rounded hover:bg-sky-900/40 text-slate-600 hover:text-sky-400 transition-colors shrink-0"
+                                    >
+                                      <Plus size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                                {hasBinding && (
+                                  <button
+                                    onClick={() => { setOpenPickerFor(role.key); setPickerPageId(null); setDpSearch(''); }}
+                                    className="mt-1.5 w-full text-left text-[10px] text-slate-600 hover:text-sky-400 transition-colors flex items-center gap-1 pl-10"
+                                  >
+                                    <Search size={9} /> ändern
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Right panel: Edit Room ── */}
-      {editingRoom && (
-        <div className="w-60 border-l border-slate-700 flex flex-col bg-slate-800 shrink-0">
-          <div className="p-3 border-b border-slate-700 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-200">Raum bearbeiten</h3>
-            <div className="flex gap-0.5">
-              <button onClick={saveEditingRoom} className="p-1.5 hover:bg-slate-700 rounded text-sky-400"><Check size={13} /></button>
-              <button onClick={() => setEditingRoom(null)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400"><X size={13} /></button>
-            </div>
-          </div>
-          <div className="p-3 flex flex-col gap-3 overflow-y-auto">
-            <div><label className="text-xs text-slate-400 block mb-1">Name</label>
-              <input type="text" value={editingRoom.name} onChange={e => setEditingRoom(r => r ? { ...r, name: e.target.value } : r)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" /></div>
-            <div><label className="text-xs text-slate-400 block mb-1">Nummer</label>
-              <input type="text" value={editingRoom.number ?? ''} onChange={e => setEditingRoom(r => r ? { ...r, number: e.target.value } : r)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" placeholder="z.B. 1.01" /></div>
-            <div><label className="text-xs text-slate-400 block mb-1">Typ</label>
-              <select value={editingRoom.type} onChange={e => { const t = e.target.value as RoomType; setEditingRoom(r => r ? { ...r, type: t, color: ROOM_TYPE_COLORS[t] } : r); }}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500">
-                {Object.entries(ROOM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select></div>
-            <div><label className="text-xs text-slate-400 block mb-1">Farbe</label>
+      {/* Datapoint picker modal */}
+      {openPickerFor && selectedRoom && (
+        <div
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setOpenPickerFor(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Datenpunkt wählen</p>
+                <p className="text-sm font-semibold text-white">
+                  {BINDING_ROLES.find(r => r.key === openPickerFor)?.label ?? openPickerFor}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
-                <input type="color" value={editingRoom.color || '#94a3b8'} onChange={e => setEditingRoom(r => r ? { ...r, color: e.target.value } : r)}
-                  className="w-8 h-8 rounded cursor-pointer bg-transparent border-0" />
-                <span className="text-xs text-slate-400">{editingRoom.color}</span>
-              </div></div>
+                {getBinding(selectedRoom, openPickerFor)?.datapoint && (
+                  <button
+                    onClick={() => { removeBinding(selectedRoom, openPickerFor); setOpenPickerFor(null); }}
+                    className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors px-2 py-1 rounded hover:bg-rose-900/30"
+                  >
+                    Entfernen
+                  </button>
+                )}
+                <button onClick={() => setOpenPickerFor(null)} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {pickerPageId !== null && (
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
+                <button
+                  onClick={() => { setPickerPageId(null); setDpSearch(''); }}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  <ChevronRight size={13} className="rotate-180" />
+                  Zurück
+                </button>
+                <span className="text-slate-600 text-xs">/</span>
+                <span className="text-xs text-slate-200 font-medium truncate">
+                  {datapointGroups.find(g => g.pageId === pickerPageId)?.pageName ?? pickerPageId}
+                </span>
+              </div>
+            )}
+
+            <div className="px-4 py-2 border-b border-slate-800">
+              <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5">
+                <Search size={13} className="text-slate-500 shrink-0" />
+                <input
+                  autoFocus
+                  type="text" value={dpSearch}
+                  onChange={e => setDpSearch(e.target.value)}
+                  placeholder="Suchen…"
+                  className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {pickerPageId === null ? (
+                datapointGroups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                    <Activity size={28} className="mb-2 opacity-30" />
+                    <span className="text-xs">Keine Logik-Datenpunkte gefunden</span>
+                  </div>
+                ) : (
+                  datapointGroups
+                    .filter(g => !dpSearch || g.pageName.toLowerCase().includes(dpSearch.toLowerCase())
+                      || g.datapoints.some(d => d.entityId.toLowerCase().includes(dpSearch.toLowerCase()) || d.label.toLowerCase().includes(dpSearch.toLowerCase())))
+                    .map(g => (
+                      <button
+                        key={g.pageId}
+                        onClick={() => { setPickerPageId(g.pageId); setDpSearch(''); }}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                            <Zap size={13} className="text-emerald-400" />
+                          </div>
+                          <span className="text-xs text-slate-200 font-medium">{g.pageName}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{g.datapoints.length}</span>
+                          <ChevronRight size={13} className="text-slate-500" />
+                        </div>
+                      </button>
+                    ))
+                )
+              ) : (() => {
+                const g = datapointGroups.find(x => x.pageId === pickerPageId);
+                const q = dpSearch.trim().toLowerCase();
+                const list = g ? (q
+                  ? g.datapoints.filter(d => d.entityId.toLowerCase().includes(q) || d.label.toLowerCase().includes(q) || displayLabel(d.entityId, datapointLabels).toLowerCase().includes(q))
+                  : g.datapoints) : [];
+                if (list.length === 0) {
+                  return <div className="py-10 text-center text-xs text-slate-500">Keine Treffer</div>;
+                }
+                return list.map(dp => {
+                  const human = displayLabel(dp.entityId, datapointLabels);
+                  const primary = dp.label && dp.label !== dp.entityId ? dp.label : human;
+                  const showSub = primary !== dp.entityId;
+                  const isCurrent = getBinding(selectedRoom, openPickerFor)?.datapoint === dp.entityId;
+                  return (
+                    <button
+                      key={dp.entityId}
+                      onClick={() => { setBindingDatapoint(selectedRoom, openPickerFor, dp.entityId); setOpenPickerFor(null); }}
+                      className={`w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left ${isCurrent ? 'bg-sky-900/20' : ''}`}
+                    >
+                      <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                        {isCurrent ? <Star size={11} className="text-sky-400" /> : <Zap size={11} className="text-emerald-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-slate-200 truncate">{primary}</div>
+                        {showSub && <div className="text-[10px] text-slate-500 font-mono truncate">{dp.entityId}</div>}
+                      </div>
+                      {isCurrent && <span className="text-[9px] text-sky-400 shrink-0">Aktuell</span>}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
           </div>
         </div>
       )}

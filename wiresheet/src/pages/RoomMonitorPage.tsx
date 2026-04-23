@@ -436,28 +436,30 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
     );
   }
 
+  // Full-page view — styled like the panel but filling the screen
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden">
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-3 mb-2">
-          <button
-            onClick={handleBack}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            <ArrowLeft size={16} />
-          </button>
+      {/* Header */}
+      <div className="bg-slate-900/80 border-b border-slate-800 px-6 py-4 shrink-0">
+        <div className="flex items-center gap-2 mb-3">
           <Breadcrumbs items={[
             { label: building.name, onClick: handleBack, icon: 'building' },
             { label: floor.name, onClick: handleBack, icon: 'floor' },
             { label: room.name, icon: 'room' },
           ]} />
+          <button
+            onClick={handleBack}
+            className="ml-auto p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <ArrowLeft size={14} />
+          </button>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-sm" style={{ background: room.color || '#94a3b8' }} />
-            <div>
-              <h1 className="text-lg font-bold text-white leading-tight">{room.name}</h1>
-              <p className="text-xs text-slate-400 flex items-center gap-2">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-4 h-4 rounded-sm shrink-0" style={{ background: room.color || '#94a3b8' }} />
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-white leading-tight truncate">{room.name}</h1>
+              <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                 {room.number && <span>{room.number}</span>}
                 <span>{floor.name}</span>
                 {alarms.length > 0 && (
@@ -469,26 +471,27 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => setLastRefresh(Date.now())}
-              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
+              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors"
               title="Aktualisieren"
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={13} />
             </button>
             <button
               onClick={handleOpenConfig}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm text-slate-200 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-200 transition-colors"
             >
-              <Settings size={13} />
+              <Settings size={12} />
               Konfigurieren
             </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="flex border-b border-slate-800 bg-slate-900 px-6">
+      {/* Tabs */}
+      <div className="flex border-b border-slate-800 bg-slate-900/60 px-6 shrink-0">
         {([
           { id: 'overview', label: 'Übersicht' },
           { id: 'points', label: `Datenpunkte (${dataPoints.length})` },
@@ -499,7 +502,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={[
-              'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+              'px-4 py-2.5 text-xs font-medium border-b-2 transition-colors',
               activeTab === tab.id
                 ? 'border-sky-500 text-sky-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200',
@@ -510,66 +513,54 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
         ))}
       </div>
 
+      {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'overview' && (
-          <div className="p-6">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Kennwerte
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 mb-8">
-              {primaryKPIs.map(dp => (
-                <KPICard key={dp.id} dp={dp} />
-              ))}
+          <div className="p-6 max-w-5xl mx-auto">
+            <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Kennwerte</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 mb-8">
+              {primaryKPIs.map(dp => <KPICard key={dp.id} dp={dp} />)}
             </div>
 
             {alarms.length > 0 && (
               <div className="mb-8">
-                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <AlertTriangle size={12} className="text-red-400" />
-                  Aktive Alarme
+                <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <AlertTriangle size={10} className="text-red-400" /> Aktive Alarme
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   {alarms.map(a => (
-                    <div key={a.id} className="flex items-center gap-3 px-4 py-3 bg-red-950/20 border border-red-800/50 rounded-lg">
-                      <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                    <div key={a.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                      <AlertTriangle size={12} className="text-red-400 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-red-200">{a.label}</p>
-                        <p className="text-xs text-red-400/70">Grenzwert überschritten — {a.formattedValue}</p>
+                        <p className="text-xs font-medium text-red-200 truncate">{a.label}</p>
+                        <p className="text-xs text-red-400/70">{a.formattedValue}</p>
                       </div>
-                      <button className="px-2.5 py-1 rounded bg-red-800/50 hover:bg-red-700/60 text-xs text-red-200 transition-colors">
-                        Quittieren
-                      </button>
+                      <button className="px-2 py-1 rounded bg-red-800/50 hover:bg-red-700/60 text-xs text-red-200 transition-colors shrink-0">Quittieren</button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Alle Werte
-            </h2>
-            <div className="flex flex-col gap-1.5">
-              {dataPoints.map(dp => (
-                <PointRow key={dp.id} dp={dp} />
-              ))}
+            <h2 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Alle Werte</h2>
+            <div className="flex flex-col gap-1">
+              {dataPoints.map(dp => <PointRow key={dp.id} dp={dp} />)}
             </div>
           </div>
         )}
 
         {activeTab === 'points' && (
-          <div className="p-6">
-            <div className="flex flex-col gap-1.5">
-              {dataPoints.map(dp => (
-                <PointRow key={dp.id} dp={dp} />
-              ))}
+          <div className="p-6 max-w-3xl mx-auto">
+            <div className="flex flex-col gap-1">
+              {dataPoints.map(dp => <PointRow key={dp.id} dp={dp} />)}
             </div>
           </div>
         )}
 
         {activeTab === 'alarms' && (
-          <div className="p-6">
+          <div className="p-6 max-w-3xl mx-auto">
             {alarms.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                 <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-3">
                   <AlertTriangle size={20} className="text-slate-600" />
                 </div>
@@ -578,23 +569,15 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
             ) : (
               <div className="flex flex-col gap-2">
                 {alarms.map(a => (
-                  <div key={a.id} className="flex items-center gap-3 px-4 py-3 bg-red-950/20 border border-red-800/50 rounded-lg">
-                    <AlertTriangle size={14} className="text-red-400 shrink-0" />
+                  <div key={a.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                    <AlertTriangle size={12} className="text-red-400 shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-red-200">{a.label}</p>
+                      <p className="text-xs font-medium text-red-200">{a.label}</p>
                       <p className="text-xs text-red-400/70 mt-0.5">
-                        Istwert: {a.formattedValue} · Datenpunkt: {a.name}
+                        {a.formattedValue} · <span className="flex items-center gap-1 inline-flex"><Clock size={9} /> {Math.round((Date.now() - (a.lastUpdate ?? Date.now())) / 1000)}s</span>
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={11} className="text-slate-500" />
-                      <span className="text-xs text-slate-500">
-                        {Math.round((Date.now() - (a.lastUpdate ?? Date.now())) / 1000)}s
-                      </span>
-                    </div>
-                    <button className="px-2.5 py-1 rounded bg-red-800/50 hover:bg-red-700/60 text-xs text-red-200 transition-colors">
-                      Quittieren
-                    </button>
+                    <button className="px-2 py-1 rounded bg-red-800/50 hover:bg-red-700/60 text-xs text-red-200 transition-colors">Quittieren</button>
                   </div>
                 ))}
               </div>
@@ -603,20 +586,18 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
         )}
 
         {activeTab === 'trends' && (
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {dataPoints.filter(dp => dp.historicValues && dp.historicValues.length > 2 && dp.category !== 'occupancy' && dp.category !== 'alarm').map(dp => (
-                <div key={dp.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
+                <div key={dp.id} className="bg-slate-800/50 border border-slate-700 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span style={{ color: STATUS_COLORS[dp.status] }}>{CATEGORY_ICONS[dp.category]}</span>
-                      <span className="text-sm font-medium text-slate-200">{dp.label}</span>
+                      <span className="text-xs font-medium text-slate-200">{dp.label}</span>
                     </div>
-                    <span className="text-lg font-bold text-white">{dp.formattedValue}</span>
+                    <span className="text-base font-bold text-white">{dp.formattedValue}</span>
                   </div>
-                  {dp.historicValues && (
-                    <TrendChartFull values={dp.historicValues} />
-                  )}
+                  {dp.historicValues && <TrendChartFull values={dp.historicValues} />}
                 </div>
               ))}
             </div>

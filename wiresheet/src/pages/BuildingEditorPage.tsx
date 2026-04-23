@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Monitor, Hexagon, Building2 } from 'lucide-react';
 import { BuildingView } from '../components/building/BuildingView';
 import { RoomEditorView } from '../components/building/RoomEditorView';
 import { useBuildingContext } from '../context/BuildingContext';
+import { WiresheetPage, HaEntity } from '../types/flow';
 
 type EditorSubMode = '3d' | 'rooms';
 
@@ -12,13 +13,47 @@ interface BuildingEditorPageProps {
   onMonitor?: () => void;
   onOpenRoom?: (roomId: string) => void;
   onConfigRoom?: (roomId: string) => void;
+  pages?: WiresheetPage[];
+  haEntities?: HaEntity[];
+  haLoading?: boolean;
+  onLoadHaEntities?: () => void;
 }
 
-export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom }: BuildingEditorPageProps) {
+export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom, pages = [], haEntities = [], haLoading = false, onLoadHaEntities }: BuildingEditorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
   const { buildings, replaceBuilding, isLoaded, activeBuildingId } = useBuildingContext();
+
+  const logicPageGroups = useMemo(() => {
+    return pages.map(page => ({
+      pageId: page.id,
+      pageName: page.name,
+      datapoints: page.nodes
+        .filter(n => n.type === 'datapoint' || n.type === 'dp-read' || n.type === 'dp-write' || n.type === 'ha-entity')
+        .map(n => ({
+          entityId: (n.data.config as Record<string, unknown> | undefined)?.['dpKey'] as string
+            || (n.data.config as Record<string, unknown> | undefined)?.['entityId'] as string
+            || n.id,
+          label: n.data.label || (n.data.config as Record<string, unknown> | undefined)?.['label'] as string || n.id,
+        }))
+        .filter(d => d.entityId),
+    })).filter(g => g.datapoints.length > 0);
+  }, [pages]);
+
+  const datapointLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const grp of logicPageGroups) {
+      for (const dp of grp.datapoints) {
+        if (dp.label && dp.label !== dp.entityId && !map[dp.entityId]) map[dp.entityId] = dp.label;
+      }
+    }
+    for (const e of haEntities) {
+      const friendly = (e.attributes as Record<string, unknown> | undefined)?.['friendly_name'];
+      if (typeof friendly === 'string' && friendly.trim()) map[e.entity_id] = friendly;
+    }
+    return map;
+  }, [logicPageGroups, haEntities]);
 
   const buildingId = params.buildingId ?? activeBuildingId;
   const building = buildings.find(b => b.id === buildingId);
@@ -98,13 +133,21 @@ export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom
 
       <div className="flex-1 overflow-hidden">
         {editorMode === '3d' ? (
-          <BuildingView liveValues={{}} />
+          <BuildingView
+            liveValues={{}}
+            pages={pages}
+            haEntities={haEntities}
+            haLoading={haLoading}
+            onLoadHaEntities={onLoadHaEntities}
+          />
         ) : (
           <RoomEditorView
             building={building}
             onUpdateBuilding={replaceBuilding}
             onOpenRoom={onOpenRoom}
             onConfigRoom={onConfigRoom}
+            datapointGroups={logicPageGroups}
+            datapointLabels={datapointLabels}
           />
         )}
       </div>
