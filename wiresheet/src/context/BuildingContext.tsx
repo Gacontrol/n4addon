@@ -1,19 +1,23 @@
-import { createContext, useContext, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, ReactNode } from 'react';
 import { useBuildingEditor } from '../hooks/useBuildingEditor';
 import { RoomMonitorConfig } from '../types/bms';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
-// Re-export the full hook return type so BuildingView can use context
+import type { DatapointGroup } from '../components/building/RoomBindingsPanel';
+
 type BuildingEditorHook = ReturnType<typeof useBuildingEditor>;
 
 interface BuildingContextValue extends BuildingEditorHook {
   monitorConfigs: Record<string, RoomMonitorConfig>;
   saveRoomMonitorConfig: (config: RoomMonitorConfig) => void;
+  datapointGroups: DatapointGroup[];
+  setDatapointGroups: (groups: DatapointGroup[]) => void;
 }
 
 const BuildingContext = createContext<BuildingContextValue>({} as BuildingContextValue);
 
 export function BuildingProvider({ children }: { children: ReactNode }) {
   const editor = useBuildingEditor();
+  const [datapointGroups, setDatapointGroups] = useState<DatapointGroup[]>([]);
 
   const allRoomIds = useMemo(
     () => editor.buildings.flatMap(b => b.floors.flatMap(f => f.rooms.map(r => r.id))),
@@ -26,6 +30,8 @@ export function BuildingProvider({ children }: { children: ReactNode }) {
       ...editor,
       monitorConfigs,
       saveRoomMonitorConfig,
+      datapointGroups,
+      setDatapointGroups,
     }}>
       {children}
     </BuildingContext.Provider>

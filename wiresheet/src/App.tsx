@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 function App() {
-  const { activeBuildingId, buildings } = useBuildingContext();
+  const { activeBuildingId, buildings, setDatapointGroups } = useBuildingContext();
 
   const {
     pages,
@@ -1279,6 +1279,8 @@ function App() {
       }))
       .filter(d => d.entityId),
   })).filter(g => g.datapoints.length > 0), [pages]);
+
+  useEffect(() => { setDatapointGroups(appLogicPageGroups); }, [appLogicPageGroups, setDatapointGroups]);
 
   useEffect(() => {
     const nodeIdSet = new Set(allNodeIdsStr.split(',').filter(Boolean));

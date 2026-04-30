@@ -545,7 +545,7 @@ export function RoomConfigPage({
   roomId: propRoomId,
   onBack,
   onOpenMonitor,
-  datapointGroups = [],
+  datapointGroups: propDatapointGroups,
 }: RoomConfigPageProps) {
   const params = useParams<{ buildingId: string; roomId: string }>();
   const navigate = useNavigate();
@@ -553,7 +553,8 @@ export function RoomConfigPage({
   const rId = propRoomId ?? params.roomId;
   const goBack = onBack ?? (() => navigate(-1));
   const goMonitor = onOpenMonitor ?? (() => navigate(`/building/${bId}/room/${rId}/monitor`));
-  const { buildings, monitorConfigs, saveRoomMonitorConfig } = useBuildingContext();
+  const { buildings, monitorConfigs, saveRoomMonitorConfig, datapointGroups: ctxGroups } = useBuildingContext();
+  const datapointGroups = propDatapointGroups ?? ctxGroups;
 
   const building = buildings.find(b => b.id === bId);
   const { floor, room } = useMemo(() => {
