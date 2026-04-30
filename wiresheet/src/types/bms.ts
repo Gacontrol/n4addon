@@ -93,6 +93,7 @@ export interface RoomMonitorConfig {
   layout?: 'grid' | 'list';
   panelTitle?: string;
   panelSubtitle?: string;
+  hiddenTabs?: ('overview' | 'points' | 'alarms' | 'trends')[];
 }
 
 export type BuildingLayerMode =

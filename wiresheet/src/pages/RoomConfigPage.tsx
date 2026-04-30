@@ -169,12 +169,12 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
             <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <div className="relative w-12 h-12">
-              <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
+              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
                 <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
                 <circle cx="24" cy="24" r="18" fill="none" stroke={accent} strokeWidth="4"
                   strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center rotate-90">
+              <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[10px] font-bold text-white">{m.v}</span>
               </div>
             </div>
@@ -356,20 +356,41 @@ function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapoint
   const [q, setQ] = useState('');
   const [pageId, setPageId] = useState<string | null>(null);
 
-  const filteredSuggestions = q
-    ? suggestions.filter(s => s.datapoint.toLowerCase().includes(q.toLowerCase()) || s.label.toLowerCase().includes(q.toLowerCase()))
-    : suggestions;
-
   const pick = (dp: string) => { onSelect(dp); onClose(); };
 
+  const qLow = q.trim().toLowerCase();
+
+  const filteredSuggestions = qLow
+    ? suggestions.filter(s => s.datapoint.toLowerCase().includes(qLow) || s.label.toLowerCase().includes(qLow))
+    : suggestions;
+
+  const filteredGroups = datapointGroups.filter(g =>
+    !qLow || g.pageName.toLowerCase().includes(qLow) || g.datapoints.some(d => d.entityId.toLowerCase().includes(qLow) || d.label.toLowerCase().includes(qLow))
+  );
+
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-          <p className="text-sm font-semibold text-white">Datenpunkt wählen</p>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"><X size={14} /></button>
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Datenpunkt wählen</div>
+            {currentValue && <div className="text-xs text-sky-300 font-mono truncate mt-0.5">{currentValue}</div>}
+          </div>
+          <div className="flex items-center gap-2">
+            {currentValue && (
+              <button onClick={() => { onSelect(''); onClose(); }} className="px-2 py-1 rounded text-[10px] text-slate-400 hover:text-rose-300 hover:bg-rose-900/30 transition-colors">
+                Zurücksetzen
+              </button>
+            )}
+            <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
+        {/* Back breadcrumb when inside a page */}
         {pageId !== null && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
             <button onClick={() => { setPageId(null); setQ(''); }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
@@ -382,14 +403,15 @@ function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapoint
           </div>
         )}
 
+        {/* Search */}
         <div className="px-4 py-2 border-b border-slate-800">
-          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5">
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5">
             <Search size={13} className="text-slate-500 shrink-0" />
             <input
               autoFocus
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Suchen oder Pfad eingeben…"
+              placeholder="Suchen oder Pfad direkt eingeben…"
               className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
               onKeyDown={e => { if (e.key === 'Enter' && q.trim()) pick(q.trim()); }}
             />
@@ -402,99 +424,106 @@ function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapoint
               </button>
             )}
           </div>
-          <p className="text-[10px] text-slate-600 mt-1">Pfad eingeben + Enter oder aus Liste wählen</p>
         </div>
 
+        {/* List */}
         <div className="flex-1 overflow-y-auto">
-          {/* Room bindings as primary source */}
-          {pageId === null && filteredSuggestions.length > 0 && (
+          {pageId === null ? (
             <>
-              {currentValue && (
-                <div className="px-4 py-1.5 border-b border-slate-800/60 bg-slate-800/30">
-                  <p className="text-[10px] text-slate-500 mb-0.5">Aktuell</p>
-                  <p className="text-xs text-sky-300 font-mono truncate">{currentValue}</p>
+              {/* Room bindings */}
+              {filteredSuggestions.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 border-b border-slate-800/50 bg-slate-800/20">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Raum-Datenpunkte</p>
+                  </div>
+                  {filteredSuggestions.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => pick(s.datapoint)}
+                      className={['w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left', currentValue === s.datapoint ? 'bg-sky-950/30' : ''].join(' ')}
+                    >
+                      <span style={{ color: CATEGORY_COLORS[s.category] ?? '#64748b' }} className="shrink-0">
+                        {CATEGORY_ICONS[s.category] ?? CATEGORY_ICONS.generic}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-200 truncate">{s.label}</p>
+                        {s.label !== s.datapoint && <p className="text-[10px] text-slate-500 font-mono truncate">{s.datapoint}</p>}
+                      </div>
+                      {currentValue === s.datapoint && <Check size={11} className="text-sky-400 shrink-0" />}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* Logic page groups */}
+              {filteredGroups.length > 0 && (
+                <>
+                  <div className="px-4 py-1.5 border-b border-slate-800/50 bg-slate-800/20">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Logik-Seiten</p>
+                  </div>
+                  {filteredGroups.map(g => (
+                    <button
+                      key={g.pageId}
+                      onClick={() => { setPageId(g.pageId); setQ(''); }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                          <Zap size={12} className="text-emerald-400" />
+                        </div>
+                        <span className="text-xs text-slate-200 font-medium">{g.pageName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{g.datapoints.length}</span>
+                        <ChevronRight size={13} className="text-slate-500" />
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {filteredSuggestions.length === 0 && filteredGroups.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-slate-600">
+                  <Activity size={24} className="mb-2 opacity-30" />
+                  <p className="text-xs text-center">Keine Datenpunkte gefunden.</p>
+                  <p className="text-[10px] text-center mt-1 text-slate-700">Pfad oben eingeben + Enter drücken.</p>
                 </div>
               )}
-              <div className="px-3 py-1.5 border-b border-slate-800/50">
-                <p className="text-[10px] text-slate-600 uppercase tracking-wider">Raum-Datenpunkte</p>
-              </div>
-              {filteredSuggestions.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => pick(s.datapoint)}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left"
-                >
-                  <span style={{ color: CATEGORY_COLORS[s.category] ?? '#64748b' }} className="shrink-0">
-                    {CATEGORY_ICONS[s.category] ?? CATEGORY_ICONS.generic}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-200 truncate">{s.label}</p>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">{s.datapoint}</p>
-                  </div>
-                  {s.isBinding && <span className="text-[9px] text-sky-600 shrink-0">●</span>}
-                </button>
-              ))}
             </>
-          )}
-
-          {/* Logic page groups */}
-          {pageId === null && datapointGroups.length > 0 && (
-            <>
-              <div className="px-3 py-1.5 border-b border-slate-800/50 border-t border-slate-800/50 mt-1">
-                <p className="text-[10px] text-slate-600 uppercase tracking-wider">Logik-Seiten</p>
-              </div>
-              {datapointGroups
-                .filter(g => !q || g.pageName.toLowerCase().includes(q.toLowerCase()) || g.datapoints.some(d => d.entityId.toLowerCase().includes(q.toLowerCase())))
-                .map(g => (
-                  <button
-                    key={g.pageId}
-                    onClick={() => { setPageId(g.pageId); setQ(''); }}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
-                        <Zap size={11} className="text-emerald-400" />
-                      </div>
-                      <span className="text-xs text-slate-200 font-medium">{g.pageName}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{g.datapoints.length}</span>
-                      <ChevronRight size={13} className="text-slate-500" />
-                    </div>
-                  </button>
-                ))}
-            </>
-          )}
-
-          {/* Datapoints within a selected page */}
-          {pageId !== null && (() => {
+          ) : (() => {
             const g = datapointGroups.find(x => x.pageId === pageId);
-            const list = g ? (q ? g.datapoints.filter(d => d.entityId.toLowerCase().includes(q.toLowerCase()) || d.label.toLowerCase().includes(q.toLowerCase())) : g.datapoints) : [];
-            if (list.length === 0) return <div className="py-10 text-center text-xs text-slate-500">Keine Treffer</div>;
-            return list.map(dp => (
-              <button
-                key={dp.entityId}
-                onClick={() => pick(dp.entityId)}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left"
-              >
-                <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
-                  <Zap size={11} className="text-emerald-400" />
+            const list = g
+              ? (qLow ? g.datapoints.filter(d => d.entityId.toLowerCase().includes(qLow) || d.label.toLowerCase().includes(qLow)) : g.datapoints)
+              : [];
+            if (list.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                  <Search size={24} className="mb-2 opacity-30" />
+                  <span className="text-xs">Keine Treffer</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-200 truncate">{dp.label || dp.entityId}</p>
-                  <p className="text-[10px] text-slate-500 font-mono truncate">{dp.entityId}</p>
-                </div>
-              </button>
-            ));
+              );
+            }
+            return list.map(dp => {
+              const primary = dp.label && dp.label !== dp.entityId ? dp.label : dp.entityId;
+              const showSub = primary !== dp.entityId;
+              return (
+                <button
+                  key={dp.entityId}
+                  onClick={() => pick(dp.entityId)}
+                  className={['w-full flex items-center gap-2.5 px-4 py-2 hover:bg-slate-800 transition-colors text-left border-b border-slate-800/30', currentValue === dp.entityId ? 'bg-sky-950/30' : ''].join(' ')}
+                >
+                  <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                    <Zap size={11} className="text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-200 truncate">{primary}</p>
+                    {showSub && <p className="text-[10px] text-slate-500 font-mono truncate">{dp.entityId}</p>}
+                  </div>
+                  {currentValue === dp.entityId && <Check size={11} className="text-sky-400 shrink-0" />}
+                </button>
+              );
+            });
           })()}
-
-          {pageId === null && filteredSuggestions.length === 0 && datapointGroups.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 px-4 text-slate-600">
-              <Activity size={24} className="mb-2 opacity-30" />
-              <p className="text-xs text-center">Keine Datenpunkte verfügbar.</p>
-              <p className="text-[10px] text-center mt-1 text-slate-700">Pfad oben manuell eingeben und Enter drücken.</p>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -596,6 +625,7 @@ export function RoomConfigPage({
   const [accent, setAccent] = useState(savedCfg?.accentColor ?? room?.color ?? '#0ea5e9');
   const [panelTitle, setPanelTitle] = useState(savedCfg?.panelTitle ?? '');
   const [panelSubtitle, setPanelSubtitle] = useState(savedCfg?.panelSubtitle ?? '');
+  const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set(savedCfg?.hiddenTabs ?? []));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerWidgetId, setPickerWidgetId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -666,7 +696,11 @@ export function RoomConfigPage({
 
   const handleSave = () => {
     if (!rId) return;
-    saveRoomMonitorConfig({ roomId: rId, datapoints: widgets, accentColor: accent, layout: 'grid', panelTitle, panelSubtitle });
+    saveRoomMonitorConfig({
+      roomId: rId, datapoints: widgets, accentColor: accent, layout: 'grid',
+      panelTitle, panelSubtitle,
+      hiddenTabs: Array.from(hiddenTabs) as ('overview' | 'points' | 'alarms' | 'trends')[],
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1070,10 +1104,57 @@ export function RoomConfigPage({
               </div>
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-              <GripVertical size={28} className="mb-3 text-slate-700" />
-              <p className="text-xs font-medium text-slate-500 mb-1">Kein Widget gewählt</p>
-              <p className="text-[10px] text-slate-600">Datenpunkt aus der linken Palette auf das Panel ziehen oder vorhandenes Widget anklicken.</p>
+            <div className="flex flex-col h-full overflow-y-auto">
+              <div className="px-4 pt-3 pb-2 border-b border-slate-800 shrink-0">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Panel-Einstellungen</p>
+              </div>
+              <div className="p-4 space-y-5 flex-1 overflow-y-auto">
+                {/* Tab visibility */}
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Sichtbare Tabs</p>
+                  <p className="text-[10px] text-slate-600 mb-2">Tabs die im Monitor angezeigt werden:</p>
+                  <div className="space-y-2">
+                    {([
+                      { id: 'panel',    label: 'Panel',       note: 'Nur wenn Widgets vorhanden', forced: true },
+                      { id: 'overview', label: 'Übersicht',   note: 'KPIs + Alarmübersicht' },
+                      { id: 'points',   label: 'Datenpunkte', note: 'Alle Datenpunkte als Liste' },
+                      { id: 'alarms',   label: 'Alarme',      note: 'Aktive Alarme' },
+                      { id: 'trends',   label: 'Trends',      note: 'Historische Verläufe' },
+                    ] as { id: string; label: string; note: string; forced?: boolean }[]).map(tab => {
+                      const isHidden = hiddenTabs.has(tab.id);
+                      const isForced = tab.forced;
+                      return (
+                        <div key={tab.id} className="flex items-center gap-2.5">
+                          <Toggle
+                            value={!isHidden}
+                            onChange={v => {
+                              if (isForced) return;
+                              setHiddenTabs(prev => {
+                                const next = new Set(prev);
+                                if (v) next.delete(tab.id); else next.add(tab.id);
+                                return next;
+                              });
+                            }}
+                            color={isForced ? 'bg-slate-600' : 'bg-sky-600'}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className={['text-xs', isForced || !isHidden ? 'text-slate-300' : 'text-slate-600'].join(' ')}>{tab.label}</p>
+                            <p className="text-[9px] text-slate-600">{tab.note}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800 pt-4">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Hinweis</p>
+                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-slate-800/50 border border-slate-800">
+                    <GripVertical size={12} className="text-slate-600 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-slate-600 leading-relaxed">Datenpunkt aus der linken Palette auf das Raster ziehen oder vorhandenes Widget anklicken.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

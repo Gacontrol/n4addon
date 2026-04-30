@@ -492,7 +492,13 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
   const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
   const { buildings, monitorConfigs } = useBuildingContext();
   const hasCustomPanel = !!(roomId && monitorConfigs[roomId]?.datapoints?.length);
-  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms' | 'trends'>(hasCustomPanel ? 'panel' : 'overview');
+  const hiddenTabs = new Set(monitorConfigs[roomId ?? '']?.hiddenTabs ?? []);
+  const firstVisibleTab = (() => {
+    if (hasCustomPanel) return 'panel';
+    const candidates = ['overview', 'points', 'alarms', 'trends'] as const;
+    return candidates.find(t => !hiddenTabs.has(t)) ?? 'overview';
+  })();
+  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms' | 'trends'>(firstVisibleTab);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
 
   const building = buildings.find(b => b.id === buildingId);
@@ -604,7 +610,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
               { id: 'points', label: `Datenpunkte (${dataPoints.length})` },
               { id: 'alarms', label: `Alarme${alarms.length > 0 ? ` (${alarms.length})` : ''}` },
               { id: 'trends', label: 'Trends' },
-            ] as const).map(tab => (
+            ] as const).filter(tab => !hiddenTabs.has(tab.id)).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -777,7 +783,7 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
           { id: 'points', label: `Datenpunkte (${dataPoints.length})` },
           { id: 'alarms', label: `Alarme${alarms.length > 0 ? ` (${alarms.length})` : ''}` },
           { id: 'trends', label: 'Trends' },
-        ] as const).map(tab => (
+        ] as const).filter(tab => !hiddenTabs.has(tab.id)).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
