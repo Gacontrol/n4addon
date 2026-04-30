@@ -30,13 +30,17 @@ export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom
       pageId: page.id,
       pageName: page.name,
       datapoints: page.nodes
-        .filter(n => n.type === 'datapoint' || n.type === 'dp-read' || n.type === 'dp-write' || n.type === 'ha-entity')
-        .map(n => ({
-          entityId: (n.data.config as Record<string, unknown> | undefined)?.['dpKey'] as string
-            || (n.data.config as Record<string, unknown> | undefined)?.['entityId'] as string
-            || n.id,
-          label: n.data.label || (n.data.config as Record<string, unknown> | undefined)?.['label'] as string || n.id,
-        }))
+        .filter(n => n.type === 'datapoint' || n.type === 'dp-read' || n.type === 'dp-write'
+          || n.type === 'ha-entity' || n.type === 'dp-boolean' || n.type === 'dp-numeric' || n.type === 'dp-enum')
+        .map(n => {
+          const cfg = n.data.config as Record<string, unknown> | undefined;
+          const entityId = (cfg?.['dpFacet'] as string)
+            || (cfg?.['dpKey'] as string)
+            || (cfg?.['entityId'] as string)
+            || n.id;
+          const label = (n.data.label as string) || (cfg?.['label'] as string) || entityId;
+          return { entityId, label };
+        })
         .filter(d => d.entityId),
     })).filter(g => g.datapoints.length > 0);
   }, [pages]);
