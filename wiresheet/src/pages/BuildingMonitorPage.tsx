@@ -47,7 +47,7 @@ interface BuildingMonitorPageProps {
   onOpenRoom?: (roomId: string) => void;
 }
 
-export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpenEditor, onOpenRoom }: BuildingMonitorPageProps) {
+export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpenEditor }: BuildingMonitorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const buildingId = propBuildingId ?? params.buildingId;

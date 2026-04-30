@@ -2,9 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Plus, Trash2, Check, X, MousePointer, Hexagon,
   Layers, ZoomIn, ZoomOut, Move,
-  ChevronDown, ChevronRight, Eye, EyeOff, CreditCard as Edit3,
-  Zap, Search, Settings, Star, Activity,
-  Thermometer, Droplets, Wind, Users, AlertTriangle, Gauge, Flame, Fan,
+  ChevronDown, ChevronRight, Eye, EyeOff,
+  Zap, Search, Star, Activity,
+  Thermometer, Droplets, Wind, Users, Gauge, Flame, Fan,
   Lightbulb, Plug, Snowflake, Bell, LayoutDashboard, Pencil,
 } from 'lucide-react';
 import { Building, Floor, Room, RoomType, Wall, RoomDataPointBinding, MonitorLayer, AlarmBehavior } from '../../types/building';
@@ -91,6 +91,116 @@ const ALARM_BEHAVIOR_LABELS: Record<AlarmBehavior, string> = {
   red: 'Rot markieren',
 };
 
+// ---- Inline Room Editor ----
+
+interface InlineRoomEditorProps {
+  room: Room;
+  onSave: (patch: Partial<Room>) => void;
+  onDelete: () => void;
+  onOpenConfig?: () => void;
+  onOpenMonitor?: () => void;
+  showMonitor?: boolean;
+  showConfig?: boolean;
+}
+
+function InlineRoomEditor({ room, onSave, onDelete, onOpenConfig, onOpenMonitor, showMonitor, showConfig }: InlineRoomEditorProps) {
+  const [name, setName] = useState(room.name);
+  const [number, setNumber] = useState(room.number ?? '');
+  const [type, setType] = useState<RoomType>(room.type);
+  const [color, setColor] = useState(room.color || '#94a3b8');
+
+  useEffect(() => {
+    setName(room.name);
+    setNumber(room.number ?? '');
+    setType(room.type);
+    setColor(room.color || '#94a3b8');
+  }, [room.id]);
+
+  const save = () => onSave({ name, number: number || undefined, type, color });
+
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      <div className="flex items-center gap-2 justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <input
+            type="color" value={color}
+            onChange={e => { setColor(e.target.value); onSave({ color: e.target.value }); }}
+            className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 shrink-0 p-0"
+            title="Farbe"
+          />
+          <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Raum</span>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={() => onDelete()} className="p-1.5 hover:bg-red-900/40 rounded text-slate-500 hover:text-red-400 transition-colors" title="Löschen">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-[10px] text-slate-500 block mb-1">Name</label>
+        <input
+          type="text" value={name}
+          onChange={e => setName(e.target.value)}
+          onBlur={save}
+          onKeyDown={e => e.key === 'Enter' && save()}
+          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors"
+          placeholder="Raumname"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Nummer</label>
+          <input
+            type="text" value={number}
+            onChange={e => setNumber(e.target.value)}
+            onBlur={save}
+            onKeyDown={e => e.key === 'Enter' && save()}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+            placeholder="z.B. 1.01"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Typ</label>
+          <select
+            value={type}
+            onChange={e => { const t = e.target.value as RoomType; setType(t); onSave({ type: t, color: ROOM_TYPE_COLORS[t] }); setColor(ROOM_TYPE_COLORS[t]); }}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+          >
+            {Object.entries(ROOM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+        <div className="bg-slate-800/40 rounded-lg p-2 border border-slate-800">
+          <p className="text-slate-600 mb-0.5">Datenpunkte</p>
+          <p className="text-slate-400 font-medium">{room.bindings?.length ?? 0} / 20</p>
+        </div>
+        {room.points && (
+          <div className="bg-slate-800/40 rounded-lg p-2 border border-slate-800">
+            <p className="text-slate-600 mb-0.5">Ecken</p>
+            <p className="text-slate-400 font-medium">{room.points.length}</p>
+          </div>
+        )}
+      </div>
+
+      {showMonitor && (
+        <button onClick={onOpenMonitor} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
+          Monitor öffnen
+        </button>
+      )}
+      {showConfig && (
+        <button onClick={onOpenConfig} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs flex items-center justify-center gap-2 transition-colors">
+          <LayoutDashboard size={12} />
+          Panel-Designer öffnen
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface RoomEditorViewProps {
   building: Building;
   onUpdateBuilding: (b: Building) => void;
@@ -110,7 +220,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [drawingPoints, setDrawingPoints] = useState<Point[]>([]);
-  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
   const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
   const [pan, setPan] = useState<Point>({ x: 80, y: 80 });
@@ -135,8 +244,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const [newBindingWritable, setNewBindingWritable] = useState(false);
   const [newBindingMin, setNewBindingMin] = useState<string>('');
   const [newBindingMax, setNewBindingMax] = useState<string>('');
-  const [pendingNewDatapoint, setPendingNewDatapoint] = useState<string>('');
-
   // Expanded category state for HVAC quick-select
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
     climate: true, air: false, actuator: false, safety: false,
@@ -366,19 +473,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       updatedAt: Date.now(),
     });
     setSelectedRoomId(null);
-    setEditingRoom(null);
   }, [activeFloor, building, onUpdateBuilding]);
-
-  const saveEditingRoom = useCallback(() => {
-    if (!editingRoom || !activeFloor) return;
-    onUpdateBuilding({
-      ...building,
-      floors: building.floors.map(f => f.id === activeFloor.id
-        ? { ...activeFloor, rooms: activeFloor.rooms.map(r => r.id === editingRoom.id ? editingRoom : r) } : f),
-      updatedAt: Date.now(),
-    });
-    setEditingRoom(null);
-  }, [editingRoom, activeFloor, building, onUpdateBuilding]);
 
   const updateRoomBindings = useCallback((roomId: string, bindings: RoomDataPointBinding[]) => {
     if (!activeFloor) return;
@@ -447,8 +542,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   ] as const;
 
   // ---- Binding helpers ----
-  const getBinding = (room: Room, bindingId: string) =>
-    (room.bindings ?? []).find(b => b.id === bindingId);
 
   // Add a new free binding after datapoint was picked
   const addFreeBinding = (room: Room, datapoint: string) => {
@@ -581,11 +674,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     updateBinding(room, bindingId, { monitorLayerIds: next });
   };
 
-  // binding being configured for layers
-  const layerConfigBinding = layerConfigFor && selectedRoom
-    ? (selectedRoom.bindings ?? []).find(b => b.id === layerConfigFor)
-    : null;
-
   return (
     <div className="flex h-full bg-slate-900 text-slate-200 overflow-hidden">
       {/* Left sidebar */}
@@ -684,7 +772,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                 {rooms.map(room => (
                   <button
                     key={room.id}
-                    onClick={() => { setSelectedRoomId(room.id); setEditingRoom(null); }}
+                    onClick={() => { setSelectedRoomId(room.id); }}
                     className={[
                       'flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left transition-all',
                       selectedRoomId === room.id ? 'bg-slate-600 text-white' : 'text-slate-300 hover:bg-slate-700',
@@ -793,7 +881,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                     className={isPolygon && tool === 'select' ? 'cursor-move' : 'cursor-pointer'}
                     onClick={e => {
                       e.stopPropagation();
-                      if (tool === 'select') { setSelectedRoomId(room.id); setEditingRoom(null); }
+                      if (tool === 'select') { setSelectedRoomId(room.id); }
                     }}
                     onMouseDown={isPolygon ? e => handleRoomMouseDown(e, room) : undefined}
                   />
@@ -857,12 +945,12 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       </div>
 
       {/* Right panel */}
-      {(selectedRoom || editingRoom) && (
+      {selectedRoom && (
         <div className="w-80 border-l border-slate-700 flex flex-col bg-slate-900 shrink-0 overflow-hidden">
           {/* Tab header */}
           <div className="flex border-b border-slate-700 bg-slate-800 shrink-0">
             <button
-              onClick={() => { setRightTab('properties'); setEditingRoom(null); }}
+              onClick={() => { setRightTab('properties'); }}
               className={[
                 'flex-1 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
                 rightTab === 'properties' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
@@ -871,7 +959,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
               Eigenschaften
             </button>
             <button
-              onClick={() => { setRightTab('datapoints'); setEditingRoom(null); }}
+              onClick={() => { setRightTab('datapoints'); }}
               className={[
                 'flex-1 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
                 rightTab === 'datapoints' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
@@ -887,107 +975,33 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
           </div>
 
           {/* Properties tab */}
-          {rightTab === 'properties' && !editingRoom && selectedRoom && (
+          {rightTab === 'properties' && (
             <div className="flex-1 overflow-y-auto">
-              <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: selectedRoom.color || '#94a3b8' }} />
-                  <span className="text-sm font-semibold text-white truncate">{selectedRoom.name}</span>
-                </div>
-                <div className="flex items-center gap-0.5">
-                  <button onClick={() => setEditingRoom({ ...selectedRoom })} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Bearbeiten"><Edit3 size={13} /></button>
-                  <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Panel-Designer"><Settings size={13} /></button>
-                  <button onClick={() => deleteRoom(selectedRoom.id)} className="p-1.5 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400" title="Löschen"><Trash2 size={13} /></button>
-                </div>
-              </div>
-              <div className="p-3 flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-1.5 text-xs">
-                  <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
-                    <p className="text-slate-500 mb-0.5">Typ</p>
-                    <p className="text-slate-200 font-medium">{ROOM_TYPE_LABELS[selectedRoom.type]}</p>
-                  </div>
-                  {selectedRoom.number && (
-                    <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
-                      <p className="text-slate-500 mb-0.5">Nummer</p>
-                      <p className="text-slate-200 font-medium">{selectedRoom.number}</p>
-                    </div>
-                  )}
-                  <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
-                    <p className="text-slate-500 mb-0.5">Datenpunkte</p>
-                    <p className="text-slate-200 font-medium">{selectedRoom.bindings?.length ?? 0} / 20</p>
-                  </div>
-                  {selectedRoom.points && (
-                    <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
-                      <p className="text-slate-500 mb-0.5">Ecken</p>
-                      <p className="text-slate-200 font-medium">{selectedRoom.points.length}</p>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-slate-600 text-center">Raum ziehen zum Verschieben</p>
-                {onOpenRoom && (
-                  <button onClick={() => onOpenRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
-                    Monitor öffnen
-                  </button>
-                )}
-                {onConfigRoom && (
-                  <button onClick={() => onConfigRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs flex items-center justify-center gap-2 transition-colors">
-                    <LayoutDashboard size={12} />
-                    Panel-Designer öffnen
-                  </button>
-                )}
+              <div className="p-3 border-b border-slate-800">
+                <InlineRoomEditor
+                  room={selectedRoom}
+                  onSave={patch => {
+                    if (!activeFloor) return;
+                    onUpdateBuilding({
+                      ...building,
+                      floors: building.floors.map(f => f.id === activeFloor.id
+                        ? { ...f, rooms: f.rooms.map(r => r.id === selectedRoom.id ? { ...r, ...patch } : r) } : f),
+                      updatedAt: Date.now(),
+                    });
+                  }}
+                  onDelete={() => deleteRoom(selectedRoom.id)}
+                  onOpenConfig={() => onConfigRoom?.(selectedRoom.id)}
+                  onOpenMonitor={() => onOpenRoom?.(selectedRoom.id)}
+                  showMonitor={!!onOpenRoom}
+                  showConfig={!!onConfigRoom}
+                />
               </div>
             </div>
           )}
 
-          {/* Edit room form */}
-          {editingRoom && (
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-200">Raum bearbeiten</h3>
-                <div className="flex gap-0.5">
-                  <button onClick={saveEditingRoom} className="p-1.5 hover:bg-slate-700 rounded text-sky-400"><Check size={13} /></button>
-                  <button onClick={() => setEditingRoom(null)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400"><X size={13} /></button>
-                </div>
-              </div>
-              <div className="p-3 flex flex-col gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Name</label>
-                  <input type="text" value={editingRoom.name}
-                    onChange={e => setEditingRoom(r => r ? { ...r, name: e.target.value } : r)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Nummer</label>
-                  <input type="text" value={editingRoom.number ?? ''}
-                    onChange={e => setEditingRoom(r => r ? { ...r, number: e.target.value } : r)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500" placeholder="z.B. 1.01" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Typ</label>
-                  <select value={editingRoom.type}
-                    onChange={e => { const t = e.target.value as RoomType; setEditingRoom(r => r ? { ...r, type: t, color: ROOM_TYPE_COLORS[t] } : r); }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-sky-500">
-                    {Object.entries(ROOM_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Farbe</label>
-                  <div className="flex items-center gap-2">
-                    <input type="color" value={editingRoom.color || '#94a3b8'}
-                      onChange={e => setEditingRoom(r => r ? { ...r, color: e.target.value } : r)}
-                      className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0" />
-                    <span className="text-xs text-slate-400 font-mono">{editingRoom.color}</span>
-                  </div>
-                </div>
-                <button onClick={saveEditingRoom} className="w-full py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
-                  Speichern
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Datapoints tab */}
-          {rightTab === 'datapoints' && selectedRoom && !editingRoom && (
+          {rightTab === 'datapoints' && (
             <div className="flex-1 overflow-y-auto">
               {/* Free bindings list */}
               <div className="p-3 border-b border-slate-800">
@@ -1298,18 +1312,54 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   autoFocus
                   type="text" value={dpSearch}
                   onChange={e => setDpSearch(e.target.value)}
-                  placeholder="Suchen…"
+                  placeholder="Suchen oder Datenpunkt-Pfad eingeben…"
                   className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && dpSearch.trim()) {
+                      const dp = dpSearch.trim();
+                      if (openPickerFor === 'new') {
+                        addFreeBinding(selectedRoom!, dp);
+                      } else if (openPickerFor?.startsWith('hvac:')) {
+                        setHvacBinding(selectedRoom!, openPickerFor.slice(5), dp);
+                      } else if (openPickerFor) {
+                        updateBinding(selectedRoom!, openPickerFor, { datapoint: dp });
+                      }
+                      setOpenPickerFor(null);
+                      setShowNewBindingForm(false);
+                    }
+                  }}
                 />
+                {dpSearch.trim() && (
+                  <button
+                    onMouseDown={() => {
+                      const dp = dpSearch.trim();
+                      if (!dp) return;
+                      if (openPickerFor === 'new') {
+                        addFreeBinding(selectedRoom!, dp);
+                      } else if (openPickerFor?.startsWith('hvac:')) {
+                        setHvacBinding(selectedRoom!, openPickerFor.slice(5), dp);
+                      } else if (openPickerFor) {
+                        updateBinding(selectedRoom!, openPickerFor, { datapoint: dp });
+                      }
+                      setOpenPickerFor(null);
+                      setShowNewBindingForm(false);
+                    }}
+                    className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10px] transition-colors"
+                  >
+                    <Check size={10} /> Übernehmen
+                  </button>
+                )}
               </div>
+              <p className="text-[10px] text-slate-600 mt-1 px-0.5">Pfad eingeben + Enter oder aus der Liste wählen</p>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {pickerPageId === null ? (
                 datapointGroups.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-500 px-4">
                     <Activity size={28} className="mb-2 opacity-30" />
-                    <span className="text-xs">Keine Logik-Datenpunkte gefunden</span>
+                    <span className="text-xs text-center">Keine Treiber/Logik-Datenpunkte gefunden.</span>
+                    <span className="text-[10px] text-slate-600 text-center mt-1">Datenpunkt-Pfad oben manuell eingeben und Enter drücken.</span>
                   </div>
                 ) : (
                   datapointGroups
