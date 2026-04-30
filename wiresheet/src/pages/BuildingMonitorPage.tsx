@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCanvas3DSettingsReadOnly } from '../hooks/useCanvas3DSettings';
 import { ArrowLeft, CreditCard as Edit3, Layers, Search, AlertTriangle } from 'lucide-react';
-import { BuildingLayerMode, LAYER_MODES } from '../types/bms';
+import { MonitorLayer } from '../types/building';
 import { BuildingCanvas3D } from '../components/building/BuildingCanvas3D';
 import { LayerSelector } from '../components/bms/LayerSelector';
 import { LegendPanel } from '../components/bms/LegendPanel';
@@ -10,20 +10,6 @@ import { RoomTooltip } from '../components/bms/RoomTooltip';
 import { RoomMonitorPage } from './RoomMonitorPage';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
 import { useBuildingContext } from '../context/BuildingContext';
-
-function getRoomLayerColor(value: number | null, layer: BuildingLayerMode): string {
-  const mode = LAYER_MODES.find(m => m.id === layer);
-  if (!mode || !value || mode.colorScale.stops.length === 0) return '';
-  const { stops, min, max } = mode.colorScale;
-  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (t >= stops[i].at && t <= stops[i + 1].at) {
-      const localT = (t - stops[i].at) / (stops[i + 1].at - stops[i].at);
-      return interpolateHex(stops[i].color, stops[i + 1].color, localT);
-    }
-  }
-  return stops[stops.length - 1]?.color ?? '';
-}
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -41,6 +27,19 @@ function interpolateHex(a: string, b: string, t: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${bl.toString(16).padStart(2, '0')}`;
 }
 
+function getRoomLayerColor(value: number, layer: MonitorLayer): string {
+  const { stops, min, max } = layer.colorScale;
+  if (stops.length === 0) return '';
+  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i].at && t <= stops[i + 1].at) {
+      const localT = (t - stops[i].at) / (stops[i + 1].at - stops[i].at);
+      return interpolateHex(stops[i].color, stops[i + 1].color, localT);
+    }
+  }
+  return stops[stops.length - 1]?.color ?? '';
+}
+
 interface BuildingMonitorPageProps {
   buildingId?: string;
   onBack?: () => void;
@@ -55,7 +54,6 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
 
   const handleBack = onBack ?? (() => navigate('/'));
   const handleOpenEditor = onOpenEditor ?? (() => navigate(`/building/${buildingId}/editor`));
-  const handleOpenRoom = onOpenRoom ?? ((roomId: string) => navigate(`/building/${buildingId}/room/${roomId}/monitor`));
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,6 +62,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   const { buildings } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
+  const monitorLayers: MonitorLayer[] = building?.monitorLayers ?? [];
 
   const allRoomIds = useMemo(() => {
     if (!building) return [];
@@ -71,13 +70,18 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   }, [building]);
 
   const {
-    activeLayer,
+    activeLayerId,
     hoveredRoomId,
     roomValues,
     setActiveLayer,
     setHoveredRoom,
     getRoomLayerValue,
-  } = useBuildingMonitor(allRoomIds);
+  } = useBuildingMonitor(allRoomIds, monitorLayers);
+
+  const activeMonitorLayer = useMemo(
+    () => monitorLayers.find(l => l.id === activeLayerId) ?? null,
+    [monitorLayers, activeLayerId]
+  );
 
   const canvas3D = useCanvas3DSettingsReadOnly();
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -94,7 +98,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   }, []);
 
   const buildingsWithLayerColors = useMemo(() => {
-    if (!building || activeLayer === 'normal') return buildings;
+    if (!building || activeLayerId === 'normal' || !activeMonitorLayer) return buildings;
     const coloredBuilding = {
       ...building,
       floors: building.floors.map(floor => ({
@@ -102,14 +106,14 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
         rooms: floor.rooms.map(room => {
           const lv = getRoomLayerValue(room.id);
           const layerColor = lv?.value !== null && lv?.value !== undefined
-            ? getRoomLayerColor(lv.value as number, activeLayer)
+            ? getRoomLayerColor(lv.value as number, activeMonitorLayer)
             : '';
           return layerColor ? { ...room, color: layerColor } : room;
         }),
       })),
     };
     return buildings.map(b => b.id === buildingId ? coloredBuilding : b);
-  }, [buildings, building, activeLayer, buildingId, getRoomLayerValue]);
+  }, [buildings, building, activeLayerId, activeMonitorLayer, buildingId, getRoomLayerValue]);
 
   const hoveredRoom = useMemo(() => {
     if (!hoveredRoomId || !building) return null;
@@ -188,7 +192,11 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
       <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && (
           <div className="w-52 border-r border-slate-800 flex flex-col bg-slate-900 overflow-y-auto">
-            <LayerSelector active={activeLayer} onChange={setActiveLayer} />
+            <LayerSelector
+              active={activeLayerId}
+              onChange={setActiveLayer}
+              monitorLayers={monitorLayers}
+            />
             <div className="border-t border-slate-800 p-2">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-2">
                 Etagen
@@ -236,7 +244,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
           />
 
           <div className="absolute bottom-4 left-4 pointer-events-none">
-            <LegendPanel activeLayer={activeLayer} />
+            <LegendPanel activeLayerId={activeLayerId} monitorLayers={monitorLayers} />
           </div>
 
           <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -293,24 +301,23 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
               {filteredRooms.map(({ room, floor }) => {
                 const lv = getRoomLayerValue(room.id);
                 const hasAlarm = lv?.status === 'alarm';
+                const displayColor = lv && activeLayerId !== 'normal' && activeMonitorLayer
+                  ? (getRoomLayerColor(lv.value as number, activeMonitorLayer) || room.color)
+                  : room.color || '#94a3b8';
                 return (
                   <button
                     key={room.id}
                     onClick={() => setOpenRoomId(room.id)}
                     className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-800 transition-colors text-left group"
                   >
-                    <span
-                      className="w-2 h-2 rounded-sm shrink-0"
-                      style={{ background: lv && activeLayer !== 'normal' ? (getRoomLayerColor(lv.value as number, activeLayer) || room.color) : room.color || '#94a3b8' }}
-                    />
+                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: displayColor }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-300 truncate group-hover:text-white">{room.name}</p>
-                      {lv && activeLayer !== 'normal' && (
+                      {lv && activeLayerId !== 'normal' ? (
                         <p className={`text-xs ${hasAlarm ? 'text-red-400' : 'text-slate-500'}`}>
                           {lv.formattedValue}
                         </p>
-                      )}
-                      {!lv && (
+                      ) : (
                         <p className="text-xs text-slate-600">{floor.name}</p>
                       )}
                     </div>
@@ -327,7 +334,8 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
         <RoomTooltip
           room={hoveredRoom}
           liveValue={hoveredRoomLiveValue}
-          activeLayer={activeLayer}
+          activeLayerId={activeLayerId}
+          activeLayer={activeMonitorLayer}
           x={tooltipPos.x}
           y={tooltipPos.y}
         />

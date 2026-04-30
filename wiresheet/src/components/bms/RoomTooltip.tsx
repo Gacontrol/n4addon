@@ -1,11 +1,13 @@
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Room } from '../../types/building';
-import { RoomLiveValue, BuildingLayerMode, LAYER_MODES } from '../../types/bms';
+import { RoomLiveValue } from '../../types/bms';
+import { MonitorLayer } from '../../types/building';
 
 interface RoomTooltipProps {
   room: Room;
   liveValue: RoomLiveValue | null;
-  activeLayer: BuildingLayerMode;
+  activeLayerId: string;
+  activeLayer?: MonitorLayer | null;
   x: number;
   y: number;
 }
@@ -19,9 +21,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-export function RoomTooltip({ room, liveValue, activeLayer, x, y }: RoomTooltipProps) {
-  const mode = LAYER_MODES.find(m => m.id === activeLayer);
-
+export function RoomTooltip({ room, liveValue, activeLayerId, activeLayer, x, y }: RoomTooltipProps) {
   return (
     <div
       className="fixed z-50 pointer-events-none"
@@ -43,9 +43,9 @@ export function RoomTooltip({ room, liveValue, activeLayer, x, y }: RoomTooltipP
           )}
         </div>
 
-        {liveValue && activeLayer !== 'normal' && (
+        {liveValue && activeLayerId !== 'normal' && (
           <div className="bg-slate-700/60 rounded-md px-2.5 py-1.5 mb-2">
-            <p className="text-xs text-slate-400">{mode?.label}</p>
+            <p className="text-xs text-slate-400">{activeLayer?.name ?? activeLayerId}</p>
             <p className="text-base font-bold text-white leading-tight">
               {liveValue.formattedValue}
             </p>

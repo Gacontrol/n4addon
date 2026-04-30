@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { BuildingLayerMode, BuildingMonitorState, RoomLiveValue, DataPointCategory, RoomMonitorConfig } from '../types/bms';
+import { BuildingMonitorState, RoomLiveValue, DataPointCategory, RoomMonitorConfig } from '../types/bms';
+import { MonitorLayer } from '../types/building';
 
 const MONITOR_CONFIG_KEY = 'wiresheet_room_monitor_configs';
 
@@ -15,24 +16,28 @@ function saveMonitorConfigs(configs: Record<string, RoomMonitorConfig>) {
   localStorage.setItem(MONITOR_CONFIG_KEY, JSON.stringify(configs));
 }
 
-function generateMockValue(category: DataPointCategory, roomId: string): number {
+function generateMockValue(roomId: string): number {
   const seed = roomId.charCodeAt(roomId.length - 1) || 42;
-  const rand = ((seed * 9301 + 49297) % 233280) / 233280;
-  switch (category) {
-    case 'temperature': return 19 + rand * 8;
-    case 'co2': return 400 + rand * 800;
-    case 'humidity': return 35 + rand * 35;
-    case 'airflow': return rand * 400;
-    case 'energy': return rand * 1500;
-    case 'occupancy': return rand > 0.5 ? 1 : 0;
-    case 'alarm': return rand > 0.85 ? 1 : 0;
-    default: return rand * 100;
-  }
+  return ((seed * 9301 + 49297) % 233280) / 233280;
 }
 
-export function useBuildingMonitor(roomIds: string[]) {
-  const [state, setState] = useState<BuildingMonitorState>({
-    activeLayer: 'temperature',
+function formatLayerValue(raw: number, layer: MonitorLayer): string {
+  const { min, max } = layer.colorScale;
+  const value = min + raw * (max - min);
+  const unit = layer.unit ? ` ${layer.unit}` : '';
+  if (max - min <= 1) {
+    return `${value.toFixed(2)}${unit}`;
+  }
+  if (max - min <= 10) {
+    return `${value.toFixed(1)}${unit}`;
+  }
+  return `${Math.round(value)}${unit}`;
+}
+
+export function useBuildingMonitor(roomIds: string[], monitorLayers?: MonitorLayer[]) {
+  const [state, setState] = useState<BuildingMonitorState & { activeLayerId: string }>({
+    activeLayer: 'temperature' as any,
+    activeLayerId: 'normal',
     hoveredRoomId: null,
     selectedRoomId: null,
     selectedFloorId: null,
@@ -41,31 +46,34 @@ export function useBuildingMonitor(roomIds: string[]) {
 
   const [monitorConfigs, setMonitorConfigs] = useState<Record<string, RoomMonitorConfig>>(loadMonitorConfigs);
 
-  const updateRoomValues = useCallback((layer: BuildingLayerMode, ids: string[]) => {
-    if (layer === 'normal' || ids.length === 0) {
+  const updateRoomValues = useCallback((layerId: string, ids: string[], layers: MonitorLayer[] = []) => {
+    if (layerId === 'normal' || ids.length === 0) {
       setState(s => ({ ...s, roomValues: [] }));
       return;
     }
-    const category = layer as DataPointCategory;
+    const layer = layers.find(l => l.id === layerId);
     const values: RoomLiveValue[] = ids.map(roomId => {
-      const value = generateMockValue(category, roomId);
+      const raw = generateMockValue(roomId);
+      const { min, max } = layer?.colorScale ?? { min: 0, max: 1 };
+      const value = min + raw * (max - min);
+      const formattedValue = layer ? formatLayerValue(raw, layer) : value.toFixed(1);
       return {
         roomId,
-        category,
+        category: 'generic' as DataPointCategory,
         value,
-        status: value > 0.8 ? 'alarm' : value > 0.6 ? 'warning' : 'ok',
-        formattedValue: formatValue(value, layer),
+        status: raw > 0.85 ? 'alarm' : raw > 0.65 ? 'warning' : 'ok',
+        formattedValue,
       };
     });
     setState(s => ({ ...s, roomValues: values }));
   }, []);
 
   useEffect(() => {
-    updateRoomValues(state.activeLayer, roomIds);
-  }, [state.activeLayer, roomIds, updateRoomValues]);
+    updateRoomValues(state.activeLayerId, roomIds, monitorLayers);
+  }, [state.activeLayerId, roomIds, monitorLayers, updateRoomValues]);
 
-  const setActiveLayer = useCallback((layer: BuildingLayerMode) => {
-    setState(s => ({ ...s, activeLayer: layer }));
+  const setActiveLayer = useCallback((layerId: string) => {
+    setState(s => ({ ...s, activeLayerId: layerId, activeLayer: layerId as any }));
   }, []);
 
   const setHoveredRoom = useCallback((roomId: string | null) => {
@@ -98,6 +106,7 @@ export function useBuildingMonitor(roomIds: string[]) {
 
   return {
     ...state,
+    activeLayerId: state.activeLayerId,
     setActiveLayer,
     setHoveredRoom,
     setSelectedRoom,
@@ -107,17 +116,4 @@ export function useBuildingMonitor(roomIds: string[]) {
     getRoomLayerValue,
     monitorConfigs,
   };
-}
-
-function formatValue(value: number, layer: BuildingLayerMode): string {
-  switch (layer) {
-    case 'temperature': return `${value.toFixed(1)} °C`;
-    case 'co2': return `${Math.round(value)} ppm`;
-    case 'humidity': return `${Math.round(value)} %`;
-    case 'airflow': return `${Math.round(value)} m³/h`;
-    case 'energy': return `${Math.round(value)} W`;
-    case 'occupancy': return value > 0.5 ? 'Belegt' : 'Frei';
-    case 'alarm': return value > 0.5 ? 'Alarm' : 'OK';
-    default: return value.toFixed(1);
-  }
 }

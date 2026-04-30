@@ -5,9 +5,9 @@ import {
   ChevronDown, ChevronRight, Eye, EyeOff, CreditCard as Edit3,
   Zap, Search, Settings, Star, Activity,
   Thermometer, Droplets, Wind, Users, AlertTriangle, Gauge, Flame, Fan,
-  Lightbulb, Plug, Snowflake, Bell,
+  Lightbulb, Plug, Snowflake, Bell, LayoutDashboard, Pencil,
 } from 'lucide-react';
-import { Building, Floor, Room, RoomType, Wall, RoomDataPointBinding } from '../../types/building';
+import { Building, Floor, Room, RoomType, Wall, RoomDataPointBinding, MonitorLayer, AlarmBehavior } from '../../types/building';
 import type { DatapointGroup } from './RoomBindingsPanel';
 
 interface Point { x: number; y: number }
@@ -43,7 +43,7 @@ interface LayerVisibility {
   walls: boolean;
 }
 
-// ---- Datapoint role definitions (matching RoomBindingsPanel) ----
+// ---- Datapoint role definitions (HVAC quick-select) ----
 
 interface BindingRole {
   key: string;
@@ -85,6 +85,12 @@ function displayLabel(entityId: string, labels?: Record<string, string>): string
   return entityId;
 }
 
+const ALARM_BEHAVIOR_LABELS: Record<AlarmBehavior, string> = {
+  none: 'Kein Alarm',
+  blink: 'Blinken',
+  red: 'Rot markieren',
+};
+
 interface RoomEditorViewProps {
   building: Building;
   onUpdateBuilding: (b: Building) => void;
@@ -117,14 +123,34 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const [showLayerPanel, setShowLayerPanel] = useState(false);
 
   // Datapoint picker state
-  const [openPickerFor, setOpenPickerFor] = useState<string | null>(null);
+  const [openPickerFor, setOpenPickerFor] = useState<string | null>(null); // bindingId or 'new'
   const [pickerPageId, setPickerPageId] = useState<string | null>(null);
   const [dpSearch, setDpSearch] = useState('');
 
-  // Expanded category state for binding roles
+  // New free binding form
+  const [showNewBindingForm, setShowNewBindingForm] = useState(false);
+  const [newBindingLabel, setNewBindingLabel] = useState('');
+  const [newBindingUnit, setNewBindingUnit] = useState('');
+  const [newBindingCategory, setNewBindingCategory] = useState('generic');
+  const [newBindingWritable, setNewBindingWritable] = useState(false);
+  const [newBindingMin, setNewBindingMin] = useState<string>('');
+  const [newBindingMax, setNewBindingMax] = useState<string>('');
+  const [pendingNewDatapoint, setPendingNewDatapoint] = useState<string>('');
+
+  // Expanded category state for HVAC quick-select
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({
     climate: true, air: false, actuator: false, safety: false,
   });
+  const [showHvacQuick, setShowHvacQuick] = useState(false);
+
+  // Layer config modal for a specific binding
+  const [layerConfigFor, setLayerConfigFor] = useState<string | null>(null);
+
+  // Monitor layer management modal
+  const [showLayerManager, setShowLayerManager] = useState(false);
+  const [editingLayer, setEditingLayer] = useState<MonitorLayer | null>(null);
+  const [newLayerName, setNewLayerName] = useState('');
+  const [newLayerUnit, setNewLayerUnit] = useState('');
 
   const dragRoom = useRef<{
     roomId: string; origPoints: Point[];
@@ -139,6 +165,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
   const rooms = activeFloor?.rooms ?? [];
   const walls = activeFloor?.walls ?? [];
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) ?? null;
+  const monitorLayers = building.monitorLayers ?? [];
 
   // ---- Coordinate transforms ----
   const worldToSvg = useCallback((wx: number, wy: number): Point => ({
@@ -419,11 +446,43 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     { id: 'polygon', label: 'Raum zeichnen', Icon: Hexagon },
   ] as const;
 
-  // ---- Datapoint picker helpers ----
-  const getBinding = (room: Room, roleKey: string): RoomDataPointBinding | undefined =>
-    (room.bindings ?? []).find(b => b.id === `${room.id}-${roleKey}`);
+  // ---- Binding helpers ----
+  const getBinding = (room: Room, bindingId: string) =>
+    (room.bindings ?? []).find(b => b.id === bindingId);
 
-  const setBindingDatapoint = (room: Room, roleKey: string, datapoint: string) => {
+  // Add a new free binding after datapoint was picked
+  const addFreeBinding = (room: Room, datapoint: string) => {
+    const existing = room.bindings ?? [];
+    if (existing.length >= 20) return;
+    const now = Date.now();
+    const newBinding: RoomDataPointBinding = {
+      id: `${room.id}-free-${now}`,
+      datapoint,
+      label: newBindingLabel || displayLabel(datapoint, datapointLabels) || datapoint,
+      category: newBindingCategory as RoomDataPointBinding['category'],
+      unit: newBindingUnit,
+      display: 'tile',
+      showInRoom: true,
+      showInBuilding: false,
+      writable: newBindingWritable,
+      minValue: newBindingMin !== '' ? parseFloat(newBindingMin) : undefined,
+      maxValue: newBindingMax !== '' ? parseFloat(newBindingMax) : undefined,
+      order: existing.length,
+      monitorLayerIds: [],
+      alarmBehavior: 'none',
+    };
+    updateRoomBindings(room.id, [...existing, newBinding]);
+    setNewBindingLabel('');
+    setNewBindingUnit('');
+    setNewBindingCategory('generic');
+    setNewBindingWritable(false);
+    setNewBindingMin('');
+    setNewBindingMax('');
+    setShowNewBindingForm(false);
+  };
+
+  // Add HVAC quick binding
+  const setHvacBinding = (room: Room, roleKey: string, datapoint: string) => {
     const role = BINDING_ROLES.find(r => r.key === roleKey);
     if (!role) return;
     const existing = room.bindings ?? [];
@@ -435,6 +494,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     } else if (hasBinding) {
       next = existing.map(b => b.id === bindingId ? { ...b, datapoint } : b);
     } else {
+      if (existing.length >= 20) return;
       const newBinding: RoomDataPointBinding = {
         id: bindingId,
         datapoint,
@@ -447,16 +507,84 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
         writable: roleKey === 'setpoint',
         minValue: role.min,
         maxValue: role.max,
-        order: BINDING_ROLES.findIndex(r => r.key === roleKey),
+        order: existing.length,
+        monitorLayerIds: [],
+        alarmBehavior: roleKey === 'alarm' ? 'red' : 'none',
       };
       next = [...existing, newBinding];
     }
     updateRoomBindings(room.id, next);
   };
 
-  const removeBinding = (room: Room, roleKey: string) => {
-    setBindingDatapoint(room, roleKey, '');
+  const removeBinding = (room: Room, bindingId: string) => {
+    const next = (room.bindings ?? []).filter(b => b.id !== bindingId);
+    updateRoomBindings(room.id, next);
   };
+
+  const updateBinding = (room: Room, bindingId: string, patch: Partial<RoomDataPointBinding>) => {
+    const next = (room.bindings ?? []).map(b => b.id === bindingId ? { ...b, ...patch } : b);
+    updateRoomBindings(room.id, next);
+  };
+
+  // ---- Monitor Layer management ----
+  const saveMonitorLayers = (layers: MonitorLayer[]) => {
+    onUpdateBuilding({ ...building, monitorLayers: layers, updatedAt: Date.now() });
+  };
+
+  const addMonitorLayer = () => {
+    if (!newLayerName.trim()) return;
+    const now = Date.now();
+    const newLayer: MonitorLayer = {
+      id: `layer-${now}`,
+      name: newLayerName.trim(),
+      unit: newLayerUnit.trim() || undefined,
+      colorScale: {
+        stops: [{ at: 0, color: '#22c55e' }, { at: 1, color: '#ef4444' }],
+        min: 0,
+        max: 100,
+      },
+      order: monitorLayers.length,
+    };
+    saveMonitorLayers([...monitorLayers, newLayer]);
+    setNewLayerName('');
+    setNewLayerUnit('');
+  };
+
+  const deleteMonitorLayer = (layerId: string) => {
+    saveMonitorLayers(monitorLayers.filter(l => l.id !== layerId));
+    // also remove from all bindings
+    const updatedBuilding: Building = {
+      ...building,
+      monitorLayers: monitorLayers.filter(l => l.id !== layerId),
+      floors: building.floors.map(f => ({
+        ...f,
+        rooms: f.rooms.map(r => ({
+          ...r,
+          bindings: (r.bindings ?? []).map(b => ({
+            ...b,
+            monitorLayerIds: (b.monitorLayerIds ?? []).filter(id => id !== layerId),
+          })),
+        })),
+      })),
+      updatedAt: Date.now(),
+    };
+    onUpdateBuilding(updatedBuilding);
+  };
+
+  const toggleBindingLayer = (room: Room, bindingId: string, layerId: string) => {
+    const binding = (room.bindings ?? []).find(b => b.id === bindingId);
+    if (!binding) return;
+    const current = binding.monitorLayerIds ?? [];
+    const next = current.includes(layerId)
+      ? current.filter(id => id !== layerId)
+      : [...current, layerId];
+    updateBinding(room, bindingId, { monitorLayerIds: next });
+  };
+
+  // binding being configured for layers
+  const layerConfigBinding = layerConfigFor && selectedRoom
+    ? (selectedRoom.bindings ?? []).find(b => b.id === layerConfigFor)
+    : null;
 
   return (
     <div className="flex h-full bg-slate-900 text-slate-200 overflow-hidden">
@@ -532,6 +660,18 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
               ))}
             </div>
           )}
+        </div>
+
+        {/* Monitor layer manager button */}
+        <div className="p-3 border-b border-slate-700">
+          <button
+            onClick={() => setShowLayerManager(true)}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+          >
+            <Layers size={11} className="text-sky-400" />
+            Monitor-Ebenen
+            <span className="ml-auto text-[10px] text-slate-500">{monitorLayers.length}</span>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 min-h-0">
@@ -756,7 +896,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                 </div>
                 <div className="flex items-center gap-0.5">
                   <button onClick={() => setEditingRoom({ ...selectedRoom })} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Bearbeiten"><Edit3 size={13} /></button>
-                  <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Monitor-Konfiguration"><Settings size={13} /></button>
+                  <button onClick={() => onConfigRoom?.(selectedRoom.id)} className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200" title="Panel-Designer"><Settings size={13} /></button>
                   <button onClick={() => deleteRoom(selectedRoom.id)} className="p-1.5 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400" title="Löschen"><Trash2 size={13} /></button>
                 </div>
               </div>
@@ -774,7 +914,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   )}
                   <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
                     <p className="text-slate-500 mb-0.5">Datenpunkte</p>
-                    <p className="text-slate-200 font-medium">{selectedRoom.bindings?.length ?? 0}</p>
+                    <p className="text-slate-200 font-medium">{selectedRoom.bindings?.length ?? 0} / 20</p>
                   </div>
                   {selectedRoom.points && (
                     <div className="bg-slate-800/60 rounded-lg p-2.5 border border-slate-700/50">
@@ -790,8 +930,9 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   </button>
                 )}
                 {onConfigRoom && (
-                  <button onClick={() => onConfigRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition-colors">
-                    Monitor-Konfiguration
+                  <button onClick={() => onConfigRoom(selectedRoom.id)} className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs flex items-center justify-center gap-2 transition-colors">
+                    <LayoutDashboard size={12} />
+                    Panel-Designer öffnen
                   </button>
                 )}
               </div>
@@ -848,96 +989,217 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
           {/* Datapoints tab */}
           {rightTab === 'datapoints' && selectedRoom && !editingRoom && (
             <div className="flex-1 overflow-y-auto">
+              {/* Free bindings list */}
               <div className="p-3 border-b border-slate-800">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">HLK-Datenpunkte</p>
-                <p className="text-[10px] text-slate-600 mt-0.5">{selectedRoom.name} · {(selectedRoom.bindings?.length ?? 0)} zugewiesen</p>
-              </div>
-
-              {datapointGroups.length === 0 && (
-                <div className="px-4 py-6 text-center">
-                  <Activity size={22} className="mx-auto mb-2 text-slate-700" />
-                  <p className="text-xs text-slate-500">Keine Datenpunkte verfügbar.</p>
-                  <p className="text-[10px] text-slate-600 mt-1">Verbinde einen Treiber (z.B. Home Assistant) um Datenpunkte zu laden.</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                    Datenpunkte ({(selectedRoom.bindings?.length ?? 0)}/20)
+                  </p>
+                  <button
+                    onClick={() => { setShowNewBindingForm(true); setOpenPickerFor('new'); setPickerPageId(null); setDpSearch(''); }}
+                    disabled={(selectedRoom.bindings?.length ?? 0) >= 20}
+                    className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={11} /> Neu
+                  </button>
                 </div>
-              )}
 
-              <div className="flex flex-col gap-1 p-2">
-                {BINDING_ROLE_CATEGORIES.map(cat => {
-                  const isOpen = expandedCats[cat.id] !== false;
-                  const roles = BINDING_ROLES.filter(r => cat.keys.includes(r.key));
-                  const assigned = roles.filter(r => getBinding(selectedRoom, r.key)?.datapoint).length;
-                  return (
-                    <div key={cat.id} className="border border-slate-800 rounded-xl overflow-hidden">
-                      <button
-                        onClick={() => setExpandedCats(s => ({ ...s, [cat.id]: !isOpen }))}
-                        className="w-full flex items-center justify-between px-3 py-2 bg-slate-800/50 hover:bg-slate-800 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-200">{cat.label}</span>
-                          {assigned > 0 && (
-                            <span className="text-[9px] text-sky-400 bg-sky-900/40 px-1.5 py-0.5 rounded-full">{assigned}/{roles.length}</span>
-                          )}
+                {(selectedRoom.bindings?.length ?? 0) === 0 && (
+                  <div className="py-4 text-center">
+                    <Activity size={20} className="mx-auto mb-2 text-slate-700" />
+                    <p className="text-xs text-slate-500">Keine Datenpunkte</p>
+                    <p className="text-[10px] text-slate-600 mt-0.5">Klicke auf "Neu" um einen Datenpunkt zu binden</p>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  {(selectedRoom.bindings ?? []).map(binding => (
+                    <div key={binding.id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-200 truncate">{binding.label || binding.datapoint}</p>
+                          <p className="text-[10px] text-slate-500 font-mono truncate">{displayLabel(binding.datapoint, datapointLabels)}</p>
                         </div>
-                        {isOpen ? <ChevronDown size={11} className="text-slate-500" /> : <ChevronRight size={11} className="text-slate-500" />}
-                      </button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            onClick={() => setLayerConfigFor(layerConfigFor === binding.id ? null : binding.id)}
+                            className={`p-1 rounded transition-colors ${layerConfigFor === binding.id ? 'bg-sky-700 text-sky-200' : 'hover:bg-slate-700 text-slate-500 hover:text-sky-400'}`}
+                            title="Ebenen konfigurieren"
+                          >
+                            <Layers size={11} />
+                          </button>
+                          <button
+                            onClick={() => { setOpenPickerFor(binding.id); setPickerPageId(null); setDpSearch(''); }}
+                            className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-sky-400 transition-colors"
+                            title="Datenpunkt ändern"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            onClick={() => removeBinding(selectedRoom, binding.id)}
+                            className="p-1 rounded hover:bg-red-900/40 text-slate-500 hover:text-red-400 transition-colors"
+                            title="Entfernen"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      </div>
 
-                      {isOpen && (
-                        <div className="divide-y divide-slate-800/60">
-                          {roles.map(role => {
-                            const binding = getBinding(selectedRoom, role.key);
-                            const hasBinding = !!(binding?.datapoint);
-                            return (
-                              <div key={role.key} className={`px-3 py-2.5 ${hasBinding ? 'bg-slate-800/20' : ''}`}>
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border transition-all"
-                                    style={hasBinding
-                                      ? { backgroundColor: role.accent + '22', borderColor: role.accent + '66', color: role.accent }
-                                      : { backgroundColor: '#1e293b', borderColor: '#334155', color: '#64748b' }
-                                    }
-                                  >
-                                    {role.icon}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-xs font-medium ${hasBinding ? 'text-white' : 'text-slate-400'}`}>{role.label}</p>
-                                    {hasBinding ? (
-                                      <p className="text-[10px] text-slate-500 font-mono truncate">{displayLabel(binding!.datapoint, datapointLabels)}</p>
-                                    ) : (
-                                      <p className="text-[10px] text-slate-600">{role.unit || 'kein Datenpunkt'}</p>
-                                    )}
-                                  </div>
-                                  {hasBinding ? (
+                      {/* Alarm & Layer config inline */}
+                      {layerConfigFor === binding.id && (
+                        <div className="border-t border-slate-700/50 px-3 py-2.5 bg-slate-800/80">
+                          <div className="mb-2">
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Alarm-Verhalten</p>
+                            <div className="flex gap-1">
+                              {(['none', 'blink', 'red'] as AlarmBehavior[]).map(ab => (
+                                <button
+                                  key={ab}
+                                  onClick={() => updateBinding(selectedRoom, binding.id, { alarmBehavior: ab })}
+                                  className={`flex-1 text-[10px] py-1 rounded-lg transition-colors ${
+                                    (binding.alarmBehavior ?? 'none') === ab
+                                      ? 'bg-sky-600 text-white'
+                                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                  }`}
+                                >
+                                  {ALARM_BEHAVIOR_LABELS[ab]}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {monitorLayers.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Sichtbar in Ebene</p>
+                              <div className="flex flex-wrap gap-1">
+                                {monitorLayers.map(layer => {
+                                  const active = (binding.monitorLayerIds ?? []).includes(layer.id);
+                                  return (
                                     <button
-                                      onClick={() => removeBinding(selectedRoom, role.key)}
-                                      className="p-1 rounded hover:bg-red-900/40 text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                                      key={layer.id}
+                                      onClick={() => toggleBindingLayer(selectedRoom, binding.id, layer.id)}
+                                      className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
+                                        active ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                      }`}
                                     >
-                                      <X size={12} />
+                                      {layer.name}
                                     </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => { setOpenPickerFor(role.key); setPickerPageId(null); setDpSearch(''); }}
-                                      className="p-1 rounded hover:bg-sky-900/40 text-slate-600 hover:text-sky-400 transition-colors shrink-0"
-                                    >
-                                      <Plus size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                                {hasBinding && (
-                                  <button
-                                    onClick={() => { setOpenPickerFor(role.key); setPickerPageId(null); setDpSearch(''); }}
-                                    className="mt-1.5 w-full text-left text-[10px] text-slate-600 hover:text-sky-400 transition-colors flex items-center gap-1 pl-10"
-                                  >
-                                    <Search size={9} /> ändern
-                                  </button>
-                                )}
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
+                              {monitorLayers.length === 0 && (
+                                <p className="text-[10px] text-slate-600">Keine Monitor-Ebenen definiert</p>
+                              )}
+                            </div>
+                          )}
+                          {monitorLayers.length === 0 && (
+                            <button
+                              onClick={() => setShowLayerManager(true)}
+                              className="text-[10px] text-sky-500 hover:text-sky-400 transition-colors"
+                            >
+                              Monitor-Ebenen erstellen →
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              {/* HVAC Quick-select */}
+              <div className="p-3">
+                <button
+                  onClick={() => setShowHvacQuick(!showHvacQuick)}
+                  className="w-full flex items-center justify-between text-[10px] text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-wider font-semibold mb-2"
+                >
+                  <span className="flex items-center gap-1.5"><Star size={10} /> HLK Schnellauswahl</span>
+                  {showHvacQuick ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                </button>
+
+                {showHvacQuick && (
+                  <div className="flex flex-col gap-1">
+                    {BINDING_ROLE_CATEGORIES.map(cat => {
+                      const isOpen = expandedCats[cat.id] !== false;
+                      const roles = BINDING_ROLES.filter(r => cat.keys.includes(r.key));
+                      const assigned = roles.filter(r => {
+                        const bindingId = `${selectedRoom.id}-${r.key}`;
+                        return (selectedRoom.bindings ?? []).find(b => b.id === bindingId)?.datapoint;
+                      }).length;
+                      return (
+                        <div key={cat.id} className="border border-slate-800 rounded-xl overflow-hidden">
+                          <button
+                            onClick={() => setExpandedCats(s => ({ ...s, [cat.id]: !isOpen }))}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-200">{cat.label}</span>
+                              {assigned > 0 && (
+                                <span className="text-[9px] text-sky-400 bg-sky-900/40 px-1.5 py-0.5 rounded-full">{assigned}/{roles.length}</span>
+                              )}
+                            </div>
+                            {isOpen ? <ChevronDown size={11} className="text-slate-500" /> : <ChevronRight size={11} className="text-slate-500" />}
+                          </button>
+
+                          {isOpen && (
+                            <div className="divide-y divide-slate-800/60">
+                              {roles.map(role => {
+                                const bindingId = `${selectedRoom.id}-${role.key}`;
+                                const binding = (selectedRoom.bindings ?? []).find(b => b.id === bindingId);
+                                const hasBinding = !!(binding?.datapoint);
+                                return (
+                                  <div key={role.key} className={`px-3 py-2.5 ${hasBinding ? 'bg-slate-800/20' : ''}`}>
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border transition-all"
+                                        style={hasBinding
+                                          ? { backgroundColor: role.accent + '22', borderColor: role.accent + '66', color: role.accent }
+                                          : { backgroundColor: '#1e293b', borderColor: '#334155', color: '#64748b' }
+                                        }
+                                      >
+                                        {role.icon}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-xs font-medium ${hasBinding ? 'text-white' : 'text-slate-400'}`}>{role.label}</p>
+                                        {hasBinding ? (
+                                          <p className="text-[10px] text-slate-500 font-mono truncate">{displayLabel(binding!.datapoint, datapointLabels)}</p>
+                                        ) : (
+                                          <p className="text-[10px] text-slate-600">{role.unit || 'kein Datenpunkt'}</p>
+                                        )}
+                                      </div>
+                                      {hasBinding ? (
+                                        <button
+                                          onClick={() => setHvacBinding(selectedRoom, role.key, '')}
+                                          className="p-1 rounded hover:bg-red-900/40 text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => { setOpenPickerFor(`hvac:${role.key}`); setPickerPageId(null); setDpSearch(''); }}
+                                          className="p-1 rounded hover:bg-sky-900/40 text-slate-600 hover:text-sky-400 transition-colors shrink-0"
+                                        >
+                                          <Plus size={12} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    {hasBinding && (
+                                      <button
+                                        onClick={() => { setOpenPickerFor(`hvac:${role.key}`); setPickerPageId(null); setDpSearch(''); }}
+                                        className="mt-1 w-full text-left text-[10px] text-slate-600 hover:text-sky-400 transition-colors flex items-center gap-1 pl-9"
+                                      >
+                                        <Search size={9} /> ändern
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -948,7 +1210,7 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       {openPickerFor && selectedRoom && (
         <div
           className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setOpenPickerFor(null)}
+          onClick={() => { setOpenPickerFor(null); setShowNewBindingForm(false); }}
         >
           <div
             className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
@@ -958,23 +1220,60 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
               <div>
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Datenpunkt wählen</p>
                 <p className="text-sm font-semibold text-white">
-                  {BINDING_ROLES.find(r => r.key === openPickerFor)?.label ?? openPickerFor}
+                  {openPickerFor === 'new' ? 'Neuer Datenpunkt'
+                    : openPickerFor.startsWith('hvac:') ? (BINDING_ROLES.find(r => r.key === openPickerFor.slice(5))?.label ?? openPickerFor)
+                    : ((selectedRoom.bindings ?? []).find(b => b.id === openPickerFor)?.label ?? 'Datenpunkt ändern')}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {getBinding(selectedRoom, openPickerFor)?.datapoint && (
-                  <button
-                    onClick={() => { removeBinding(selectedRoom, openPickerFor); setOpenPickerFor(null); }}
-                    className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors px-2 py-1 rounded hover:bg-rose-900/30"
-                  >
-                    Entfernen
-                  </button>
-                )}
-                <button onClick={() => setOpenPickerFor(null)} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
-                  <X size={14} />
-                </button>
-              </div>
+              <button onClick={() => { setOpenPickerFor(null); setShowNewBindingForm(false); }} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <X size={14} />
+              </button>
             </div>
+
+            {/* New binding meta form (only for 'new') */}
+            {openPickerFor === 'new' && showNewBindingForm && (
+              <div className="px-4 py-3 border-b border-slate-800 bg-slate-900/60 flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">Bezeichnung</label>
+                    <input value={newBindingLabel} onChange={e => setNewBindingLabel(e.target.value)} placeholder="z.B. Temperatur"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">Einheit</label>
+                    <input value={newBindingUnit} onChange={e => setNewBindingUnit(e.target.value)} placeholder="°C, %, ppm…"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">Kategorie</label>
+                    <select value={newBindingCategory} onChange={e => setNewBindingCategory(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                      {['temperature','setpoint','humidity','co2','airflow','occupancy','alarm','energy','valve','fanSpeed','light','pump','generic'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-500 block mb-0.5">Min</label>
+                      <input type="number" value={newBindingMin} onChange={e => setNewBindingMin(e.target.value)} placeholder="0"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-500 block mb-0.5">Max</label>
+                      <input type="number" value={newBindingMax} onChange={e => setNewBindingMax(e.target.value)} placeholder="100"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500" />
+                    </div>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                  <input type="checkbox" checked={newBindingWritable} onChange={e => setNewBindingWritable(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded accent-sky-500" />
+                  Schreibbar (Sollwert)
+                </label>
+                <p className="text-[10px] text-slate-600">Wähle unten den Datenpunkt aus dem Treiber oder der Logik</p>
+              </div>
+            )}
 
             {pickerPageId !== null && (
               <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
@@ -1048,25 +1347,141 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
                   const human = displayLabel(dp.entityId, datapointLabels);
                   const primary = dp.label && dp.label !== dp.entityId ? dp.label : human;
                   const showSub = primary !== dp.entityId;
-                  const isCurrent = getBinding(selectedRoom, openPickerFor)?.datapoint === dp.entityId;
                   return (
                     <button
                       key={dp.entityId}
-                      onClick={() => { setBindingDatapoint(selectedRoom, openPickerFor, dp.entityId); setOpenPickerFor(null); }}
-                      className={`w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left ${isCurrent ? 'bg-sky-900/20' : ''}`}
+                      onClick={() => {
+                        if (openPickerFor === 'new') {
+                          addFreeBinding(selectedRoom, dp.entityId);
+                        } else if (openPickerFor?.startsWith('hvac:')) {
+                          setHvacBinding(selectedRoom, openPickerFor.slice(5), dp.entityId);
+                        } else {
+                          // change existing binding datapoint
+                          updateBinding(selectedRoom, openPickerFor!, { datapoint: dp.entityId });
+                        }
+                        setOpenPickerFor(null);
+                        setShowNewBindingForm(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left"
                     >
                       <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
-                        {isCurrent ? <Star size={11} className="text-sky-400" /> : <Zap size={11} className="text-emerald-400" />}
+                        <Zap size={11} className="text-emerald-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-slate-200 truncate">{primary}</div>
                         {showSub && <div className="text-[10px] text-slate-500 font-mono truncate">{dp.entityId}</div>}
                       </div>
-                      {isCurrent && <span className="text-[9px] text-sky-400 shrink-0">Aktuell</span>}
                     </button>
                   );
                 });
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monitor Layer Manager Modal */}
+      {showLayerManager && (
+        <div
+          className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowLayerManager(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Monitor-Ebenen</p>
+                <p className="text-sm font-semibold text-white">Ebenen verwalten</p>
+              </div>
+              <button onClick={() => setShowLayerManager(false)} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+              <p className="text-xs text-slate-500">
+                Definiere Ebenen für den Monitor-Modus. Pro Datenpunkt kannst du festlegen, in welcher Ebene er sichtbar ist und zur Raumeinfärbung verwendet wird.
+              </p>
+
+              {monitorLayers.length === 0 && (
+                <div className="py-6 text-center text-slate-600 text-xs">
+                  <Layers size={24} className="mx-auto mb-2 opacity-30" />
+                  <p>Noch keine Ebenen definiert</p>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {monitorLayers.map(layer => (
+                  <div key={layer.id} className="bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-2.5 flex items-center gap-3">
+                    {editingLayer?.id === layer.id ? (
+                      <div className="flex-1 flex items-center gap-2">
+                        <input
+                          value={editingLayer.name}
+                          onChange={e => setEditingLayer({ ...editingLayer, name: e.target.value })}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+                          autoFocus
+                        />
+                        <input
+                          value={editingLayer.unit ?? ''}
+                          onChange={e => setEditingLayer({ ...editingLayer, unit: e.target.value })}
+                          placeholder="Einheit"
+                          className="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+                        />
+                        <button onClick={() => {
+                          saveMonitorLayers(monitorLayers.map(l => l.id === editingLayer.id ? editingLayer : l));
+                          setEditingLayer(null);
+                        }} className="p-1 hover:bg-sky-700 rounded text-sky-400"><Check size={12} /></button>
+                        <button onClick={() => setEditingLayer(null)} className="p-1 hover:bg-slate-700 rounded text-slate-400"><X size={12} /></button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-200">{layer.name}</p>
+                          {layer.unit && <p className="text-[10px] text-slate-500">{layer.unit}</p>}
+                        </div>
+                        <div className="flex gap-0.5 shrink-0">
+                          <button onClick={() => setEditingLayer({ ...layer })} className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors">
+                            <Pencil size={11} />
+                          </button>
+                          <button onClick={() => deleteMonitorLayer(layer.id)} className="p-1 hover:bg-red-900/40 rounded text-slate-500 hover:text-red-400 transition-colors">
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add new layer form */}
+              <div className="border border-slate-700/60 rounded-xl p-3 bg-slate-800/30">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Neue Ebene</p>
+                <div className="flex gap-2">
+                  <input
+                    value={newLayerName}
+                    onChange={e => setNewLayerName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addMonitorLayer()}
+                    placeholder="Name z.B. Temperatur"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 placeholder-slate-600"
+                  />
+                  <input
+                    value={newLayerUnit}
+                    onChange={e => setNewLayerUnit(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addMonitorLayer()}
+                    placeholder="°C"
+                    className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 placeholder-slate-600"
+                  />
+                  <button
+                    onClick={addMonitorLayer}
+                    disabled={!newLayerName.trim()}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Plus size={12} /> Hinzufügen
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

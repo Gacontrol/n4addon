@@ -74,6 +74,8 @@ export type DataPointCategory =
 
 export type RoomDataPointDisplay = 'tile' | 'badge' | 'trend' | 'icon' | 'gauge' | 'value';
 
+export type AlarmBehavior = 'none' | 'blink' | 'red';
+
 export interface RoomDataPointBinding {
   id: string;
   datapoint: string;
@@ -87,6 +89,22 @@ export interface RoomDataPointBinding {
   writable?: boolean;
   minValue?: number;
   maxValue?: number;
+  order: number;
+  /** IDs of MonitorLayers this binding appears in */
+  monitorLayerIds?: string[];
+  alarmBehavior?: AlarmBehavior;
+}
+
+export interface MonitorLayer {
+  id: string;
+  name: string;
+  unit?: string;
+  colorScale: {
+    stops: Array<{ at: number; color: string }>;
+    min: number;
+    max: number;
+  };
+  icon?: string;
   order: number;
 }
 
@@ -342,6 +360,7 @@ export interface Building {
   floors: Floor[];
   objModels: ObjModel[];
   widgets3d: Widget3D[];
+  monitorLayers?: MonitorLayer[];
   createdAt: number;
   updatedAt: number;
 }
