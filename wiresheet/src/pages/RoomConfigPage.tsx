@@ -5,7 +5,7 @@ import {
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
   SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
-  Monitor, Link, Type, X,
+  Monitor, Link, Type, X, ChevronRight,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../types/bms';
 import { RoomDataPointBinding } from '../types/building';
@@ -342,64 +342,161 @@ function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDa
   };
 }
 
-// ---- Datapoint binding input with autocomplete ----
+// ---- Datapoint picker modal ----
 
-interface DpBindingInputProps {
-  value: string;
-  onChange: (v: string) => void;
+interface DpPickerModalProps {
+  currentValue: string;
   suggestions: PaletteSource[];
+  onSelect: (v: string) => void;
+  onClose: () => void;
+  datapointGroups?: DatapointGroup[];
 }
 
-function DpBindingInput({ value, onChange, suggestions }: DpBindingInputProps) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState(value);
-  const containerRef = useRef<HTMLDivElement>(null);
+function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapointGroups = [] }: DpPickerModalProps) {
+  const [q, setQ] = useState('');
+  const [pageId, setPageId] = useState<string | null>(null);
 
-  const filtered = q.length > 0
-    ? suggestions.filter(s =>
-        s.datapoint.toLowerCase().includes(q.toLowerCase()) ||
-        s.label.toLowerCase().includes(q.toLowerCase())
-      ).slice(0, 12)
-    : suggestions.slice(0, 12);
+  const filteredSuggestions = q
+    ? suggestions.filter(s => s.datapoint.toLowerCase().includes(q.toLowerCase()) || s.label.toLowerCase().includes(q.toLowerCase()))
+    : suggestions;
+
+  const pick = (dp: string) => { onSelect(dp); onClose(); };
 
   return (
-    <div ref={containerRef} className="relative">
-      <div className="relative">
-        <Link size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-        <input
-          value={q}
-          onChange={e => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Datenpunkt-Pfad…"
-          className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white font-mono placeholder-slate-600 focus:outline-none focus:border-sky-500"
-        />
-        {q && (
-          <button onClick={() => { setQ(''); onChange(''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-            <X size={10} />
-          </button>
-        )}
-      </div>
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
-          {filtered.map(s => (
-            <button
-              key={s.id}
-              onMouseDown={() => { setQ(s.datapoint); onChange(s.datapoint); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-700 text-left transition-colors"
-            >
-              <span style={{ color: CATEGORY_COLORS[s.category] ?? '#64748b' }} className="shrink-0">
-                {CATEGORY_ICONS[s.category] ?? CATEGORY_ICONS.generic}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-200 truncate">{s.label}</p>
-                <p className="text-[10px] text-slate-500 font-mono truncate">{s.datapoint}</p>
-              </div>
-              {s.isBinding && <span className="text-[9px] text-sky-600">●</span>}
-            </button>
-          ))}
+    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+          <p className="text-sm font-semibold text-white">Datenpunkt wählen</p>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"><X size={14} /></button>
         </div>
-      )}
+
+        {pageId !== null && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-900/60">
+            <button onClick={() => { setPageId(null); setQ(''); }} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors">
+              <ChevronRight size={13} className="rotate-180" /> Zurück
+            </button>
+            <span className="text-slate-600 text-xs">/</span>
+            <span className="text-xs text-slate-200 font-medium truncate">
+              {datapointGroups.find(g => g.pageId === pageId)?.pageName ?? pageId}
+            </span>
+          </div>
+        )}
+
+        <div className="px-4 py-2 border-b border-slate-800">
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5">
+            <Search size={13} className="text-slate-500 shrink-0" />
+            <input
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Suchen oder Pfad eingeben…"
+              className="flex-1 bg-transparent text-slate-200 text-xs outline-none placeholder-slate-500"
+              onKeyDown={e => { if (e.key === 'Enter' && q.trim()) pick(q.trim()); }}
+            />
+            {q.trim() && (
+              <button
+                onMouseDown={() => pick(q.trim())}
+                className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10px] transition-colors"
+              >
+                <Check size={10} /> Übernehmen
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-600 mt-1">Pfad eingeben + Enter oder aus Liste wählen</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {/* Room bindings as primary source */}
+          {pageId === null && filteredSuggestions.length > 0 && (
+            <>
+              {currentValue && (
+                <div className="px-4 py-1.5 border-b border-slate-800/60 bg-slate-800/30">
+                  <p className="text-[10px] text-slate-500 mb-0.5">Aktuell</p>
+                  <p className="text-xs text-sky-300 font-mono truncate">{currentValue}</p>
+                </div>
+              )}
+              <div className="px-3 py-1.5 border-b border-slate-800/50">
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider">Raum-Datenpunkte</p>
+              </div>
+              {filteredSuggestions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => pick(s.datapoint)}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left"
+                >
+                  <span style={{ color: CATEGORY_COLORS[s.category] ?? '#64748b' }} className="shrink-0">
+                    {CATEGORY_ICONS[s.category] ?? CATEGORY_ICONS.generic}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-200 truncate">{s.label}</p>
+                    <p className="text-[10px] text-slate-500 font-mono truncate">{s.datapoint}</p>
+                  </div>
+                  {s.isBinding && <span className="text-[9px] text-sky-600 shrink-0">●</span>}
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Logic page groups */}
+          {pageId === null && datapointGroups.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 border-b border-slate-800/50 border-t border-slate-800/50 mt-1">
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider">Logik-Seiten</p>
+              </div>
+              {datapointGroups
+                .filter(g => !q || g.pageName.toLowerCase().includes(q.toLowerCase()) || g.datapoints.some(d => d.entityId.toLowerCase().includes(q.toLowerCase())))
+                .map(g => (
+                  <button
+                    key={g.pageId}
+                    onClick={() => { setPageId(g.pageId); setQ(''); }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                        <Zap size={11} className="text-emerald-400" />
+                      </div>
+                      <span className="text-xs text-slate-200 font-medium">{g.pageName}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">{g.datapoints.length}</span>
+                      <ChevronRight size={13} className="text-slate-500" />
+                    </div>
+                  </button>
+                ))}
+            </>
+          )}
+
+          {/* Datapoints within a selected page */}
+          {pageId !== null && (() => {
+            const g = datapointGroups.find(x => x.pageId === pageId);
+            const list = g ? (q ? g.datapoints.filter(d => d.entityId.toLowerCase().includes(q.toLowerCase()) || d.label.toLowerCase().includes(q.toLowerCase())) : g.datapoints) : [];
+            if (list.length === 0) return <div className="py-10 text-center text-xs text-slate-500">Keine Treffer</div>;
+            return list.map(dp => (
+              <button
+                key={dp.entityId}
+                onClick={() => pick(dp.entityId)}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/30 transition-colors text-left"
+              >
+                <div className="w-6 h-6 rounded bg-slate-800 flex items-center justify-center shrink-0">
+                  <Zap size={11} className="text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-slate-200 truncate">{dp.label || dp.entityId}</p>
+                  <p className="text-[10px] text-slate-500 font-mono truncate">{dp.entityId}</p>
+                </div>
+              </button>
+            ));
+          })()}
+
+          {pageId === null && filteredSuggestions.length === 0 && datapointGroups.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 px-4 text-slate-600">
+              <Activity size={24} className="mb-2 opacity-30" />
+              <p className="text-xs text-center">Keine Datenpunkte verfügbar.</p>
+              <p className="text-[10px] text-center mt-1 text-slate-700">Pfad oben manuell eingeben und Enter drücken.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -500,6 +597,7 @@ export function RoomConfigPage({
   const [panelTitle, setPanelTitle] = useState(savedCfg?.panelTitle ?? '');
   const [panelSubtitle, setPanelSubtitle] = useState(savedCfg?.panelSubtitle ?? '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pickerWidgetId, setPickerWidgetId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [search, setSearch] = useState('');
   const [dropOver, setDropOver] = useState<{ col: number; row: number } | null>(null);
@@ -818,17 +916,33 @@ export function RoomConfigPage({
                 {/* Datenpunkt-Binding */}
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">Datenpunkt</p>
-                  <DpBindingInput
-                    value={selected.sourceDatapoint ?? ''}
-                    onChange={v => {
-                      const src = allSources.find(s => s.datapoint === v);
-                      updateWidget(selected.datapointId, {
-                        sourceDatapoint: v,
-                        ...(src ? { category: src.category, unit: src.unit, minValue: src.minValue, maxValue: src.maxValue } : {}),
-                      });
-                    }}
-                    suggestions={allSources}
-                  />
+                  <button
+                    onClick={() => setPickerWidgetId(selected.datapointId)}
+                    className="w-full flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs hover:border-sky-600 transition-colors group"
+                  >
+                    <Link size={10} className="text-slate-500 shrink-0 group-hover:text-sky-500 transition-colors" />
+                    <span className={['flex-1 text-left truncate font-mono', selected.sourceDatapoint ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
+                      {selected.sourceDatapoint || 'Datenpunkt wählen…'}
+                    </span>
+                    <ChevronRight size={10} className="text-slate-600 shrink-0" />
+                  </button>
+                  {pickerWidgetId === selected.datapointId && (
+                    <DpPickerModal
+                      currentValue={selected.sourceDatapoint ?? ''}
+                      suggestions={allSources}
+                      datapointGroups={datapointGroups}
+                      onSelect={v => {
+                        const src = allSources.find(s => s.datapoint === v);
+                        updateWidget(selected.datapointId, {
+                          sourceDatapoint: v,
+                          ...(src ? { category: src.category, unit: src.unit, minValue: src.minValue, maxValue: src.maxValue } : {}),
+                        });
+                        setPickerWidgetId(null);
+                      }}
+                      onClose={() => setPickerWidgetId(null)}
+                    />
+                  )}
+
                   {/* Category override */}
                   <div className="mt-2">
                     <p className="text-[10px] text-slate-600 mb-1">Kategorie</p>

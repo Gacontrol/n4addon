@@ -490,10 +490,10 @@ export function RoomMonitorPage({ buildingId: propBuildingId, roomId: propRoomId
   const roomId = propRoomId ?? params.roomId;
   const handleBack = onBack ?? (() => navigate(`/building/${buildingId}/monitor`));
   const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
+  const { buildings, monitorConfigs } = useBuildingContext();
   const hasCustomPanel = !!(roomId && monitorConfigs[roomId]?.datapoints?.length);
   const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms' | 'trends'>(hasCustomPanel ? 'panel' : 'overview');
   const [lastRefresh, setLastRefresh] = useState(Date.now());
-  const { buildings, monitorConfigs } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
   const { floor, room } = useMemo(() => {
