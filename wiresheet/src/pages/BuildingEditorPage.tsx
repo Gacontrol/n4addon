@@ -34,11 +34,11 @@ export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom
           || n.type === 'ha-entity' || n.type === 'dp-boolean' || n.type === 'dp-numeric' || n.type === 'dp-enum')
         .map(n => {
           const cfg = n.data.config as Record<string, unknown> | undefined;
-          const entityId = (cfg?.['dpFacet'] as string)
-            || (cfg?.['dpKey'] as string)
-            || (cfg?.['entityId'] as string)
-            || n.id;
-          const label = (n.data.label as string) || (cfg?.['label'] as string) || entityId;
+          // entityId must be the node's ID (= dpStore key used by server)
+          // dpFacet / label are human-readable display names only
+          const entityId = n.id;
+          const facet = (cfg?.['dpFacet'] as string) || '';
+          const label = facet || (n.data.label as string) || (cfg?.['label'] as string) || n.id;
           return { entityId, label };
         })
         .filter(d => d.entityId),
