@@ -19,6 +19,11 @@
   cursor: pointer !important;
 }
 
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 @keyframes highlight-pulse {
   0%, 100% {
     box-shadow: 0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5);
