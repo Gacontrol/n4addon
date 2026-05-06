@@ -632,6 +632,8 @@ export function RoomMonitorPage({
               const wCols = w.panelW ?? 1;
               const hRows = w.panelH ?? 1;
               const liveVal = resolveLiveValue(w, liveValues);
+              const isWritable = w.widgetType === 'slider' || w.widgetType === 'incrementer' || w.widgetType === 'switch';
+              console.log('[Panel widget]', w.datapointId, 'type:', w.widgetType, 'writable:', w.writable, 'src:', w.sourceDatapoint, 'isWritable:', isWritable);
               return (
                 <div
                   key={w.datapointId}
@@ -648,10 +650,9 @@ export function RoomMonitorPage({
                     val={liveVal}
                     accent={accent}
                     onWrite={
-                      (w.writable !== false && (w.widgetType === 'slider' || w.widgetType === 'incrementer' || w.widgetType === 'switch'))
+                      isWritable
                         ? (v) => {
                             const raw = w.sourceDatapoint || w.datapointId;
-                            // strip "ext-" prefix added for external datapoints
                             const key = raw.startsWith('ext-') ? raw.slice(4) : raw;
                             writeDp(key, v);
                           }
