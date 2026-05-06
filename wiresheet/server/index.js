@@ -5187,6 +5187,11 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
       } else {
         const persist = parsed.segment === 'primary';
         dpStore.set(dpKey, value, { persist });
+        // Also mirror value on nodeId itself so the UI shows it immediately
+        // even before the next page execution cycle translates nodeId:in -> nodeId
+        if (parsed.segment === 'port' && dpKey !== parsed.nodeId) {
+          dpStore.set(parsed.nodeId, value, { persist: true });
+        }
         affectedNodeIds.add(parsed.nodeId);
       }
     }

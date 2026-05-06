@@ -635,7 +635,11 @@ export function RoomMonitorPage({
                     cfg={w}
                     val={liveVal}
                     accent={accent}
-                    onWrite={w.writable ? (v) => writeDp(w.sourceDatapoint ?? w.datapointId, v) : undefined}
+                    onWrite={
+                      (w.writable !== false && (w.widgetType === 'slider' || w.widgetType === 'incrementer' || w.widgetType === 'switch'))
+                        ? (v) => writeDp(w.sourceDatapoint ?? w.datapointId, v)
+                        : undefined
+                    }
                   />
                 </div>
               );
