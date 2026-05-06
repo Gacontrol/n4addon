@@ -1646,6 +1646,7 @@ function App() {
         haEntities={haEntities}
         haLoading={haLoading}
         onLoadHaEntities={loadHaEntities}
+        liveValues={liveValues}
       />
     );
   }

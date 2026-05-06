@@ -17,9 +17,10 @@ interface BuildingEditorPageProps {
   haEntities?: HaEntity[];
   haLoading?: boolean;
   onLoadHaEntities?: () => void;
+  liveValues?: Record<string, unknown>;
 }
 
-export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom, pages = [], haEntities = [], haLoading = false, onLoadHaEntities }: BuildingEditorPageProps) {
+export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom, pages = [], haEntities = [], haLoading = false, onLoadHaEntities, liveValues = {} }: BuildingEditorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
@@ -152,6 +153,7 @@ export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom
             onConfigRoom={onConfigRoom}
             datapointGroups={logicPageGroups}
             datapointLabels={datapointLabels}
+            liveValues={liveValues}
           />
         )}
       </div>
