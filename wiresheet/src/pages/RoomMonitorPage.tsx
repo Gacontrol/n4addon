@@ -285,16 +285,17 @@ function SliderWidget({ cfg, val, accent, onWrite }: {
 
   return (
     <div className="w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40">
-      <div className="h-full flex flex-col justify-between p-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
-          <span className="text-xs font-bold text-white shrink-0">{fmtWidget(val, cfg.unit)}</span>
+      <div className="w-full h-full flex flex-col justify-between p-[8%]">
+        <div className="flex items-center gap-[4%] min-w-0">
+          <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate flex-1">{cfg.label}</span>
+          <span className="text-[clamp(10px,2cqw,18px)] font-bold text-white shrink-0">{fmtWidget(val, cfg.unit)}</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
+        <div className="flex items-center gap-[3%]">
+          <span className="text-[clamp(8px,1.2cqw,11px)] text-slate-600 shrink-0">{min}</span>
           <div
             ref={trackRef}
-            className={`flex-1 h-3 bg-slate-700 rounded-full relative ${onWrite ? 'cursor-pointer' : ''}`}
+            className={`flex-1 rounded-full relative ${onWrite ? 'cursor-pointer' : ''}`}
+            style={{ height: 'clamp(6px,1.5cqh,14px)', background: '#334155' }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -302,45 +303,29 @@ function SliderWidget({ cfg, val, accent, onWrite }: {
             <div className="h-full rounded-full transition-none" style={{ width: `${pct}%`, background: offline ? '#475569' : accent }} />
             {onWrite && !offline && (
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 transition-none"
-                style={{ left: `calc(${pct}% - 7px)`, borderColor: accent }}
+                className="absolute top-1/2 -translate-y-1/2 rounded-full bg-white shadow-md border-2 transition-none"
+                style={{
+                  width: 'clamp(10px,2cqh,18px)', height: 'clamp(10px,2cqh,18px)',
+                  left: `calc(${pct}% - clamp(5px,1cqh,9px))`,
+                  borderColor: accent,
+                }}
               />
             )}
           </div>
-          <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
+          <span className="text-[clamp(8px,1.2cqw,11px)] text-slate-600 shrink-0">{max}</span>
         </div>
       </div>
     </div>
   );
 }
 
-function scaledLiveText(base: 'value' | 'label' | 'unit', cols: number, rows: number): string {
-  const area = cols * rows;
-  if (base === 'value') {
-    if (area >= 6) return 'text-4xl';
-    if (area >= 4) return 'text-3xl';
-    if (area >= 2) return 'text-2xl';
-    return 'text-lg';
-  }
-  if (base === 'label') {
-    if (area >= 4) return 'text-sm';
-    if (area >= 2) return 'text-xs';
-    return 'text-[10px]';
-  }
-  // unit
-  if (area >= 4) return 'text-xs';
-  return 'text-[9px]';
-}
-
 function WidgetLive({
-  cfg, val, accent, onWrite, panelW = 1, panelH = 1,
+  cfg, val, accent, onWrite,
 }: {
   cfg: RoomDataPointConfig;
   val: unknown;
   accent: string;
   onWrite?: (v: unknown) => void;
-  panelW?: number;
-  panelH?: number;
 }) {
   const cc = WIDGET_CATEGORY_COLORS[cfg.category ?? 'generic'] ?? '#64748b';
   const min = cfg.minValue ?? 0;
@@ -349,93 +334,96 @@ function WidgetLive({
   const pct = isNaN(numVal) ? 0 : Math.min(100, Math.max(0, ((numVal - min) / (max - min)) * 100));
   const offline = val === undefined || val === null;
   const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40';
-  const area = panelW * panelH;
-  const valCls = scaledLiveText('value', panelW, panelH);
-  const lblCls = scaledLiveText('label', panelW, panelH);
 
   switch (cfg.widgetType) {
     case 'kpi':
     default:
       return (
         <div className={base}>
-          <div className="h-full flex flex-col justify-center p-2.5 gap-1">
-            <span className={`${lblCls} text-slate-400 truncate`}>{cfg.label}</span>
-            <span className={`${valCls} font-bold leading-none ${offline ? 'text-slate-600' : 'text-white'}`}>
-              {fmtWidget(val, cfg.unit)}
-            </span>
+          <div className="w-full h-full flex flex-col justify-between p-[8%]">
+            <div className="flex items-center gap-[4%] min-w-0">
+              <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate">{cfg.label}</span>
+            </div>
+            <div className="flex items-end gap-[2%]">
+              <span className="font-bold leading-none text-[clamp(18px,5cqw,52px)]"
+                style={{ color: offline ? '#475569' : 'white' }}>
+                {fmtWidget(val, cfg.unit)}
+              </span>
+            </div>
           </div>
         </div>
       );
-    case 'gauge': {
-      const gSize = area >= 4 ? 80 : area >= 2 ? 64 : 48;
+    case 'gauge':
       return (
         <div className={base}>
-          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
-            <span className={`${lblCls} text-slate-400 truncate w-full text-center`}>{cfg.label}</span>
-            <div className="relative" style={{ width: gSize, height: gSize }}>
-              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[2%] p-[6%]">
+            <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="relative flex-1 w-full flex items-center justify-center" style={{ minHeight: 0 }}>
+              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ maxWidth: '80%', maxHeight: '80%', transform: 'rotate(-90deg)' }}>
                 <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
                 <circle cx="24" cy="24" r="18" fill="none" stroke={offline ? '#475569' : accent} strokeWidth="4"
                   strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`${area >= 2 ? 'text-sm' : 'text-[10px]'} font-bold text-white`}>
-                  {isNaN(numVal) ? '—' : Math.round(numVal)}
+                <span className="font-bold text-white text-[clamp(10px,2.5cqw,22px)]">
+                  {isNaN(numVal) ? '—' : (Math.abs(numVal) < 10 ? numVal.toFixed(1) : Math.round(numVal))}
                 </span>
               </div>
             </div>
-            <span className={`${scaledLiveText('unit', panelW, panelH)} text-slate-500`}>{cfg.unit ?? ''}</span>
+            <span className="text-[clamp(8px,1.2cqw,12px)] text-slate-500">{cfg.unit ?? ''}</span>
           </div>
         </div>
       );
-    }
     case 'slider':
       return <SliderWidget cfg={cfg} val={val} accent={accent} onWrite={onWrite} />;
-    case 'switch': {
-      const swH = area >= 4 ? 32 : 22;
-      const swW = area >= 4 ? 56 : 40;
-      const knobSize = area >= 4 ? 24 : 16;
-      const knobOff = area >= 4 ? 4 : 3;
-      const knobOn = swW - knobSize - knobOff;
+    case 'switch':
       return (
         <div className={base}>
-          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-2">
-            <span className={`${lblCls} text-slate-400 truncate w-full text-center`}>{cfg.label}</span>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
+            <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <button
               onClick={() => onWrite && onWrite(!val)}
               className="relative rounded-full transition-colors"
-              style={{ background: val ? accent : '#334155', height: swH, width: swW }}
+              style={{
+                background: val ? accent : '#334155',
+                width: 'clamp(36px,25%,72px)',
+                height: 'clamp(20px,14%,36px)',
+              }}
             >
               <span className="absolute rounded-full bg-white shadow transition-all"
-                style={{ width: knobSize, height: knobSize, left: val ? knobOn : knobOff, top: knobOff }} />
+                style={{
+                  width: 'clamp(14px,9%,28px)', height: 'clamp(14px,9%,28px)',
+                  top: '50%', transform: 'translateY(-50%)',
+                  left: val ? 'calc(100% - clamp(17px,11%,31px))' : '3px',
+                }} />
             </button>
           </div>
         </div>
       );
-    }
     case 'badge':
       return (
         <div className={base}>
-          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
-            <span style={{ color: cc }}>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
+            <span style={{ color: offline ? '#475569' : cc }}>
               {cfg.category === 'alarm'
-                ? <AlertTriangle size={area >= 4 ? 24 : 16} />
-                : <Activity size={area >= 4 ? 24 : 16} />}
+                ? <AlertTriangle className="w-[clamp(14px,4cqw,28px)] h-[clamp(14px,4cqw,28px)]" />
+                : <Activity className="w-[clamp(14px,4cqw,28px)] h-[clamp(14px,4cqw,28px)]" />}
             </span>
-            <span className={`px-2 py-0.5 rounded-full ${area >= 4 ? 'text-sm' : 'text-[10px]'} font-semibold`}
+            <span className="px-[8%] py-[2%] rounded-full font-semibold text-[clamp(10px,2cqw,20px)]"
               style={{ background: `${offline ? '#475569' : cc}22`, color: offline ? '#475569' : cc }}>
               {fmtWidget(val, cfg.unit)}
             </span>
-            <span className={`${lblCls} text-slate-500 truncate text-center`}>{cfg.label}</span>
+            <span className="text-[clamp(9px,1.5cqw,13px)] text-slate-500 truncate text-center w-full">{cfg.label}</span>
           </div>
         </div>
       );
     case 'row':
       return (
         <div className={base}>
-          <div className="h-full flex items-center justify-between px-3 gap-2">
-            <span className={`${lblCls} text-slate-400 truncate flex-1`}>{cfg.label}</span>
-            <span className={`${area >= 2 ? 'text-base' : 'text-sm'} font-semibold shrink-0 ${offline ? 'text-slate-600' : 'text-white'}`}>
+          <div className="w-full h-full flex items-center gap-[3%] px-[6%]">
+            <span className="text-[clamp(10px,1.8cqw,15px)] text-slate-400 truncate flex-1">{cfg.label}</span>
+            <span className="text-[clamp(11px,2.5cqw,20px)] font-semibold shrink-0"
+              style={{ color: offline ? '#475569' : 'white' }}>
               {fmtWidget(val, cfg.unit)}
             </span>
           </div>
@@ -444,9 +432,10 @@ function WidgetLive({
     case 'label':
       return (
         <div className={base}>
-          <div className="h-full flex flex-col items-center justify-center p-2 gap-1">
-            <span className={`${lblCls} text-slate-500 truncate w-full text-center`}>{cfg.label}</span>
-            <span className={`${valCls} font-bold ${offline ? 'text-slate-600' : 'text-white'}`}>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[3%] p-[6%]">
+            <span className="text-[clamp(9px,1.5cqw,13px)] text-slate-500 truncate w-full text-center">{cfg.label}</span>
+            <span className="font-bold text-[clamp(18px,5cqw,52px)]"
+              style={{ color: offline ? '#475569' : 'white' }}>
               {fmtWidget(val, cfg.unit)}
             </span>
           </div>
@@ -455,23 +444,23 @@ function WidgetLive({
     case 'incrementer': {
       const step = cfg.step ?? 1;
       const safeVal = isNaN(numVal) ? min : numVal;
-      const btnSize = area >= 4 ? 'w-10 h-10 text-xl' : 'w-6 h-6 text-sm';
       return (
         <div className={base}>
-          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
-            <span className={`${lblCls} text-slate-400 truncate w-full text-center`}>{cfg.label}</span>
-            <div className="flex items-center gap-2">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
+            <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="flex items-center gap-[6%] w-full justify-center">
               <button
                 onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.max(min, safeVal - step)); }}
-                className={`${btnSize} rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold hover:bg-slate-600 touch-manipulation`}
+                className="rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold hover:bg-slate-600 touch-manipulation text-[clamp(12px,3cqw,24px)]"
+                style={{ width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}
               >−</button>
-              <span className={`${area >= 4 ? 'text-2xl' : 'text-sm'} font-bold text-white min-w-8 text-center`}>
+              <span className="font-bold text-white text-[clamp(16px,4cqw,36px)] min-w-[2ch] text-center">
                 {fmtWidget(val, cfg.unit)}
               </span>
               <button
                 onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.min(max, safeVal + step)); }}
-                className={`${btnSize} rounded-lg flex items-center justify-center text-white font-bold hover:opacity-80 touch-manipulation`}
-                style={{ background: accent }}
+                className="rounded-lg flex items-center justify-center text-white font-bold hover:opacity-80 touch-manipulation text-[clamp(12px,3cqw,24px)]"
+                style={{ background: accent, width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}
               >+</button>
             </div>
           </div>
@@ -484,7 +473,7 @@ function WidgetLive({
       return (
         <div className="w-full h-full rounded-xl overflow-hidden"
           style={{ background: cfg.bgColor || 'rgba(30,41,59,0.5)', border: '1px solid rgba(100,116,139,0.2)' }}>
-          <div className="h-full flex flex-col justify-center p-3">
+          <div className="w-full h-full flex flex-col justify-center p-[8%]">
             <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[cfg.fontSize ?? 'base']} ${alignMap[cfg.textAlign ?? 'left']}`}
               style={{ color: cfg.textColor || '#f1f5f9' }}>
               {cfg.staticText || cfg.label}
@@ -708,14 +697,13 @@ export function RoomMonitorPage({
                     top: GAP + row * (CH + GAP),
                     width: wCols * CW + (wCols - 1) * GAP,
                     height: hRows * CH + (hRows - 1) * GAP,
+                    containerType: 'size',
                   }}
                 >
                   <WidgetLive
                     cfg={w}
                     val={liveVal}
                     accent={accent}
-                    panelW={wCols}
-                    panelH={hRows}
                     onWrite={
                       isWritable
                         ? (v) => {
