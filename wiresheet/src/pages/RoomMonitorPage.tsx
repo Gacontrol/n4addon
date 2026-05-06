@@ -3,17 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Settings, Thermometer, Wind, Droplets, Activity,
   Users, AlertTriangle, Zap, Gauge, Flame, Settings2,
-  ChevronRight, RefreshCw,
 } from 'lucide-react';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
 import { useRoomDisplayConfig } from '../hooks/useRoomDisplayConfig';
 import { DatapointCategory, CATEGORY_LABELS, RoomDatapointDisplay } from '../types/roomDisplay';
+import type { RoomDataPointConfig } from '../types/bms';
 import type { Room } from '../types/building';
 
 // ---- Category icons ----
 
-const CATEGORY_ICONS: Record<DatapointCategory, typeof Thermometer> = {
+const CATEGORY_ICONS: Record<string, typeof Thermometer> = {
   temperature: Thermometer,
   humidity: Droplets,
   co2: Wind,
@@ -27,7 +27,7 @@ const CATEGORY_ICONS: Record<DatapointCategory, typeof Thermometer> = {
   generic: Activity,
 };
 
-const CATEGORY_COLORS: Record<DatapointCategory, string> = {
+const CATEGORY_COLORS: Record<string, string> = {
   temperature: '#ef4444',
   humidity: '#06b6d4',
   co2: '#84cc16',
@@ -41,7 +41,7 @@ const CATEGORY_COLORS: Record<DatapointCategory, string> = {
   generic: '#64748b',
 };
 
-// ---- Format a live value ----
+// ---- Helpers ----
 
 function fmt(val: unknown, unit?: string): string {
   if (val === undefined || val === null) return '—';
@@ -53,63 +53,111 @@ function fmt(val: unknown, unit?: string): string {
   return unit ? `${String(val)} ${unit}` : String(val);
 }
 
-function getStatus(val: unknown, dp: RoomDatapointDisplay): 'ok' | 'warning' | 'alarm' | 'offline' {
-  if (val === undefined || val === null) return 'offline';
-  if (dp.category === 'alarm' && (val === true || val === 1 || val === '1')) return 'alarm';
-  if (typeof val === 'number') {
-    if (dp.highThreshold !== undefined && val > dp.highThreshold) return 'alarm';
-    if (dp.lowThreshold !== undefined && val < dp.lowThreshold) return 'alarm';
-  }
-  return 'ok';
+function getLiveKey(dp: RoomDataPointConfig): string {
+  // sourceDatapoint is the real node ID used in liveValues
+  return dp.sourceDatapoint || dp.datapointId;
+}
+
+function isAlarmValue(val: unknown, cat?: string): boolean {
+  if (cat === 'alarm' && (val === true || val === 1 || val === '1')) return true;
+  return false;
 }
 
 const STATUS_COLORS: Record<string, string> = {
   ok: '#22c55e',
-  warning: '#f59e0b',
   alarm: '#ef4444',
   offline: '#475569',
 };
 
-// ---- KPI Card ----
+// ---- KPI Card (from monitorConfigs) ----
 
-function KPICard({ dp, val }: { dp: RoomDatapointDisplay; val: unknown }) {
-  const Icon = CATEGORY_ICONS[dp.category] ?? Activity;
-  const catColor = CATEGORY_COLORS[dp.category] ?? '#64748b';
-  const status = getStatus(val, dp);
-  const statusColor = STATUS_COLORS[status];
-  const isAlarm = status === 'alarm';
+function KPICard({ dp, val }: { dp: RoomDataPointConfig; val: unknown }) {
+  const Icon = CATEGORY_ICONS[dp.category ?? 'generic'] ?? Activity;
+  const catColor = CATEGORY_COLORS[dp.category ?? 'generic'] ?? '#64748b';
+  const alarm = isAlarmValue(val, dp.category);
 
   return (
     <div className={[
       'rounded-xl border p-3 flex flex-col gap-2 transition-colors',
-      isAlarm ? 'border-red-500/40 bg-red-950/10' : 'border-slate-700/60 bg-slate-800/50',
+      alarm ? 'border-red-500/40 bg-red-950/10' : 'border-slate-700/60 bg-slate-800/50',
+    ].join(' ')}>
+      <div className="flex items-center justify-between">
+        <Icon className="w-4 h-4" style={{ color: catColor }} />
+        <span className="text-[9px] uppercase tracking-wider text-slate-500">
+          {CATEGORY_LABELS[dp.category as DatapointCategory] ?? dp.category ?? 'Allgemein'}
+        </span>
+      </div>
+      <span className={`text-xl font-bold leading-none ${alarm ? 'text-red-400' : 'text-white'}`}>
+        {fmt(val, dp.unit)}
+      </span>
+      <div className="text-[10px] text-slate-500 truncate">{dp.label}</div>
+    </div>
+  );
+}
+
+// ---- Point Row (from monitorConfigs) ----
+
+function PointRow({ dp, val }: { dp: RoomDataPointConfig; val: unknown }) {
+  const Icon = CATEGORY_ICONS[dp.category ?? 'generic'] ?? Activity;
+  const catColor = CATEGORY_COLORS[dp.category ?? 'generic'] ?? '#64748b';
+  const alarm = isAlarmValue(val, dp.category);
+  const offline = val === undefined || val === null;
+
+  return (
+    <div className={[
+      'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors',
+      alarm ? 'border-red-500/30 bg-red-950/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800',
+    ].join(' ')}>
+      <Icon className="w-4 h-4 shrink-0" style={{ color: catColor }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-slate-200 font-medium truncate">{dp.label}</p>
+        <p className="text-[10px] font-mono text-slate-600 truncate">{getLiveKey(dp)}</p>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className={`text-sm font-semibold ${alarm ? 'text-red-400' : offline ? 'text-slate-600' : 'text-white'}`}>
+          {fmt(val, dp.unit)}
+        </span>
+        <span className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: alarm ? STATUS_COLORS.alarm : offline ? STATUS_COLORS.offline : STATUS_COLORS.ok }} />
+      </div>
+    </div>
+  );
+}
+
+// ---- RoomDetailsPage datapoints (from useRoomDisplayConfig) ----
+
+function KPICardDisplay({ dp, val }: { dp: RoomDatapointDisplay; val: unknown }) {
+  const Icon = CATEGORY_ICONS[dp.category] ?? Activity;
+  const catColor = CATEGORY_COLORS[dp.category] ?? '#64748b';
+  const alarm = dp.category === 'alarm' && (val === true || val === 1);
+
+  return (
+    <div className={[
+      'rounded-xl border p-3 flex flex-col gap-2 transition-colors',
+      alarm ? 'border-red-500/40 bg-red-950/10' : 'border-slate-700/60 bg-slate-800/50',
     ].join(' ')}>
       <div className="flex items-center justify-between">
         <Icon className="w-4 h-4" style={{ color: catColor }} />
         <span className="text-[9px] uppercase tracking-wider text-slate-500">{CATEGORY_LABELS[dp.category]}</span>
       </div>
-      <div>
-        <span className="text-xl font-bold leading-none" style={{ color: isAlarm ? statusColor : 'white' }}>
-          {fmt(val, dp.unit)}
-        </span>
-      </div>
+      <span className={`text-xl font-bold leading-none ${alarm ? 'text-red-400' : 'text-white'}`}>
+        {fmt(val, dp.unit)}
+      </span>
       <div className="text-[10px] text-slate-500 truncate">{dp.label || dp.datapoint}</div>
     </div>
   );
 }
 
-// ---- Point Row ----
-
-function PointRow({ dp, val }: { dp: RoomDatapointDisplay; val: unknown }) {
+function PointRowDisplay({ dp, val }: { dp: RoomDatapointDisplay; val: unknown }) {
   const Icon = CATEGORY_ICONS[dp.category] ?? Activity;
   const catColor = CATEGORY_COLORS[dp.category] ?? '#64748b';
-  const status = getStatus(val, dp);
-  const isAlarm = status === 'alarm';
+  const alarm = dp.category === 'alarm' && (val === true || val === 1);
+  const offline = val === undefined || val === null;
 
   return (
     <div className={[
       'flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors',
-      isAlarm ? 'border-red-500/30 bg-red-950/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800',
+      alarm ? 'border-red-500/30 bg-red-950/10' : 'border-slate-700 bg-slate-800/40 hover:bg-slate-800',
     ].join(' ')}>
       <Icon className="w-4 h-4 shrink-0" style={{ color: catColor }} />
       <div className="flex-1 min-w-0">
@@ -117,17 +165,11 @@ function PointRow({ dp, val }: { dp: RoomDatapointDisplay; val: unknown }) {
         <p className="text-[10px] font-mono text-slate-600 truncate">{dp.datapoint}</p>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        {val !== undefined && val !== null ? (
-          <span className={[
-            'text-sm font-semibold',
-            isAlarm ? 'text-red-400' : 'text-white',
-          ].join(' ')}>
-            {fmt(val, dp.unit)}
-          </span>
-        ) : (
-          <span className="text-xs text-slate-600">—</span>
-        )}
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_COLORS[status] }} />
+        <span className={`text-sm font-semibold ${alarm ? 'text-red-400' : offline ? 'text-slate-600' : 'text-white'}`}>
+          {fmt(val, dp.unit)}
+        </span>
+        <span className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: alarm ? STATUS_COLORS.alarm : offline ? STATUS_COLORS.offline : STATUS_COLORS.ok }} />
       </div>
     </div>
   );
@@ -176,7 +218,7 @@ export function RoomMonitorPage({
   const handleBack = onBack ?? (() => navigate(`/building/${buildingId}/monitor`));
   const handleOpenConfig = onOpenConfig ?? (() => navigate(`/building/${buildingId}/room/${roomId}/config`));
 
-  const { buildings } = useBuildingContext();
+  const { buildings, monitorConfigs } = useBuildingContext();
   const { getConfig } = useRoomDisplayConfig(buildingId);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'alarms'>('overview');
@@ -192,24 +234,40 @@ export function RoomMonitorPage({
     return { floor: null, room: null };
   }, [building, roomId]);
 
-  const roomCfg = roomId ? getConfig(roomId) : undefined;
-  const datapoints = roomCfg?.visibleDatapoints ?? [];
-
-  const alarmDps = useMemo(() =>
-    datapoints.filter(dp => getStatus(liveValues[dp.datapoint], dp) === 'alarm'),
-    [datapoints, liveValues],
+  // Primary source: PanelDesigner config (monitorConfigs)
+  const monitorCfg = roomId ? monitorConfigs[roomId] : undefined;
+  const monitorDps = useMemo(
+    () => (monitorCfg?.datapoints ?? []).filter(dp => dp.showInMonitor !== false),
+    [monitorCfg],
   );
 
-  const kpiDps = useMemo(() => {
-    const seen = new Set<DatapointCategory>();
-    const preferred: DatapointCategory[] = ['temperature', 'co2', 'humidity', 'occupancy', 'alarm', 'energy'];
-    const result: RoomDatapointDisplay[] = [];
-    for (const cat of preferred) {
-      const dp = datapoints.find(d => d.category === cat && !seen.has(d.category));
-      if (dp) { seen.add(dp.category); result.push(dp); }
+  // Secondary source: RoomDetailsPage config (useRoomDisplayConfig)
+  const displayCfg = roomId ? getConfig(roomId) : undefined;
+  const displayDps = displayCfg?.visibleDatapoints ?? [];
+
+  // Use monitorConfigs if they have data, otherwise fall back to displayConfig
+  const useMonitorSource = monitorDps.length > 0;
+  const hasAnyConfig = monitorDps.length > 0 || displayDps.length > 0;
+
+  const alarmDps = useMemo(() => {
+    if (useMonitorSource) {
+      return monitorDps.filter(dp => isAlarmValue(liveValues[getLiveKey(dp)], dp.category));
     }
-    return result;
-  }, [datapoints]);
+    return displayDps.filter(dp => dp.category === 'alarm' && (liveValues[dp.datapoint] === true || liveValues[dp.datapoint] === 1));
+  }, [monitorDps, displayDps, liveValues, useMonitorSource]);
+
+  const kpiDps = useMemo(() => {
+    if (useMonitorSource) {
+      return monitorDps.filter(dp => dp.isPrimaryRoomKPI || dp.isPrimaryBuildingPoint).slice(0, 6);
+    }
+    const seen = new Set<string>();
+    const preferred = ['temperature', 'co2', 'humidity', 'occupancy', 'alarm', 'energy'];
+    return displayDps.filter(dp => {
+      if (seen.has(dp.category) || !preferred.includes(dp.category)) return false;
+      seen.add(dp.category);
+      return true;
+    });
+  }, [monitorDps, displayDps, useMonitorSource]);
 
   if (!building || !room || !floor) {
     if (asPanel) return null;
@@ -225,18 +283,17 @@ export function RoomMonitorPage({
     );
   }
 
+  const px = asPanel ? 'px-4' : 'px-6';
+
   const headerContent = (
-    <div className={asPanel ? 'bg-slate-900/80 border-b border-slate-800 px-4 py-3 rounded-t-2xl shrink-0' : 'bg-slate-900/80 border-b border-slate-800 px-6 py-4 shrink-0'}>
+    <div className={`${asPanel ? 'bg-slate-900/80 border-b border-slate-800 px-4 py-3 rounded-t-2xl' : 'bg-slate-900/80 border-b border-slate-800 px-6 py-4'} shrink-0`}>
       <div className="flex items-center gap-2 mb-2">
         <Breadcrumbs items={[
           { label: building.name, onClick: handleBack, icon: 'building' },
           { label: floor.name, onClick: handleBack, icon: 'floor' },
           { label: room.name, icon: 'room' },
         ]} />
-        <button
-          onClick={handleBack}
-          className="ml-auto p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-        >
+        <button onClick={handleBack} className="ml-auto p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors shrink-0">
           <ArrowLeft size={14} />
         </button>
       </div>
@@ -246,7 +303,6 @@ export function RoomMonitorPage({
           <div className="min-w-0">
             <h1 className={`${asPanel ? 'text-base' : 'text-xl'} font-bold text-white leading-tight truncate`}>{room.name}</h1>
             <p className="text-xs text-slate-400 flex items-center gap-2">
-              {(room as unknown as { number?: string }).number && <span>{(room as unknown as { number?: string }).number}</span>}
               <span>{floor.name}</span>
               {alarmDps.length > 0 && (
                 <span className="flex items-center gap-1 text-red-400">
@@ -257,24 +313,19 @@ export function RoomMonitorPage({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={handleOpenConfig}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-200 transition-colors"
-          >
-            <Settings size={12} />
-            {asPanel ? '' : 'Konfigurieren'}
-          </button>
-        </div>
+        <button onClick={handleOpenConfig} className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs text-slate-200 transition-colors shrink-0">
+          <Settings size={12} />
+          {!asPanel && 'Konfigurieren'}
+        </button>
       </div>
     </div>
   );
 
   const tabBar = (
-    <div className={`flex border-b border-slate-800 bg-slate-900/60 ${asPanel ? 'px-4' : 'px-6'} shrink-0`}>
+    <div className={`flex border-b border-slate-800 bg-slate-900/60 ${px} shrink-0`}>
       {([
         { id: 'overview' as const, label: 'Übersicht' },
-        { id: 'points' as const, label: `Datenpunkte (${datapoints.length})` },
+        { id: 'points' as const, label: `Datenpunkte (${useMonitorSource ? monitorDps.length : displayDps.length})` },
         { id: 'alarms' as const, label: `Alarme${alarmDps.length > 0 ? ` (${alarmDps.length})` : ''}` },
       ]).map(tab => (
         <button
@@ -295,58 +346,65 @@ export function RoomMonitorPage({
     <div className="flex-1 overflow-y-auto">
       {activeTab === 'overview' && (
         <div className={asPanel ? 'p-4' : 'p-6 max-w-5xl mx-auto'}>
-          {/* Primary datapoint highlight */}
-          {roomCfg?.primaryDatapoint && (
-            <div className="mb-5 rounded-xl border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 p-4">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Hauptdatenpunkt</div>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-white">
-                  {fmt(liveValues[roomCfg.primaryDatapoint], roomCfg.primaryUnit)}
-                </span>
-              </div>
-              <div className="text-xs text-slate-400 mt-1">{roomCfg.primaryLabel || roomCfg.primaryDatapoint}</div>
-            </div>
-          )}
-
-          {kpiDps.length > 0 && (
-            <>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Kennwerte</div>
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                {kpiDps.map(dp => (
-                  <KPICard key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />
-                ))}
-              </div>
-            </>
-          )}
-
-          {alarmDps.length > 0 && (
-            <div className="mb-5">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
-                <AlertTriangle size={10} className="text-red-400" /> Aktive Alarme
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {alarmDps.map(dp => (
-                  <div key={dp.datapoint} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
-                    <AlertTriangle size={12} className="text-red-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-red-200 truncate">{dp.label}</p>
-                      <p className="text-xs text-red-400/70">{fmt(liveValues[dp.datapoint], dp.unit)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {datapoints.length === 0 ? (
+          {!hasAnyConfig ? (
             <EmptyState onConfigure={handleOpenConfig} />
           ) : (
             <>
+              {/* Primary KPIs */}
+              {kpiDps.length > 0 && (
+                <>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Kennwerte</div>
+                  <div className="grid grid-cols-2 gap-2 mb-5">
+                    {useMonitorSource
+                      ? (kpiDps as RoomDataPointConfig[]).map(dp => (
+                          <KPICard key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />
+                        ))
+                      : (kpiDps as RoomDatapointDisplay[]).map(dp => (
+                          <KPICardDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />
+                        ))
+                    }
+                  </div>
+                </>
+              )}
+
+              {/* Alarms */}
+              {alarmDps.length > 0 && (
+                <div className="mb-5">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
+                    <AlertTriangle size={10} className="text-red-400" /> Aktive Alarme
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {useMonitorSource
+                      ? (alarmDps as RoomDataPointConfig[]).map(dp => (
+                          <div key={dp.datapointId} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                            <AlertTriangle size={12} className="text-red-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-red-200 truncate">{dp.label}</p>
+                              <p className="text-xs text-red-400/70">{fmt(liveValues[getLiveKey(dp)], dp.unit)}</p>
+                            </div>
+                          </div>
+                        ))
+                      : (alarmDps as RoomDatapointDisplay[]).map(dp => (
+                          <div key={dp.datapoint} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                            <AlertTriangle size={12} className="text-red-400 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-red-200 truncate">{dp.label}</p>
+                              <p className="text-xs text-red-400/70">{fmt(liveValues[dp.datapoint], dp.unit)}</p>
+                            </div>
+                          </div>
+                        ))
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* All points */}
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Alle Werte</div>
               <div className="flex flex-col gap-1">
-                {datapoints.map(dp => (
-                  <PointRow key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />
-                ))}
+                {useMonitorSource
+                  ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />)
+                  : displayDps.map(dp => <PointRowDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />)
+                }
               </div>
             </>
           )}
@@ -355,13 +413,14 @@ export function RoomMonitorPage({
 
       {activeTab === 'points' && (
         <div className={asPanel ? 'p-4' : 'p-6 max-w-3xl mx-auto'}>
-          {datapoints.length === 0 ? (
+          {!hasAnyConfig ? (
             <EmptyState onConfigure={handleOpenConfig} />
           ) : (
             <div className="flex flex-col gap-1">
-              {datapoints.map(dp => (
-                <PointRow key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />
-              ))}
+              {useMonitorSource
+                ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />)
+                : displayDps.map(dp => <PointRowDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />)
+              }
             </div>
           )}
         </div>
@@ -378,15 +437,26 @@ export function RoomMonitorPage({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {alarmDps.map(dp => (
-                <div key={dp.datapoint} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
-                  <AlertTriangle size={12} className="text-red-400 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-red-200">{dp.label}</p>
-                    <p className="text-xs text-red-400/70 mt-0.5">{fmt(liveValues[dp.datapoint], dp.unit)}</p>
-                  </div>
-                </div>
-              ))}
+              {useMonitorSource
+                ? (alarmDps as RoomDataPointConfig[]).map(dp => (
+                    <div key={dp.datapointId} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                      <AlertTriangle size={12} className="text-red-400 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-red-200">{dp.label}</p>
+                        <p className="text-xs text-red-400/70 mt-0.5">{fmt(liveValues[getLiveKey(dp)], dp.unit)}</p>
+                      </div>
+                    </div>
+                  ))
+                : (alarmDps as RoomDatapointDisplay[]).map(dp => (
+                    <div key={dp.datapoint} className="flex items-center gap-2.5 px-3 py-2.5 bg-red-950/20 border border-red-800/50 rounded-lg">
+                      <AlertTriangle size={12} className="text-red-400 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-red-200">{dp.label}</p>
+                        <p className="text-xs text-red-400/70 mt-0.5">{fmt(liveValues[dp.datapoint], dp.unit)}</p>
+                      </div>
+                    </div>
+                  ))
+              }
             </div>
           )}
         </div>
