@@ -18,12 +18,16 @@ interface BuildingEditorPageProps {
   haLoading?: boolean;
   onLoadHaEntities?: () => void;
   liveValues?: Record<string, unknown>;
+  editorMode?: EditorSubMode;
+  onSetEditorMode?: (mode: EditorSubMode) => void;
 }
 
-export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom, pages = [], haEntities = [], haLoading = false, onLoadHaEntities, liveValues = {} }: BuildingEditorPageProps) {
+export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom, pages = [], haEntities = [], haLoading = false, onLoadHaEntities, liveValues = {}, editorMode: propEditorMode, onSetEditorMode }: BuildingEditorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
-  const [editorMode, setEditorMode] = useState<EditorSubMode>('3d');
+  const [localEditorMode, setLocalEditorMode] = useState<EditorSubMode>(propEditorMode ?? '3d');
+  const editorMode = propEditorMode ?? localEditorMode;
+  const setEditorMode = (m: EditorSubMode) => { setLocalEditorMode(m); onSetEditorMode?.(m); };
   const { buildings, replaceBuilding, isLoaded, activeBuildingId } = useBuildingContext();
 
   const logicPageGroups = useMemo(() => {

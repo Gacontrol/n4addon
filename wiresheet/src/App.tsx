@@ -149,6 +149,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | 'buildingMonitor' | 'roomMonitor' | 'roomConfig' | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [buildingEditorMode, setBuildingEditorMode] = useState<'3d' | 'rooms'>('3d');
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -2332,6 +2333,8 @@ function App() {
           haLoading={haLoading}
           onLoadHaEntities={loadHaEntities}
           liveValues={liveValues}
+          editorMode={buildingEditorMode}
+          onSetEditorMode={setBuildingEditorMode}
         />
       ) : mainView === 'buildingMonitor' ? (
         <BuildingMonitorPage
@@ -2355,6 +2358,8 @@ function App() {
           roomId={activeRoomId}
           onBack={() => setMainView('building')}
           onOpenMonitor={() => setMainView('roomMonitor')}
+          onSwitchTo3D={() => { setBuildingEditorMode('3d'); setMainView('building'); }}
+          onSwitchToRooms={() => { setBuildingEditorMode('rooms'); setMainView('building'); }}
           datapointGroups={appLogicPageGroups}
         />
       ) : (

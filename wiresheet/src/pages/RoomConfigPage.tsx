@@ -4,7 +4,7 @@ import {
   ArrowLeft, Check, Thermometer, Wind, Droplets, Activity, Users, AlertTriangle,
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
-  SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
+  SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft, Hexagon,
   Monitor, Link, Type, X, ChevronRight,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../types/bms';
@@ -537,6 +537,8 @@ interface RoomConfigPageProps {
   roomId?: string;
   onBack?: () => void;
   onOpenMonitor?: () => void;
+  onSwitchTo3D?: () => void;
+  onSwitchToRooms?: () => void;
   datapointGroups?: DatapointGroup[];
 }
 
@@ -545,6 +547,8 @@ export function RoomConfigPage({
   roomId: propRoomId,
   onBack,
   onOpenMonitor,
+  onSwitchTo3D,
+  onSwitchToRooms,
   datapointGroups: propDatapointGroups,
 }: RoomConfigPageProps) {
   const params = useParams<{ buildingId: string; roomId: string }>();
@@ -726,8 +730,27 @@ export function RoomConfigPage({
         <button onClick={goBack} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
           <ArrowLeft size={15} />
         </button>
+        <Building2 size={15} className="text-slate-400" />
+        <span className="text-sm font-semibold text-slate-200">{building.name}</span>
+        {(onSwitchTo3D || onSwitchToRooms) && (
+          <div className="ml-2 flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+            <button
+              onClick={onSwitchTo3D}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all text-slate-400 hover:text-slate-200"
+            >
+              <Building2 size={13} />
+              3D Gebäude-Editor
+            </button>
+            <button
+              onClick={onSwitchToRooms}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all text-slate-400 hover:text-slate-200"
+            >
+              <Hexagon size={13} />
+              Raum-Editor
+            </button>
+          </div>
+        )}
         <Breadcrumbs items={[
-          { label: building.name, onClick: goBack, icon: 'building' },
           { label: room.name, onClick: goMonitor, icon: 'room' },
           { label: 'Panel-Designer' },
         ]} />
