@@ -2353,7 +2353,7 @@ function App() {
         <RoomConfigPage
           buildingId={buildingId}
           roomId={activeRoomId}
-          onBack={() => setMainView('roomMonitor')}
+          onBack={() => setMainView('building')}
           onOpenMonitor={() => setMainView('roomMonitor')}
           datapointGroups={appLogicPageGroups}
         />
