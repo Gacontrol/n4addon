@@ -3369,10 +3369,16 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
         nodeValues[portKey] = bindingValues[portKey];
         return bindingValues[portKey];
       }
-      const conn = incomingConns.find(c => c.targetPort === inputPort.id);
+      // Match by port ID, or fall back to index-based 'input-N' pattern
+      const conn = incomingConns.find(c =>
+        c.targetPort === inputPort.id ||
+        c.targetPort === `input-${idx}`
+      );
       if (conn) {
         const connVal = getInputValue(conn);
         nodeValues[portKey] = connVal;
+        // Also store under the index-based key so live values display correctly
+        nodeValues[`${nodeId}:input-${idx}`] = connVal;
         return connVal;
       }
       const dpVal = dpStore.get(portKey);
