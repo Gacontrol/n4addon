@@ -10,6 +10,7 @@ import { RoomTooltip } from '../components/bms/RoomTooltip';
 import { RoomMonitorPage } from './RoomMonitorPage';
 import { useBuildingMonitor } from '../hooks/useBuildingMonitor';
 import { useBuildingContext } from '../context/BuildingContext';
+import { RoomDataPointConfig } from '../types/bms';
 
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -60,7 +61,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFloorFilter, setSelectedFloorFilter] = useState<string>('all');
   const [openRoomId, setOpenRoomId] = useState<string | null>(null);
-  const { buildings } = useBuildingContext();
+  const { buildings, monitorConfigs } = useBuildingContext();
 
   const building = buildings.find(b => b.id === buildingId);
   const monitorLayers: MonitorLayer[] = building?.monitorLayers ?? [];
@@ -126,6 +127,24 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   }, [hoveredRoomId, building]);
 
   const hoveredRoomLiveValue = hoveredRoomId ? getRoomLayerValue(hoveredRoomId) : null;
+
+  const hoveredRoomTooltipDps = useMemo((): Array<{ dp: RoomDataPointConfig; value: unknown }> => {
+    if (!hoveredRoomId) return [];
+    const cfg = monitorConfigs[hoveredRoomId];
+    if (!cfg) return [];
+    return cfg.datapoints
+      .filter(dp => dp.showInTooltip || dp.isPrimaryRoomKPI)
+      .sort((a, b) => {
+        if (a.isPrimaryRoomKPI && !b.isPrimaryRoomKPI) return -1;
+        if (!a.isPrimaryRoomKPI && b.isPrimaryRoomKPI) return 1;
+        return a.order - b.order;
+      })
+      .map(dp => {
+        const key = dp.sourceDatapoint || dp.datapointId;
+        const cleanKey = key.startsWith('ext-') ? key.slice(4) : key;
+        return { dp, value: liveValues[cleanKey] ?? liveValues[key] };
+      });
+  }, [hoveredRoomId, monitorConfigs, liveValues]);
 
   const filteredRooms = useMemo(() => {
     if (!building) return [];
@@ -226,11 +245,12 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
           <BuildingCanvas3D
             buildings={buildingsWithLayerColors}
             activeFloorId={selectedFloorFilter === 'all' ? null : selectedFloorFilter}
+            isolateActiveFloor={selectedFloorFilter !== 'all'}
             selectedRoomId={openRoomId}
             selectedWallId={null}
             onSelectRoom={handleRoomClick}
             onSelectWall={() => {}}
-            highlightFloor={false}
+            highlightFloor={selectedFloorFilter !== 'all'}
             bgColor={canvas3D.bgColor}
             bgTransparent={canvas3D.bgTransparent}
             buildingMode={canvas3D.buildingMode}
@@ -337,6 +357,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
           liveValue={hoveredRoomLiveValue}
           activeLayerId={activeLayerId}
           activeLayer={activeMonitorLayer}
+          tooltipDps={hoveredRoomTooltipDps}
           x={tooltipPos.x}
           y={tooltipPos.y}
         />
