@@ -419,20 +419,20 @@ function WidgetLive({
       );
     case 'incrementer': {
       const step = cfg.step ?? 1;
-      const safeVal = isNaN(numVal) ? (min) : numVal;
+      const safeVal = isNaN(numVal) ? min : numVal;
       return (
         <div className={base}>
           <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
             <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => onWrite && onWrite(Math.max(min, safeVal - step))}
-                className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600"
+                onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.max(min, safeVal - step)); }}
+                className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600 touch-manipulation"
               >−</button>
               <span className="text-sm font-bold text-white min-w-8 text-center">{fmtWidget(val, cfg.unit)}</span>
               <button
-                onClick={() => onWrite && onWrite(Math.min(max, safeVal + step))}
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80"
+                onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.min(max, safeVal + step)); }}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80 touch-manipulation"
                 style={{ background: accent }}
               >+</button>
             </div>

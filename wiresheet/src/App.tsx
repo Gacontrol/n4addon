@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 function App() {
-  const { activeBuildingId, buildings, setDatapointGroups } = useBuildingContext();
+  const { activeBuildingId, buildings, setDatapointGroups, monitorConfigs } = useBuildingContext();
 
   const {
     pages,
@@ -2068,6 +2068,7 @@ function App() {
               onVisuBindingClick={handleVisuBindingClick}
               onVisuBindingDelete={handleVisuBindingDelete}
               onInsertNodeIntoConnection={insertNodeIntoConnection}
+              monitorConfigs={monitorConfigs}
             />
 
             <DriverPanel

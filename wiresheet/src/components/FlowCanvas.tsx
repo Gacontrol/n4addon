@@ -3,6 +3,7 @@ import { FlowNode, VisuBindingInfo } from './FlowNode';
 import { ConnectionLine } from './ConnectionLine';
 import { FlowNode as FlowNodeType, Connection, DatapointOverride, DriverBinding, BindingStatus } from '../types/flow';
 import { VisuPage, getBindingNodeId, parseDpKey } from '../types/visualization';
+import { RoomMonitorConfig } from '../types/bms';
 import { Trash2, Copy, Clipboard, Type, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ContextMenuState {
@@ -57,6 +58,7 @@ interface FlowCanvasProps {
   onVisuBindingClick?: (binding: VisuBindingInfo) => void;
   onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
   onInsertNodeIntoConnection?: (nodeId: string, connectionId: string) => void;
+  monitorConfigs?: Record<string, RoomMonitorConfig>;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -103,7 +105,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onDriverBindingDelete,
   onVisuBindingClick,
   onVisuBindingDelete,
-  onInsertNodeIntoConnection
+  onInsertNodeIntoConnection,
+  monitorConfigs = {},
 }) => {
 
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
@@ -139,8 +142,27 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         });
       }
     }
+    // Room panel bindings
+    for (const cfg of Object.values(monitorConfigs)) {
+      for (const dp of cfg.datapoints) {
+        const refId = dp.sourceDatapoint || dp.datapointId;
+        const cleanId = refId.startsWith('ext-') ? refId.slice(4) : refId;
+        if (cleanId !== nodeId) continue;
+        const isWrite = dp.writable && (dp.widgetType === 'slider' || dp.widgetType === 'incrementer' || dp.widgetType === 'switch');
+        result.push({
+          widgetLabel: dp.label || dp.widgetType,
+          pageName: `Raum: ${cfg.roomId}`,
+          pageId: `room:${cfg.roomId}`,
+          widgetId: `room:${cfg.roomId}:${dp.datapointId}`,
+          portId: undefined,
+          paramKey: undefined,
+          isWrite: !!isWrite,
+          value: liveValues[nodeId],
+        });
+      }
+    }
     return result;
-  }, [visuPages, liveValues]);
+  }, [visuPages, liveValues, monitorConfigs]);
 
   const getDriverBindingsForNode = useCallback((nodeId: string): (DriverBinding & { isAvailable?: boolean; errorReason?: string })[] => {
     return driverBindings.filter(b => b.nodeId === nodeId).map(binding => {
