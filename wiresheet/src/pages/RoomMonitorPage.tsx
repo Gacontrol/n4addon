@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Settings, Thermometer, Wind, Droplets, Activity,
-  Users, AlertTriangle, Zap, Gauge, Flame, Settings2,
+  Users, AlertTriangle, Zap, Gauge, Flame, Settings2, LayoutGrid,
 } from 'lucide-react';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
@@ -203,6 +203,167 @@ function EmptyState({ onConfigure }: { onConfigure: () => void }) {
   );
 }
 
+// ---- Panel grid constants ----
+
+const COLS = 4;
+const ROWS = 8;
+const CW = 144;
+const CH = 84;
+const GAP = 8;
+
+const WIDGET_CATEGORY_COLORS: Record<string, string> = {
+  temperature: '#ef4444', humidity: '#06b6d4', co2: '#84cc16', airflow: '#0ea5e9',
+  pressure: '#8b5cf6', occupancy: '#10b981', alarm: '#ef4444', energy: '#f59e0b',
+  setpoint: '#f97316', mode: '#6366f1', generic: '#64748b',
+};
+
+function fmtWidget(val: unknown, unit?: string): string {
+  if (val === undefined || val === null) return '—';
+  if (typeof val === 'boolean') return val ? 'Ein' : 'Aus';
+  if (typeof val === 'number') {
+    const r = Math.abs(val) < 10 ? Math.round(val * 10) / 10 : Math.round(val);
+    return unit ? `${r} ${unit}` : String(r);
+  }
+  return unit ? `${String(val)} ${unit}` : String(val);
+}
+
+function WidgetLive({
+  cfg, val, accent, onWrite,
+}: {
+  cfg: RoomDataPointConfig;
+  val: unknown;
+  accent: string;
+  onWrite?: (v: unknown) => void;
+}) {
+  const cc = WIDGET_CATEGORY_COLORS[cfg.category ?? 'generic'] ?? '#64748b';
+  const min = cfg.minValue ?? 0;
+  const max = cfg.maxValue ?? 100;
+  const numVal = typeof val === 'number' ? val : (typeof val === 'string' ? parseFloat(val) : NaN);
+  const pct = isNaN(numVal) ? 0 : Math.min(100, Math.max(0, ((numVal - min) / (max - min)) * 100));
+  const offline = val === undefined || val === null;
+  const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40';
+
+  switch (cfg.widgetType) {
+    case 'kpi':
+    default:
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col justify-center p-2.5 gap-1">
+            <span className="text-[10px] text-slate-400 truncate">{cfg.label}</span>
+            <span className={`text-lg font-bold leading-none ${offline ? 'text-slate-600' : 'text-white'}`}>
+              {fmtWidget(val, cfg.unit)}
+            </span>
+          </div>
+        </div>
+      );
+    case 'gauge':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="relative w-12 h-12">
+              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
+                <circle cx="24" cy="24" r="18" fill="none" stroke={offline ? '#475569' : accent} strokeWidth="4"
+                  strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-white">{isNaN(numVal) ? '—' : Math.round(numVal)}</span>
+              </div>
+            </div>
+            <span className="text-[9px] text-slate-500">{cfg.unit ?? ''}</span>
+          </div>
+        </div>
+      );
+    case 'slider':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col justify-between p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
+              <span className="text-xs font-bold text-white shrink-0">{fmtWidget(val, cfg.unit)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
+              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: offline ? '#475569' : accent }} />
+              </div>
+              <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
+            </div>
+          </div>
+        </div>
+      );
+    case 'switch':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <button
+              onClick={() => onWrite && onWrite(!val)}
+              className="relative w-10 h-5.5 rounded-full transition-colors"
+              style={{ background: val ? accent : '#334155', height: '22px', width: '40px' }}
+            >
+              <span className="absolute top-0.5 transition-transform w-4 h-4 rounded-full bg-white shadow"
+                style={{ left: val ? '20px' : '2px', top: '3px' }} />
+            </button>
+          </div>
+        </div>
+      );
+    case 'badge':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
+            <span style={{ color: cc }}>
+              {cfg.category === 'alarm' ? <AlertTriangle size={16} /> : <Activity size={16} />}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+              style={{ background: `${offline ? '#475569' : cc}22`, color: offline ? '#475569' : cc }}>
+              {fmtWidget(val, cfg.unit)}
+            </span>
+            <span className="text-[9px] text-slate-500 truncate text-center">{cfg.label}</span>
+          </div>
+        </div>
+      );
+    case 'row':
+      return (
+        <div className={base}>
+          <div className="h-full flex items-center justify-between px-3 gap-2">
+            <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
+            <span className={`text-sm font-semibold shrink-0 ${offline ? 'text-slate-600' : 'text-white'}`}>
+              {fmtWidget(val, cfg.unit)}
+            </span>
+          </div>
+        </div>
+      );
+    case 'label':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center p-2 gap-1">
+            <span className="text-[10px] text-slate-500 truncate w-full text-center">{cfg.label}</span>
+            <span className={`text-base font-bold ${offline ? 'text-slate-600' : 'text-white'}`}>
+              {fmtWidget(val, cfg.unit)}
+            </span>
+          </div>
+        </div>
+      );
+    case 'incrementer':
+      return (
+        <div className={base}>
+          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
+            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal - 1)}
+                className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600">−</button>
+              <span className="text-sm font-bold text-white min-w-8 text-center">{fmtWidget(val, cfg.unit)}</span>
+              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal + 1)}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80" style={{ background: accent }}>+</button>
+            </div>
+          </div>
+        </div>
+      );
+  }
+}
+
 // ---- Props ----
 
 interface RoomMonitorPageProps {
@@ -232,7 +393,9 @@ export function RoomMonitorPage({
   const { buildings, monitorConfigs } = useBuildingContext();
   const { getConfig } = useRoomDisplayConfig(buildingId);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'alarms'>('overview');
+  const hasPanelWidgets = (monitorCfg?.datapoints ?? []).length > 0;
+  const defaultTab = hasPanelWidgets ? 'panel' : 'overview';
+  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms'>(defaultTab);
 
   const building = buildings.find(b => b.id === buildingId);
 
@@ -335,13 +498,14 @@ export function RoomMonitorPage({
   const tabBar = (
     <div className={`flex border-b border-slate-800 bg-slate-900/60 ${px} shrink-0`}>
       {([
+        ...(hasPanelWidgets ? [{ id: 'panel' as const, label: 'Panel' }] : []),
         { id: 'overview' as const, label: 'Übersicht' },
         { id: 'points' as const, label: `Datenpunkte (${useMonitorSource ? monitorDps.length : displayDps.length})` },
         { id: 'alarms' as const, label: `Alarme${alarmDps.length > 0 ? ` (${alarmDps.length})` : ''}` },
       ]).map(tab => (
         <button
           key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
+          onClick={() => setActiveTab(tab.id as 'panel' | 'overview' | 'points' | 'alarms')}
           className={[
             'px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
             activeTab === tab.id ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
@@ -353,8 +517,59 @@ export function RoomMonitorPage({
     </div>
   );
 
+  const accent = monitorCfg?.accentColor ?? room?.color ?? '#0ea5e9';
+  const panelWidgets = monitorCfg?.datapoints ?? [];
+  const canvasW = COLS * (CW + GAP) + GAP;
+  const canvasH = ROWS * (CH + GAP) + GAP;
+
   const tabContent = (
     <div className="flex-1 overflow-y-auto">
+      {activeTab === 'panel' && (
+        <div className={asPanel ? 'p-2 flex justify-center' : 'p-4 flex justify-center'}>
+          <div
+            className="relative shrink-0 rounded-xl bg-slate-900/50"
+            style={{ width: canvasW, height: canvasH }}
+          >
+            {/* Grid background cells */}
+            {Array.from({ length: ROWS }).map((_, row) =>
+              Array.from({ length: COLS }).map((_, col) => (
+                <div
+                  key={`${col}-${row}`}
+                  className="absolute rounded-lg border border-slate-800/40"
+                  style={{
+                    left: GAP + col * (CW + GAP),
+                    top: GAP + row * (CH + GAP),
+                    width: CW,
+                    height: CH,
+                  }}
+                />
+              ))
+            )}
+            {/* Live widgets */}
+            {panelWidgets.map(w => {
+              const col = w.panelCol ?? 0;
+              const row = w.panelRow ?? 0;
+              const wCols = w.panelW ?? 1;
+              const hRows = w.panelH ?? 1;
+              const liveVal = resolveLiveValue(w, liveValues);
+              return (
+                <div
+                  key={w.datapointId}
+                  className="absolute"
+                  style={{
+                    left: GAP + col * (CW + GAP),
+                    top: GAP + row * (CH + GAP),
+                    width: wCols * CW + (wCols - 1) * GAP,
+                    height: hRows * CH + (hRows - 1) * GAP,
+                  }}
+                >
+                  <WidgetLive cfg={w} val={liveVal} accent={accent} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {activeTab === 'overview' && (
         <div className={asPanel ? 'p-4' : 'p-6 max-w-5xl mx-auto'}>
           {!hasAnyConfig ? (
