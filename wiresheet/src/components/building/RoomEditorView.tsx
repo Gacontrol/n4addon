@@ -2,15 +2,13 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Plus, Trash2, Check, X, MousePointer, Hexagon,
   Layers, ZoomIn, ZoomOut, Move,
-  ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff,
+  ChevronDown, ChevronRight, Eye, EyeOff,
   Zap, Search, Star, Activity,
   Thermometer, Droplets, Wind, Users, Gauge, Flame, Fan,
   Lightbulb, Plug, Snowflake, Bell, LayoutDashboard, Pencil,
-  LayoutTemplate,
 } from 'lucide-react';
 import { Building, Floor, Room, RoomType, Wall, RoomDataPointBinding, MonitorLayer, AlarmBehavior } from '../../types/building';
 import type { DatapointGroup } from './RoomBindingsPanel';
-import { PanelDesigner } from './PanelDesigner';
 
 interface Point { x: number; y: number }
 
@@ -252,13 +250,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
     climate: true, air: false, actuator: false, safety: false,
   });
   const [showHvacQuick, setShowHvacQuick] = useState(false);
-
-  // Panel designer bottom split
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [panelHeight, setPanelHeight] = useState(380);
-  const resizingRef = useRef(false);
-  const resizeStartY = useRef(0);
-  const resizeStartH = useRef(0);
 
   // Layer config modal for a specific binding
   const [layerConfigFor, setLayerConfigFor] = useState<string | null>(null);
@@ -1246,78 +1237,6 @@ export function RoomEditorView({ building, onUpdateBuilding, onOpenRoom, onConfi
       )}
 
     </div>
-
-      {/* ---- Bottom: Panel Designer ---- */}
-      <div
-        className="shrink-0 border-t border-slate-700 bg-slate-900 flex flex-col overflow-hidden transition-all"
-        style={{ height: panelOpen ? panelHeight : 36 }}
-      >
-        {/* Resize handle */}
-        {panelOpen && (
-          <div
-            className="h-1 bg-slate-700 hover:bg-sky-600 cursor-ns-resize transition-colors shrink-0"
-            onMouseDown={e => {
-              resizingRef.current = true;
-              resizeStartY.current = e.clientY;
-              resizeStartH.current = panelHeight;
-              const onMove = (me: MouseEvent) => {
-                if (!resizingRef.current) return;
-                const delta = resizeStartY.current - me.clientY;
-                setPanelHeight(Math.max(200, Math.min(700, resizeStartH.current + delta)));
-              };
-              const onUp = () => {
-                resizingRef.current = false;
-                window.removeEventListener('mousemove', onMove);
-                window.removeEventListener('mouseup', onUp);
-              };
-              window.addEventListener('mousemove', onMove);
-              window.addEventListener('mouseup', onUp);
-            }}
-          />
-        )}
-
-        {/* Toggle bar */}
-        <div
-          className="flex items-center gap-2 px-4 h-9 shrink-0 cursor-pointer select-none hover:bg-slate-800/60 transition-colors"
-          onClick={() => setPanelOpen(v => !v)}
-        >
-          <LayoutTemplate size={13} className={panelOpen ? 'text-sky-400' : 'text-slate-500'} />
-          <span className={['text-xs font-medium', panelOpen ? 'text-sky-300' : 'text-slate-400'].join(' ')}>
-            Panel-Designer
-          </span>
-          {selectedRoom && (
-            <span className="text-[10px] text-slate-600 ml-1">— {selectedRoom.name}</span>
-          )}
-          {!selectedRoom && !panelOpen && (
-            <span className="text-[10px] text-slate-600 ml-1">Raum auswählen</span>
-          )}
-          <div className="flex-1" />
-          {panelOpen
-            ? <ChevronDown size={13} className="text-slate-500" />
-            : <ChevronUp size={13} className="text-slate-500" />
-          }
-        </div>
-
-        {/* Designer content */}
-        {panelOpen && (
-          <div className="flex-1 overflow-hidden min-h-0">
-            {selectedRoom && activeFloor ? (
-              <PanelDesigner
-                key={selectedRoom.id}
-                room={selectedRoom}
-                floorName={activeFloor.name}
-                buildingId={building.id}
-                datapointGroups={datapointGroups}
-                onOpenMonitor={onOpenRoom ? () => onOpenRoom(selectedRoom.id) : undefined}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-600 text-xs">
-                Wähle einen Raum im Grundriss aus, um das Panel zu konfigurieren.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Datapoint picker modal */}
       {openPickerFor && selectedRoom && (

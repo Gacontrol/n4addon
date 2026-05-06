@@ -891,7 +891,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
   const canvasH = ROWS * (CH + GAP) + GAP;
 
   return (
-    <div className="flex h-full overflow-hidden bg-slate-950 text-slate-200" onClick={() => setSelectedId(null)}>
+    <div className="flex h-full overflow-hidden bg-slate-950 text-slate-200">
 
       {/* ---- LEFT: Palette ---- */}
       <div className="w-52 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
@@ -984,7 +984,8 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
 
       {/* ---- CENTER: Canvas ---- */}
       <div className="flex-1 overflow-auto flex flex-col items-center py-4 px-3 bg-slate-950"
-        onClick={() => setSelectedId(null)}>
+        onClick={() => setSelectedId(null)}
+        onMouseDown={e => { if (e.target === e.currentTarget) setSelectedId(null); }}>
 
         {/* Panel header preview */}
         <div className="mb-2 w-full" style={{ maxWidth: canvasW }}>
@@ -1252,7 +1253,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
               </div>
 
               {/* Size */}
-              <div>
+              <div onClick={e => e.stopPropagation()}>
                 <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Größe</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
