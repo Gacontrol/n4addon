@@ -708,7 +708,7 @@ export function RoomConfigPage({
 
   if (!building || !room || !floor) {
     return (
-      <div className="flex h-screen bg-slate-950 text-slate-200 items-center justify-center">
+      <div className="flex h-full bg-slate-950 text-slate-200 items-center justify-center">
         <p className="text-slate-400 mr-4">Raum nicht gefunden</p>
         <button onClick={goBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm">Zurück</button>
       </div>
@@ -719,7 +719,7 @@ export function RoomConfigPage({
   const canvasH = ROWS * (CH + GAP) + GAP;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-200 overflow-hidden">
 
       {/* Header */}
       <header className="bg-slate-900 border-b border-slate-800 px-5 py-2.5 shrink-0 flex items-center gap-3">

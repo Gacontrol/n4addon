@@ -90,7 +90,7 @@ export function BuildingEditorPage({ onBack, onMonitor, onOpenRoom, onConfigRoom
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950">
+    <div className="flex flex-col h-full bg-slate-950">
       <header className="bg-slate-900 border-b border-slate-700 px-4 py-2.5 flex items-center gap-3 shrink-0">
         <button
           onClick={handleBack}

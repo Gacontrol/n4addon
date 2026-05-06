@@ -214,7 +214,7 @@ export function RoomMonitorPage({
   if (!building || !room || !floor) {
     if (asPanel) return null;
     return (
-      <div className="flex h-screen bg-slate-950 text-slate-200 items-center justify-center">
+      <div className="flex h-full bg-slate-950 text-slate-200 items-center justify-center">
         <div className="text-center">
           <p className="text-slate-400 mb-4">Raum nicht gefunden</p>
           <button onClick={handleBack} className="px-4 py-2 bg-slate-700 rounded-lg text-sm hover:bg-slate-600 transition-colors">
@@ -407,7 +407,7 @@ export function RoomMonitorPage({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-200 overflow-hidden">
       {headerContent}
       {tabBar}
       {tabContent}

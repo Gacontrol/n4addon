@@ -153,7 +153,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200">
+    <div className="flex flex-col h-full bg-slate-950 text-slate-200">
       <header className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center gap-3">
         <button
           onClick={handleBack}

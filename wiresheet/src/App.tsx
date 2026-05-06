@@ -1635,58 +1635,6 @@ function App() {
 
   const buildingId = activeBuildingId || buildings[0]?.id;
 
-  if (mainView === 'building') {
-    return (
-      <BuildingEditorPage
-        onBack={() => setMainView('logic')}
-        onMonitor={() => setMainView('buildingMonitor')}
-        onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
-        onConfigRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomConfig'); }}
-        pages={pages}
-        haEntities={haEntities}
-        haLoading={haLoading}
-        onLoadHaEntities={loadHaEntities}
-        liveValues={liveValues}
-      />
-    );
-  }
-
-  if (mainView === 'buildingMonitor') {
-    return (
-      <BuildingMonitorPage
-        buildingId={buildingId}
-        liveValues={liveValues}
-        onBack={() => setMainView('building')}
-        onOpenEditor={() => setMainView('building')}
-        onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
-      />
-    );
-  }
-
-  if (mainView === 'roomMonitor' && activeRoomId) {
-    return (
-      <RoomMonitorPage
-        buildingId={buildingId}
-        roomId={activeRoomId}
-        liveValues={liveValues}
-        onBack={() => setMainView('buildingMonitor')}
-        onOpenConfig={() => setMainView('roomConfig')}
-      />
-    );
-  }
-
-  if (mainView === 'roomConfig' && activeRoomId) {
-    return (
-      <RoomConfigPage
-        buildingId={buildingId}
-        roomId={activeRoomId}
-        onBack={() => setMainView('roomMonitor')}
-        onOpenMonitor={() => setMainView('roomMonitor')}
-        datapointGroups={appLogicPageGroups}
-      />
-    );
-  }
-
   return (
     <div className="flex flex-col h-screen bg-slate-900 overflow-hidden">
       <header className="bg-slate-800 border-b border-slate-700 px-2 sm:px-4 py-2 sm:py-2.5 flex-shrink-0">
@@ -1770,7 +1718,11 @@ function App() {
             {isAdmin && (
               <button
                 onClick={() => setMainView('building')}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-slate-400 hover:text-white"
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  mainView === 'building' || mainView === 'buildingMonitor' || mainView === 'roomMonitor' || mainView === 'roomConfig'
+                    ? 'bg-teal-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
                 <Building2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Gebäude</span>
@@ -2368,6 +2320,42 @@ function App() {
           pages={pages}
           liveValues={liveValues}
           customBlockDefs={customBlocks}
+        />
+      ) : mainView === 'building' ? (
+        <BuildingEditorPage
+          onBack={() => setMainView('logic')}
+          onMonitor={() => setMainView('buildingMonitor')}
+          onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
+          onConfigRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomConfig'); }}
+          pages={pages}
+          haEntities={haEntities}
+          haLoading={haLoading}
+          onLoadHaEntities={loadHaEntities}
+          liveValues={liveValues}
+        />
+      ) : mainView === 'buildingMonitor' ? (
+        <BuildingMonitorPage
+          buildingId={buildingId}
+          liveValues={liveValues}
+          onBack={() => setMainView('building')}
+          onOpenEditor={() => setMainView('building')}
+          onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
+        />
+      ) : mainView === 'roomMonitor' && activeRoomId ? (
+        <RoomMonitorPage
+          buildingId={buildingId}
+          roomId={activeRoomId}
+          liveValues={liveValues}
+          onBack={() => setMainView('buildingMonitor')}
+          onOpenConfig={() => setMainView('roomConfig')}
+        />
+      ) : mainView === 'roomConfig' && activeRoomId ? (
+        <RoomConfigPage
+          buildingId={buildingId}
+          roomId={activeRoomId}
+          onBack={() => setMainView('roomMonitor')}
+          onOpenMonitor={() => setMainView('roomMonitor')}
+          datapointGroups={appLogicPageGroups}
         />
       ) : (
         <VisualizationView
