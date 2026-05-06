@@ -608,7 +608,7 @@ export const nodeTemplates: NodeTemplate[] = [
       aggregateStartDelayMs: 0,
       aggregateStopDelayMs: 0,
       aggregateFeedbackTimeoutMs: 10000,
-      aggregateEnableFeedback: true,
+      aggregateEnableFeedback: false,
       aggregateSpeedMin: 0,
       aggregateSpeedMax: 100,
       aggregateAntiSeizeIntervalMs: 604800000,

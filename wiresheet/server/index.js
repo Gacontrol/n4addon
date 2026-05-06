@@ -3824,7 +3824,8 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       const startDelayMs = cfg.pumpStartDelayMs ?? cfg.aggregateStartDelayMs ?? 0;
       const stopDelayMs = cfg.pumpStopDelayMs ?? cfg.aggregateStopDelayMs ?? 0;
       const feedbackTimeoutMs = cfg.pumpFeedbackTimeoutMs ?? cfg.aggregateFeedbackTimeoutMs ?? 10000;
-      const enableFeedback = (cfg.pumpEnableFeedback ?? cfg.aggregateEnableFeedback) !== false;
+      // Feedback only active when explicitly enabled (default: off so new blocks work without wiring)
+      const enableFeedback = !!(cfg.pumpEnableFeedback ?? cfg.aggregateEnableFeedback);
       const speedMin = cfg.pumpSpeedMin ?? cfg.aggregateSpeedMin ?? 0;
       const speedMax = cfg.pumpSpeedMax ?? cfg.aggregateSpeedMax ?? 100;
       const antiSeizeIntervalMs = cfg.pumpAntiSeizeIntervalMs ?? cfg.aggregateAntiSeizeIntervalMs ?? 604800000;
@@ -3853,6 +3854,11 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       if (st.startTs === undefined) st.startTs = (st.aggregateCmd ? now : null);
       if (st.prevAggregateCmd === undefined) st.prevAggregateCmd = st.aggregateCmd;
       if (st.lastTickTs === undefined) st.lastTickTs = now;
+
+      // feedbackFault clears automatically when the aggregate is stopped
+      if (!st.aggregateCmd && st.feedbackFault) {
+        st.feedbackFault = false;
+      }
 
       if (resetInput && (st.faultLatch || st.feedbackFault)) {
         if (!faultInput) {
@@ -3922,6 +3928,9 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       if (st.aggregateCmd && !st.prevAggregateCmd) {
         st.startCount++;
         st.startTs = now;
+      }
+      if (!st.aggregateCmd && st.prevAggregateCmd) {
+        st.startTs = null;
       }
       st.prevAggregateCmd = st.aggregateCmd;
 
