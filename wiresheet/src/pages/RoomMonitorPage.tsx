@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Settings, Thermometer, Wind, Droplets, Activity,
@@ -10,6 +10,26 @@ import { useRoomDisplayConfig } from '../hooks/useRoomDisplayConfig';
 import { DatapointCategory, CATEGORY_LABELS, RoomDatapointDisplay } from '../types/roomDisplay';
 import type { RoomDataPointConfig } from '../types/bms';
 import type { Room } from '../types/building';
+
+// ---- Write helper ----
+
+function getApiBase(): string {
+  const path = window.location.pathname;
+  const m = path.match(/^(\/api\/hassio_ingress\/[^/]+)/) || path.match(/^(\/app\/[^/]+)/);
+  return m ? `${m[1]}/api` : '/api';
+}
+
+async function writeDp(dpKey: string, value: unknown) {
+  try {
+    await fetch(`${getApiBase()}/visu/write-value`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dpKey, value, mode: 'set' }),
+    });
+  } catch (e) {
+    console.warn('[writeDp] error:', e);
+  }
+}
 
 // ---- Category icons ----
 
@@ -227,6 +247,69 @@ function fmtWidget(val: unknown, unit?: string): string {
   return unit ? `${String(val)} ${unit}` : String(val);
 }
 
+function SliderWidget({ cfg, val, accent, onWrite }: {
+  cfg: RoomDataPointConfig; val: unknown; accent: string; onWrite?: (v: unknown) => void;
+}) {
+  const min = cfg.minValue ?? 0;
+  const max = cfg.maxValue ?? 100;
+  const numVal = typeof val === 'number' ? val : (typeof val === 'string' ? parseFloat(val) : NaN);
+  const pct = isNaN(numVal) ? 0 : Math.min(100, Math.max(0, ((numVal - min) / (max - min)) * 100));
+  const offline = val === undefined || val === null;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const computeValue = useCallback((clientX: number): number => {
+    const rect = trackRef.current?.getBoundingClientRect();
+    if (!rect) return min;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const raw = min + ratio * (max - min);
+    const step = cfg.maxValue !== undefined && cfg.minValue !== undefined ? (max - min) / 20 : 1;
+    return Math.round(raw / step) * step;
+  }, [min, max, cfg]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onWrite) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragging.current = true;
+    onWrite(computeValue(e.clientX));
+  };
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current || !onWrite) return;
+    onWrite(computeValue(e.clientX));
+  };
+  const handlePointerUp = () => { dragging.current = false; };
+
+  return (
+    <div className="w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40">
+      <div className="h-full flex flex-col justify-between p-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
+          <span className="text-xs font-bold text-white shrink-0">{fmtWidget(val, cfg.unit)}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
+          <div
+            ref={trackRef}
+            className={`flex-1 h-3 bg-slate-700 rounded-full relative ${onWrite ? 'cursor-pointer' : ''}`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          >
+            <div className="h-full rounded-full transition-none" style={{ width: `${pct}%`, background: offline ? '#475569' : accent }} />
+            {onWrite && !offline && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 transition-none"
+                style={{ left: `calc(${pct}% - 7px)`, borderColor: accent }}
+              />
+            )}
+          </div>
+          <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WidgetLive({
   cfg, val, accent, onWrite,
 }: {
@@ -276,23 +359,7 @@ function WidgetLive({
         </div>
       );
     case 'slider':
-      return (
-        <div className={base}>
-          <div className="h-full flex flex-col justify-between p-2.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
-              <span className="text-xs font-bold text-white shrink-0">{fmtWidget(val, cfg.unit)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
-              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: offline ? '#475569' : accent }} />
-              </div>
-              <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
-            </div>
-          </div>
-        </div>
-      );
+      return <SliderWidget cfg={cfg} val={val} accent={accent} onWrite={onWrite} />;
     case 'switch':
       return (
         <div className={base}>
@@ -300,10 +367,10 @@ function WidgetLive({
             <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <button
               onClick={() => onWrite && onWrite(!val)}
-              className="relative w-10 h-5.5 rounded-full transition-colors"
+              className="relative rounded-full transition-colors"
               style={{ background: val ? accent : '#334155', height: '22px', width: '40px' }}
             >
-              <span className="absolute top-0.5 transition-transform w-4 h-4 rounded-full bg-white shadow"
+              <span className="absolute w-4 h-4 rounded-full bg-white shadow transition-all"
                 style={{ left: val ? '20px' : '2px', top: '3px' }} />
             </button>
           </div>
@@ -352,10 +419,10 @@ function WidgetLive({
           <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
             <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <div className="flex items-center gap-2">
-              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal - 1)}
+              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal - (cfg.minValue !== undefined ? (max - min) / 20 : 1))}
                 className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600">−</button>
               <span className="text-sm font-bold text-white min-w-8 text-center">{fmtWidget(val, cfg.unit)}</span>
-              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal + 1)}
+              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal + (cfg.minValue !== undefined ? (max - min) / 20 : 1))}
                 className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80" style={{ background: accent }}>+</button>
             </div>
           </div>
@@ -564,7 +631,12 @@ export function RoomMonitorPage({
                     height: hRows * CH + (hRows - 1) * GAP,
                   }}
                 >
-                  <WidgetLive cfg={w} val={liveVal} accent={accent} />
+                  <WidgetLive
+                    cfg={w}
+                    val={liveVal}
+                    accent={accent}
+                    onWrite={w.writable ? (v) => writeDp(w.sourceDatapoint ?? w.datapointId, v) : undefined}
+                  />
                 </div>
               );
             })}
