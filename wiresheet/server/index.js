@@ -3437,7 +3437,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
         }
       }
-    } else if (dpStore.get(nodeId) !== undefined && !['dp-boolean','dp-numeric','dp-enum','and-gate','or-gate','xor-gate','not-gate','switch','select','math-add','math-sub','math-mul','math-div','math-min','math-max','math-avg','math-abs','const-value','compare','threshold','timer','delay'].includes(node.type)) {
+    } else if (dpStore.get(nodeId) !== undefined && !['dp-boolean','dp-numeric','dp-enum','and-gate','or-gate','xor-gate','not-gate','switch','select','math-add','math-sub','math-mul','math-div','math-min','math-max','math-avg','math-abs','const-value','compare','threshold','timer','delay','pump-control','aggregate-control','valve-control','sensor-control','pid-controller','heating-curve','smoothing','counter','sr-flipflop','rs-flipflop','rising-edge','falling-edge','time-trigger','time-program','python-script','scaling','case-container','modbus-device','modbus-device-output','modbus-driver','ha-input','ha-output','remote-ga-output','sequence-control','light-toggle','state-trigger'].includes(node.type)) {
       const ov = dpStore.get(nodeId);
       nodeValues[nodeId] = ov;
     } else if (node.type === 'and-gate') {
