@@ -6229,8 +6229,7 @@ visuApp.use('/api', async (req, res) => {
 });
 
 visuApp.use('/assets', express.static(path.join(distDir, 'assets'), {
-  maxAge: '1y',
-  immutable: true
+  maxAge: '10m',
 }));
 
 visuApp.get('/', (req, res) => {
