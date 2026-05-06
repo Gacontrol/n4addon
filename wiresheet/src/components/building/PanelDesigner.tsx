@@ -4,14 +4,14 @@ import {
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
   SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
-  Monitor, Link, Type, X, ChevronRight, Image as ImageIcon, AlignCenter,
+  Monitor, Link, Type, X, ChevronRight, Image as ImageIcon, Plus,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../../types/bms';
 import { Room, RoomDataPointBinding } from '../../types/building';
 import { useBuildingContext } from '../../context/BuildingContext';
 import type { DatapointGroup } from './RoomBindingsPanel';
 
-// ---- Category display helpers ----
+// ---- Category helpers ----
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   temperature: <Thermometer size={13} />,
@@ -76,17 +76,17 @@ const WIDGET_TYPES: {
   defaultW: number;
   defaultH: number;
 }[] = [
-  { type: 'kpi',         label: 'KPI',        icon: <Hash size={13} />,              description: 'Großer Zahlenwert',   defaultW: 1, defaultH: 1 },
-  { type: 'gauge',       label: 'Gauge',       icon: <CircleDot size={13} />,          description: 'Kreisanzeige',         defaultW: 1, defaultH: 1 },
-  { type: 'slider',      label: 'Slider',      icon: <SlidersHorizontal size={13} />,  description: 'Sollwert-Regler',      defaultW: 2, defaultH: 1 },
-  { type: 'incrementer', label: 'Inkrement.',  icon: <ChevronLeft size={13} />,        description: '+/– Schaltflächen',    defaultW: 1, defaultH: 1 },
-  { type: 'switch',      label: 'Schalter',    icon: <ToggleLeft size={13} />,         description: 'Ein/Aus',              defaultW: 1, defaultH: 1 },
-  { type: 'badge',       label: 'Badge',       icon: <AlertTriangle size={13} />,      description: 'Status-Badge',         defaultW: 1, defaultH: 1 },
-  { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',       defaultW: 2, defaultH: 1 },
-  { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,          description: 'Historischer Verlauf', defaultW: 2, defaultH: 1 },
-  { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',    defaultW: 1, defaultH: 1 },
-  { type: 'title',       label: 'Titel/Text',  icon: <Type size={13} />,              description: 'Statischer Text',      defaultW: 2, defaultH: 1 },
-  { type: 'image',       label: 'Bild',        icon: <ImageIcon size={13} />,         description: 'Bild-URL',             defaultW: 2, defaultH: 2 },
+  { type: 'kpi',         label: 'KPI',        icon: <Hash size={13} />,              description: 'Großer Zahlenwert',    defaultW: 1, defaultH: 1 },
+  { type: 'gauge',       label: 'Gauge',       icon: <CircleDot size={13} />,         description: 'Kreisanzeige',          defaultW: 1, defaultH: 1 },
+  { type: 'slider',      label: 'Slider',      icon: <SlidersHorizontal size={13} />, description: 'Sollwert-Regler',       defaultW: 2, defaultH: 1 },
+  { type: 'incrementer', label: 'Inkrement.',  icon: <ChevronLeft size={13} />,       description: '+/– Schaltflächen',     defaultW: 1, defaultH: 1 },
+  { type: 'switch',      label: 'Schalter',    icon: <ToggleLeft size={13} />,        description: 'Ein/Aus',               defaultW: 1, defaultH: 1 },
+  { type: 'badge',       label: 'Badge',       icon: <AlertTriangle size={13} />,     description: 'Status-Badge',          defaultW: 1, defaultH: 1 },
+  { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',        defaultW: 2, defaultH: 1 },
+  { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,         description: 'Historischer Verlauf',  defaultW: 2, defaultH: 1 },
+  { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',     defaultW: 1, defaultH: 1 },
+  { type: 'title',       label: 'Text',        icon: <Type size={13} />,              description: 'Statischer Text/Titel', defaultW: 2, defaultH: 1 },
+  { type: 'image',       label: 'Bild',        icon: <ImageIcon size={13} />,         description: 'Bild-URL',              defaultW: 2, defaultH: 2 },
 ];
 
 // ---- Grid constants ----
@@ -115,6 +115,21 @@ function mockVal(cat: string, unit?: string) {
   }
 }
 
+// ---- Scaled text helper ----
+// Returns larger text class when widget spans multiple rows/cols
+
+function scaledText(base: string, cols: number, rows: number, small = false): string {
+  const area = cols * rows;
+  if (small) {
+    if (area >= 4) return 'text-sm';
+    return 'text-[10px]';
+  }
+  if (area >= 6) return 'text-4xl';
+  if (area >= 4) return 'text-3xl';
+  if (area >= 2) return 'text-2xl';
+  return 'text-xl';
+}
+
 // ---- Widget preview ----
 
 function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; accent: string; selected: boolean }) {
@@ -128,6 +143,8 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
   const pct = Math.min(100, Math.max(0, ((m.n - min) / (max - min)) * 100));
   const border = selected ? `2px solid ${accent}` : '1px solid rgba(100,116,139,0.25)';
   const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80';
+  const ww = cfg.panelW ?? 1;
+  const wh = cfg.panelH ?? 1;
 
   switch (cfg.widgetType) {
     case 'slider':
@@ -136,12 +153,12 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           <div className="h-full flex flex-col justify-between p-2.5">
             <div className="flex items-center gap-1.5">
               <span style={{ color: cc }}>{icon}</span>
-              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
-              <span className="text-xs font-bold text-white shrink-0">{m.v}<span className="text-[9px] font-normal text-slate-400 ml-0.5">{m.u}</span></span>
+              <span className={`text-slate-400 truncate flex-1 ${ww >= 2 ? 'text-xs' : 'text-[10px]'}`}>{cfg.label}</span>
+              <span className={`font-bold text-white shrink-0 ${ww >= 2 ? 'text-sm' : 'text-xs'}`}>{m.v}<span className="text-[9px] font-normal text-slate-400 ml-0.5">{m.u}</span></span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
-              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
               </div>
               <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
@@ -153,42 +170,44 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
       return (
         <div className={base} style={{ border }}>
           <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
-            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold">−</div>
-              <span className="text-sm font-bold text-white min-w-8 text-center">{m.v}</span>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ background: accent }}>+</div>
+              <div className={`rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold ${wh >= 2 ? 'w-10 h-10 text-lg' : 'w-6 h-6 text-sm'}`}>−</div>
+              <span className={`font-bold text-white min-w-8 text-center ${scaledText('', ww, wh)}`}>{m.v}</span>
+              <div className={`rounded-lg flex items-center justify-center text-white font-bold ${wh >= 2 ? 'w-10 h-10 text-lg' : 'w-6 h-6 text-sm'}`} style={{ background: accent }}>+</div>
             </div>
             <span className="text-[9px] text-slate-500">{m.u}</span>
           </div>
         </div>
       );
-    case 'gauge':
+    case 'gauge': {
+      const gSize = wh >= 2 ? 80 : ww >= 2 ? 64 : 48;
       return (
         <div className={base} style={{ border }}>
           <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
-            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
-            <div className="relative w-12 h-12">
+            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
+            <div className="relative" style={{ width: gSize, height: gSize }}>
               <svg viewBox="0 0 48 48" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
                 <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
                 <circle cx="24" cy="24" r="18" fill="none" stroke={accent} strokeWidth="4"
                   strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white">{m.v}</span>
+                <span className={`font-bold text-white ${wh >= 2 ? 'text-base' : 'text-[10px]'}`}>{m.v}</span>
               </div>
             </div>
             <span className="text-[9px] text-slate-500">{m.u}</span>
           </div>
         </div>
       );
+    }
     case 'badge':
       return (
         <div className={base} style={{ border }}>
           <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
             <span style={{ color: cc }}>{icon}</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
-            <span className="text-[9px] text-slate-500 truncate text-center">{cfg.label}</span>
+            <span className={`px-2 py-0.5 rounded-full font-semibold ${wh >= 2 ? 'text-sm' : 'text-[10px]'}`} style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
+            <span className={`text-slate-500 truncate text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
           </div>
         </div>
       );
@@ -196,11 +215,11 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
       return (
         <div className={base} style={{ border }}>
           <div className="h-full flex flex-col items-center justify-center gap-1.5 p-2">
-            <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
+            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
             <div className="flex items-center gap-2">
               <span className="text-[9px] text-slate-500">AUS</span>
-              <div className="w-9 h-5 rounded-full flex items-center px-0.5" style={{ background: accent }}>
-                <div className="w-4 h-4 bg-white rounded-full ml-auto shadow" />
+              <div className={`rounded-full flex items-center px-0.5 ${wh >= 2 ? 'w-14 h-7' : 'w-9 h-5'}`} style={{ background: accent }}>
+                <div className={`bg-white rounded-full ml-auto shadow ${wh >= 2 ? 'w-6 h-6' : 'w-4 h-4'}`} />
               </div>
               <span className="text-[9px] text-slate-400">EIN</span>
             </div>
@@ -213,10 +232,10 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           <div className="h-full flex flex-col justify-between p-2.5">
             <div className="flex items-center gap-1.5">
               <span style={{ color: cc }}>{icon}</span>
-              <span className="text-[10px] text-slate-400 truncate flex-1">{cfg.label}</span>
-              <span className="text-xs font-bold text-white shrink-0">{m.v} {m.u}</span>
+              <span className={`text-slate-400 truncate flex-1 ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
+              <span className={`font-bold text-white shrink-0 ${scaledText('', ww, wh)}`}>{m.v} {m.u}</span>
             </div>
-            <svg viewBox="0 0 80 20" className="w-full" preserveAspectRatio="none">
+            <svg viewBox="0 0 80 20" className="w-full" preserveAspectRatio="none" style={{ height: wh >= 2 ? 40 : 20 }}>
               {[.4,.6,.5,.7,.45,.8,.6,.75,.65,.55].map((v, i, a) =>
                 i < a.length - 1 ? (
                   <line key={i}
@@ -234,8 +253,8 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
         <div className={base} style={{ border }}>
           <div className="h-full flex items-center gap-2.5 px-3">
             <span style={{ color: cc }} className="shrink-0">{icon}</span>
-            <span className="text-xs text-slate-300 flex-1 truncate">{cfg.label}</span>
-            <span className="text-xs font-semibold text-white shrink-0">{m.v} {m.u}</span>
+            <span className={`text-slate-300 flex-1 truncate ${ww >= 3 ? 'text-sm' : 'text-xs'}`}>{cfg.label}</span>
+            <span className={`font-semibold text-white shrink-0 ${ww >= 3 ? 'text-base' : 'text-xs'}`}>{m.v} {m.u}</span>
           </div>
         </div>
       );
@@ -244,27 +263,25 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
         <div className={base} style={{ border }}>
           <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
             <span style={{ color: cc }}>{icon}</span>
-            <span className="text-lg font-bold text-white leading-none">{m.v}</span>
-            <span className="text-[10px] text-slate-400">{m.u}</span>
+            <span className={`font-bold text-white leading-none ${scaledText('', ww, wh)}`}>{m.v}</span>
+            <span className={`text-slate-400 ${scaledText('', ww, wh, true)}`}>{m.u}</span>
             <span className="text-[9px] text-slate-500 truncate">{cfg.label}</span>
           </div>
         </div>
       );
     case 'title': {
-      const align = cfg.textAlign ?? 'left';
-      const fs = cfg.fontSize ?? 'base';
-      const fsMap: Record<string, string> = { xs: 'text-xs', sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
       const alignMap: Record<string, string> = { left: 'text-left', center: 'text-center', right: 'text-right' };
+      const fsMap: Record<string, string> = { xs: 'text-xs', sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
       return (
         <div className={base} style={{ border, background: cfg.bgColor || undefined }}>
           <div className="h-full flex flex-col justify-center p-3">
             {cfg.staticText ? (
-              <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[fs]} ${alignMap[align]}`}
+              <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[cfg.fontSize ?? 'base']} ${alignMap[cfg.textAlign ?? 'left']}`}
                 style={{ color: cfg.textColor || '#f1f5f9' }}>
                 {cfg.staticText}
               </p>
             ) : (
-              <p className={`text-slate-600 italic text-xs ${alignMap[align]}`}>Titel / Text…</p>
+              <p className={`text-slate-600 italic text-xs ${alignMap[cfg.textAlign ?? 'left']}`}>Titel / Text…</p>
             )}
           </div>
         </div>
@@ -289,11 +306,11 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           <div className="h-full flex flex-col justify-between p-2.5">
             <div className="flex items-center gap-1.5">
               <span style={{ color: cc }}>{icon}</span>
-              <span className="text-[10px] text-slate-400 truncate">{cfg.label}</span>
+              <span className={`text-slate-400 truncate ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
             </div>
             <div className="flex items-end gap-1">
-              <span className="text-xl font-bold leading-none" style={{ color: sc }}>{m.v}</span>
-              {m.u && <span className="text-xs text-slate-400 pb-0.5">{m.u}</span>}
+              <span className={`font-bold leading-none ${scaledText('', ww, wh)}`} style={{ color: sc }}>{m.v}</span>
+              {m.u && <span className={`text-slate-400 pb-0.5 ${scaledText('', ww, wh, true)}`}>{m.u}</span>}
             </div>
           </div>
         </div>
@@ -349,12 +366,18 @@ function findFreeCell(widgets: RoomDataPointConfig[], w: number, h: number): { c
   return { col: 0, row: widgets.length % ROWS };
 }
 
-function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDataPointConfig {
+function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[], atCol?: number, atRow?: number): RoomDataPointConfig {
   const wt = defaultWidgetType(src.category);
   const def = WIDGET_TYPES.find(x => x.type === wt)!;
-  const pos = findFreeCell(existing, def.defaultW, def.defaultH);
+  const pos = atCol !== undefined && atRow !== undefined
+    ? { col: Math.min(atCol, COLS - def.defaultW), row: Math.min(atRow, ROWS - def.defaultH) }
+    : findFreeCell(existing, def.defaultW, def.defaultH);
+  // Allow duplicate datapoints — use unique id
+  const baseId = src.id;
+  const existingCount = existing.filter(w => w.datapointId === baseId || w.datapointId.startsWith(baseId + '#')).length;
+  const datapointId = existingCount > 0 ? `${baseId}#${existingCount}` : baseId;
   return {
-    datapointId: src.id,
+    datapointId,
     label: src.label,
     displayType: 'kpi',
     widgetType: wt,
@@ -378,13 +401,15 @@ function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDa
   };
 }
 
-function makeStaticWidget(type: 'title' | 'image', existing: RoomDataPointConfig[]): RoomDataPointConfig {
+function makeStaticWidget(type: 'title' | 'image', existing: RoomDataPointConfig[], atCol?: number, atRow?: number): RoomDataPointConfig {
   const def = WIDGET_TYPES.find(x => x.type === type)!;
-  const pos = findFreeCell(existing, def.defaultW, def.defaultH);
+  const pos = atCol !== undefined && atRow !== undefined
+    ? { col: Math.min(atCol, COLS - def.defaultW), row: Math.min(atRow, ROWS - def.defaultH) }
+    : findFreeCell(existing, def.defaultW, def.defaultH);
   const id = `static-${type}-${Date.now()}`;
   return {
     datapointId: id,
-    label: type === 'title' ? 'Titel' : 'Bild',
+    label: type === 'title' ? 'Text' : 'Bild',
     displayType: 'kpi',
     widgetType: type,
     order: existing.length,
@@ -399,8 +424,7 @@ function makeStaticWidget(type: 'title' | 'image', existing: RoomDataPointConfig
     isPrimaryRoomKPI: false,
     isPrimaryBuildingPoint: false,
     writable: false,
-    staticText: type === 'title' ? '' : undefined,
-    imageUrl: type === 'image' ? '' : undefined,
+    staticText: '',
     textAlign: 'left',
     fontSize: 'base',
   };
@@ -411,30 +435,76 @@ function makeStaticWidget(type: 'title' | 'image', existing: RoomDataPointConfig
 interface DpPickerModalProps {
   currentValue: string;
   suggestions: PaletteSource[];
-  onSelect: (v: string) => void;
+  onSelect: (v: string, wt?: WidgetType) => void;
   onClose: () => void;
   datapointGroups?: DatapointGroup[];
+  showWidgetTypes?: boolean;
 }
 
-function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapointGroups = [] }: DpPickerModalProps) {
+function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapointGroups = [], showWidgetTypes = false }: DpPickerModalProps) {
   const [q, setQ] = useState('');
   const [pageId, setPageId] = useState<string | null>(null);
+  const [pendingDp, setPendingDp] = useState<string | null>(null);
+  const [pendingWt, setPendingWt] = useState<WidgetType | null>(null);
 
-  const pick = (dp: string) => { onSelect(dp); onClose(); };
+  const pick = (dp: string) => {
+    if (showWidgetTypes) {
+      setPendingDp(dp);
+      const src = suggestions.find(s => s.datapoint === dp);
+      setPendingWt(defaultWidgetType(src?.category ?? 'generic'));
+    } else {
+      onSelect(dp);
+      onClose();
+    }
+  };
+
   const qLow = q.trim().toLowerCase();
-
   const filteredSuggestions = qLow
     ? suggestions.filter(s => s.datapoint.toLowerCase().includes(qLow) || s.label.toLowerCase().includes(qLow))
     : suggestions;
-
   const filteredGroups = datapointGroups.filter(g =>
     !qLow || g.pageName.toLowerCase().includes(qLow) || g.datapoints.some(d => d.entityId.toLowerCase().includes(qLow) || d.label.toLowerCase().includes(qLow))
   );
 
+  if (pendingDp && showWidgetTypes) {
+    return (
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <button onClick={() => setPendingDp(null)} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
+              <ChevronRight size={13} className="rotate-180" /> Zurück
+            </button>
+            <p className="text-xs font-medium text-white">Widget-Typ wählen</p>
+            <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-800 text-slate-400"><X size={14} /></button>
+          </div>
+          <div className="p-3 grid grid-cols-3 gap-1.5">
+            {WIDGET_TYPES.filter(wt => wt.type !== 'title' && wt.type !== 'image').map(wt => (
+              <button key={wt.type}
+                onClick={() => { onSelect(pendingDp, wt.type); onClose(); }}
+                className={['flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border text-[10px] transition-all',
+                  pendingWt === wt.type
+                    ? 'border-sky-500 bg-sky-950/50 text-sky-300'
+                    : 'border-slate-700 bg-slate-800/40 text-slate-400 hover:border-slate-500 hover:text-slate-200'].join(' ')}>
+                <span>{wt.icon}</span>
+                {wt.label}
+              </button>
+            ))}
+          </div>
+          <div className="px-3 pb-3">
+            <button onClick={() => { onSelect(pendingDp, pendingWt ?? 'kpi'); onClose(); }}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">
+              <Check size={12} /> Übernehmen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900/80">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Datenpunkt wählen</div>
             {currentValue && <div className="text-xs text-sky-300 font-mono truncate mt-0.5">{currentValue}</div>}
@@ -569,6 +639,87 @@ function DpPickerModal({ currentValue, suggestions, onSelect, onClose, datapoint
   );
 }
 
+// ---- Empty cell add modal ----
+
+interface AddWidgetModalProps {
+  col: number;
+  row: number;
+  sources: PaletteSource[];
+  datapointGroups: DatapointGroup[];
+  existing: RoomDataPointConfig[];
+  onAdd: (w: RoomDataPointConfig) => void;
+  onClose: () => void;
+  accent: string;
+}
+
+function AddWidgetModal({ col, row, sources, datapointGroups, existing, onAdd, onClose, accent }: AddWidgetModalProps) {
+  const [step, setStep] = useState<'type' | 'dp' | 'done'>('type');
+  const [chosenType, setChosenType] = useState<WidgetType | null>(null);
+
+  const handleTypeSelect = (type: WidgetType) => {
+    if (type === 'title' || type === 'image') {
+      onAdd(makeStaticWidget(type, existing, col, row));
+      onClose();
+      return;
+    }
+    setChosenType(type);
+    setStep('dp');
+  };
+
+  const handleDpSelect = (dp: string) => {
+    const src = sources.find(s => s.datapoint === dp) ?? {
+      id: `ext-${dp}`, label: dp, datapoint: dp, category: 'generic', isBinding: false,
+    };
+    const w = makeWidget(src, existing, col, row);
+    if (chosenType) w.widgetType = chosenType;
+    onAdd(w);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            {step === 'dp' && (
+              <button onClick={() => setStep('type')} className="p-1 rounded hover:bg-slate-800 text-slate-400">
+                <ChevronRight size={13} className="rotate-180" />
+              </button>
+            )}
+            <p className="text-sm font-semibold text-white">
+              {step === 'type' ? 'Widget-Typ wählen' : 'Datenpunkt wählen'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-slate-800 text-slate-400"><X size={14} /></button>
+        </div>
+
+        {step === 'type' && (
+          <div className="p-3 grid grid-cols-3 gap-1.5 max-h-[60vh] overflow-y-auto">
+            {WIDGET_TYPES.map(wt => (
+              <button key={wt.type} onClick={() => handleTypeSelect(wt.type)}
+                className="flex flex-col items-center gap-1 py-3 px-1 rounded-lg border border-slate-700 bg-slate-800/40 text-slate-300 hover:border-sky-500 hover:bg-sky-950/40 hover:text-sky-300 transition-all text-[11px]">
+                <span className="text-slate-400">{wt.icon}</span>
+                <span>{wt.label}</span>
+                <span className="text-[9px] text-slate-600 text-center">{wt.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {step === 'dp' && (
+          <DpPickerModal
+            currentValue=""
+            suggestions={sources}
+            datapointGroups={datapointGroups}
+            onSelect={handleDpSelect}
+            onClose={onClose}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---- PanelDesigner ----
 
 interface PanelDesignerProps {
@@ -643,6 +794,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
   const [hiddenTabs, setHiddenTabs] = useState<Set<string>>(new Set(savedCfg?.hiddenTabs ?? []));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerWidgetId, setPickerWidgetId] = useState<string | null>(null);
+  const [addCell, setAddCell] = useState<{ col: number; row: number } | null>(null);
   const [saved, setSaved] = useState(false);
   const [search, setSearch] = useState('');
   const [dropOver, setDropOver] = useState<{ col: number; row: number } | null>(null);
@@ -652,11 +804,10 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
   const widgetDragId = useRef<string | null>(null);
 
   const selected = widgets.find(w => w.datapointId === selectedId) ?? null;
-  const usedIds = new Set(widgets.map(w => w.datapointId));
-  const available = allSources.filter(s => !usedIds.has(s.id));
+  // Show all sources in palette — duplicates allowed
   const filtered = search.trim()
-    ? available.filter(s => s.label.toLowerCase().includes(search.toLowerCase()) || s.datapoint.toLowerCase().includes(search.toLowerCase()))
-    : available;
+    ? allSources.filter(s => s.label.toLowerCase().includes(search.toLowerCase()) || s.datapoint.toLowerCase().includes(search.toLowerCase()))
+    : allSources;
 
   const getCell = useCallback((cx: number, cy: number) => {
     if (!canvasRef.current) return null;
@@ -666,6 +817,18 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
     return { col, row };
   }, []);
+
+  const getCellAtPoint = useCallback((cx: number, cy: number): { col: number; row: number } | null => {
+    return getCell(cx, cy);
+  }, [getCell]);
+
+  const isCellOccupied = useCallback((col: number, row: number) => {
+    return widgets.some(w => {
+      const wc = w.panelCol ?? 0, wr = w.panelRow ?? 0;
+      const ww = w.panelW ?? 1, wh = w.panelH ?? 1;
+      return col >= wc && col < wc + ww && row >= wr && row < wr + wh;
+    });
+  }, [widgets]);
 
   const removeWidget = useCallback((id: string) => {
     setWidgets(p => p.filter(w => w.datapointId !== id));
@@ -699,13 +862,20 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
     if (paletteDragSrc.current) {
       const src = paletteDragSrc.current;
       paletteDragSrc.current = null;
-      const newW = makeWidget(src, widgets);
-      newW.panelCol = Math.min(cell.col, COLS - (newW.panelW ?? 1));
-      newW.panelRow = Math.min(cell.row, ROWS - (newW.panelH ?? 1));
+      const newW = makeWidget(src, widgets, cell.col, cell.row);
       setWidgets(p => [...p, newW]);
       setSelectedId(newW.datapointId);
     }
   }, [getCell, widgets, updateWidget]);
+
+  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const cell = getCellAtPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    if (!isCellOccupied(cell.col, cell.row)) {
+      setAddCell(cell);
+    }
+  }, [getCellAtPoint, isCellOccupied]);
 
   const handleSave = () => {
     saveRoomMonitorConfig({
@@ -725,7 +895,6 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
 
       {/* ---- LEFT: Palette ---- */}
       <div className="w-52 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
-        {/* Toolbar */}
         <div className="px-3 pt-2.5 pb-2 border-b border-slate-800 shrink-0 flex items-center gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider truncate">Datenpunkte</p>
@@ -745,19 +914,19 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
         </div>
 
         <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
-          {/* Static elements */}
-          <div className="pb-1.5 mb-1.5 border-b border-slate-800">
+          {/* Static element buttons */}
+          <div className="pb-1.5 mb-1 border-b border-slate-800">
             <p className="text-[9px] text-slate-600 uppercase tracking-wider px-1 mb-1">Statische Elemente</p>
             <div className="flex gap-1">
               <button
                 onClick={() => { const w = makeStaticWidget('title', widgets); setWidgets(p => [...p, w]); setSelectedId(w.datapointId); }}
-                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
+                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-sky-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
                 <Type size={11} className="shrink-0 text-slate-400" />
-                <span>Titel</span>
+                <span>Text</span>
               </button>
               <button
                 onClick={() => { const w = makeStaticWidget('image', widgets); setWidgets(p => [...p, w]); setSelectedId(w.datapointId); }}
-                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
+                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-sky-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
                 <ImageIcon size={11} className="shrink-0 text-slate-400" />
                 <span>Bild</span>
               </button>
@@ -771,11 +940,11 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
               <p className="mt-0.5 text-slate-700 text-[10px]">Zuerst Bindings zuweisen.</p>
             </div>
           )}
-          {filtered.map(src => {
+          {filtered.map((src, idx) => {
             const cc = CATEGORY_COLORS[src.category] ?? '#64748b';
             const icon = CATEGORY_ICONS[src.category] ?? CATEGORY_ICONS.generic;
             return (
-              <div key={src.id} draggable
+              <div key={`${src.id}-${idx}`} draggable
                 onDragStart={e => { paletteDragSrc.current = src; widgetDragId.current = null; e.dataTransfer.effectAllowed = 'copy'; }}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 cursor-grab active:cursor-grabbing transition-colors group select-none">
                 <span style={{ color: cc }} className="shrink-0">{icon}</span>
@@ -793,7 +962,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
               <p className="text-[9px] text-slate-600 uppercase tracking-wider px-1 mb-1">Im Panel ({widgets.length})</p>
               {widgets.map(w => {
                 const cc = CATEGORY_COLORS[w.category ?? 'generic'] ?? '#64748b';
-                const icon = CATEGORY_ICONS[w.category ?? 'generic'] ?? CATEGORY_ICONS.generic;
+                const icon = w.widgetType === 'title' ? <Type size={9} /> : w.widgetType === 'image' ? <ImageIcon size={9} /> : (CATEGORY_ICONS[w.category ?? 'generic'] ?? CATEGORY_ICONS.generic);
                 return (
                   <div key={w.datapointId}
                     onClick={e => { e.stopPropagation(); setSelectedId(w.datapointId === selectedId ? null : w.datapointId); }}
@@ -840,17 +1009,27 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
           onDragOver={e => { e.preventDefault(); setDropOver(getCell(e.clientX, e.clientY)); }}
           onDrop={handleDrop}
           onDragLeave={() => setDropOver(null)}
-          onClick={e => e.stopPropagation()}>
+          onClick={handleCanvasClick}>
 
-          {/* Grid cells */}
+          {/* Grid cells — clickable empty cells */}
           {Array.from({ length: ROWS }, (_, row) =>
-            Array.from({ length: COLS }, (_, col) => (
-              <div key={`g-${col}-${row}`} style={{
-                position: 'absolute',
-                left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
-                width: CW, height: CH,
-              }} className="rounded-xl border border-slate-800/50 bg-slate-800/10" />
-            ))
+            Array.from({ length: COLS }, (_, col) => {
+              const occupied = isCellOccupied(col, row);
+              return (
+                <div key={`g-${col}-${row}`} style={{
+                  position: 'absolute',
+                  left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
+                  width: CW, height: CH,
+                }}
+                  className={`rounded-xl border transition-colors ${occupied ? 'border-slate-800/50 bg-slate-800/10' : 'border-slate-800/50 bg-slate-800/10 hover:border-sky-700/50 hover:bg-sky-900/10 cursor-pointer group'}`}>
+                  {!occupied && (
+                    <div className="w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus size={16} className="text-sky-700" />
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
 
           {/* Drop preview */}
@@ -897,7 +1076,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
             );
           })}
         </div>
-        <p className="mt-1.5 text-[9px] text-slate-700">{COLS} Sp. × {ROWS} Z. · Ziehen zum Verschieben</p>
+        <p className="mt-1.5 text-[9px] text-slate-700">{COLS} Sp. × {ROWS} Z. · Ziehen zum Verschieben · Leere Kachel klicken zum Hinzufügen</p>
       </div>
 
       {/* ---- RIGHT: Properties ---- */}
@@ -922,7 +1101,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
         {selected ? (
           <>
             <div className="px-3 pt-2.5 pb-2 border-b border-slate-800 shrink-0">
-              <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Widget</p>
+              <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Bezeichnung</p>
               <input value={selected.label} onChange={e => updateWidget(selected.datapointId, { label: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
                 placeholder="Bezeichnung" />
@@ -981,11 +1160,11 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
                     <div>
                       <p className="text-[9px] text-slate-600 mb-1">Hintergrund</p>
                       <div className="flex items-center gap-1.5">
-                        <input type="color" value={selected.bgColor ?? '#1e293b'}
+                        <input type="color" value={selected.bgColor || '#1e293b'}
                           onChange={e => updateWidget(selected.datapointId, { bgColor: e.target.value })}
                           className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0" />
                         <button onClick={() => updateWidget(selected.datapointId, { bgColor: '' })}
-                          className="text-[9px] text-slate-600 hover:text-slate-400">
+                          className="text-[9px] text-slate-600 hover:text-slate-400 transition-colors">
                           Transparent
                         </button>
                       </div>
@@ -1019,40 +1198,40 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
 
               {/* Datenpunkt — only for non-static widgets */}
               {selected.widgetType !== 'title' && selected.widgetType !== 'image' && (
-              <div>
-                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Datenpunkt</p>
-                <button onClick={() => setPickerWidgetId(selected.datapointId)}
-                  className="w-full flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs hover:border-sky-600 transition-colors group">
-                  <Link size={10} className="text-slate-500 shrink-0 group-hover:text-sky-500 transition-colors" />
-                  <span className={['flex-1 text-left truncate font-mono text-[10px]', selected.sourceDatapoint ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
-                    {selected.sourceDatapoint || 'Datenpunkt wählen…'}
-                  </span>
-                  <ChevronRight size={10} className="text-slate-600 shrink-0" />
-                </button>
-                {pickerWidgetId === selected.datapointId && (
-                  <DpPickerModal
-                    currentValue={selected.sourceDatapoint ?? ''}
-                    suggestions={allSources}
-                    datapointGroups={groups}
-                    onSelect={v => {
-                      const src = allSources.find(s => s.datapoint === v);
-                      updateWidget(selected.datapointId, {
-                        sourceDatapoint: v,
-                        ...(src ? { category: src.category, unit: src.unit, minValue: src.minValue, maxValue: src.maxValue } : {}),
-                      });
-                      setPickerWidgetId(null);
-                    }}
-                    onClose={() => setPickerWidgetId(null)}
-                  />
-                )}
-                <div className="mt-1.5">
-                  <select value={selected.category ?? 'generic'}
-                    onChange={e => updateWidget(selected.datapointId, { category: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
-                    {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Datenpunkt</p>
+                  <button onClick={() => setPickerWidgetId(selected.datapointId)}
+                    className="w-full flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs hover:border-sky-600 transition-colors group">
+                    <Link size={10} className="text-slate-500 shrink-0 group-hover:text-sky-500 transition-colors" />
+                    <span className={['flex-1 text-left truncate font-mono text-[10px]', selected.sourceDatapoint ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
+                      {selected.sourceDatapoint || 'Datenpunkt wählen…'}
+                    </span>
+                    <ChevronRight size={10} className="text-slate-600 shrink-0" />
+                  </button>
+                  {pickerWidgetId === selected.datapointId && (
+                    <DpPickerModal
+                      currentValue={selected.sourceDatapoint ?? ''}
+                      suggestions={allSources}
+                      datapointGroups={groups}
+                      onSelect={v => {
+                        const src = allSources.find(s => s.datapoint === v);
+                        updateWidget(selected.datapointId, {
+                          sourceDatapoint: v,
+                          ...(src ? { category: src.category, unit: src.unit, minValue: src.minValue, maxValue: src.maxValue } : {}),
+                        });
+                        setPickerWidgetId(null);
+                      }}
+                      onClose={() => setPickerWidgetId(null)}
+                    />
+                  )}
+                  <div className="mt-1.5">
+                    <select value={selected.category ?? 'generic'}
+                      onChange={e => updateWidget(selected.datapointId, { category: e.target.value })}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                      {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
               )}
 
               {/* Widget type */}
@@ -1077,17 +1256,17 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
                 <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Größe</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <p className="text-[9px] text-slate-600 mb-1">Breite</p>
+                    <p className="text-[9px] text-slate-600 mb-1">Breite (Spalten)</p>
                     <select value={selected.panelW ?? 1} onChange={e => updateWidget(selected.datapointId, { panelW: +e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
                       {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <div>
-                    <p className="text-[9px] text-slate-600 mb-1">Höhe</p>
+                    <p className="text-[9px] text-slate-600 mb-1">Höhe (Zeilen)</p>
                     <select value={selected.panelH ?? 1} onChange={e => updateWidget(selected.datapointId, { panelH: +e.target.value })}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
-                      {[1, 2].map(n => <option key={n} value={n}>{n}</option>)}
+                      {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1121,40 +1300,44 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
               )}
 
               {/* Visibility */}
-              <div>
-                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Sichtbarkeit</p>
-                <div className="space-y-1.5">
-                  {([
-                    ['showInMonitor',  'Monitor',       <Monitor size={9} />],
-                    ['showInBuilding', 'Gebäude-Layer', <Building2 size={9} />],
-                    ['showInTooltip',  'Tooltip',       <Tag size={9} />],
-                    ['showInService',  'Service',       <Settings size={9} />],
-                  ] as [keyof RoomDataPointConfig, string, React.ReactNode][]).map(([key, lbl, icon]) => (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <Toggle value={!!selected[key]} onChange={v => updateWidget(selected.datapointId, { [key]: v })} />
-                      <span className="text-slate-500 shrink-0">{icon}</span>
-                      <span className="text-[11px] text-slate-400">{lbl}</span>
-                    </label>
-                  ))}
+              {selected.widgetType !== 'title' && selected.widgetType !== 'image' && (
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Sichtbarkeit</p>
+                  <div className="space-y-1.5">
+                    {([
+                      ['showInMonitor',  'Monitor',       <Monitor size={9} />],
+                      ['showInBuilding', 'Gebäude-Layer', <Building2 size={9} />],
+                      ['showInTooltip',  'Tooltip',       <Tag size={9} />],
+                      ['showInService',  'Service',       <Settings size={9} />],
+                    ] as [keyof RoomDataPointConfig, string, React.ReactNode][]).map(([key, lbl, icon]) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <Toggle value={!!selected[key]} onChange={v => updateWidget(selected.datapointId, { [key]: v })} />
+                        <span className="text-slate-500 shrink-0">{icon}</span>
+                        <span className="text-[11px] text-slate-400">{lbl}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Priority */}
-              <div>
-                <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Priorität</p>
-                <div className="space-y-1.5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Toggle value={!!selected.isPrimaryRoomKPI} onChange={v => updateWidget(selected.datapointId, { isPrimaryRoomKPI: v })} color="bg-yellow-500" />
-                    <Star size={9} className="text-slate-500 shrink-0" />
-                    <span className="text-[11px] text-slate-400">Primärer Raum-KPI</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Toggle value={!!selected.isPrimaryBuildingPoint} onChange={v => updateWidget(selected.datapointId, { isPrimaryBuildingPoint: v })} color="bg-amber-500" />
-                    <Building2 size={9} className="text-slate-500 shrink-0" />
-                    <span className="text-[11px] text-slate-400">Gebäude-Hauptwert</span>
-                  </label>
+              {selected.widgetType !== 'title' && selected.widgetType !== 'image' && (
+                <div>
+                  <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Priorität</p>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Toggle value={!!selected.isPrimaryRoomKPI} onChange={v => updateWidget(selected.datapointId, { isPrimaryRoomKPI: v })} color="bg-yellow-500" />
+                      <Star size={9} className="text-slate-500 shrink-0" />
+                      <span className="text-[11px] text-slate-400">Primärer Raum-KPI</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Toggle value={!!selected.isPrimaryBuildingPoint} onChange={v => updateWidget(selected.datapointId, { isPrimaryBuildingPoint: v })} color="bg-amber-500" />
+                      <Building2 size={9} className="text-slate-500 shrink-0" />
+                      <span className="text-[11px] text-slate-400">Gebäude-Hauptwert</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button onClick={() => removeWidget(selected.datapointId)}
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/30 border border-red-900/40 text-red-400 hover:bg-red-950/60 text-xs transition-colors">
@@ -1200,13 +1383,27 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
               <div className="border-t border-slate-800 pt-3">
                 <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-slate-800/50 border border-slate-800">
                   <GripVertical size={11} className="text-slate-600 mt-0.5 shrink-0" />
-                  <p className="text-[10px] text-slate-600 leading-relaxed">Datenpunkt aus der linken Palette auf das Raster ziehen oder vorhandenes Widget anklicken.</p>
+                  <p className="text-[10px] text-slate-600 leading-relaxed">Datenpunkt aus der linken Palette auf das Raster ziehen. Leere Kachel anklicken um ein Widget hinzuzufügen.</p>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Add widget modal (empty cell click) */}
+      {addCell && (
+        <AddWidgetModal
+          col={addCell.col}
+          row={addCell.row}
+          sources={allSources}
+          datapointGroups={groups}
+          existing={widgets}
+          accent={accent}
+          onAdd={w => { setWidgets(p => [...p, w]); setSelectedId(w.datapointId); }}
+          onClose={() => setAddCell(null)}
+        />
+      )}
     </div>
   );
 }
