@@ -20,14 +20,18 @@ function getApiBase(): string {
 }
 
 async function writeDp(dpKey: string, value: unknown) {
+  const url = `${getApiBase()}/visu/write-value`;
+  console.log('[Panel write]', dpKey, '=', value, '→', url);
   try {
-    await fetch(`${getApiBase()}/visu/write-value`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dpKey, value, mode: 'set' }),
     });
+    const json = await res.json().catch(() => ({}));
+    console.log('[Panel write] response', res.status, json);
   } catch (e) {
-    console.warn('[writeDp] error:', e);
+    console.warn('[Panel write] error:', e);
   }
 }
 
@@ -413,21 +417,29 @@ function WidgetLive({
           </div>
         </div>
       );
-    case 'incrementer':
+    case 'incrementer': {
+      const step = cfg.step ?? 1;
+      const safeVal = isNaN(numVal) ? (min) : numVal;
       return (
         <div className={base}>
           <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
             <span className="text-[10px] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <div className="flex items-center gap-2">
-              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal - (cfg.minValue !== undefined ? (max - min) / 20 : 1))}
-                className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600">−</button>
+              <button
+                onClick={() => onWrite && onWrite(Math.max(min, safeVal - step))}
+                className="w-6 h-6 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-sm font-bold hover:bg-slate-600"
+              >−</button>
               <span className="text-sm font-bold text-white min-w-8 text-center">{fmtWidget(val, cfg.unit)}</span>
-              <button onClick={() => onWrite && !isNaN(numVal) && onWrite(numVal + (cfg.minValue !== undefined ? (max - min) / 20 : 1))}
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80" style={{ background: accent }}>+</button>
+              <button
+                onClick={() => onWrite && onWrite(Math.min(max, safeVal + step))}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-sm font-bold hover:opacity-80"
+                style={{ background: accent }}
+              >+</button>
             </div>
           </div>
         </div>
       );
+    }
   }
 }
 
@@ -637,7 +649,12 @@ export function RoomMonitorPage({
                     accent={accent}
                     onWrite={
                       (w.writable !== false && (w.widgetType === 'slider' || w.widgetType === 'incrementer' || w.widgetType === 'switch'))
-                        ? (v) => writeDp(w.sourceDatapoint ?? w.datapointId, v)
+                        ? (v) => {
+                            const raw = w.sourceDatapoint || w.datapointId;
+                            // strip "ext-" prefix added for external datapoints
+                            const key = raw.startsWith('ext-') ? raw.slice(4) : raw;
+                            writeDp(key, v);
+                          }
                         : undefined
                     }
                   />

@@ -82,6 +82,7 @@ export interface RoomDataPointConfig {
   unit?: string;
   minValue?: number;
   maxValue?: number;
+  step?: number;
   category?: string;
   sourceDatapoint?: string;
 }

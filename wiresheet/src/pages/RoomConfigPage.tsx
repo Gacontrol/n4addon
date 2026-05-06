@@ -668,7 +668,12 @@ export function RoomConfigPage({
 
   const changeWidgetType = useCallback((id: string, type: WidgetType) => {
     const def = WIDGET_TYPES.find(x => x.type === type)!;
-    updateWidget(id, { widgetType: type, panelW: def.defaultW, panelH: def.defaultH });
+    updateWidget(id, {
+      widgetType: type,
+      panelW: def.defaultW,
+      panelH: def.defaultH,
+      writable: type === 'slider' || type === 'incrementer' || type === 'switch',
+    });
   }, [updateWidget]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
