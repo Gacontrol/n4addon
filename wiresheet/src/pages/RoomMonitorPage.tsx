@@ -393,9 +393,13 @@ export function RoomMonitorPage({
   const { buildings, monitorConfigs } = useBuildingContext();
   const { getConfig } = useRoomDisplayConfig(buildingId);
 
+  // Primary source: PanelDesigner config (monitorConfigs)
+  const monitorCfg = roomId ? monitorConfigs[roomId] : undefined;
+
   const hasPanelWidgets = (monitorCfg?.datapoints ?? []).length > 0;
-  const defaultTab = hasPanelWidgets ? 'panel' : 'overview';
-  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms'>(
+    hasPanelWidgets ? 'panel' : 'overview'
+  );
 
   const building = buildings.find(b => b.id === buildingId);
 
@@ -407,9 +411,6 @@ export function RoomMonitorPage({
     }
     return { floor: null, room: null };
   }, [building, roomId]);
-
-  // Primary source: PanelDesigner config (monitorConfigs)
-  const monitorCfg = roomId ? monitorConfigs[roomId] : undefined;
   const monitorDps = useMemo(
     () => (monitorCfg?.datapoints ?? []).filter(dp => dp.showInMonitor !== false),
     [monitorCfg],
