@@ -45,9 +45,10 @@ interface BuildingMonitorPageProps {
   onBack?: () => void;
   onOpenEditor?: () => void;
   onOpenRoom?: (roomId: string) => void;
+  liveValues?: Record<string, unknown>;
 }
 
-export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpenEditor }: BuildingMonitorPageProps) {
+export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpenEditor, liveValues = {} }: BuildingMonitorPageProps) {
   const params = useParams<{ buildingId: string }>();
   const navigate = useNavigate();
   const buildingId = propBuildingId ?? params.buildingId;
@@ -346,6 +347,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
           buildingId={buildingId}
           roomId={openRoomId}
           asPanel
+          liveValues={liveValues}
           onBack={() => setOpenRoomId(null)}
           onOpenConfig={() => navigate(`/building/${buildingId}/room/${openRoomId}/config`)}
         />

@@ -1655,6 +1655,7 @@ function App() {
     return (
       <BuildingMonitorPage
         buildingId={buildingId}
+        liveValues={liveValues}
         onBack={() => setMainView('building')}
         onOpenEditor={() => setMainView('building')}
         onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
@@ -1667,6 +1668,7 @@ function App() {
       <RoomMonitorPage
         buildingId={buildingId}
         roomId={activeRoomId}
+        liveValues={liveValues}
         onBack={() => setMainView('buildingMonitor')}
         onOpenConfig={() => setMainView('roomConfig')}
       />
