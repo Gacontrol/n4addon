@@ -115,22 +115,8 @@ function mockVal(cat: string, unit?: string) {
   }
 }
 
-// ---- Scaled text helper ----
-// Returns larger text class when widget spans multiple rows/cols
-
-function scaledText(base: string, cols: number, rows: number, small = false): string {
-  const area = cols * rows;
-  if (small) {
-    if (area >= 4) return 'text-sm';
-    return 'text-[10px]';
-  }
-  if (area >= 6) return 'text-4xl';
-  if (area >= 4) return 'text-3xl';
-  if (area >= 2) return 'text-2xl';
-  return 'text-xl';
-}
-
 // ---- Widget preview ----
+// All widgets use percentage-based sizing so they fill the full cell area.
 
 function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; accent: string; selected: boolean }) {
   const cat = cfg.category ?? 'generic';
@@ -143,25 +129,25 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
   const pct = Math.min(100, Math.max(0, ((m.n - min) / (max - min)) * 100));
   const border = selected ? `2px solid ${accent}` : '1px solid rgba(100,116,139,0.25)';
   const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80';
-  const ww = cfg.panelW ?? 1;
-  const wh = cfg.panelH ?? 1;
 
   switch (cfg.widgetType) {
     case 'slider':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col justify-between p-2.5">
-            <div className="flex items-center gap-1.5">
-              <span style={{ color: cc }}>{icon}</span>
-              <span className={`text-slate-400 truncate flex-1 ${ww >= 2 ? 'text-xs' : 'text-[10px]'}`}>{cfg.label}</span>
-              <span className={`font-bold text-white shrink-0 ${ww >= 2 ? 'text-sm' : 'text-xs'}`}>{m.v}<span className="text-[9px] font-normal text-slate-400 ml-0.5">{m.u}</span></span>
+          <div className="w-full h-full flex flex-col justify-between p-[8%]">
+            <div className="flex items-center gap-[4%] min-w-0">
+              <span style={{ color: cc }} className="shrink-0">{icon}</span>
+              <span className="text-slate-400 truncate flex-1 text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
+              <span className="font-bold text-white shrink-0 text-[clamp(10px,2cqw,16px)]">
+                {m.v}<span className="font-normal text-slate-400 text-[0.7em] ml-0.5">{m.u}</span>
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] text-slate-600 shrink-0">{min}</span>
-              <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="flex items-center gap-[3%]">
+              <span className="text-slate-600 shrink-0 text-[clamp(8px,1.2cqw,11px)]">{min}</span>
+              <div className="flex-1 rounded-full overflow-hidden bg-slate-700" style={{ height: 'clamp(4px,1%,8px)' }}>
                 <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
               </div>
-              <span className="text-[9px] text-slate-600 shrink-0">{max}</span>
+              <span className="text-slate-600 shrink-0 text-[clamp(8px,1.2cqw,11px)]">{max}</span>
             </div>
           </div>
         </div>
@@ -169,59 +155,62 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
     case 'incrementer':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
-            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
-            <div className="flex items-center gap-2">
-              <div className={`rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold ${wh >= 2 ? 'w-10 h-10 text-lg' : 'w-6 h-6 text-sm'}`}>−</div>
-              <span className={`font-bold text-white min-w-8 text-center ${scaledText('', ww, wh)}`}>{m.v}</span>
-              <div className={`rounded-lg flex items-center justify-center text-white font-bold ${wh >= 2 ? 'w-10 h-10 text-lg' : 'w-6 h-6 text-sm'}`} style={{ background: accent }}>+</div>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
+            <span className="text-slate-400 truncate w-full text-center text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
+            <div className="flex items-center gap-[6%] w-full justify-center">
+              <div className="rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-[clamp(12px,3cqw,22px)]"
+                style={{ width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}>−</div>
+              <span className="font-bold text-white text-[clamp(16px,4cqw,32px)] min-w-[2ch] text-center">{m.v}</span>
+              <div className="rounded-lg flex items-center justify-center text-white font-bold text-[clamp(12px,3cqw,22px)]"
+                style={{ background: accent, width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}>+</div>
             </div>
-            <span className="text-[9px] text-slate-500">{m.u}</span>
+            <span className="text-slate-500 text-[clamp(8px,1.2cqw,11px)]">{m.u}</span>
           </div>
         </div>
       );
-    case 'gauge': {
-      const gSize = wh >= 2 ? 80 : ww >= 2 ? 64 : 48;
+    case 'gauge':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
-            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
-            <div className="relative" style={{ width: gSize, height: gSize }}>
-              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[2%] p-[6%]">
+            <span className="text-slate-400 truncate w-full text-center text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
+            <div className="relative flex-1 w-full flex items-center justify-center" style={{ minHeight: 0 }}>
+              <svg viewBox="0 0 48 48" className="w-full h-full" style={{ maxWidth: '80%', maxHeight: '80%', transform: 'rotate(-90deg)' }}>
                 <circle cx="24" cy="24" r="18" fill="none" stroke="rgba(100,116,139,0.25)" strokeWidth="4" />
                 <circle cx="24" cy="24" r="18" fill="none" stroke={accent} strokeWidth="4"
                   strokeDasharray={`${2 * Math.PI * 18 * pct / 100} ${2 * Math.PI * 18}`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`font-bold text-white ${wh >= 2 ? 'text-base' : 'text-[10px]'}`}>{m.v}</span>
+                <span className="font-bold text-white text-[clamp(10px,2.5cqw,20px)]">{m.v}</span>
               </div>
             </div>
-            <span className="text-[9px] text-slate-500">{m.u}</span>
+            <span className="text-slate-500 text-[clamp(8px,1.2cqw,11px)]">{m.u}</span>
           </div>
         </div>
       );
-    }
     case 'badge':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col items-center justify-center gap-1 p-2">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
             <span style={{ color: cc }}>{icon}</span>
-            <span className={`px-2 py-0.5 rounded-full font-semibold ${wh >= 2 ? 'text-sm' : 'text-[10px]'}`} style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
-            <span className={`text-slate-500 truncate text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
+            <span className="px-[8%] py-[2%] rounded-full font-semibold text-[clamp(10px,2cqw,18px)]"
+              style={{ background: `${sc}22`, color: sc }}>{m.v}</span>
+            <span className="text-slate-500 truncate text-center w-full text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
           </div>
         </div>
       );
     case 'switch':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col items-center justify-center gap-1.5 p-2">
-            <span className={`text-slate-400 truncate w-full text-center ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-slate-500">AUS</span>
-              <div className={`rounded-full flex items-center px-0.5 ${wh >= 2 ? 'w-14 h-7' : 'w-9 h-5'}`} style={{ background: accent }}>
-                <div className={`bg-white rounded-full ml-auto shadow ${wh >= 2 ? 'w-6 h-6' : 'w-4 h-4'}`} />
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] p-[6%]">
+            <span className="text-slate-400 truncate w-full text-center text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
+            <div className="flex items-center gap-[5%]">
+              <span className="text-slate-500 text-[clamp(8px,1.2cqw,11px)]">AUS</span>
+              <div className="rounded-full flex items-center px-[3%]"
+                style={{ background: accent, width: 'clamp(36px,30%,72px)', height: 'clamp(20px,16%,36px)' }}>
+                <div className="bg-white rounded-full ml-auto shadow"
+                  style={{ width: 'clamp(14px,12%,28px)', height: 'clamp(14px,12%,28px)' }} />
               </div>
-              <span className="text-[9px] text-slate-400">EIN</span>
+              <span className="text-slate-300 text-[clamp(8px,1.2cqw,11px)]">EIN</span>
             </div>
           </div>
         </div>
@@ -229,13 +218,13 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
     case 'chart':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col justify-between p-2.5">
-            <div className="flex items-center gap-1.5">
-              <span style={{ color: cc }}>{icon}</span>
-              <span className={`text-slate-400 truncate flex-1 ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
-              <span className={`font-bold text-white shrink-0 ${scaledText('', ww, wh)}`}>{m.v} {m.u}</span>
+          <div className="w-full h-full flex flex-col justify-between p-[8%]">
+            <div className="flex items-center gap-[4%] min-w-0 shrink-0">
+              <span style={{ color: cc }} className="shrink-0">{icon}</span>
+              <span className="text-slate-400 truncate flex-1 text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
+              <span className="font-bold text-white shrink-0 text-[clamp(10px,2cqw,16px)]">{m.v} {m.u}</span>
             </div>
-            <svg viewBox="0 0 80 20" className="w-full" preserveAspectRatio="none" style={{ height: wh >= 2 ? 40 : 20 }}>
+            <svg viewBox="0 0 80 20" className="w-full flex-1" preserveAspectRatio="none" style={{ minHeight: 0 }}>
               {[.4,.6,.5,.7,.45,.8,.6,.75,.65,.55].map((v, i, a) =>
                 i < a.length - 1 ? (
                   <line key={i}
@@ -251,21 +240,21 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
     case 'row':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex items-center gap-2.5 px-3">
+          <div className="w-full h-full flex items-center gap-[3%] px-[6%]">
             <span style={{ color: cc }} className="shrink-0">{icon}</span>
-            <span className={`text-slate-300 flex-1 truncate ${ww >= 3 ? 'text-sm' : 'text-xs'}`}>{cfg.label}</span>
-            <span className={`font-semibold text-white shrink-0 ${ww >= 3 ? 'text-base' : 'text-xs'}`}>{m.v} {m.u}</span>
+            <span className="text-slate-300 flex-1 truncate text-[clamp(10px,1.8cqw,15px)]">{cfg.label}</span>
+            <span className="font-semibold text-white shrink-0 text-[clamp(11px,2.2cqw,18px)]">{m.v} {m.u}</span>
           </div>
         </div>
       );
     case 'label':
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col items-center justify-center gap-0.5 p-2">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-[3%] p-[6%]">
             <span style={{ color: cc }}>{icon}</span>
-            <span className={`font-bold text-white leading-none ${scaledText('', ww, wh)}`}>{m.v}</span>
-            <span className={`text-slate-400 ${scaledText('', ww, wh, true)}`}>{m.u}</span>
-            <span className="text-[9px] text-slate-500 truncate">{cfg.label}</span>
+            <span className="font-bold text-white leading-none text-[clamp(18px,5cqw,48px)]">{m.v}</span>
+            <span className="text-slate-400 text-[clamp(9px,1.5cqw,14px)]">{m.u}</span>
+            <span className="text-slate-500 truncate text-[clamp(8px,1.2cqw,11px)]">{cfg.label}</span>
           </div>
         </div>
       );
@@ -274,7 +263,7 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
       const fsMap: Record<string, string> = { xs: 'text-xs', sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
       return (
         <div className={base} style={{ border, background: cfg.bgColor || undefined }}>
-          <div className="h-full flex flex-col justify-center p-3">
+          <div className="w-full h-full flex flex-col justify-center p-[8%]">
             {cfg.staticText ? (
               <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[cfg.fontSize ?? 'base']} ${alignMap[cfg.textAlign ?? 'left']}`}
                 style={{ color: cfg.textColor || '#f1f5f9' }}>
@@ -293,7 +282,7 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           {cfg.imageUrl ? (
             <img src={cfg.imageUrl} alt={cfg.label} className="w-full h-full object-cover rounded-xl" />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-600">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] text-slate-600">
               <ImageIcon size={20} className="opacity-30" />
               <span className="text-[10px]">Bild-URL eingeben</span>
             </div>
@@ -303,14 +292,14 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
     default: // kpi
       return (
         <div className={base} style={{ border }}>
-          <div className="h-full flex flex-col justify-between p-2.5">
-            <div className="flex items-center gap-1.5">
-              <span style={{ color: cc }}>{icon}</span>
-              <span className={`text-slate-400 truncate ${scaledText('', ww, wh, true)}`}>{cfg.label}</span>
+          <div className="w-full h-full flex flex-col justify-between p-[8%]">
+            <div className="flex items-center gap-[4%] min-w-0">
+              <span style={{ color: cc }} className="shrink-0">{icon}</span>
+              <span className="text-slate-400 truncate text-[clamp(9px,1.5cqw,13px)]">{cfg.label}</span>
             </div>
-            <div className="flex items-end gap-1">
-              <span className={`font-bold leading-none ${scaledText('', ww, wh)}`} style={{ color: sc }}>{m.v}</span>
-              {m.u && <span className={`text-slate-400 pb-0.5 ${scaledText('', ww, wh, true)}`}>{m.u}</span>}
+            <div className="flex items-end gap-[2%]">
+              <span className="font-bold leading-none text-[clamp(18px,5cqw,48px)]" style={{ color: sc }}>{m.v}</span>
+              {m.u && <span className="text-slate-400 pb-[2%] text-[clamp(9px,1.5cqw,14px)]">{m.u}</span>}
             </div>
           </div>
         </div>
@@ -1064,6 +1053,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
                   left: GAP + col * (CW + GAP), top: GAP + row * (CH + GAP),
                   width: ww * CW + (ww - 1) * GAP, height: wh * CH + (wh - 1) * GAP,
                   zIndex: selectedId === w.datapointId ? 10 : 2,
+                  containerType: 'size',
                 }}
                 className="cursor-grab active:cursor-grabbing select-none">
                 <WidgetPreview cfg={w} accent={accent} selected={selectedId === w.datapointId} />
