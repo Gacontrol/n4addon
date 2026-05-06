@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useBuildingContext } from './context/BuildingContext';
-import { UnifiedBuildingShell } from './pages/UnifiedBuildingShell';
+import { BuildingEditorPage } from './pages/BuildingEditorPage';
+import { BuildingMonitorPage } from './pages/BuildingMonitorPage';
+import { RoomMonitorPage } from './pages/RoomMonitorPage';
+import { RoomConfigPage } from './pages/RoomConfigPage';
 import { NodePalette } from './components/NodePalette';
 import { FlowCanvas } from './components/FlowCanvas';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -144,7 +147,8 @@ function App() {
   }, [unshelveExpiredAlarms]);
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | null>(null);
+  const [mainView, setMainView] = useState<'logic' | 'visu' | 'drivers' | 'alarms' | 'trends' | 'building' | 'buildingMonitor' | 'roomMonitor' | 'roomConfig' | null>(null);
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [ghostNode, setGhostNode] = useState<{ label: string; x: number; y: number; template: NodeTemplate } | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingPageName, setEditingPageName] = useState('');
@@ -1633,14 +1637,50 @@ function App() {
 
   if (mainView === 'building') {
     return (
-      <UnifiedBuildingShell
-        buildingId={buildingId}
+      <BuildingEditorPage
         onBack={() => setMainView('logic')}
+        onMonitor={() => setMainView('buildingMonitor')}
+        onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
+        onConfigRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomConfig'); }}
         pages={pages}
         haEntities={haEntities}
         haLoading={haLoading}
         onLoadHaEntities={loadHaEntities}
         liveValues={liveValues}
+      />
+    );
+  }
+
+  if (mainView === 'buildingMonitor') {
+    return (
+      <BuildingMonitorPage
+        buildingId={buildingId}
+        onBack={() => setMainView('building')}
+        onOpenEditor={() => setMainView('building')}
+        onOpenRoom={(roomId) => { setActiveRoomId(roomId); setMainView('roomMonitor'); }}
+      />
+    );
+  }
+
+  if (mainView === 'roomMonitor' && activeRoomId) {
+    return (
+      <RoomMonitorPage
+        buildingId={buildingId}
+        roomId={activeRoomId}
+        onBack={() => setMainView('buildingMonitor')}
+        onOpenConfig={() => setMainView('roomConfig')}
+      />
+    );
+  }
+
+  if (mainView === 'roomConfig' && activeRoomId) {
+    return (
+      <RoomConfigPage
+        buildingId={buildingId}
+        roomId={activeRoomId}
+        onBack={() => setMainView('roomMonitor')}
+        onOpenMonitor={() => setMainView('roomMonitor')}
+        datapointGroups={appLogicPageGroups}
       />
     );
   }
