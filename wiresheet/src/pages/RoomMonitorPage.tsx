@@ -54,8 +54,19 @@ function fmt(val: unknown, unit?: string): string {
 }
 
 function getLiveKey(dp: RoomDataPointConfig): string {
-  // sourceDatapoint is the real node ID used in liveValues
   return dp.sourceDatapoint || dp.datapointId;
+}
+
+function resolveLiveValue(dp: RoomDataPointConfig, liveValues: Record<string, unknown>): unknown {
+  const key = getLiveKey(dp);
+  if (liveValues[key] !== undefined) return liveValues[key];
+  // Fall back: strip port suffix (e.g. "node-123:loadvisu" → "node-123")
+  const colonIdx = key.indexOf(':');
+  if (colonIdx !== -1) {
+    const nodeId = key.slice(0, colonIdx);
+    if (liveValues[nodeId] !== undefined) return liveValues[nodeId];
+  }
+  return undefined;
 }
 
 function isAlarmValue(val: unknown, cat?: string): boolean {
@@ -251,7 +262,7 @@ export function RoomMonitorPage({
 
   const alarmDps = useMemo(() => {
     if (useMonitorSource) {
-      return monitorDps.filter(dp => isAlarmValue(liveValues[getLiveKey(dp)], dp.category));
+      return monitorDps.filter(dp => isAlarmValue(resolveLiveValue(dp, liveValues), dp.category));
     }
     return displayDps.filter(dp => dp.category === 'alarm' && (liveValues[dp.datapoint] === true || liveValues[dp.datapoint] === 1));
   }, [monitorDps, displayDps, liveValues, useMonitorSource]);
@@ -357,7 +368,7 @@ export function RoomMonitorPage({
                   <div className="grid grid-cols-2 gap-2 mb-5">
                     {useMonitorSource
                       ? (kpiDps as RoomDataPointConfig[]).map(dp => (
-                          <KPICard key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />
+                          <KPICard key={dp.datapointId} dp={dp} val={resolveLiveValue(dp, liveValues)} />
                         ))
                       : (kpiDps as RoomDatapointDisplay[]).map(dp => (
                           <KPICardDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />
@@ -380,7 +391,7 @@ export function RoomMonitorPage({
                             <AlertTriangle size={12} className="text-red-400 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-red-200 truncate">{dp.label}</p>
-                              <p className="text-xs text-red-400/70">{fmt(liveValues[getLiveKey(dp)], dp.unit)}</p>
+                              <p className="text-xs text-red-400/70">{fmt(resolveLiveValue(dp, liveValues), dp.unit)}</p>
                             </div>
                           </div>
                         ))
@@ -402,7 +413,7 @@ export function RoomMonitorPage({
               <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Alle Werte</div>
               <div className="flex flex-col gap-1">
                 {useMonitorSource
-                  ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />)
+                  ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={resolveLiveValue(dp, liveValues)} />)
                   : displayDps.map(dp => <PointRowDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />)
                 }
               </div>
@@ -418,7 +429,7 @@ export function RoomMonitorPage({
           ) : (
             <div className="flex flex-col gap-1">
               {useMonitorSource
-                ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={liveValues[getLiveKey(dp)]} />)
+                ? monitorDps.map(dp => <PointRow key={dp.datapointId} dp={dp} val={resolveLiveValue(dp, liveValues)} />)
                 : displayDps.map(dp => <PointRowDisplay key={dp.datapoint} dp={dp} val={liveValues[dp.datapoint]} />)
               }
             </div>
@@ -443,7 +454,7 @@ export function RoomMonitorPage({
                       <AlertTriangle size={12} className="text-red-400 shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs font-medium text-red-200">{dp.label}</p>
-                        <p className="text-xs text-red-400/70 mt-0.5">{fmt(liveValues[getLiveKey(dp)], dp.unit)}</p>
+                        <p className="text-xs text-red-400/70 mt-0.5">{fmt(resolveLiveValue(dp, liveValues), dp.unit)}</p>
                       </div>
                     </div>
                   ))
