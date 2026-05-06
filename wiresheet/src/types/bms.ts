@@ -60,7 +60,9 @@ export type WidgetType =
   | 'badge'
   | 'switch'
   | 'chart'
-  | 'label';
+  | 'label'
+  | 'title'
+  | 'image';
 
 export interface RoomDataPointConfig {
   datapointId: string;
@@ -85,6 +87,12 @@ export interface RoomDataPointConfig {
   step?: number;
   category?: string;
   sourceDatapoint?: string;
+  staticText?: string;
+  imageUrl?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  fontSize?: 'xs' | 'sm' | 'base' | 'lg' | 'xl';
+  textColor?: string;
+  bgColor?: string;
 }
 
 export interface RoomMonitorConfig {

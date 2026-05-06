@@ -4,7 +4,7 @@ import {
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
   SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
-  Monitor, Link, Type, X, ChevronRight,
+  Monitor, Link, Type, X, ChevronRight, Image as ImageIcon, AlignCenter,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../../types/bms';
 import { Room, RoomDataPointBinding } from '../../types/building';
@@ -85,6 +85,8 @@ const WIDGET_TYPES: {
   { type: 'row',         label: 'Zeile',       icon: <Tag size={13} />,               description: 'Kompakte Zeile',       defaultW: 2, defaultH: 1 },
   { type: 'chart',       label: 'Verlauf',     icon: <BarChart2 size={13} />,          description: 'Historischer Verlauf', defaultW: 2, defaultH: 1 },
   { type: 'label',       label: 'Anzeige',     icon: <Eye size={13} />,               description: 'Nur-Lese Anzeige',    defaultW: 1, defaultH: 1 },
+  { type: 'title',       label: 'Titel/Text',  icon: <Type size={13} />,              description: 'Statischer Text',      defaultW: 2, defaultH: 1 },
+  { type: 'image',       label: 'Bild',        icon: <ImageIcon size={13} />,         description: 'Bild-URL',             defaultW: 2, defaultH: 2 },
 ];
 
 // ---- Grid constants ----
@@ -248,6 +250,39 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
           </div>
         </div>
       );
+    case 'title': {
+      const align = cfg.textAlign ?? 'left';
+      const fs = cfg.fontSize ?? 'base';
+      const fsMap: Record<string, string> = { xs: 'text-xs', sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+      const alignMap: Record<string, string> = { left: 'text-left', center: 'text-center', right: 'text-right' };
+      return (
+        <div className={base} style={{ border, background: cfg.bgColor || undefined }}>
+          <div className="h-full flex flex-col justify-center p-3">
+            {cfg.staticText ? (
+              <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[fs]} ${alignMap[align]}`}
+                style={{ color: cfg.textColor || '#f1f5f9' }}>
+                {cfg.staticText}
+              </p>
+            ) : (
+              <p className={`text-slate-600 italic text-xs ${alignMap[align]}`}>Titel / Text…</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    case 'image':
+      return (
+        <div className={base} style={{ border }}>
+          {cfg.imageUrl ? (
+            <img src={cfg.imageUrl} alt={cfg.label} className="w-full h-full object-cover rounded-xl" />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-600">
+              <ImageIcon size={20} className="opacity-30" />
+              <span className="text-[10px]">Bild-URL eingeben</span>
+            </div>
+          )}
+        </div>
+      );
     default: // kpi
       return (
         <div className={base} style={{ border }}>
@@ -340,6 +375,34 @@ function makeWidget(src: PaletteSource, existing: RoomDataPointConfig[]): RoomDa
     maxValue: src.maxValue,
     category: src.category,
     sourceDatapoint: src.datapoint,
+  };
+}
+
+function makeStaticWidget(type: 'title' | 'image', existing: RoomDataPointConfig[]): RoomDataPointConfig {
+  const def = WIDGET_TYPES.find(x => x.type === type)!;
+  const pos = findFreeCell(existing, def.defaultW, def.defaultH);
+  const id = `static-${type}-${Date.now()}`;
+  return {
+    datapointId: id,
+    label: type === 'title' ? 'Titel' : 'Bild',
+    displayType: 'kpi',
+    widgetType: type,
+    order: existing.length,
+    panelCol: pos.col,
+    panelRow: pos.row,
+    panelW: def.defaultW,
+    panelH: def.defaultH,
+    showInMonitor: true,
+    showInService: false,
+    showInTooltip: false,
+    showInBuilding: false,
+    isPrimaryRoomKPI: false,
+    isPrimaryBuildingPoint: false,
+    writable: false,
+    staticText: type === 'title' ? '' : undefined,
+    imageUrl: type === 'image' ? '' : undefined,
+    textAlign: 'left',
+    fontSize: 'base',
   };
 }
 
@@ -682,6 +745,25 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
         </div>
 
         <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+          {/* Static elements */}
+          <div className="pb-1.5 mb-1.5 border-b border-slate-800">
+            <p className="text-[9px] text-slate-600 uppercase tracking-wider px-1 mb-1">Statische Elemente</p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => { const w = makeStaticWidget('title', widgets); setWidgets(p => [...p, w]); setSelectedId(w.datapointId); }}
+                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
+                <Type size={11} className="shrink-0 text-slate-400" />
+                <span>Titel</span>
+              </button>
+              <button
+                onClick={() => { const w = makeStaticWidget('image', widgets); setWidgets(p => [...p, w]); setSelectedId(w.datapointId); }}
+                className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 hover:border-slate-600 hover:bg-slate-800 transition-colors text-xs text-slate-300">
+                <ImageIcon size={11} className="shrink-0 text-slate-400" />
+                <span>Bild</span>
+              </button>
+            </div>
+          </div>
+
           {allSources.length === 0 && (
             <div className="py-6 text-center text-slate-600 text-xs px-2">
               <Settings size={16} className="mx-auto mb-1.5 opacity-30" />
@@ -848,7 +930,95 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
 
             <div className="flex-1 overflow-y-auto p-3 space-y-4">
 
-              {/* Datenpunkt */}
+              {/* Title widget properties */}
+              {selected.widgetType === 'title' && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Text</p>
+                    <textarea
+                      value={selected.staticText ?? ''}
+                      onChange={e => updateWidget(selected.datapointId, { staticText: e.target.value })}
+                      placeholder="Text eingeben…"
+                      rows={3}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 resize-none"
+                      onClick={e => e.stopPropagation()}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[9px] text-slate-600 mb-1">Ausrichtung</p>
+                      <select value={selected.textAlign ?? 'left'}
+                        onChange={e => updateWidget(selected.datapointId, { textAlign: e.target.value as 'left' | 'center' | 'right' })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                        <option value="left">Links</option>
+                        <option value="center">Mitte</option>
+                        <option value="right">Rechts</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-600 mb-1">Schriftgröße</p>
+                      <select value={selected.fontSize ?? 'base'}
+                        onChange={e => updateWidget(selected.datapointId, { fontSize: e.target.value as 'xs' | 'sm' | 'base' | 'lg' | 'xl' })}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
+                        <option value="xs">Klein</option>
+                        <option value="sm">Normal</option>
+                        <option value="base">Mittel</option>
+                        <option value="lg">Groß</option>
+                        <option value="xl">Sehr groß</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[9px] text-slate-600 mb-1">Textfarbe</p>
+                      <div className="flex items-center gap-1.5">
+                        <input type="color" value={selected.textColor ?? '#f1f5f9'}
+                          onChange={e => updateWidget(selected.datapointId, { textColor: e.target.value })}
+                          className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0" />
+                        <span className="text-[10px] text-slate-500 font-mono">{selected.textColor ?? '#f1f5f9'}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-600 mb-1">Hintergrund</p>
+                      <div className="flex items-center gap-1.5">
+                        <input type="color" value={selected.bgColor ?? '#1e293b'}
+                          onChange={e => updateWidget(selected.datapointId, { bgColor: e.target.value })}
+                          className="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0 shrink-0" />
+                        <button onClick={() => updateWidget(selected.datapointId, { bgColor: '' })}
+                          className="text-[9px] text-slate-600 hover:text-slate-400">
+                          Transparent
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image widget properties */}
+              {selected.widgetType === 'image' && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Bild-URL</p>
+                    <input
+                      type="text"
+                      value={selected.imageUrl ?? ''}
+                      onChange={e => updateWidget(selected.datapointId, { imageUrl: e.target.value })}
+                      placeholder="https://…"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
+                      onClick={e => e.stopPropagation()}
+                    />
+                    {selected.imageUrl && (
+                      <div className="mt-2 rounded-lg overflow-hidden border border-slate-700" style={{ height: 80 }}>
+                        <img src={selected.imageUrl} alt="" className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Datenpunkt — only for non-static widgets */}
+              {selected.widgetType !== 'title' && selected.widgetType !== 'image' && (
               <div>
                 <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Datenpunkt</p>
                 <button onClick={() => setPickerWidgetId(selected.datapointId)}
@@ -883,6 +1053,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
                   </select>
                 </div>
               </div>
+              )}
 
               {/* Widget type */}
               <div>

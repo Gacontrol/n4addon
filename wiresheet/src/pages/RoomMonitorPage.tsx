@@ -440,6 +440,33 @@ function WidgetLive({
         </div>
       );
     }
+    case 'title': {
+      const alignMap: Record<string, string> = { left: 'text-left', center: 'text-center', right: 'text-right' };
+      const fsMap: Record<string, string> = { xs: 'text-xs', sm: 'text-sm', base: 'text-base', lg: 'text-lg', xl: 'text-xl' };
+      return (
+        <div className="w-full h-full rounded-xl overflow-hidden"
+          style={{ background: cfg.bgColor || 'rgba(30,41,59,0.5)', border: '1px solid rgba(100,116,139,0.2)' }}>
+          <div className="h-full flex flex-col justify-center p-3">
+            <p className={`font-semibold leading-snug whitespace-pre-wrap ${fsMap[cfg.fontSize ?? 'base']} ${alignMap[cfg.textAlign ?? 'left']}`}
+              style={{ color: cfg.textColor || '#f1f5f9' }}>
+              {cfg.staticText || cfg.label}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    case 'image':
+      return (
+        <div className="w-full h-full rounded-xl overflow-hidden border border-slate-800/40">
+          {cfg.imageUrl ? (
+            <img src={cfg.imageUrl} alt={cfg.label} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-slate-800/50 text-slate-600 text-xs">
+              Kein Bild
+            </div>
+          )}
+        </div>
+      );
   }
 }
 

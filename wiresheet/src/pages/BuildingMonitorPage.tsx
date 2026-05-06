@@ -312,11 +312,14 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
         </div>
 
         {sidebarOpen && filteredRooms.length > 0 && (
-          <div className="w-52 border-l border-slate-800 flex flex-col bg-slate-900 overflow-hidden">
-            <div className="p-2 border-b border-slate-800">
+          <div className="w-56 border-l border-slate-800 flex flex-col bg-slate-900 overflow-hidden">
+            <div className="p-2 border-b border-slate-800 flex items-center justify-between">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
                 Räume ({filteredRooms.length})
               </p>
+              {activeMonitorLayer && (
+                <span className="text-[10px] text-sky-400 px-1">{activeMonitorLayer.name}</span>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-1.5">
               {filteredRooms.map(({ room, floor }) => {
@@ -325,24 +328,51 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
                 const displayColor = lv && activeLayerId !== 'normal' && activeMonitorLayer
                   ? (getRoomLayerColor(lv.value as number, activeMonitorLayer) || room.color)
                   : room.color || '#94a3b8';
+                const roomCfg = monitorConfigs[room.id];
+                const primaryDps = roomCfg?.datapoints
+                  .filter(dp => dp.isPrimaryRoomKPI || dp.showInTooltip)
+                  .sort((a, b) => {
+                    if (a.isPrimaryRoomKPI && !b.isPrimaryRoomKPI) return -1;
+                    if (!a.isPrimaryRoomKPI && b.isPrimaryRoomKPI) return 1;
+                    return a.order - b.order;
+                  })
+                  .slice(0, 2) ?? [];
                 return (
                   <button
                     key={room.id}
                     onClick={() => setOpenRoomId(room.id)}
-                    className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-800 transition-colors text-left group"
+                    className="w-full flex items-start gap-2 px-2 py-2 rounded-md hover:bg-slate-800 transition-colors text-left group border-b border-slate-800/50 last:border-0"
                   >
-                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: displayColor }} />
+                    <span className="w-2 h-2 rounded-sm shrink-0 mt-1" style={{ background: displayColor }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-300 truncate group-hover:text-white">{room.name}</p>
+                      <p className="text-xs text-slate-300 truncate group-hover:text-white font-medium">{room.name}</p>
                       {lv && activeLayerId !== 'normal' ? (
-                        <p className={`text-xs ${hasAlarm ? 'text-red-400' : 'text-slate-500'}`}>
+                        <p className={`text-xs font-semibold ${hasAlarm ? 'text-red-400' : 'text-sky-300'}`}>
                           {lv.formattedValue}
                         </p>
+                      ) : primaryDps.length > 0 ? (
+                        <div className="mt-0.5 space-y-0.5">
+                          {primaryDps.map(dp => {
+                            const key = dp.sourceDatapoint || dp.datapointId;
+                            const cleanKey = key.startsWith('ext-') ? key.slice(4) : key;
+                            const rawVal = liveValues[cleanKey] ?? liveValues[key];
+                            const formatted = rawVal === undefined || rawVal === null ? '—'
+                              : typeof rawVal === 'boolean' ? (rawVal ? 'Ein' : 'Aus')
+                              : typeof rawVal === 'number' ? (Number.isInteger(rawVal) ? String(rawVal) : rawVal.toFixed(1)) + (dp.unit ? ' ' + dp.unit : '')
+                              : String(rawVal) + (dp.unit ? ' ' + dp.unit : '');
+                            return (
+                              <div key={dp.datapointId} className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] text-slate-500 truncate">{dp.label}</span>
+                                <span className="text-[10px] font-semibold text-slate-300 shrink-0">{formatted}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
-                        <p className="text-xs text-slate-600">{floor.name}</p>
+                        <p className="text-[10px] text-slate-600">{floor.name}</p>
                       )}
                     </div>
-                    {hasAlarm && <AlertTriangle size={10} className="text-red-400 shrink-0" />}
+                    {hasAlarm && <AlertTriangle size={10} className="text-red-400 shrink-0 mt-0.5" />}
                   </button>
                 );
               })}
