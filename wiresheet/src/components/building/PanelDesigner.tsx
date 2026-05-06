@@ -4,12 +4,37 @@ import {
   Zap, Settings, Eye, Star, Building2, Gauge, RefreshCw, Plug, Fan,
   Lightbulb, Bell, Snowflake, Flame, Search, Trash2, GripVertical,
   SlidersHorizontal, ToggleLeft, Hash, BarChart2, Tag, CircleDot, ChevronLeft,
-  Monitor, Link, Type, X, ChevronRight, Image as ImageIcon, Plus,
+  Monitor, Link, Type, X, ChevronRight, Image as ImageIcon, Plus, Upload, FolderOpen,
 } from 'lucide-react';
 import { RoomMonitorConfig, RoomDataPointConfig, WidgetType } from '../../types/bms';
 import { Room, RoomDataPointBinding } from '../../types/building';
 import { useBuildingContext } from '../../context/BuildingContext';
+import { FileManager } from '../visualization/FileManager';
 import type { DatapointGroup } from './RoomBindingsPanel';
+
+function getApiBase(): string {
+  const p = window.location.pathname;
+  const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+  return m ? m[1] : '';
+}
+
+async function uploadImageFile(file: File): Promise<string> {
+  const apiBase = getApiBase();
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`${apiBase}/api/images/upload`, { method: 'POST', body: formData });
+  if (!res.ok) throw new Error('Upload fehlgeschlagen');
+  const data = await res.json();
+  return data.url as string;
+}
+
+function resolveImageUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const base = getApiBase();
+  if (url.startsWith('/api/images/') || url.startsWith('/api/')) return `${base}${url}`;
+  return url;
+}
 
 // ---- Category helpers ----
 
@@ -276,19 +301,21 @@ function WidgetPreview({ cfg, accent, selected }: { cfg: RoomDataPointConfig; ac
         </div>
       );
     }
-    case 'image':
+    case 'image': {
+      const imgSrc = cfg.imageUrl ? resolveImageUrl(cfg.imageUrl) : '';
       return (
         <div className={base} style={{ border }}>
-          {cfg.imageUrl ? (
-            <img src={cfg.imageUrl} alt={cfg.label} className="w-full h-full object-cover rounded-xl" />
+          {imgSrc ? (
+            <img src={imgSrc} alt={cfg.label} className="w-full h-full object-cover rounded-xl" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-[4%] text-slate-600">
               <ImageIcon size={20} className="opacity-30" />
-              <span className="text-[10px]">Bild-URL eingeben</span>
+              <span className="text-[10px]">Bild hochladen oder wählen</span>
             </div>
           )}
         </div>
       );
+    }
     default: // kpi
       return (
         <div className={base} style={{ border }}>
@@ -705,6 +732,123 @@ function AddWidgetModal({ col, row, sources, datapointGroups, existing, onAdd, o
           />
         )}
       </div>
+    </div>
+  );
+}
+
+// ---- Image widget editor (upload + file manager) ----
+
+function ImageWidgetEditor({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadImageFile(file);
+      onChange(url);
+    } catch {
+      // fallback: base64
+      const reader = new FileReader();
+      reader.onload = () => onChange(reader.result as string);
+      reader.readAsDataURL(file);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handlePickerSelect = async (url: string) => {
+    const apiBase = getApiBase();
+    try {
+      const res = await fetch(`${apiBase}${url}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const b64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        onChange(b64);
+      } else {
+        onChange(url);
+      }
+    } catch {
+      onChange(url);
+    }
+    setShowPicker(false);
+  };
+
+  const displayUrl = imageUrl ? resolveImageUrl(imageUrl) : '';
+
+  return (
+    <div className="space-y-2" onClick={e => e.stopPropagation()}>
+      <p className="text-[9px] text-slate-500 uppercase tracking-wider">Bild</p>
+
+      {displayUrl ? (
+        <div className="relative rounded-lg overflow-hidden border border-slate-700" style={{ height: 100 }}>
+          <img src={displayUrl} alt="" className="w-full h-full object-cover"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 hover:opacity-100 transition-opacity bg-black/60">
+            <button onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-1 px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white text-[10px] rounded transition-colors">
+              <Upload size={9} /> Upload
+            </button>
+            <button onClick={() => setShowPicker(true)}
+              className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-white text-[10px] rounded transition-colors">
+              <FolderOpen size={9} /> Bibliothek
+            </button>
+            <button onClick={() => onChange('')}
+              className="flex items-center gap-1 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-[10px] rounded transition-colors">
+              <X size={9} /> Entfernen
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border-2 border-dashed border-slate-700 h-20 flex flex-col items-center justify-center gap-1.5">
+          {uploading ? (
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-[9px] text-slate-500">Hochladen…</span>
+            </div>
+          ) : (
+            <>
+              <ImageIcon size={16} className="text-slate-600" />
+              <div className="flex gap-1.5">
+                <button onClick={() => fileRef.current?.click()}
+                  className="flex items-center gap-1 px-2 py-1 bg-sky-900/50 hover:bg-sky-900 border border-sky-700/40 text-sky-400 text-[10px] rounded transition-colors">
+                  <Upload size={9} /> Upload
+                </button>
+                <button onClick={() => setShowPicker(true)}
+                  className="flex items-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-[10px] rounded transition-colors">
+                  <FolderOpen size={9} /> Bibliothek
+                </button>
+              </div>
+            </>
+          )}
+          {error && <span className="text-[9px] text-red-400">{error}</span>}
+        </div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+      {showPicker && (
+        <FileManager
+          apiBase={getApiBase()}
+          pickerMode
+          onSelectImage={handlePickerSelect}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1166,25 +1310,10 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
 
               {/* Image widget properties */}
               {selected.widgetType === 'image' && (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Bild-URL</p>
-                    <input
-                      type="text"
-                      value={selected.imageUrl ?? ''}
-                      onChange={e => updateWidget(selected.datapointId, { imageUrl: e.target.value })}
-                      placeholder="https://…"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
-                      onClick={e => e.stopPropagation()}
-                    />
-                    {selected.imageUrl && (
-                      <div className="mt-2 rounded-lg overflow-hidden border border-slate-700" style={{ height: 80 }}>
-                        <img src={selected.imageUrl} alt="" className="w-full h-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ImageWidgetEditor
+                  imageUrl={selected.imageUrl ?? ''}
+                  onChange={url => updateWidget(selected.datapointId, { imageUrl: url })}
+                />
               )}
 
               {/* Datenpunkt — only for non-static widgets */}

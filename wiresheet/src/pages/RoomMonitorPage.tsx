@@ -19,6 +19,14 @@ function getApiBase(): string {
   return m ? `${m[1]}/api` : '/api';
 }
 
+function resolveImgUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const base = window.location.pathname.match(/^(\/api\/hassio_ingress\/[^/]+|\/app\/[^/]+)/)?.[1] ?? '';
+  if (url.startsWith('/api/images/') || url.startsWith('/api/')) return `${base}${url}`;
+  return url;
+}
+
 async function writeDp(dpKey: string, value: unknown) {
   const url = `${getApiBase()}/visu/write-value`;
   console.log('[Panel write]', dpKey, '=', value, '→', url);
@@ -450,16 +458,16 @@ function WidgetLive({
             <span className="text-[clamp(9px,1.5cqw,14px)] text-slate-400 truncate w-full text-center">{cfg.label}</span>
             <div className="flex items-center gap-[6%] w-full justify-center">
               <button
-                onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.max(min, safeVal - step)); }}
-                className="rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold hover:bg-slate-600 touch-manipulation text-[clamp(12px,3cqw,24px)]"
+                onClick={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.max(min, safeVal - step)); }}
+                className="rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold hover:bg-slate-600 active:bg-slate-600 touch-manipulation text-[clamp(12px,3cqw,24px)]"
                 style={{ width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}
               >−</button>
               <span className="font-bold text-white text-[clamp(16px,4cqw,36px)] min-w-[2ch] text-center">
                 {fmtWidget(val, cfg.unit)}
               </span>
               <button
-                onPointerDown={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.min(max, safeVal + step)); }}
-                className="rounded-lg flex items-center justify-center text-white font-bold hover:opacity-80 touch-manipulation text-[clamp(12px,3cqw,24px)]"
+                onClick={(e) => { e.stopPropagation(); if (onWrite) onWrite(Math.min(max, safeVal + step)); }}
+                className="rounded-lg flex items-center justify-center text-white font-bold hover:opacity-80 active:opacity-80 touch-manipulation text-[clamp(12px,3cqw,24px)]"
                 style={{ background: accent, width: 'clamp(24px,20%,52px)', height: 'clamp(24px,20%,52px)' }}
               >+</button>
             </div>
@@ -482,11 +490,12 @@ function WidgetLive({
         </div>
       );
     }
-    case 'image':
+    case 'image': {
+      const imgSrc = cfg.imageUrl ? resolveImgUrl(cfg.imageUrl) : '';
       return (
         <div className="w-full h-full rounded-xl overflow-hidden border border-slate-800/40">
-          {cfg.imageUrl ? (
-            <img src={cfg.imageUrl} alt={cfg.label} className="w-full h-full object-cover" />
+          {imgSrc ? (
+            <img src={imgSrc} alt={cfg.label} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-slate-800/50 text-slate-600 text-xs">
               Kein Bild
@@ -494,6 +503,7 @@ function WidgetLive({
           )}
         </div>
       );
+    }
   }
 }
 
