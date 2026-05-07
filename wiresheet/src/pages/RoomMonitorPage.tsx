@@ -1078,7 +1078,7 @@ export function RoomMonitorPage({
 
   if (asPanel) {
     return (
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[min(640px,48vw)] h-[min(88vh,900px)] flex flex-col pointer-events-none">
+      <div className="fixed right-[15rem] top-1/2 -translate-y-1/2 z-40 w-[min(640px,44vw)] h-[min(88vh,900px)] flex flex-col pointer-events-none">
         <div className="relative flex flex-col h-full w-full bg-slate-950/96 backdrop-blur-md border border-slate-700/60 rounded-2xl shadow-[0_8px_60px_rgba(0,0,0,0.7)] pointer-events-auto animate-[slideInRight_.22s_cubic-bezier(0.16,1,0.3,1)] overflow-hidden">
           {headerContent}
           {tabBar}
