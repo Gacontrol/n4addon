@@ -327,6 +327,79 @@ function SliderWidget({ cfg, val, accent, onWrite }: {
   );
 }
 
+function ChartWidget({ cfg, val, accent }: { cfg: RoomDataPointConfig; val: unknown; accent: string }) {
+  const [points, setPoints] = useState<{ ts: number; v: number }[]>([]);
+
+  const apiBase = useMemo(() => {
+    const p = window.location.pathname;
+    const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+    return m ? `${m[1]}/api` : '/api';
+  }, []);
+
+  useEffect(() => {
+    const nodeId = (cfg.sourceDatapoint || cfg.datapointId).replace(/^ext-/, '');
+    const now = Date.now();
+    const from = now - 3600000; // last 1h
+    fetch(`${apiBase}/trend-data?nodeId=${encodeURIComponent(nodeId)}&from=${from}&to=${now}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json?.data) return;
+        setPoints((json.data as { ts: number; v: unknown }[]).filter(p => typeof p.v === 'number').map(p => ({ ts: p.ts, v: p.v as number })));
+      })
+      .catch(() => {});
+  }, [cfg.sourceDatapoint, cfg.datapointId, apiBase]);
+
+  const numVal = typeof val === 'number' ? val : (typeof val === 'string' ? parseFloat(val) : NaN);
+  const offline = val === undefined || val === null;
+  const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40';
+
+  // Build SVG polyline from points
+  const svgContent = useMemo(() => {
+    if (points.length < 2) return null;
+    const vals = points.map(p => p.v);
+    const times = points.map(p => p.ts);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const minT = Math.min(...times), maxT = Math.max(...times);
+    const W = 80, H = 20, pad = 1;
+    const sx = (t: number) => maxT === minT ? pad : pad + ((t - minT) / (maxT - minT)) * (W - 2 * pad);
+    const sy = (v: number) => maxV === minV ? H / 2 : (H - pad) - ((v - minV) / (maxV - minV)) * (H - 2 * pad);
+    const line = points.map(p => `${sx(p.ts)},${sy(p.v)}`).join(' ');
+    const fill = `${sx(times[0])},${H} ${line} ${sx(times[times.length - 1])},${H}`;
+    return { line, fill, W, H };
+  }, [points]);
+
+  return (
+    <div className={base}>
+      <div className="w-full h-full flex flex-col justify-between p-[8%]">
+        <div className="flex items-center justify-between gap-[4%] min-w-0 shrink-0">
+          <span className="text-[clamp(9px,1.5cqw,13px)] text-slate-400 truncate flex-1">{cfg.label}</span>
+          <span className="font-bold text-white shrink-0 text-[clamp(10px,2cqw,16px)]" style={{ color: offline ? '#475569' : 'white' }}>
+            {isNaN(numVal) ? '—' : numVal.toFixed(1)}{cfg.unit ? ` ${cfg.unit}` : ''}
+          </span>
+        </div>
+        <div className="flex-1 w-full" style={{ minHeight: 0 }}>
+          {svgContent ? (
+            <svg viewBox={`0 0 ${svgContent.W} ${svgContent.H}`} className="w-full h-full" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id={`cw-g-${cfg.datapointId}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={accent} stopOpacity="0.3" />
+                  <stop offset="100%" stopColor={accent} stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+              <polygon points={svgContent.fill} fill={`url(#cw-g-${cfg.datapointId})`} />
+              <polyline points={svgContent.line} fill="none" stroke={accent} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[clamp(8px,1.2cqw,10px)] text-slate-600">
+              Keine Verlaufsdaten
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WidgetLive({
   cfg, val, accent, onWrite,
 }: {
@@ -344,6 +417,8 @@ function WidgetLive({
   const base = 'w-full h-full rounded-xl overflow-hidden bg-slate-800/80 border border-slate-700/40';
 
   switch (cfg.widgetType) {
+    case 'chart':
+      return <ChartWidget cfg={cfg} val={val} accent={accent} />;
     case 'kpi':
     default:
       return (
