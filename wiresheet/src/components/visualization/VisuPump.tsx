@@ -56,16 +56,15 @@ const PumpSymbol: React.FC<{ color: string; running: boolean; size: number }> = 
 
 const FanSymbol: React.FC<{ color: string; running: boolean; size: number }> = ({ color, running, size }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" style={{ overflow: 'visible', background: 'transparent' }}>
-    {/* Outer circle */}
     <circle cx="50" cy="50" r="46" stroke={color} strokeWidth={running ? 4 : 3} fill="transparent" />
-    {/* Fan blade: diagonal line from upper-left to right-center (like the reference image) */}
-    <line x1="12" y1="22" x2="88" y2="42" stroke={color} strokeWidth="4" strokeLinecap="round" />
-    {/* Fan blade: lower straight horizontal line */}
-    <line x1="12" y1="72" x2="88" y2="72" stroke={color} strokeWidth="4" strokeLinecap="round" />
+    {/* Upper diagonal chord: upper-left to lower-right across circle */}
+    <line x1="15" y1="28" x2="85" y2="62" stroke={color} strokeWidth="4" strokeLinecap="round" />
+    {/* Lower near-horizontal chord: left to right near bottom */}
+    <line x1="10" y1="70" x2="90" y2="70" stroke={color} strokeWidth="4" strokeLinecap="round" />
     {running && (
       <>
-        <line x1="12" y1="22" x2="88" y2="42" stroke={color} strokeWidth="8" strokeLinecap="round" opacity="0.25" />
-        <line x1="12" y1="72" x2="88" y2="72" stroke={color} strokeWidth="8" strokeLinecap="round" opacity="0.25" />
+        <line x1="15" y1="28" x2="85" y2="62" stroke={color} strokeWidth="9" strokeLinecap="round" opacity="0.22" />
+        <line x1="10" y1="70" x2="90" y2="70" stroke={color} strokeWidth="9" strokeLinecap="round" opacity="0.22" />
       </>
     )}
   </svg>
