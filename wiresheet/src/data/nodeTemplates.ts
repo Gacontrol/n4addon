@@ -671,6 +671,31 @@ export const nodeTemplates: NodeTemplate[] = [
     }
   },
   {
+    type: 'bool-sensor-control',
+    label: 'Bool-Sensorbaustein',
+    icon: 'ShieldAlert',
+    category: 'complex',
+    color: '#d97706',
+    inputs: [
+      { label: 'SignalIn', type: 'input' },
+      { label: 'AlarmReset', type: 'input' }
+    ],
+    outputs: [
+      { label: 'SignalOut', type: 'output' },
+      { label: 'Alarm', type: 'output' }
+    ],
+    description: 'Bool-Sensorbaustein fuer Filterueberwachung, Frostueberwachung, Maxhygrostat u.a.',
+    defaultConfig: {
+      boolSensorName: '',
+      boolSensorAlarmOnTrue: true,
+      boolSensorMonitoringEnable: true,
+      boolSensorAlarmDelayMs: 5000,
+      boolSensorNormalLabel: 'OK',
+      boolSensorAlarmLabel: 'ALARM',
+      boolSensorSymbolType: 'filter'
+    }
+  },
+  {
     type: 'pid-controller',
     label: 'PID Regler',
     icon: 'Activity',

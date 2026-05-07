@@ -2183,6 +2183,138 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {node.type === 'bool-sensor-control' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-amber-400">
+              <span className="text-xs font-semibold uppercase tracking-wider">Bool-Sensorbaustein</span>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Bezeichnung</label>
+              <input
+                type="text"
+                value={config.boolSensorName ?? ''}
+                placeholder="z.B. Filterueberwachung"
+                onChange={e => updateConfig('boolSensorName', e.target.value || '')}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Symbol-Typ</label>
+              <select
+                value={config.boolSensorSymbolType ?? 'filter'}
+                onChange={e => updateConfig('boolSensorSymbolType', e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+              >
+                <option value="filter">Filterueberwachung</option>
+                <option value="frost">Frostschutz</option>
+                <option value="humidity">Maxhygrostat / Feuchte</option>
+                <option value="pressure">Druckueberwachung</option>
+                <option value="fire">Brandmeldung</option>
+                <option value="generic">Generisch</option>
+                <option value="none">Kein Symbol</option>
+              </select>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Anzeigetexte</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Text normal</label>
+                  <input
+                    type="text"
+                    value={config.boolSensorNormalLabel ?? 'OK'}
+                    onChange={e => updateConfig('boolSensorNormalLabel', e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1">Text Alarm</label>
+                  <input
+                    type="text"
+                    value={config.boolSensorAlarmLabel ?? 'ALARM'}
+                    onChange={e => updateConfig('boolSensorAlarmLabel', e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Alarm-Logik</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Alarmausloesung bei Signal</span>
+                <div className="flex rounded-lg overflow-hidden border border-slate-600">
+                  <button
+                    onClick={() => updateConfig('boolSensorAlarmOnTrue', true)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${config.boolSensorAlarmOnTrue !== false ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  >
+                    TRUE
+                  </button>
+                  <button
+                    onClick={() => updateConfig('boolSensorAlarmOnTrue', false)}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${config.boolSensorAlarmOnTrue === false ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                  >
+                    FALSE
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
+              <label className="block text-xs text-slate-400 mb-2 font-medium">Ueberwachung</label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-300">Ueberwachung aktiv</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.boolSensorMonitoringEnable !== false}
+                    onChange={e => updateConfig('boolSensorMonitoringEnable', e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-600 rounded-full peer peer-checked:bg-amber-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
+                </label>
+              </div>
+              <div>
+                <label className="block text-[10px] text-slate-500 mb-1">Alarmverzoegerung (ms)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={config.boolSensorAlarmDelayMs ?? 5000}
+                  onChange={e => updateConfig('boolSensorAlarmDelayMs', parseInt(e.target.value) || 5000)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-700/30 rounded-lg p-2 space-y-1">
+              <div className="text-[10px] text-slate-400 font-medium mb-1">Eingaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-slate-300">SignalIn (Bool)</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-slate-300">AlarmReset</span></div>
+              </div>
+              <div className="text-[10px] text-slate-400 font-medium mt-2 mb-1">Ausgaenge:</div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-slate-300">SignalOut (Bool)</span></div>
+                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-slate-300">Alarm</span></div>
+              </div>
+            </div>
+
+            <AlarmSettings
+              nodeType={node.type}
+              alarmClasses={alarmClasses}
+              sensorAlarmConfig={config.boolSensorAlarmConfig as SensorAlarmConfig}
+              onSensorAlarmConfigChange={(cfg) => updateConfig('boolSensorAlarmConfig', cfg)}
+            />
+
+            <p className="text-[10px] text-slate-500">
+              Bool-Sensorbaustein fuer Filterueberwachung, Frostschutz, Maxhygrostat u.a. Eingang ist ein Boolean-Signal.
+            </p>
+          </div>
+        )}
+
         {node.type === 'time-program' && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">

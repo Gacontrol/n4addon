@@ -915,6 +915,25 @@ export const widgetTemplates: WidgetTemplate[] = [
     bindingDirection: 'read'
   },
   {
+    type: 'visu-bool-sensor',
+    label: 'Bool-Sensor',
+    icon: 'ShieldAlert',
+    category: 'complex',
+    defaultSize: { width: 110, height: 110 },
+    defaultConfig: {
+      boolSensorName: '',
+      normalColor: '#22c55e',
+      alarmColor: '#ef4444',
+      rotation: 0,
+      symbolType: 'filter',
+      showStatus: true,
+    },
+    defaultStyle: { showLabel: false, labelPosition: 'bottom' },
+    description: 'Bool-Sensor-Widget fuer Filterueberwachung, Frostschutz, Maxhygrostat u.a.',
+    supportsBinding: true,
+    bindingDirection: 'read'
+  },
+  {
     type: 'visu-pid',
     label: 'PID Regler',
     icon: 'Activity',

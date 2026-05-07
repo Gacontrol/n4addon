@@ -55,6 +55,7 @@ import {
   PumpWidgetConfig,
   ValveWidgetConfig,
   SensorWidgetConfig,
+  BoolSensorWidgetConfig,
   PIDWidgetConfig,
   AlarmConsoleWidgetConfig,
   TrendChartConfig,
@@ -68,6 +69,7 @@ import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
 import { VisuSensor } from './VisuSensor';
+import { VisuBoolSensor } from './VisuBoolSensor';
 import { VisuPID } from './VisuPID';
 import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuAlarmConsole } from './VisuAlarmConsole';
@@ -197,6 +199,16 @@ interface SensorParams {
   sensorRangeMax?: number;
 }
 
+interface BoolSensorParams {
+  boolSensorName?: string;
+  boolSensorAlarmOnTrue?: boolean;
+  boolSensorMonitoringEnable?: boolean;
+  boolSensorAlarmDelayMs?: number;
+  boolSensorNormalLabel?: string;
+  boolSensorAlarmLabel?: string;
+  boolSensorSymbolType?: string;
+}
+
 interface PIDParams {
   pidName?: string;
   pidKp?: number;
@@ -247,6 +259,7 @@ interface VisuWidgetProps {
   pumpParams?: PumpParams;
   valveParams?: ValveParams;
   sensorParams?: SensorParams;
+  boolSensorParams?: BoolSensorParams;
   pidParams?: PIDParams;
   heatingCurveParams?: HeatingCurveParams;
   timeProgramParams?: TimeProgramParams;
@@ -331,6 +344,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   pumpParams,
   valveParams,
   sensorParams,
+  boolSensorParams,
   pidParams,
   heatingCurveParams,
   timeProgramParams,
@@ -1382,6 +1396,26 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
         );
       }
 
+      case 'visu-bool-sensor': {
+        const boolSensorCfg = widget.config as BoolSensorWidgetConfig;
+        const boolSensorValues = value as {
+          signalValue?: boolean;
+          alarm?: boolean;
+        } | null;
+        return (
+          <VisuBoolSensor
+            config={boolSensorCfg}
+            value={boolSensorValues ? {
+              signalValue: boolSensorValues.signalValue ?? false,
+              alarm: boolSensorValues.alarm ?? false,
+            } : null}
+            isEditMode={isEditMode}
+            onValueChange={(updates) => onValueChange(updates)}
+            params={boolSensorParams}
+          />
+        );
+      }
+
       case 'visu-pid': {
         const pidCfg = widget.config as PIDWidgetConfig;
         const pidValues = value as {
@@ -1571,6 +1605,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isPumpWidget = widget.type === 'visu-pump';
   const isValveWidget = widget.type === 'visu-valve';
   const isSensorWidget = widget.type === 'visu-sensor';
+  const isBoolSensorWidget = widget.type === 'visu-bool-sensor';
   const isTrendWidget = widget.type === 'visu-trend-chart';
   const isTrendTilesWidget = widget.type === 'visu-trend-tiles';
   const isPIDWidget = widget.type === 'visu-pid';
@@ -1580,7 +1615,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
   const isRemoteVisuWidget = widget.type === 'visu-remote-visu';
   const isLineInDrawingMode = widget.type === 'visu-line' && (widget.config as { x1?: number }).x1 === undefined;
   const isPolygonInDrawingMode = widget.type === 'visu-polygon' && (!(widget.config as { points?: unknown[] }).points || (widget.config as { points?: unknown[] }).points!.length === 0);
-  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isTrendWidget || isTrendTilesWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget || isRemoteVisuWidget;
+  const isTransparentWidget = isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isBoolSensorWidget || isTrendWidget || isTrendTilesWidget || isPIDWidget || isHeatingCurveWidget || isAlarmConsoleWidget || is3DBuildingWidget || isRemoteVisuWidget;
 
   const highlightStyle = isHighlighted ? {
     boxShadow: '0 0 0 4px #ec4899, 0 0 20px 8px rgba(236, 72, 153, 0.5)',
@@ -1591,7 +1626,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
     <div
       data-widget-id={widget.id}
       data-widget-locked={widget.locked ? 'true' : undefined}
-      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
+      className={`absolute ${isEditMode && !widget.locked ? 'cursor-move' : ''} ${isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isBoolSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? '' : 'flex items-center justify-center'} ${isHighlighted ? 'z-[9999]' : ''}`}
       style={{
         left: widget.position.x,
         top: widget.position.y,
@@ -1618,7 +1653,7 @@ export const VisuWidgetRenderer: React.FC<VisuWidgetProps> = ({
           : ((!isTransparentWidget && !isNavWidget && widget.style.theme && widget.style.theme !== 'default') ? themeVars.boxShadow : undefined),
         backdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
         WebkitBackdropFilter: (!isTransparentWidget && !isNavWidget && themeVars.backdropFilter) ? themeVars.backdropFilter : undefined,
-        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? 0 : 8,
+        padding: isDrawingWidget || isNavWidget || isModernWidget || isDashWidget || isPumpWidget || isValveWidget || isSensorWidget || isBoolSensorWidget || is3DBuildingWidget || isRemoteVisuWidget ? 0 : 8,
         overflow: is3DBuildingWidget || isRemoteVisuWidget ? 'hidden' : undefined,
         transition: isHighlighted ? 'box-shadow 0.3s ease-in-out, border 0.3s ease-in-out' : undefined
       } as React.CSSProperties}

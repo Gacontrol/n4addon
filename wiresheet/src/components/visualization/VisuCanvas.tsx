@@ -260,6 +260,15 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       };
     }
 
+    if (widget.type === 'visu-bool-sensor') {
+      const node = logicNodes.find(n => n.id === nodeId);
+      if (!node || node.type !== 'bool-sensor-control') return null;
+      return {
+        signalValue: liveValues[`${nodeId}:output-0`] ?? false,
+        alarm: liveValues[`${nodeId}:output-1`] ?? false,
+      };
+    }
+
     if (widget.type === 'visu-pid') {
       const node = logicNodes.find(n => n.id === nodeId);
       if (!node || node.type !== 'pid-controller') return null;
@@ -387,6 +396,25 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
       sensorAlarmDelayMs: cfg.sensorAlarmDelayMs,
       sensorRangeMin: cfg.sensorRangeMin,
       sensorRangeMax: cfg.sensorRangeMax
+    };
+  }, [logicNodes]);
+
+  const getBoolSensorWidgetParams = useCallback((widget: VisuWidget) => {
+    if (widget.type !== 'visu-bool-sensor' || !widget.binding) return undefined;
+    const node = logicNodes.find(n => n.id === parseDpKey(widget.binding?.dpKey).nodeId);
+    if (!node || node.type !== 'bool-sensor-control') return undefined;
+    const cfg = node.data.config || {};
+    const customLabel = cfg.customLabel as string | undefined;
+    const configName = cfg.boolSensorName as string | undefined;
+    const nodeName = configName || customLabel || node.data.label || 'Bool-Sensor';
+    return {
+      boolSensorName: nodeName,
+      boolSensorAlarmOnTrue: cfg.boolSensorAlarmOnTrue,
+      boolSensorMonitoringEnable: cfg.boolSensorMonitoringEnable,
+      boolSensorAlarmDelayMs: cfg.boolSensorAlarmDelayMs,
+      boolSensorNormalLabel: cfg.boolSensorNormalLabel,
+      boolSensorAlarmLabel: cfg.boolSensorAlarmLabel,
+      boolSensorSymbolType: cfg.boolSensorSymbolType,
     };
   }, [logicNodes]);
 
@@ -1234,6 +1262,7 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
               pumpParams={getPumpWidgetParams(widget)}
               valveParams={getValveWidgetParams(widget)}
               sensorParams={getSensorWidgetParams(widget)}
+              boolSensorParams={getBoolSensorWidgetParams(widget)}
               pidParams={getPIDWidgetParams(widget)}
               heatingCurveParams={getHeatingCurveWidgetParams(widget)}
               timeProgramParams={getTimeProgramWidgetParams(widget)}

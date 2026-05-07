@@ -34,6 +34,7 @@ const NODE_TYPE_SLOTS = {
   'aggregate-control': { inputs: [{ id: 'start', label: 'StartCmd' }, { id: 'fb', label: 'Feedback' }, { id: 'fault', label: 'Fault' }, { id: 'rev', label: 'Revision' }, { id: 'hand', label: 'HandStart' }, { id: 'spd', label: 'SpeedSP' }, { id: 'rst', label: 'Reset' }], outputs: [{ id: 'cmd', label: 'Cmd' }, { id: 'spdout', label: 'SpeedOut' }, { id: 'run', label: 'Running' }, { id: 'fout', label: 'Fault' }, { id: 'ready', label: 'Ready' }, { id: 'alarm', label: 'Alarm' }, { id: 'hours', label: 'OpHours' }, { id: 'starts', label: 'Starts' }] },
   'valve-control':     { inputs: [{ id: 'sp', label: 'Setpoint' }, { id: 'fb', label: 'Feedback' }, { id: 'rst', label: 'Reset' }], outputs: [{ id: 'out', label: 'ValveOut' }, { id: 'alarm', label: 'Alarm' }] },
   'sensor-control':    { inputs: [{ id: 'in', label: 'SensorIn' }, { id: 'rst', label: 'AlarmReset' }], outputs: [{ id: 'out', label: 'SensorOut' }, { id: 'alarm', label: 'Alarm' }] },
+  'bool-sensor-control': { inputs: [{ id: 'in', label: 'SignalIn' }, { id: 'rst', label: 'AlarmReset' }], outputs: [{ id: 'out', label: 'SignalOut' }, { id: 'alarm', label: 'Alarm' }] },
   'time-program':      { inputs: [], outputs: [{ id: 'out', label: 'Ausgang' }] },
   'python-script':     { inputs: [{ id: 'in', label: 'Eingang' }], outputs: [{ id: 'out', label: 'Ausgang' }] },
   'case-container':    { inputs: [{ id: 'case', label: 'Case' }], outputs: [] },
@@ -2934,6 +2935,7 @@ function getDefaultValueForNodeType(nodeType) {
     case 'pump-control':
     case 'valve-control':
     case 'sensor-control':
+    case 'bool-sensor-control':
     case 'modbus-device-input':
     case 'modbus-device-output':
     case 'time-trigger':
@@ -3020,6 +3022,10 @@ function getDefaultOutputsForNodeType(node) {
       break;
     case 'sensor-control':
       defaults['output-0'] = 0;
+      defaults['output-1'] = false;
+      break;
+    case 'bool-sensor-control':
+      defaults['output-0'] = false;
       defaults['output-1'] = false;
       break;
     case 'python-script': {
@@ -3437,7 +3443,7 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
           nodeValues[nodeId] = node.type === 'dp-boolean' ? false : 0;
         }
       }
-    } else if (dpStore.get(nodeId) !== undefined && !['dp-boolean','dp-numeric','dp-enum','and-gate','or-gate','xor-gate','not-gate','switch','select','math-add','math-sub','math-mul','math-div','math-min','math-max','math-avg','math-abs','const-value','compare','threshold','timer','delay','pump-control','aggregate-control','valve-control','sensor-control','pid-controller','heating-curve','smoothing','counter','sr-flipflop','rs-flipflop','rising-edge','falling-edge','time-trigger','time-program','python-script','scaling','case-container','modbus-device','modbus-device-output','modbus-driver','ha-input','ha-output','remote-ga-output','sequence-control','light-toggle','state-trigger'].includes(node.type)) {
+    } else if (dpStore.get(nodeId) !== undefined && !['dp-boolean','dp-numeric','dp-enum','and-gate','or-gate','xor-gate','not-gate','switch','select','math-add','math-sub','math-mul','math-div','math-min','math-max','math-avg','math-abs','const-value','compare','threshold','timer','delay','pump-control','aggregate-control','valve-control','sensor-control','bool-sensor-control','pid-controller','heating-curve','smoothing','counter','sr-flipflop','rs-flipflop','rising-edge','falling-edge','time-trigger','time-program','python-script','scaling','case-container','modbus-device','modbus-device-output','modbus-driver','ha-input','ha-output','remote-ga-output','sequence-control','light-toggle','state-trigger'].includes(node.type)) {
       const ov = dpStore.get(nodeId);
       nodeValues[nodeId] = ov;
     } else if (node.type === 'and-gate') {
@@ -4077,6 +4083,47 @@ async function executePageLogic(nodes, connections, manualOverrides = {}, pageId
       nodeValues[`${nodeId}:input-0`] = sensorIn;
       nodeValues[`${nodeId}:hoaMode`] = visuHOA;
       nodeValues[`${nodeId}:manualValue`] = manualValue;
+    } else if (node.type === 'bool-sensor-control') {
+      const signalIn = toBool(inputVals[0]);
+      const resetInputWire = toBool(inputVals[1]);
+
+      const visuReset = cfg.boolSensorVisuReset;
+      const resetInput = visuReset === true ? true : resetInputWire;
+
+      const alarmOnTrue = cfg.boolSensorAlarmOnTrue !== false;
+      const monitoringEnable = cfg.boolSensorMonitoringEnable !== false;
+      const alarmDelayMs = cfg.boolSensorAlarmDelayMs ?? 5000;
+
+      const now = Date.now();
+      const st = pageId ? getNodeState(pageId, nodeId) : node.__boolSensorState || (node.__boolSensorState = {});
+
+      if (st.alarmTimerStart === undefined) st.alarmTimerStart = null;
+      if (st.alarmLatch === undefined) st.alarmLatch = false;
+
+      // Signal causes alarm when it matches the configured alarm-trigger value
+      const alarmCondition = alarmOnTrue ? signalIn : !signalIn;
+
+      if (resetInput && st.alarmLatch) {
+        st.alarmLatch = false;
+        st.alarmTimerStart = null;
+        if (visuReset === true) cfg.boolSensorVisuReset = false;
+      }
+
+      if (monitoringEnable && alarmCondition) {
+        if (st.alarmTimerStart === null) {
+          st.alarmTimerStart = now;
+        } else if (now - st.alarmTimerStart >= alarmDelayMs) {
+          st.alarmLatch = true;
+        }
+      } else {
+        st.alarmTimerStart = null;
+      }
+
+      nodeValues[nodeId] = signalIn;
+      nodeValues[`${nodeId}:output-0`] = signalIn;
+      nodeValues[`${nodeId}:output-1`] = st.alarmLatch;
+      nodeValues[`${nodeId}:input-0`] = signalIn;
+      nodeValues[`${nodeId}:signalValue`] = signalIn;
     } else if (node.type === 'pid-controller') {
       const setpoint = toNumber(inputVals[0]);
       const actualValue = toNumber(inputVals[1]);
@@ -5094,6 +5141,14 @@ function expandCompositeControl(nodeId, ctrl, rawValue, resolvedNodeType) {
     }
     return writes;
   }
+  const boolSensorCtrl = rawValue.boolSensorControl;
+  if (boolSensorCtrl) {
+    if (boolSensorCtrl.reset !== undefined) writes.push({ dpKey: `${nodeId}:cfg:boolSensorVisuReset`, value: boolSensorCtrl.reset });
+    for (const key of Object.keys(boolSensorCtrl)) {
+      if (key.startsWith('param_')) writes.push({ dpKey: `${nodeId}:cfg:${key.slice(6)}`, value: boolSensorCtrl[key] });
+    }
+    return writes;
+  }
   const hcCtrl = rawValue.heatingCurveControl;
   if (hcCtrl) {
     for (const key of Object.keys(hcCtrl)) {
@@ -5135,7 +5190,7 @@ app.post(['/visu/write-value', '/api/visu/write-value'], async (req, res) => {
     let writes = [];
     if (rawValue && typeof rawValue === 'object' && (
       rawValue.pumpControl || rawValue.aggregateControl || rawValue.valveControl ||
-      rawValue.sensorControl || rawValue.heatingCurveControl || rawValue.pidControl ||
+      rawValue.sensorControl || rawValue.boolSensorControl || rawValue.heatingCurveControl || rawValue.pidControl ||
       rawValue.sequenceControl
     )) {
       let resolvedNodeType = null;

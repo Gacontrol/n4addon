@@ -62,6 +62,7 @@ export type WidgetType =
   | 'visu-pump'
   | 'visu-valve'
   | 'visu-sensor'
+  | 'visu-bool-sensor'
   | 'visu-pid'
   | 'visu-heating-curve'
   | 'visu-alarm-console'
@@ -452,6 +453,7 @@ export type WidgetConfig =
   | PumpWidgetConfig
   | ValveWidgetConfig
   | SensorWidgetConfig
+  | BoolSensorWidgetConfig
   | PIDWidgetConfig
   | HeatingCurveWidgetConfig
   | AlarmConsoleWidgetConfig
@@ -731,6 +733,21 @@ export interface SensorWidgetConfig {
   showValue?: boolean;
   showUnit?: boolean;
   showLimits?: boolean;
+  widgetSize?: WidgetSizePreset;
+  labelPosition?: LabelPosition;
+  fontSize?: number;
+  fontFamily?: FontFamily;
+}
+
+export type BoolSensorSymbolType = 'filter' | 'frost' | 'humidity' | 'pressure' | 'fire' | 'generic' | 'none';
+
+export interface BoolSensorWidgetConfig {
+  boolSensorName?: string;
+  normalColor?: string;
+  alarmColor?: string;
+  rotation?: 0 | 90 | 180 | 270;
+  symbolType?: BoolSensorSymbolType;
+  showStatus?: boolean;
   widgetSize?: WidgetSizePreset;
   labelPosition?: LabelPosition;
   fontSize?: number;

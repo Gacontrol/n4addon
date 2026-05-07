@@ -1522,6 +1522,24 @@ function App() {
           }
         }
       }
+
+      if (node.type === 'bool-sensor-control' && config.boolSensorAlarmConfig) {
+        const alarmCfg = config.boolSensorAlarmConfig as SensorAlarmConfig;
+        if (alarmCfg.alarmClassId) {
+          const alarmValue = liveValues[`${node.id}:output-1`];
+          const boolSensorName = config.boolSensorName || nodeLabel;
+          if (alarmValue === true) {
+            trigger(node.id, alarmCfg.alarmClassId, `${boolSensorName}: Alarm`, 'sensor', {
+              sourceNodeName: boolSensorName,
+              sourcePageId: pageInfo?.pageId,
+              sourcePageName: pageInfo?.pageName,
+              value: true
+            });
+          } else {
+            clearBySource(node.id, 'sensor');
+          }
+        }
+      }
     });
   }, [liveValuesJson, allLogicNodes, alarmClasses, nodeToPageMap]);
 
@@ -1532,7 +1550,7 @@ function App() {
 
     const compositeValue = value as Record<string, Record<string, unknown>> | null;
     const compositeCtrl = compositeValue && typeof compositeValue === 'object'
-      ? (compositeValue.pidControl || compositeValue.heatingCurveControl || compositeValue.pumpControl || compositeValue.aggregateControl || compositeValue.valveControl || compositeValue.sensorControl)
+      ? (compositeValue.pidControl || compositeValue.heatingCurveControl || compositeValue.pumpControl || compositeValue.aggregateControl || compositeValue.valveControl || compositeValue.sensorControl || compositeValue.boolSensorControl)
       : null;
 
     if (compositeValue && typeof compositeValue === 'object' && compositeValue.timeProgramControl) {
