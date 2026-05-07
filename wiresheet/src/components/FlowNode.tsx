@@ -952,34 +952,39 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                           const displayVal = hasValue
                             ? (String(vb.value).length > 6 ? String(vb.value).slice(0, 6) + '..' : String(vb.value))
                             : null;
+                          const isRoom = vb.pageId.startsWith('room:');
+                          const colorText = isRoom ? 'text-teal-400' : 'text-pink-400';
+                          const colorBg = isRoom ? 'bg-teal-950/60 hover:bg-teal-900/80' : 'bg-pink-950/60 hover:bg-pink-900/80';
+                          const colorVal = isRoom ? 'text-teal-300 bg-teal-900/60' : 'text-pink-300 bg-pink-900/60';
+                          const lineColor = isRoom ? '#14b8a6' : '#ec4899';
                           return (
                             <div key={vbi} className="flex items-center group/visu-binding">
                               <button
                                 className="p-0.5 rounded hover:bg-red-600/60 opacity-0 group-hover/visu-binding:opacity-100 transition-opacity mr-0.5"
-                                title="Visu-Verbindung loeschen"
+                                title="Verbindung loeschen"
                                 onClick={(e) => { e.stopPropagation(); onVisuBindingDelete?.(vb); }}
                                 onPointerDown={(e) => e.stopPropagation()}
                               >
                                 <Icons.X className="w-3 h-3 text-red-400" />
                               </button>
                               <span
-                                className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap text-pink-400 bg-pink-950/60 hover:bg-pink-900/80 transition-colors cursor-pointer"
-                                title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
+                                className={`text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap ${colorText} ${colorBg} transition-colors cursor-pointer`}
+                                title={`${isRoom ? 'Panel' : 'Visu'}: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
                                 onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
                                 onPointerDown={(e) => e.stopPropagation()}
                               >
                                 <span className="inline-flex items-center gap-1">
-                                  <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
-                                  Visu: {vb.pageName} / {vb.widgetLabel}
+                                  {isRoom ? <Icons.Layout className="w-2.5 h-2.5 flex-shrink-0" /> : <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />}
+                                  {isRoom ? `Panel: ${vb.pageName} / ${vb.widgetLabel}` : `Visu: ${vb.pageName} / ${vb.widgetLabel}`}
                                   {hasValue && (
-                                    <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
+                                    <span className={`font-mono text-[8px] px-1 rounded ${colorVal}`}>
                                       {displayVal}
                                     </span>
                                   )}
                                 </span>
                               </span>
                               <svg width="20" height="20" className="flex-shrink-0">
-                                <line x1="0" y1="10" x2="20" y2="10" stroke="#ec4899" strokeWidth="2" strokeDasharray="4 2" />
+                                <line x1="0" y1="10" x2="20" y2="10" stroke={lineColor} strokeWidth="2" strokeDasharray="4 2" />
                               </svg>
                             </div>
                           );
@@ -1218,22 +1223,30 @@ export const FlowNode: React.FC<FlowNodeProps> = ({
                   >
                     <Icons.X className="w-3 h-3 text-red-400" />
                   </button>
-                  <div
-                    className="flex items-center gap-1 text-[9px] text-pink-400 bg-pink-950/60 px-1.5 py-0.5 rounded leading-none cursor-pointer hover:bg-pink-900/80 transition-colors"
-                    title={`Visu: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
-                    onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />
-                    <span className="truncate max-w-[120px]">
-                      Visu: {vb.pageName} / {vb.widgetLabel}
-                    </span>
-                    {hasValue && (
-                      <span className="font-mono text-[8px] text-pink-300 bg-pink-900/60 px-1 rounded">
-                        {displayVal}
-                      </span>
-                    )}
-                  </div>
+                  {(() => {
+                    const isRoom = vb.pageId.startsWith('room:');
+                    const colorText = isRoom ? 'text-teal-400' : 'text-pink-400';
+                    const colorBg = isRoom ? 'bg-teal-950/60 hover:bg-teal-900/80' : 'bg-pink-950/60 hover:bg-pink-900/80';
+                    const colorVal = isRoom ? 'text-teal-300 bg-teal-900/60' : 'text-pink-300 bg-pink-900/60';
+                    return (
+                      <div
+                        className={`flex items-center gap-1 text-[9px] ${colorText} ${colorBg} px-1.5 py-0.5 rounded leading-none cursor-pointer transition-colors`}
+                        title={`${isRoom ? 'Panel' : 'Visu'}: ${vb.pageName} / ${vb.widgetLabel}${vb.paramKey ? ` -> ${vb.paramKey}` : ''} (${vb.isWrite ? 'Write' : 'Read'})${hasValue ? ` = ${vb.value}` : ''} - Klicken zum Anzeigen`}
+                        onClick={(e) => { e.stopPropagation(); onVisuBindingClick?.(vb); }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        {isRoom ? <Icons.Layout className="w-2.5 h-2.5 flex-shrink-0" /> : <Icons.Monitor className="w-2.5 h-2.5 flex-shrink-0" />}
+                        <span className="truncate max-w-[120px]">
+                          {isRoom ? `Panel: ${vb.pageName} / ${vb.widgetLabel}` : `Visu: ${vb.pageName} / ${vb.widgetLabel}`}
+                        </span>
+                        {hasValue && (
+                          <span className={`font-mono text-[8px] px-1 rounded ${colorVal}`}>
+                            {displayVal}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

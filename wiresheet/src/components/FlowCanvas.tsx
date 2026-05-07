@@ -59,6 +59,8 @@ interface FlowCanvasProps {
   onVisuBindingDelete?: (binding: VisuBindingInfo) => void;
   onInsertNodeIntoConnection?: (nodeId: string, connectionId: string) => void;
   monitorConfigs?: Record<string, RoomMonitorConfig>;
+  roomNames?: Record<string, string>;
+  datapointLabels?: Record<string, string>;
 }
 
 export const FlowCanvas: React.FC<FlowCanvasProps> = ({
@@ -107,6 +109,8 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onVisuBindingDelete,
   onInsertNodeIntoConnection,
   monitorConfigs = {},
+  roomNames = {},
+  datapointLabels = {},
 }) => {
 
   const getVisuBindingsForNode = useCallback((nodeId: string): VisuBindingInfo[] => {
@@ -149,9 +153,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         const cleanId = refId.startsWith('ext-') ? refId.slice(4) : refId;
         if (cleanId !== nodeId) continue;
         const isWrite = dp.writable && (dp.widgetType === 'slider' || dp.widgetType === 'incrementer' || dp.widgetType === 'switch');
+        const roomLabel = roomNames[cfg.roomId] || cfg.roomId;
+        const dpLabel = dp.label || datapointLabels[nodeId] || nodeId;
         result.push({
-          widgetLabel: dp.label || dp.widgetType,
-          pageName: `Raum: ${cfg.roomId}`,
+          widgetLabel: dpLabel,
+          pageName: roomLabel,
           pageId: `room:${cfg.roomId}`,
           widgetId: `room:${cfg.roomId}:${dp.datapointId}`,
           portId: undefined,

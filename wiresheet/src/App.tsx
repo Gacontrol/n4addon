@@ -34,6 +34,18 @@ import {
 function App() {
   const { activeBuildingId, buildings, setDatapointGroups, monitorConfigs } = useBuildingContext();
 
+  const roomNames = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const b of buildings) {
+      for (const f of b.floors) {
+        for (const r of f.rooms) {
+          map[r.id] = r.name;
+        }
+      }
+    }
+    return map;
+  }, [buildings]);
+
   const {
     pages,
     activePage,
@@ -1108,6 +1120,13 @@ function App() {
   }, []);
 
   const handleVisuBindingClick = useCallback((binding: VisuBindingInfo) => {
+    if (binding.pageId.startsWith('room:')) {
+      // Navigate to room config editor
+      const roomId = binding.pageId.slice(5); // strip "room:"
+      setActiveRoomId(roomId);
+      setMainView('roomConfig');
+      return;
+    }
     setActiveVisuPageId(binding.pageId);
     setMainView('visu');
     setHighlightedWidgetId(binding.widgetId);
@@ -1285,6 +1304,16 @@ function App() {
   })).filter(g => g.datapoints.length > 0), [pages]);
 
   useEffect(() => { setDatapointGroups(appLogicPageGroups); }, [appLogicPageGroups, setDatapointGroups]);
+
+  const datapointLabels = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const grp of appLogicPageGroups) {
+      for (const dp of grp.datapoints) {
+        if (dp.label && dp.label !== dp.entityId) map[dp.entityId] = dp.label;
+      }
+    }
+    return map;
+  }, [appLogicPageGroups]);
 
   useEffect(() => {
     const nodeIdSet = new Set(allNodeIdsStr.split(',').filter(Boolean));
@@ -2069,6 +2098,8 @@ function App() {
               onVisuBindingDelete={handleVisuBindingDelete}
               onInsertNodeIntoConnection={insertNodeIntoConnection}
               monitorConfigs={monitorConfigs}
+              roomNames={roomNames}
+              datapointLabels={datapointLabels}
             />
 
             <DriverPanel
