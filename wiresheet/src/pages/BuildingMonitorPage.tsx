@@ -262,6 +262,7 @@ export function BuildingMonitorPage({ buildingId: propBuildingId, onBack, onOpen
             showGrid={canvas3D.showGrid}
             autoRotate={canvas3D.autoRotate}
             onRoomHover={handleRoomHover}
+            liveValues={liveValues as Record<string, string | number>}
           />
 
           <div className="absolute bottom-4 left-4 pointer-events-none">
