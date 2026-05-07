@@ -338,15 +338,20 @@ function ChartWidget({ cfg, val, accent }: { cfg: RoomDataPointConfig; val: unkn
 
   useEffect(() => {
     const nodeId = (cfg.sourceDatapoint || cfg.datapointId).replace(/^ext-/, '');
-    const now = Date.now();
-    const from = now - 3600000; // last 1h
-    fetch(`${apiBase}/trend-data?nodeId=${encodeURIComponent(nodeId)}&from=${from}&to=${now}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(json => {
-        if (!json?.data) return;
-        setPoints((json.data as { ts: number; v: unknown }[]).filter(p => typeof p.v === 'number').map(p => ({ ts: p.ts, v: p.v as number })));
-      })
-      .catch(() => {});
+    const load = () => {
+      const now = Date.now();
+      const from = now - 3600000;
+      fetch(`${apiBase}/trend-data?nodeId=${encodeURIComponent(nodeId)}&from=${from}&to=${now}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(json => {
+          if (!json?.data) return;
+          setPoints((json.data as { ts: number; v: unknown }[]).filter(p => typeof p.v === 'number').map(p => ({ ts: p.ts, v: p.v as number })));
+        })
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, [cfg.sourceDatapoint, cfg.datapointId, apiBase]);
 
   const numVal = typeof val === 'number' ? val : (typeof val === 'string' ? parseFloat(val) : NaN);
@@ -355,15 +360,17 @@ function ChartWidget({ cfg, val, accent }: { cfg: RoomDataPointConfig; val: unkn
 
   // Build SVG polyline from points
   const svgContent = useMemo(() => {
-    if (points.length < 2) return null;
-    const vals = points.map(p => p.v);
-    const times = points.map(p => p.ts);
+    if (points.length === 0) return null;
+    // Pad single point to draw a flat line
+    const pts = points.length === 1 ? [{ ts: points[0].ts - 1000, v: points[0].v }, points[0]] : points;
+    const vals = pts.map(p => p.v);
+    const times = pts.map(p => p.ts);
     const minV = Math.min(...vals), maxV = Math.max(...vals);
     const minT = Math.min(...times), maxT = Math.max(...times);
     const W = 80, H = 20, pad = 1;
     const sx = (t: number) => maxT === minT ? pad : pad + ((t - minT) / (maxT - minT)) * (W - 2 * pad);
     const sy = (v: number) => maxV === minV ? H / 2 : (H - pad) - ((v - minV) / (maxV - minV)) * (H - 2 * pad);
-    const line = points.map(p => `${sx(p.ts)},${sy(p.v)}`).join(' ');
+    const line = pts.map(p => `${sx(p.ts)},${sy(p.v)}`).join(' ');
     const fill = `${sx(times[0])},${H} ${line} ${sx(times[times.length - 1])},${H}`;
     return { line, fill, W, H };
   }, [points]);
@@ -624,16 +631,17 @@ function RoomTrendTab({ dps, liveValues }: { dps: RoomDataPointConfig[]; liveVal
 
   // Simple SVG sparkline chart
   function Sparkline({ ser, width = 260, height = 80 }: { ser: TrendSer; width?: number; height?: number }) {
-    if (ser.data.length < 2) return <div className="text-[10px] text-slate-600 flex items-center justify-center h-16">Keine Daten</div>;
-    const vals = ser.data.map(p => p.v);
-    const times = ser.data.map(p => p.ts);
+    if (ser.data.length === 0) return <div className="text-[10px] text-slate-600 flex items-center justify-center h-16">Keine Daten</div>;
+    const rawData = ser.data.length === 1 ? [{ ts: ser.data[0].ts - 1000, v: ser.data[0].v }, ser.data[0]] : ser.data;
+    const vals = rawData.map(p => p.v);
+    const times = rawData.map(p => p.ts);
     const minV = Math.min(...vals), maxV = Math.max(...vals);
     const minT = Math.min(...times), maxT = Math.max(...times);
     const pad = 4;
     const scaleX = (t: number) => maxT === minT ? pad : pad + ((t - minT) / (maxT - minT)) * (width - 2 * pad);
     const scaleY = (v: number) => maxV === minV ? height / 2 : (height - pad) - ((v - minV) / (maxV - minV)) * (height - 2 * pad);
-    const points = ser.data.map(p => `${scaleX(p.ts)},${scaleY(p.v)}`).join(' ');
-    const last = ser.data[ser.data.length - 1];
+    const points = rawData.map(p => `${scaleX(p.ts)},${scaleY(p.v)}`).join(' ');
+    const last = rawData[rawData.length - 1];
     const live = liveValues[(ser.nodeId).replace(/^ext-/, '')] as number | undefined;
     return (
       <div className="relative">

@@ -356,6 +356,7 @@ interface PaletteSource {
   minValue?: number;
   maxValue?: number;
   isBinding: boolean;
+  pageName?: string;
 }
 
 // ---- Helpers ----
@@ -890,6 +891,7 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
             datapoint: dp.entityId,
             category: 'generic',
             isBinding: false,
+            pageName: grp.pageName,
           });
         }
       }
@@ -1324,9 +1326,11 @@ export function PanelDesigner({ room, floorName, buildingId, datapointGroups = [
                     className="w-full flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs hover:border-sky-600 transition-colors group">
                     <Link size={10} className="text-slate-500 shrink-0 group-hover:text-sky-500 transition-colors" />
                     <span className={['flex-1 text-left truncate text-[10px]', selected.sourceDatapoint ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
-                      {selected.sourceDatapoint
-                        ? (allSources.find(s => s.datapoint === selected.sourceDatapoint)?.label || selected.sourceDatapoint)
-                        : 'Datenpunkt wählen…'}
+                      {selected.sourceDatapoint ? (() => {
+                        const src = allSources.find(s => s.datapoint === selected.sourceDatapoint);
+                        const lbl = src?.label || selected.sourceDatapoint;
+                        return src?.pageName ? <><span className="text-slate-500">{src.pageName} · </span>{lbl}</> : lbl;
+                      })() : 'Datenpunkt wählen…'}
                     </span>
                     <ChevronRight size={10} className="text-slate-600 shrink-0" />
                   </button>
