@@ -90,6 +90,8 @@ const PUMP_CONTROL_NODE_TYPE = 'pump-control';
 const AGGREGATE_CONTROL_NODE_TYPE = 'aggregate-control';
 const VALVE_CONTROL_NODE_TYPE = 'valve-control';
 const SENSOR_CONTROL_NODE_TYPE = 'sensor-control';
+const BOOL_SENSOR_WIDGET_TYPE = 'visu-bool-sensor';
+const BOOL_SENSOR_CONTROL_NODE_TYPE = 'bool-sensor-control';
 const PID_CONTROL_NODE_TYPE = 'pid-controller';
 const HEATING_CURVE_NODE_TYPE = 'heating-curve';
 const TIME_PROGRAM_NODE_TYPE = 'time-program';
@@ -130,6 +132,16 @@ const SENSOR_SYMBOL_OPTIONS = [
   { value: 'flow', label: 'Durchfluss (Q)' },
   { value: 'level', label: 'Fuellstand (L)' },
   { value: 'generic', label: 'Allgemein' }
+];
+
+const BOOL_SENSOR_SYMBOL_OPTIONS = [
+  { value: 'filter',   label: 'Filterueberwachung' },
+  { value: 'frost',    label: 'Frostschutz' },
+  { value: 'humidity', label: 'Hygrostat / Feuchte' },
+  { value: 'pressure', label: 'Druckueberwachung' },
+  { value: 'fire',     label: 'Brandmeldung' },
+  { value: 'generic',  label: 'Allgemein' },
+  { value: 'none',     label: 'Kein Symbol' },
 ];
 
 const PID_SYMBOL_OPTIONS = [
@@ -502,6 +514,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const isPumpWidget = widget.type === PUMP_WIDGET_TYPE;
   const isValveWidget = widget.type === VALVE_WIDGET_TYPE;
   const isSensorWidget = widget.type === SENSOR_WIDGET_TYPE;
+  const isBoolSensorWidget = widget.type === BOOL_SENSOR_WIDGET_TYPE;
   const isPIDWidget = widget.type === PID_WIDGET_TYPE;
   const isHeatingCurveWidget = widget.type === HEATING_CURVE_WIDGET_TYPE;
   const isTimeProgramWidget = widget.type === TIME_PROGRAM_WIDGET_TYPE;
@@ -511,6 +524,7 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
   const pumpControlNodes = availableNodes.filter(n => n.type === PUMP_CONTROL_NODE_TYPE || n.type === AGGREGATE_CONTROL_NODE_TYPE);
   const valveControlNodes = availableNodes.filter(n => n.type === VALVE_CONTROL_NODE_TYPE);
   const sensorControlNodes = availableNodes.filter(n => n.type === SENSOR_CONTROL_NODE_TYPE);
+  const boolSensorControlNodes = availableNodes.filter(n => n.type === BOOL_SENSOR_CONTROL_NODE_TYPE);
   const pidControlNodes = availableNodes.filter(n => n.type === PID_CONTROL_NODE_TYPE);
   const heatingCurveNodes = availableNodes.filter(n => n.type === HEATING_CURVE_NODE_TYPE);
   const timeProgramNodes = availableNodes.filter(n => n.type === TIME_PROGRAM_NODE_TYPE);
@@ -571,6 +585,10 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
     }
     if (isValveWidget && node?.type === VALVE_CONTROL_NODE_TYPE) {
       onUpdate({ binding: migrateBinding({ nodeId, direction: 'readwrite' }) });
+      return;
+    }
+    if (isBoolSensorWidget && node?.type === BOOL_SENSOR_CONTROL_NODE_TYPE) {
+      onUpdate({ binding: migrateBinding({ nodeId, direction: 'read' }) });
       return;
     }
     if (isSequenceWidget && node?.type === SEQUENCE_CONTROL_NODE_TYPE) {
@@ -2231,6 +2249,129 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
         );
       }
 
+      case 'visu-bool-sensor': {
+        const bsCfg = config as { boolSensorName?: string; normalColor?: string; alarmColor?: string; rotation?: number; symbolType?: string; showStatus?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
+        return (
+          <>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Symbol</label>
+              <select
+                value={bsCfg.symbolType || 'filter'}
+                onChange={(e) => onUpdate({ config: { ...config, symbolType: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {BOOL_SENSOR_SYMBOL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Bildgroesse</label>
+              <select
+                value={bsCfg.widgetSize || 'medium'}
+                onChange={(e) => onUpdate({ config: { ...config, widgetSize: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {WIDGET_SIZE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Name (leer = vom Baustein)</label>
+              <input
+                type="text"
+                value={bsCfg.boolSensorName || ''}
+                placeholder="Name vom verknuepften Baustein"
+                onChange={(e) => onUpdate({ config: { ...config, boolSensorName: e.target.value || undefined } as Record<string, unknown> })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 placeholder-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Drehung</label>
+              <select
+                value={bsCfg.rotation ?? 0}
+                onChange={(e) => onUpdate({ config: { ...config, rotation: parseInt(e.target.value) as 0 | 90 | 180 | 270 } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {ROTATION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Text-Position</label>
+              <select
+                value={bsCfg.labelPosition || 'bottom'}
+                onChange={(e) => onUpdate({ config: { ...config, labelPosition: e.target.value } })}
+                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+              >
+                {LABEL_POSITION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftgroesse</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={32}
+                  value={bsCfg.fontSize ?? 12}
+                  onChange={(e) => onUpdate({ config: { ...config, fontSize: parseInt(e.target.value) || 12 } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Schriftart</label>
+                <select
+                  value={bsCfg.fontFamily || 'system'}
+                  onChange={(e) => onUpdate({ config: { ...config, fontFamily: e.target.value } })}
+                  className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-sm text-slate-200"
+                >
+                  {FONT_FAMILY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Farbe Normal</label>
+                <input
+                  type="color"
+                  value={bsCfg.normalColor || '#22c55e'}
+                  onChange={(e) => onUpdate({ config: { ...config, normalColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Farbe Alarm</label>
+                <input
+                  type="color"
+                  value={bsCfg.alarmColor || '#ef4444'}
+                  onChange={(e) => onUpdate({ config: { ...config, alarmColor: e.target.value } })}
+                  className="w-full h-8 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5 border-t border-slate-700 pt-2">
+              <label className="block text-xs text-slate-500">Anzeige-Optionen</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={bsCfg.showStatus !== false}
+                  onChange={(e) => onUpdate({ config: { ...config, showStatus: e.target.checked } })}
+                  className="rounded"
+                />
+                <label className="text-xs text-slate-400">Status-Text anzeigen</label>
+              </div>
+            </div>
+          </>
+        );
+      }
+
       case 'visu-pid': {
         const pidCfg = config as { pidName?: string; normalColor?: string; activeColor?: string; rotation?: number; symbolType?: string; showSetpoint?: boolean; showActualValue?: boolean; showOutput?: boolean; widgetSize?: string; labelPosition?: string; fontSize?: number; fontFamily?: string };
         return (
@@ -3749,6 +3890,36 @@ export const WidgetPropertiesPanel: React.FC<WidgetPropertiesPanelProps> = ({
                     <Activity className="w-3 h-3 text-sky-400 shrink-0" />
                     <span className="text-[10px] text-slate-400">Messwert:</span>
                     <span className="text-[10px] font-mono text-sky-300 ml-auto">{Number(liveValues[`${bindingNodeId}:output-0`] ?? 0).toFixed(2).replace(/\.00$/, '')}</span>
+                  </div>
+                )}
+              </>
+            ) : isBoolSensorWidget ? (
+              <>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Verknuepfe dieses Bool-Sensor-Widget mit einem Bool-Sensorbaustein um Signal und Alarmzustand anzuzeigen.
+                </p>
+                {boolSensorControlNodes.length === 0 ? (
+                  <div className="flex items-center gap-2 p-2 bg-amber-900/20 border border-amber-700 rounded">
+                    <Settings className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs text-amber-400">Kein Bool-Sensorbaustein in der Logik vorhanden. Bitte zuerst einen Bool-Sensorbaustein hinzufuegen.</span>
+                  </div>
+                ) : (
+                  <NodeBrowser
+                    nodes={boolSensorControlNodes}
+                    logicSheets={logicSheets}
+                    selectedNodeId={bindingNodeId}
+                    getNodeLabel={getNodeLabel}
+                    getNodePorts={() => []}
+                    getNodeConfigParams={() => []}
+                    onSelectNode={(nodeId) => handleNodeChange(nodeId)}
+                    onClear={() => onUpdate({ binding: undefined })}
+                  />
+                )}
+                {widget.binding && liveValues[`${bindingNodeId}:output-0`] !== undefined && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-900/50 rounded border border-slate-700/50">
+                    <Activity className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span className="text-[10px] text-slate-400">Signal:</span>
+                    <span className="text-[10px] font-mono text-amber-300 ml-auto">{liveValues[`${bindingNodeId}:output-0`] ? 'TRUE' : 'FALSE'}</span>
                   </div>
                 )}
               </>

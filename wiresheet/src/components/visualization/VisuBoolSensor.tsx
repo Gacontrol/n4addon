@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, RotateCcw, X, Settings, ShieldAlert, Snowflake, Filter, Droplets, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, RotateCcw, X, Settings, CheckCircle, XCircle } from 'lucide-react';
 
 export type BoolSensorSymbolType = 'filter' | 'frost' | 'humidity' | 'generic' | 'pressure' | 'fire' | 'none';
 export type WidgetSizePreset = 'small' | 'medium' | 'large';
@@ -31,7 +31,7 @@ interface BoolSensorValues {
   alarm: boolean;
 }
 
-interface BoolSensorParams {
+export interface BoolSensorParams {
   boolSensorName?: string;
   boolSensorAlarmOnTrue?: boolean;
   boolSensorMonitoringEnable?: boolean;

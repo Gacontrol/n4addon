@@ -69,7 +69,7 @@ import { VisuFrame } from './VisuFrame';
 import { VisuPump } from './VisuPump';
 import { VisuValve } from './VisuValve';
 import { VisuSensor } from './VisuSensor';
-import { VisuBoolSensor } from './VisuBoolSensor';
+import { VisuBoolSensor, BoolSensorParams } from './VisuBoolSensor';
 import { VisuPID } from './VisuPID';
 import { VisuHeatingCurve } from './VisuHeatingCurve';
 import { VisuAlarmConsole } from './VisuAlarmConsole';
@@ -197,16 +197,6 @@ interface SensorParams {
   sensorAlarmDelayMs?: number;
   sensorRangeMin?: number;
   sensorRangeMax?: number;
-}
-
-interface BoolSensorParams {
-  boolSensorName?: string;
-  boolSensorAlarmOnTrue?: boolean;
-  boolSensorMonitoringEnable?: boolean;
-  boolSensorAlarmDelayMs?: number;
-  boolSensorNormalLabel?: string;
-  boolSensorAlarmLabel?: string;
-  boolSensorSymbolType?: string;
 }
 
 interface PIDParams {

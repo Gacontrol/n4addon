@@ -409,12 +409,12 @@ export const VisuCanvas: React.FC<VisuCanvasProps> = ({
     const nodeName = configName || customLabel || node.data.label || 'Bool-Sensor';
     return {
       boolSensorName: nodeName,
-      boolSensorAlarmOnTrue: cfg.boolSensorAlarmOnTrue,
-      boolSensorMonitoringEnable: cfg.boolSensorMonitoringEnable,
-      boolSensorAlarmDelayMs: cfg.boolSensorAlarmDelayMs,
-      boolSensorNormalLabel: cfg.boolSensorNormalLabel,
-      boolSensorAlarmLabel: cfg.boolSensorAlarmLabel,
-      boolSensorSymbolType: cfg.boolSensorSymbolType,
+      boolSensorAlarmOnTrue: cfg.boolSensorAlarmOnTrue as boolean | undefined,
+      boolSensorMonitoringEnable: cfg.boolSensorMonitoringEnable as boolean | undefined,
+      boolSensorAlarmDelayMs: cfg.boolSensorAlarmDelayMs as number | undefined,
+      boolSensorNormalLabel: cfg.boolSensorNormalLabel as string | undefined,
+      boolSensorAlarmLabel: cfg.boolSensorAlarmLabel as string | undefined,
+      boolSensorSymbolType: cfg.boolSensorSymbolType as import('./VisuBoolSensor').BoolSensorSymbolType | undefined,
     };
   }, [logicNodes]);
 
