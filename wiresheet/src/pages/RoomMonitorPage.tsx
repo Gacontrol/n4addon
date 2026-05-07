@@ -1,8 +1,8 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Settings, Thermometer, Wind, Droplets, Activity,
-  Users, AlertTriangle, Zap, Gauge, Flame, Settings2, LayoutGrid,
+  Users, AlertTriangle, Zap, Gauge, Flame, Settings2, LayoutGrid, TrendingUp,
 } from 'lucide-react';
 import { Breadcrumbs } from '../components/bms/Breadcrumbs';
 import { useBuildingContext } from '../context/BuildingContext';
@@ -507,6 +507,142 @@ function WidgetLive({
   }
 }
 
+// ---- Room Trend Tab ----
+
+const TREND_COLORS = ['#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+interface TrendPt { ts: number; v: number }
+interface TrendSer { nodeId: string; label: string; color: string; unit?: string; data: TrendPt[] }
+
+function RoomTrendTab({ dps, liveValues }: { dps: RoomDataPointConfig[]; liveValues: Record<string, unknown> }) {
+  const [series, setSeries] = useState<TrendSer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [range, setRange] = useState<'1h' | '6h' | '24h' | '7d'>('24h');
+  const [selected, setSelected] = useState<Set<string>>(new Set(dps.map(d => d.datapointId)));
+
+  const apiBase = useMemo(() => {
+    const p = window.location.pathname;
+    const m = p.match(/^(\/api\/hassio_ingress\/[^/]+)/) || p.match(/^(\/app\/[^/]+)/);
+    return m ? `${m[1]}/api` : '/api';
+  }, []);
+
+  const rangeMs = useMemo(() => ({ '1h': 3600000, '6h': 21600000, '24h': 86400000, '7d': 604800000 }[range]), [range]);
+
+  useEffect(() => {
+    const targets = dps.filter(d => selected.has(d.datapointId));
+    if (targets.length === 0) { setSeries([]); return; }
+    setLoading(true);
+    const now = Date.now();
+    const from = now - rangeMs;
+    Promise.all(targets.map(async (dp, i) => {
+      const nodeId = (dp.sourceDatapoint || dp.datapointId).replace(/^ext-/, '');
+      try {
+        const res = await fetch(`${apiBase}/trend-data?nodeId=${encodeURIComponent(nodeId)}&from=${from}&to=${now}`);
+        if (!res.ok) return null;
+        const { data } = await res.json();
+        return { nodeId: dp.datapointId, label: dp.label || dp.datapointId, color: TREND_COLORS[i % TREND_COLORS.length], unit: dp.unit, data: (data as TrendPt[]).filter(p => typeof p.v === 'number') } as TrendSer;
+      } catch { return null; }
+    })).then(results => { setSeries(results.filter(Boolean) as TrendSer[]); setLoading(false); });
+  }, [dps, selected, range, rangeMs, apiBase]);
+
+  const allHaveData = series.every(s => s.data.length > 0);
+
+  // Simple SVG sparkline chart
+  function Sparkline({ ser, width = 260, height = 80 }: { ser: TrendSer; width?: number; height?: number }) {
+    if (ser.data.length < 2) return <div className="text-[10px] text-slate-600 flex items-center justify-center h-16">Keine Daten</div>;
+    const vals = ser.data.map(p => p.v);
+    const times = ser.data.map(p => p.ts);
+    const minV = Math.min(...vals), maxV = Math.max(...vals);
+    const minT = Math.min(...times), maxT = Math.max(...times);
+    const pad = 4;
+    const scaleX = (t: number) => maxT === minT ? pad : pad + ((t - minT) / (maxT - minT)) * (width - 2 * pad);
+    const scaleY = (v: number) => maxV === minV ? height / 2 : (height - pad) - ((v - minV) / (maxV - minV)) * (height - 2 * pad);
+    const points = ser.data.map(p => `${scaleX(p.ts)},${scaleY(p.v)}`).join(' ');
+    const last = ser.data[ser.data.length - 1];
+    const live = liveValues[(ser.nodeId).replace(/^ext-/, '')] as number | undefined;
+    return (
+      <div className="relative">
+        <svg width={width} height={height} className="w-full" viewBox={`0 0 ${width} ${height}`}>
+          <defs>
+            <linearGradient id={`g-${ser.nodeId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={ser.color} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={ser.color} stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          <polygon points={`${scaleX(times[0])},${height} ${points} ${scaleX(times[times.length-1])},${height}`} fill={`url(#g-${ser.nodeId})`} />
+          <polyline points={points} fill="none" stroke={ser.color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={scaleX(last.ts)} cy={scaleY(last.v)} r="3" fill={ser.color} />
+        </svg>
+        <div className="flex items-center justify-between mt-0.5 px-1">
+          <span className="text-[9px] text-slate-600">{new Date(minT).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span className="text-[9px] text-slate-600">{new Date(maxT).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        {live !== undefined && (
+          <div className="absolute top-1 right-1 text-[10px] font-mono" style={{ color: ser.color }}>
+            {live}{ser.unit ? ` ${ser.unit}` : ''}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Range selector */}
+      <div className="flex items-center gap-1">
+        <TrendingUp size={12} className="text-slate-500 mr-1" />
+        {(['1h','6h','24h','7d'] as const).map(r => (
+          <button key={r} onClick={() => setRange(r)}
+            className={`px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${range === r ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+            {r}
+          </button>
+        ))}
+        {loading && <div className="w-3.5 h-3.5 border border-sky-500 border-t-transparent rounded-full animate-spin ml-2" />}
+      </div>
+
+      {/* Series toggle chips */}
+      <div className="flex flex-wrap gap-1.5">
+        {dps.map((dp, i) => {
+          const on = selected.has(dp.datapointId);
+          const color = TREND_COLORS[i % TREND_COLORS.length];
+          return (
+            <button key={dp.datapointId} onClick={() => setSelected(prev => { const n = new Set(prev); on ? n.delete(dp.datapointId) : n.add(dp.datapointId); return n; })}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border transition-colors ${on ? 'border-transparent text-white' : 'border-slate-700 text-slate-500 bg-transparent'}`}
+              style={on ? { background: color + '33', borderColor: color, color } : {}}>
+              <span className="w-2 h-2 rounded-full" style={{ background: on ? color : '#475569' }} />
+              {dp.label || dp.datapointId}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Charts */}
+      {series.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-600">
+          <TrendingUp size={24} className="mb-2 opacity-30" />
+          <p className="text-sm">Keine Verlaufsdaten verfügbar</p>
+          <p className="text-xs mt-1 text-slate-700">Verlaufsaufzeichnung muss in der Trend-Ansicht aktiviert sein</p>
+        </div>
+      )}
+      <div className="space-y-3">
+        {series.map(s => (
+          <div key={s.nodeId} className="rounded-xl bg-slate-800/50 border border-slate-700/40 p-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-medium" style={{ color: s.color }}>{s.label}</span>
+              {s.data.length > 0 && (
+                <span className="text-[10px] text-slate-400 font-mono">
+                  min {Math.min(...s.data.map(p=>p.v)).toFixed(1)} · max {Math.max(...s.data.map(p=>p.v)).toFixed(1)}{s.unit ? ` ${s.unit}` : ''}
+                </span>
+              )}
+            </div>
+            <Sparkline ser={s} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---- Props ----
 
 interface RoomMonitorPageProps {
@@ -540,8 +676,11 @@ export function RoomMonitorPage({
   const monitorCfg = roomId ? monitorConfigs[roomId] : undefined;
 
   const hasPanelWidgets = (monitorCfg?.datapoints ?? []).length > 0;
-  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms'>(
-    hasPanelWidgets ? 'panel' : 'overview'
+  const hiddenTabs = useMemo(() => new Set(monitorCfg?.hiddenTabs ?? []), [monitorCfg]);
+
+  const defaultTab = hasPanelWidgets ? 'panel' : (hiddenTabs.has('overview') ? 'points' : 'overview');
+  const [activeTab, setActiveTab] = useState<'panel' | 'overview' | 'points' | 'alarms' | 'trends'>(
+    defaultTab as 'panel' | 'overview' | 'points' | 'alarms' | 'trends'
   );
 
   const building = buildings.find(b => b.id === buildingId);
@@ -643,13 +782,14 @@ export function RoomMonitorPage({
     <div className={`flex border-b border-slate-800 bg-slate-900/60 ${px} shrink-0`}>
       {([
         ...(hasPanelWidgets ? [{ id: 'panel' as const, label: 'Panel' }] : []),
-        { id: 'overview' as const, label: 'Übersicht' },
-        { id: 'points' as const, label: `Datenpunkte (${useMonitorSource ? monitorDps.length : displayDps.length})` },
-        { id: 'alarms' as const, label: `Alarme${alarmDps.length > 0 ? ` (${alarmDps.length})` : ''}` },
+        ...(!hiddenTabs.has('overview') ? [{ id: 'overview' as const, label: 'Übersicht' }] : []),
+        ...(!hiddenTabs.has('points') ? [{ id: 'points' as const, label: `Datenpunkte (${useMonitorSource ? monitorDps.length : displayDps.length})` }] : []),
+        ...(!hiddenTabs.has('alarms') ? [{ id: 'alarms' as const, label: `Alarme${alarmDps.length > 0 ? ` (${alarmDps.length})` : ''}` }] : []),
+        ...(!hiddenTabs.has('trends') ? [{ id: 'trends' as const, label: 'Verlauf' }] : []),
       ]).map(tab => (
         <button
           key={tab.id}
-          onClick={() => setActiveTab(tab.id as 'panel' | 'overview' | 'points' | 'alarms')}
+          onClick={() => setActiveTab(tab.id as 'panel' | 'overview' | 'points' | 'alarms' | 'trends')}
           className={[
             'px-3 py-2.5 text-xs font-medium border-b-2 transition-colors',
             activeTab === tab.id ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-400 hover:text-slate-200',
@@ -697,7 +837,6 @@ export function RoomMonitorPage({
               const hRows = w.panelH ?? 1;
               const liveVal = resolveLiveValue(w, liveValues);
               const isWritable = w.widgetType === 'slider' || w.widgetType === 'incrementer' || w.widgetType === 'switch';
-              console.log('[Panel widget]', w.datapointId, 'type:', w.widgetType, 'writable:', w.writable, 'src:', w.sourceDatapoint, 'isWritable:', isWritable);
               return (
                 <div
                   key={w.datapointId}
@@ -810,6 +949,10 @@ export function RoomMonitorPage({
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'trends' && (
+        <RoomTrendTab dps={monitorDps} liveValues={liveValues} />
       )}
 
       {activeTab === 'alarms' && (
