@@ -183,9 +183,6 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [viewMode, setViewMode] = useState<ViewMode>('floor');
   const [roomDetailsOpen, setRoomDetailsOpen] = useState(false);
   const { mode: appMode, setMode: setAppMode } = useAppMode();
-  useEffect(() => {
-    if (appMode === 'editor') setShowRoomPanel(true);
-  }, [appMode]);
   const {
     buildingState: buildingDisplayState,
     getConfig: getRoomDisplayConfig,
@@ -198,7 +195,7 @@ export function BuildingView({ haEntities = [], haLoading = false, onLoadHaEntit
   const [editingFloorId, setEditingFloorId] = useState<string | null>(null);
   const [editingFloorName, setEditingFloorName] = useState('');
   const [newRoomType, setNewRoomType] = useState<RoomType>('room');
-  const [showRoomPanel, setShowRoomPanel] = useState(true);
+  const [showRoomPanel, setShowRoomPanel] = useState(false);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [floorOverlays, setFloorOverlays] = useState<Record<string, boolean>>({});
   const [expanded3DFloors, setExpanded3DFloors] = useState<Record<string, boolean>>({});
